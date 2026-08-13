@@ -3,22 +3,23 @@ FROM node:22-alpine AS builder
 
 WORKDIR /app
 
-# Copia o package.json raiz, pacotes compartilhados e a aplicação frontend
+# Copia o monorepo (package.json raiz, pacotes e frontend)
 COPY package.json ./
 COPY packages/label-schema ./packages/label-schema
 COPY packages/contracts ./packages/contracts
 COPY apps/frontend ./apps/frontend
 
-# Compila os pacotes compartilhados
+# Instala dependências do monorepo e compila os pacotes e a aplicação
+RUN npm install
+
 WORKDIR /app/packages/label-schema
-RUN npm install && npm run build
+RUN npm run build
 
 WORKDIR /app/packages/contracts
-RUN npm install && npm run build
+RUN npm run build
 
-# Compila o frontend
 WORKDIR /app/apps/frontend
-RUN npm install && npm run build
+RUN npm run build
 
 # Estágio 2: Nginx para servir arquivos estáticos
 FROM nginx:alpine AS runner

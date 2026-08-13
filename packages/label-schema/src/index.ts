@@ -1,3 +1,3 @@
-export { CANONICAL_FIELDS, CanonicalFieldDefinition } from './canonicalFields';
-export * from './types';
-export * from './schema';
+export { CANONICAL_FIELDS, type CanonicalFieldDefinition } from './canonicalFields.js';
+export * from './types.js';
+export * from './schema.js';

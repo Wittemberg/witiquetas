@@ -1,33 +1,39 @@
 # Estágio 1: Build
-FROM node:20-alpine AS builder
+FROM node:22-alpine AS builder
 
 WORKDIR /app
 
-# Copia arquivos do workspace e do backend
+# Copia o package.json raiz, pacotes compartilhados e a aplicação backend
 COPY package.json ./
-COPY apps/backend/package.json ./apps/backend/
-COPY apps/backend/tsconfig.json ./apps/backend/
-COPY apps/backend/src ./apps/backend/src
+COPY packages/label-schema ./packages/label-schema
+COPY packages/contracts ./packages/contracts
+COPY apps/backend ./apps/backend
 
-# Instala dependências do backend
+# Compila os pacotes compartilhados
+WORKDIR /app/packages/label-schema
+RUN npm install && npm run build
+
+WORKDIR /app/packages/contracts
+RUN npm install && npm run build
+
+# Compila o backend
 WORKDIR /app/apps/backend
-RUN npm install
-RUN npm run build
+RUN npm install && npm run build
 
 # Estágio 2: Runner de produção
-FROM node:20-alpine AS runner
+FROM node:22-alpine AS runner
 
-WORKDIR /app/apps/backend
+WORKDIR /app
 
 ENV NODE_ENV=production
 ENV PORT=3000
 
-# Copia package.json e instala apenas dependências de produção
-COPY apps/backend/package.json ./
-RUN npm install --only=production
+# Copia pacotes e a aplicação compilada do builder
+COPY --from=builder /app/packages/label-schema ./packages/label-schema
+COPY --from=builder /app/packages/contracts ./packages/contracts
+COPY --from=builder /app/apps/backend ./apps/backend
 
-# Copia o código compilado do builder
-COPY --from=builder /app/apps/backend/dist ./dist
+WORKDIR /app/apps/backend
 
 EXPOSE 3000
 

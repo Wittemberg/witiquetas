@@ -1,20 +1,24 @@
 # Estágio 1: Build da aplicação React/Vite
-FROM node:20-alpine AS builder
+FROM node:22-alpine AS builder
 
 WORKDIR /app
 
-# Copia package.json do workspace e do frontend
+# Copia o package.json raiz, pacotes compartilhados e a aplicação frontend
 COPY package.json ./
-COPY apps/frontend/package.json ./apps/frontend/
-COPY apps/frontend/tsconfig.json ./apps/frontend/
-COPY apps/frontend/vite.config.ts ./apps/frontend/
-COPY apps/frontend/index.html ./apps/frontend/
-COPY apps/frontend/src ./apps/frontend/src
+COPY packages/label-schema ./packages/label-schema
+COPY packages/contracts ./packages/contracts
+COPY apps/frontend ./apps/frontend
 
-# Instala dependências e compila
+# Compila os pacotes compartilhados
+WORKDIR /app/packages/label-schema
+RUN npm install && npm run build
+
+WORKDIR /app/packages/contracts
+RUN npm install && npm run build
+
+# Compila o frontend
 WORKDIR /app/apps/frontend
-RUN npm install
-RUN npm run build
+RUN npm install && npm run build
 
 # Estágio 2: Nginx para servir arquivos estáticos
 FROM nginx:alpine AS runner

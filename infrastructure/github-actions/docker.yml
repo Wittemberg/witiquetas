@@ -1,0 +1,46 @@
+name: Build and deploy Witiquetas
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Baixar código
+        uses: actions/checkout@v4
+
+      - name: Login no GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GHCR_TOKEN }}
+
+      - name: Build e push frontend
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/frontend/Dockerfile
+          push: true
+          tags: ghcr.io/wittemberg/witiquetas-frontend:latest
+
+      - name: Build e push backend
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/backend/Dockerfile
+          push: true
+          tags: ghcr.io/wittemberg/witiquetas-backend:latest
+
+      - name: Forçar redeploy no Portainer
+        run: |
+          curl --fail --show-error --silent \
+            -X POST "${{ secrets.PORTAINER_WEBHOOK_URL }}"

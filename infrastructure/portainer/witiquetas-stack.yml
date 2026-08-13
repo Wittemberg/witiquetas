@@ -1,0 +1,50 @@
+version: "3.8"
+
+services:
+  frontend:
+    image: ghcr.io/wittemberg/witiquetas-frontend:latest
+    networks:
+      - interna
+    deploy:
+      replicas: 1
+      labels:
+        - "traefik.enable=true"
+        - "traefik.http.routers.witiquetas.rule=Host(`witiquetas.wrtec.com.br`)"
+        - "traefik.http.routers.witiquetas.entrypoints=websecure"
+        - "traefik.http.routers.witiquetas.tls.certresolver=letsencryptresolver"
+        - "traefik.http.services.witiquetas.loadbalancer.server.port=80"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost"]
+      interval: 30s
+      timeout: 10s
+      retries: 4
+
+  backend:
+    image: ghcr.io/wittemberg/witiquetas-backend:latest
+    networks:
+      - interna
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - TZ=America/Sao_Paulo
+      # Secrets e URLs devem ser cadastrados no Portainer/ambiente,
+      # não versionados neste arquivo.
+    deploy:
+      replicas: 1
+      labels:
+        - "traefik.enable=true"
+        - "traefik.http.routers.witiquetas-api.rule=Host(`witiquetas.wrtec.com.br`) && PathPrefix(`/api`)"
+        - "traefik.http.routers.witiquetas-api.entrypoints=websecure"
+        - "traefik.http.routers.witiquetas-api.tls.certresolver=letsencryptresolver"
+        - "traefik.http.routers.witiquetas-api.priority=100"
+        - "traefik.http.services.witiquetas-api.loadbalancer.server.port=3000"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 4
+
+networks:
+  interna:
+    external: true
+    name: interna

@@ -157,10 +157,14 @@ const handleVersion = (_req: Request, res: Response) => {
 };
 
 import templatesRouter from './routes/templates';
+import compileRouter from './routes/compile';
 
 // Suporta tanto rotas diretas quanto rotas com prefixo /api (conforme Traefik/Nginx)
 app.use('/templates', templatesRouter);
 app.use('/api/templates', templatesRouter);
+
+app.use('/compile', compileRouter);
+app.use('/api/compile', compileRouter);
 
 app.get('/health', handleHealthCheck);
 app.get('/api/health', handleHealthCheck);

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useEditorStore } from './useEditorStore';
 import CanvasArea from './CanvasArea';
 import PropertyInspector from './PropertyInspector';
+import CompileModal from './CompileModal';
 import {
   Type,
   DollarSign,
@@ -19,7 +20,8 @@ import {
   Download,
   ArrowLeft,
   Sliders,
-  Plus
+  Plus,
+  Printer
 } from 'lucide-react';
 
 interface EditorLayoutProps {
@@ -27,6 +29,7 @@ interface EditorLayoutProps {
 }
 
 export default function EditorLayout({ onBackToDashboard }: EditorLayoutProps) {
+  const [isCompileModalOpen, setIsCompileModalOpen] = useState(false);
   const {
     document,
     updateDimensions,
@@ -182,8 +185,18 @@ export default function EditorLayout({ onBackToDashboard }: EditorLayoutProps) {
           </div>
         </div>
 
-        {/* Ações de Salvar e Exportar */}
+        {/* Ações de Salvar, Compilar e Exportar */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <button
+            className="btn"
+            style={{ background: 'rgba(16, 185, 129, 0.15)', border: '1px solid rgba(16, 185, 129, 0.4)', color: '#6ee7b7' }}
+            onClick={() => setIsCompileModalOpen(true)}
+            title="Compilar para linguagem nativa PPLA/PPLB"
+          >
+            <Printer size={16} />
+            <span>Compilar / Impressão</span>
+          </button>
+
           <button className="btn" onClick={handleExportJSON} title="Baixar arquivo JSON LabelDocument v1">
             <Download size={16} />
             <span>Exportar JSON</span>
@@ -299,6 +312,8 @@ export default function EditorLayout({ onBackToDashboard }: EditorLayoutProps) {
           <PropertyInspector />
         </aside>
       </div>
+
+      <CompileModal isOpen={isCompileModalOpen} onClose={() => setIsCompileModalOpen(false)} />
     </div>
   );
 }

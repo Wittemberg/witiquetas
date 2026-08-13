@@ -7,6 +7,9 @@ WORKDIR /app
 COPY package.json ./
 COPY packages/label-schema ./packages/label-schema
 COPY packages/contracts ./packages/contracts
+COPY packages/printer-core ./packages/printer-core
+COPY packages/printer-ppla ./packages/printer-ppla
+COPY packages/printer-pplb ./packages/printer-pplb
 COPY apps/backend ./apps/backend
 
 # Instala dependências e compila os pacotes e a aplicação
@@ -16,6 +19,15 @@ WORKDIR /app/packages/label-schema
 RUN npm run build
 
 WORKDIR /app/packages/contracts
+RUN npm run build
+
+WORKDIR /app/packages/printer-core
+RUN npm run build
+
+WORKDIR /app/packages/printer-ppla
+RUN npm run build
+
+WORKDIR /app/packages/printer-pplb
 RUN npm run build
 
 WORKDIR /app/apps/backend

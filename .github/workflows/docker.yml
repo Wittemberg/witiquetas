@@ -1,0 +1,56 @@
+name: Build and Deploy Witiquetas
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build-and-deploy:
+    name: Build & Push Docker Images
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry (GHCR)
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GHCR_TOKEN }}
+
+      - name: Build & Push Backend Image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/backend/Dockerfile
+          push: true
+          tags: ghcr.io/wittemberg/witiquetas-backend:latest
+
+      - name: Build & Push Frontend Image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/frontend/Dockerfile
+          push: true
+          tags: ghcr.io/wittemberg/witiquetas-frontend:latest
+
+      - name: Trigger Portainer Webhook for Auto Redeploy
+        if: success()
+        run: |
+          if [ -n "${{ secrets.PORTAINER_WEBHOOK_URL }}" ]; then
+            echo "Triggering Portainer redeploy webhook..."
+            curl --fail --show-error --silent -X POST "${{ secrets.PORTAINER_WEBHOOK_URL }}"
+            echo "Portainer webhook triggered successfully."
+          else
+            echo "PORTAINER_WEBHOOK_URL is not set. Skipping redeploy webhook."
+          fi

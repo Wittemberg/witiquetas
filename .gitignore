@@ -1,0 +1,38 @@
+# Node / npm
+node_modules/
+**/node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Compilação / Build outputs
+dist/
+**/dist/
+build/
+**/build/
+.cache/
+
+# Variáveis de ambiente e segredos
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.env
+
+# IDE / Editores
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Cobertura de testes e logs
+coverage/
+*.log
+logs/
+
+# Tauri / Rust (para quando o agente local for iniciado)
+apps/agent-local/src-tauri/target/

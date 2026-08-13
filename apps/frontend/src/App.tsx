@@ -11,8 +11,10 @@ import {
   GitBranch, 
   Layers, 
   ShieldCheck, 
-  Clock 
+  Clock,
+  PenTool
 } from 'lucide-react';
+import EditorLayout from './editor/EditorLayout';
 
 interface ServiceStatus {
   status: string;
@@ -43,6 +45,7 @@ interface VersionResponse {
 }
 
 export default function App() {
+  const [currentView, setCurrentView] = useState<'dashboard' | 'editor'>('dashboard');
   const [health, setHealth] = useState<HealthResponse | null>(null);
   const [version, setVersion] = useState<VersionResponse | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -82,6 +85,10 @@ export default function App() {
   const pgStatus = health?.services?.postgres;
   const minioStatus = health?.services?.minio;
 
+  if (currentView === 'editor') {
+    return <EditorLayout onBackToDashboard={() => setCurrentView('dashboard')} />;
+  }
+
   return (
     <div className="container">
       {/* Header */}
@@ -92,10 +99,18 @@ export default function App() {
           </div>
           <div>
             <h1 className="brand-title">Witiquetas</h1>
-            <p className="brand-subtitle">Fase 0 — Validação de Conectividade da Infraestrutura</p>
+            <p className="brand-subtitle">Plataforma Web para Gestão e Impressão de Etiquetas Térmicas</p>
           </div>
         </div>
         <div className="controls">
+          <button 
+            className="btn btn-primary"
+            onClick={() => setCurrentView('editor')}
+            style={{ background: 'linear-gradient(135deg, #10b981, #06b6d4)', boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)' }}
+          >
+            <PenTool size={16} />
+            <span>Abrir Editor Visual de Etiquetas</span>
+          </button>
           <button 
             className="btn" 
             onClick={() => setAutoRefresh(!autoRefresh)}
@@ -104,9 +119,9 @@ export default function App() {
             <Clock size={16} />
             {autoRefresh ? 'Auto-refresh On (15s)' : 'Auto-refresh Off'}
           </button>
-          <button className="btn btn-primary" onClick={fetchData} disabled={loading}>
+          <button className="btn" onClick={fetchData} disabled={loading}>
             <RefreshCw size={16} className={loading ? 'spin' : ''} />
-            Atualizar Status
+            <span>Atualizar</span>
           </button>
         </div>
       </header>

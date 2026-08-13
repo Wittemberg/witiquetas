@@ -1,0 +1,99 @@
+import { z } from 'zod';
+
+export const LabelDimensionsSchema = z.object({
+  widthMm: z.number().positive(),
+  heightMm: z.number().positive(),
+  dpi: z.union([z.literal(203), z.literal(300), z.literal(600)]),
+  orientation: z.enum(['portrait', 'landscape']).optional(),
+});
+
+export const BaseElementSchema = z.object({
+  id: z.string(),
+  type: z.enum(['text', 'price', 'barcode', 'qrcode', 'line', 'rectangle', 'image']),
+  x: z.number(),
+  y: z.number(),
+  width: z.number().positive(),
+  height: z.number().positive(),
+  rotation: z.number().optional(),
+  locked: z.boolean().optional(),
+  visible: z.boolean().optional(),
+});
+
+export const TextElementSchema = BaseElementSchema.extend({
+  type: z.literal('text'),
+  text: z.string(),
+  field: z.string().optional(),
+  fontFamily: z.string(),
+  fontSize: z.number().positive(),
+  fontWeight: z.enum(['normal', 'bold']).optional(),
+  fontStyle: z.enum(['normal', 'italic']).optional(),
+  alignment: z.enum(['left', 'center', 'right']).optional(),
+  verticalAlignment: z.enum(['top', 'middle', 'bottom']).optional(),
+  wrap: z.enum(['auto', 'none']).optional(),
+  color: z.string().optional(),
+});
+
+export const PriceElementSchema = BaseElementSchema.extend({
+  type: z.literal('price'),
+  field: z.string(),
+  prefix: z.string().optional(),
+  integerFontSize: z.number().positive(),
+  fractionFontSize: z.number().positive(),
+  currencyFontSize: z.number().positive().optional(),
+  color: z.string().optional(),
+});
+
+export const BarcodeElementSchema = BaseElementSchema.extend({
+  type: z.literal('barcode'),
+  format: z.enum(['EAN13', 'CODE128', 'EAN8']),
+  field: z.string().optional(),
+  value: z.string(),
+  showText: z.boolean().optional(),
+  fontFamily: z.string().optional(),
+  fontSize: z.number().optional(),
+});
+
+export const QrCodeElementSchema = BaseElementSchema.extend({
+  type: z.literal('qrcode'),
+  field: z.string().optional(),
+  value: z.string(),
+});
+
+export const LineElementSchema = BaseElementSchema.extend({
+  type: z.literal('line'),
+  strokeWidth: z.number().positive(),
+  color: z.string().optional(),
+  dash: z.array(z.number()).optional(),
+});
+
+export const RectangleElementSchema = BaseElementSchema.extend({
+  type: z.literal('rectangle'),
+  strokeWidth: z.number().nonnegative(),
+  strokeColor: z.string().optional(),
+  fillColor: z.string().optional(),
+  cornerRadius: z.number().nonnegative().optional(),
+});
+
+export const ImageElementSchema = BaseElementSchema.extend({
+  type: z.literal('image'),
+  src: z.string(),
+});
+
+export const LabelElementSchema = z.discriminatedUnion('type', [
+  TextElementSchema,
+  PriceElementSchema,
+  BarcodeElementSchema,
+  QrCodeElementSchema,
+  LineElementSchema,
+  RectangleElementSchema,
+  ImageElementSchema,
+]);
+
+export const LabelDocumentSchema = z.object({
+  schemaVersion: z.number().int().positive(),
+  title: z.string(),
+  dimensions: LabelDimensionsSchema,
+  elements: z.array(LabelElementSchema),
+  createdAt: z.string().optional(),
+  updatedAt: z.string().optional(),
+});

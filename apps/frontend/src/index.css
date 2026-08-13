@@ -273,3 +273,28 @@ body {
   color: var(--text-muted);
   font-size: 0.85rem;
 }
+
+.inspector-input,
+.inspector-select {
+  width: 100%;
+  background: rgba(10, 14, 23, 0.8);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 0.45rem 0.65rem;
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 0.85rem;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.inspector-input:focus,
+.inspector-select:focus {
+  border-color: var(--accent-blue);
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+.inspector-select option {
+  background: #0f1525;
+  color: var(--text-primary);
+}

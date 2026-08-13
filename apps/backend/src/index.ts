@@ -130,9 +130,9 @@ const handleHealthCheck = async (_req: Request, res: Response) => {
   ]);
 
   const allOk = postgres.status === 'OK' && minio.status === 'OK';
-  const statusCode = allOk ? 200 : 503;
 
-  res.status(statusCode).json({
+  // O container deve responder 200 mesmo se degradado, permitindo visualizar o dashboard de status
+  res.status(200).json({
     status: allOk ? 'HEALTHY' : 'DEGRADED',
     app: 'witiquetas-backend',
     environment: process.env.NODE_ENV || 'development',

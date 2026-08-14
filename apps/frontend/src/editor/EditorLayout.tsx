@@ -3,6 +3,7 @@ import { useEditorStore } from './useEditorStore';
 import CanvasArea from './CanvasArea';
 import PropertyInspector from './PropertyInspector';
 import CompileModal from './CompileModal';
+import NewTemplateWizard from './NewTemplateWizard';
 import {
   Type,
   DollarSign,
@@ -19,17 +20,24 @@ import {
   Save,
   Download,
   ArrowLeft,
-  Sliders,
-  Plus,
-  Printer
+  Printer,
+  Sun,
+  Moon,
+  Sparkles,
+  Maximize2,
+  AlertTriangle
 } from 'lucide-react';
 
 interface EditorLayoutProps {
   onBackToDashboard: () => void;
+  theme: 'dark' | 'light';
+  onToggleTheme: () => void;
 }
 
-export default function EditorLayout({ onBackToDashboard }: EditorLayoutProps) {
+export default function EditorLayout({ onBackToDashboard, theme, onToggleTheme }: EditorLayoutProps) {
   const [isCompileModalOpen, setIsCompileModalOpen] = useState(false);
+  const [isWizardOpen, setIsWizardOpen] = useState(false);
+
   const {
     document,
     updateDimensions,
@@ -48,6 +56,9 @@ export default function EditorLayout({ onBackToDashboard }: EditorLayoutProps) {
 
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+
+  // Alerta de limite térmico padrão (104 mm)
+  const isOverThermalLimit = document.dimensions.widthMm > 104;
 
   // Salvar Modelo na API Backend
   const handleSaveBackend = async () => {
@@ -89,12 +100,12 @@ export default function EditorLayout({ onBackToDashboard }: EditorLayoutProps) {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: '#0b0f17', overflow: 'hidden' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: 'var(--bg-primary)', overflow: 'hidden' }}>
       {/* Barra de Ferramentas Superior (Header) */}
       <header
         style={{
           height: '60px',
-          background: 'rgba(22, 28, 45, 0.95)',
+          background: 'var(--header-bg)',
           borderBottom: '1px solid var(--border-color)',
           display: 'flex',
           alignItems: 'center',
@@ -113,15 +124,32 @@ export default function EditorLayout({ onBackToDashboard }: EditorLayoutProps) {
           <div style={{ height: '24px', width: '1px', background: 'var(--border-color)' }} />
 
           <div>
-            <h2 style={{ fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-              {document.title}
-            </h2>
-            <div style={{ display: 'flex', gap: '0.75rem', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-              <span>{document.dimensions.widthMm} x {document.dimensions.heightMm} mm</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <h2 style={{ fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                {document.title}
+              </h2>
+              <button
+                className="btn"
+                style={{ padding: '0.2rem 0.5rem', fontSize: '0.72rem', height: '24px' }}
+                onClick={() => setIsWizardOpen(true)}
+                title="Trocar formato ou nicho da etiqueta"
+              >
+                <Maximize2 size={12} />
+                <span>Trocar Formato</span>
+              </button>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+              <span>{document.dimensions.widthMm} × {document.dimensions.heightMm} mm</span>
               <span>•</span>
               <span>{document.dimensions.dpi} DPI</span>
               <span>•</span>
               <span>Schema v{document.schemaVersion}</span>
+              {isOverThermalLimit && (
+                <span style={{ color: 'var(--status-warning)', display: 'flex', alignItems: 'center', gap: '0.2rem', fontWeight: 600 }}>
+                  <AlertTriangle size={12} />
+                  Largura &gt; 104mm
+                </span>
+              )}
             </div>
           </div>
         </div>
@@ -172,7 +200,7 @@ export default function EditorLayout({ onBackToDashboard }: EditorLayoutProps) {
           <div style={{ height: '24px', width: '1px', background: 'var(--border-color)', margin: '0 0.25rem' }} />
 
           {/* Zoom */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', background: 'rgba(10, 14, 23, 0.6)', padding: '0.2rem 0.5rem', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', background: 'var(--bg-input)', padding: '0.2rem 0.5rem', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
             <button className="btn" style={{ padding: '0.2rem', border: 'none' }} onClick={() => setZoom(zoom - 0.25)}>
               <ZoomOut size={14} />
             </button>
@@ -185,11 +213,20 @@ export default function EditorLayout({ onBackToDashboard }: EditorLayoutProps) {
           </div>
         </div>
 
-        {/* Ações de Salvar, Compilar e Exportar */}
+        {/* Ações da Direita + Alternador de Tema */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          {/* Alternador Sol / Lua */}
+          <button
+            className="btn-theme-toggle"
+            onClick={onToggleTheme}
+            title={theme === 'dark' ? 'Alternar para Modo Claro (Light)' : 'Alternar para Modo Escuro (Dark)'}
+          >
+            {theme === 'dark' ? <Sun size={18} color="#f59e0b" /> : <Moon size={18} color="#3b82f6" />}
+          </button>
+
           <button
             className="btn"
-            style={{ background: 'rgba(16, 185, 129, 0.15)', border: '1px solid rgba(16, 185, 129, 0.4)', color: '#6ee7b7' }}
+            style={{ background: 'rgba(16, 185, 129, 0.15)', border: '1px solid rgba(16, 185, 129, 0.4)', color: 'var(--status-success)' }}
             onClick={() => setIsCompileModalOpen(true)}
             title="Compilar para linguagem nativa PPLA/PPLB"
           >
@@ -215,7 +252,7 @@ export default function EditorLayout({ onBackToDashboard }: EditorLayoutProps) {
         <aside
           style={{
             width: '240px',
-            background: 'rgba(15, 21, 37, 0.9)',
+            background: 'var(--aside-bg)',
             borderRight: '1px solid var(--border-color)',
             padding: '1.25rem 1rem',
             display: 'flex',
@@ -229,7 +266,7 @@ export default function EditorLayout({ onBackToDashboard }: EditorLayoutProps) {
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
             <button className="btn" style={{ justifyContent: 'flex-start' }} onClick={() => addElement('text')}>
-              <Type size={16} color="#3b82f6" />
+              <Type size={16} color="var(--accent-blue)" />
               <span>Texto Simples</span>
             </button>
 
@@ -239,30 +276,39 @@ export default function EditorLayout({ onBackToDashboard }: EditorLayoutProps) {
             </button>
 
             <button className="btn" style={{ justifyContent: 'flex-start' }} onClick={() => addElement('barcode')}>
-              <Barcode size={16} color="#06b6d4" />
+              <Barcode size={16} color="var(--accent-cyan)" />
               <span>Código EAN-13</span>
             </button>
 
             <button className="btn" style={{ justifyContent: 'flex-start' }} onClick={() => addElement('qrcode')}>
-              <QrCode size={16} color="#10b981" />
+              <QrCode size={16} color="var(--status-success)" />
               <span>QR Code</span>
             </button>
 
             <button className="btn" style={{ justifyContent: 'flex-start' }} onClick={() => addElement('rectangle')}>
-              <Square size={16} color="#f59e0b" />
+              <Square size={16} color="var(--status-warning)" />
               <span>Retângulo</span>
             </button>
 
             <button className="btn" style={{ justifyContent: 'flex-start' }} onClick={() => addElement('line')}>
-              <Minus size={16} color="#8b5cf6" />
+              <Minus size={16} color="var(--accent-purple)" />
               <span>Linha Divisória</span>
             </button>
           </div>
 
           <div style={{ marginTop: 'auto', borderTop: '1px solid var(--border-color)', paddingTop: '1rem' }}>
-            <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', display: 'block', marginBottom: '0.4rem' }}>
-              Dimensões da Etiqueta
-            </label>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+              <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}>
+                Dimensões da Etiqueta
+              </label>
+              <button
+                style={{ background: 'transparent', border: 'none', color: 'var(--accent-blue)', fontSize: '0.75rem', cursor: 'pointer', fontWeight: 600 }}
+                onClick={() => setIsWizardOpen(true)}
+              >
+                Nichos
+              </button>
+            </div>
+
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.5rem', marginBottom: '0.5rem' }}>
               <div>
                 <span className="metric-label">Largura (mm)</span>
@@ -284,6 +330,12 @@ export default function EditorLayout({ onBackToDashboard }: EditorLayoutProps) {
               </div>
             </div>
 
+            {isOverThermalLimit && (
+              <div style={{ padding: '0.4rem 0.6rem', background: 'rgba(245, 158, 11, 0.15)', border: '1px solid rgba(245, 158, 11, 0.3)', borderRadius: '6px', color: '#fbbf24', fontSize: '0.7rem', marginBottom: '0.5rem' }}>
+                ⚠️ Atenção: Largura acima do padrão de 104 mm.
+              </div>
+            )}
+
             <span className="metric-label">Resolução Impressora</span>
             <select
               className="inspector-select"
@@ -303,7 +355,7 @@ export default function EditorLayout({ onBackToDashboard }: EditorLayoutProps) {
         <aside
           style={{
             width: '320px',
-            background: 'rgba(15, 21, 37, 0.9)',
+            background: 'var(--aside-bg)',
             borderLeft: '1px solid var(--border-color)',
             display: 'flex',
             flexDirection: 'column',
@@ -314,6 +366,11 @@ export default function EditorLayout({ onBackToDashboard }: EditorLayoutProps) {
       </div>
 
       <CompileModal isOpen={isCompileModalOpen} onClose={() => setIsCompileModalOpen(false)} />
+      <NewTemplateWizard
+        isOpen={isWizardOpen}
+        onClose={() => setIsWizardOpen(false)}
+        onSuccess={() => setIsWizardOpen(false)}
+      />
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { LabelDocument, LabelElement, ElementType } from '@witiquetas/label-schema';
+import { LabelDocument, LabelElement, ElementType, calculateOrientation } from '@witiquetas/label-schema';
 
 // Converter Milímetros ➔ Pixels com base no DPI (ex: 203 DPI = ~8 dots/mm)
 export function mmToPx(mm: number, dpi: number = 203): number {
@@ -124,6 +124,14 @@ const initialDocument: LabelDocument = {
   ],
 };
 
+export interface CreateNewDocumentParams {
+  title: string;
+  widthMm: number;
+  heightMm: number;
+  dpi?: 203 | 300 | 600;
+  nicheName?: string;
+}
+
 interface EditorState {
   document: LabelDocument;
   selectedElementId: string | null;
@@ -138,6 +146,7 @@ interface EditorState {
 
   // Actions
   setDocument: (doc: LabelDocument) => void;
+  createNewDocument: (params: CreateNewDocumentParams) => void;
   updateDimensions: (widthMm: number, heightMm: number, dpi: 203 | 300 | 600) => void;
   setSelectedElementId: (id: string | null) => void;
   setZoom: (zoom: number) => void;
@@ -157,7 +166,7 @@ interface EditorState {
 export const useEditorStore = create<EditorState>((set, get) => ({
   document: initialDocument,
   selectedElementId: 'prod-desc',
-  zoom: 2.5, // 250% de zoom padrão para facilitar a visualização no monitor
+  zoom: 2.5, // 250% de zoom padrão
   snapToGrid: true,
   gridSizeMm: 2,
   showPreviewData: true,
@@ -174,8 +183,103 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     });
   },
 
+  createNewDocument: ({ title, widthMm, heightMm, dpi = 203, nicheName }) => {
+    const orientation = calculateOrientation(widthMm, heightMm);
+    const elements: LabelElement[] = [];
+
+    // Gerar elementos iniciais proporcionais às dimensões da etiqueta
+    if (widthMm >= 40 && heightMm >= 20) {
+      // Descrição do Produto
+      elements.push({
+        id: `elem-desc-${Date.now()}`,
+        type: 'text',
+        text: 'NOME / DESCRIÇÃO DO PRODUTO',
+        field: 'produto.descricao',
+        x: Math.round(widthMm * 0.05),
+        y: Math.round(heightMm * 0.08),
+        width: Math.round(widthMm * 0.9),
+        height: Math.max(5, Math.round(heightMm * 0.2)),
+        fontFamily: 'Inter',
+        fontSize: Math.min(14, Math.max(8, Math.round(widthMm * 0.12))),
+        fontWeight: 'bold',
+        alignment: 'left',
+        color: '#0f172a',
+      });
+
+      // Se houver espaço para preço e barcode
+      if (heightMm >= 30) {
+        elements.push({
+          id: `elem-price-${Date.now() + 1}`,
+          type: 'price',
+          field: 'produto.preco',
+          prefix: 'R$',
+          x: Math.round(widthMm * 0.55),
+          y: Math.round(heightMm * 0.35),
+          width: Math.round(widthMm * 0.4),
+          height: Math.round(heightMm * 0.3),
+          integerFontSize: Math.min(26, Math.max(14, Math.round(heightMm * 0.5))),
+          fractionFontSize: Math.min(16, Math.max(10, Math.round(heightMm * 0.3))),
+          currencyFontSize: 10,
+          color: '#dc2626',
+        });
+
+        elements.push({
+          id: `elem-ean-${Date.now() + 2}`,
+          type: 'barcode',
+          format: 'EAN13',
+          field: 'produto.ean',
+          value: '7894900011517',
+          x: Math.round(widthMm * 0.05),
+          y: Math.round(heightMm * 0.45),
+          width: Math.min(widthMm * 0.48, 50),
+          height: Math.round(heightMm * 0.4),
+          showText: true,
+        });
+      }
+    } else {
+      // Etiqueta bem pequena (ex: 25x12 ou jóias)
+      elements.push({
+        id: `elem-text-${Date.now()}`,
+        type: 'text',
+        text: 'ITEM REF',
+        field: 'produto.descricao',
+        x: 1,
+        y: 1,
+        width: widthMm - 2,
+        height: heightMm - 2,
+        fontFamily: 'Inter',
+        fontSize: 8,
+        fontWeight: 'normal',
+        alignment: 'center',
+        color: '#0f172a',
+      });
+    }
+
+    const newDoc: LabelDocument = {
+      schemaVersion: 1,
+      title: title || `${nicheName || 'Etiqueta'} (${widthMm}x${heightMm}mm)`,
+      dimensions: {
+        widthMm,
+        heightMm,
+        dpi,
+        orientation: orientation === 'quadrada' ? 'portrait' : orientation === 'horizontal' ? 'landscape' : 'portrait',
+      },
+      elements,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    set({
+      document: newDoc,
+      selectedElementId: elements.length > 0 ? elements[0].id : null,
+      history: [newDoc],
+      historyIndex: 0,
+    });
+  },
+
   updateDimensions: (widthMm, heightMm, dpi) => {
     const { document, pushHistory } = get();
+    const orientation = calculateOrientation(widthMm, heightMm);
     const updated: LabelDocument = {
       ...document,
       dimensions: {
@@ -183,6 +287,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         widthMm,
         heightMm,
         dpi,
+        orientation: orientation === 'quadrada' ? 'portrait' : orientation === 'horizontal' ? 'landscape' : 'portrait',
       },
     };
     set({ document: updated });
@@ -207,7 +312,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           text: 'Novo Texto',
           x: 10,
           y: 10,
-          width: 40,
+          width: Math.min(40, document.dimensions.widthMm - 10),
           height: 6,
           fontFamily: 'Inter',
           fontSize: 12,
@@ -224,7 +329,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           prefix: 'R$',
           x: 10,
           y: 10,
-          width: 30,
+          width: Math.min(30, document.dimensions.widthMm - 10),
           height: 12,
           integerFontSize: 20,
           fractionFontSize: 12,
@@ -241,8 +346,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           value: '7894900011517',
           x: 10,
           y: 10,
-          width: 45,
-          height: 10,
+          width: Math.min(45, document.dimensions.widthMm - 10),
+          height: Math.min(12, document.dimensions.heightMm - 10),
           showText: true,
         };
         break;
@@ -253,17 +358,17 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           value: 'https://witiquetas.wrtec.com.br',
           x: 10,
           y: 10,
-          width: 15,
-          height: 15,
+          width: Math.min(15, document.dimensions.widthMm - 10),
+          height: Math.min(15, document.dimensions.heightMm - 10),
         };
         break;
       case 'line':
         newElem = {
           id: newId,
           type: 'line',
-          x: 5,
+          x: 2,
           y: 10,
-          width: 90,
+          width: document.dimensions.widthMm - 4,
           height: 1,
           strokeWidth: 1,
           color: '#000000',
@@ -273,10 +378,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         newElem = {
           id: newId,
           type: 'rectangle',
-          x: 10,
-          y: 10,
-          width: 30,
-          height: 15,
+          x: 5,
+          y: 5,
+          width: Math.min(30, document.dimensions.widthMm - 10),
+          height: Math.min(15, document.dimensions.heightMm - 10),
           strokeWidth: 1,
           strokeColor: '#000000',
           fillColor: 'transparent',

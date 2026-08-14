@@ -12,9 +12,15 @@ import {
   Layers, 
   ShieldCheck, 
   Clock,
-  PenTool
+  PenTool,
+  Sun,
+  Moon,
+  Plus,
+  Sparkles,
+  Maximize2
 } from 'lucide-react';
 import EditorLayout from './editor/EditorLayout';
+import NewTemplateWizard from './editor/NewTemplateWizard';
 
 interface ServiceStatus {
   status: string;
@@ -52,6 +58,22 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<string>('');
   const [autoRefresh, setAutoRefresh] = useState<boolean>(true);
+  const [isWizardOpen, setIsWizardOpen] = useState<boolean>(false);
+
+  // Tema Claro / Escuro
+  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
+    const saved = localStorage.getItem('witiquetas-theme');
+    return saved === 'light' ? 'light' : 'dark';
+  });
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('witiquetas-theme', theme);
+  }, [theme]);
+
+  const toggleTheme = () => {
+    setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
+  };
 
   const fetchData = async () => {
     setLoading(true);
@@ -86,12 +108,18 @@ export default function App() {
   const minioStatus = health?.services?.minio;
 
   if (currentView === 'editor') {
-    return <EditorLayout onBackToDashboard={() => setCurrentView('dashboard')} />;
+    return (
+      <EditorLayout
+        onBackToDashboard={() => setCurrentView('dashboard')}
+        theme={theme}
+        onToggleTheme={toggleTheme}
+      />
+    );
   }
 
   return (
     <div className="container">
-      {/* Header */}
+      {/* Header Principal */}
       <header className="header">
         <div className="brand">
           <div className="brand-icon">
@@ -102,23 +130,45 @@ export default function App() {
             <p className="brand-subtitle">Plataforma Web para Gestão e Impressão de Etiquetas Térmicas</p>
           </div>
         </div>
+
         <div className="controls">
+          {/* Alternador de Tema Sol / Lua */}
+          <button 
+            className="btn-theme-toggle"
+            onClick={toggleTheme}
+            title={theme === 'dark' ? 'Alternar para Modo Claro (Light)' : 'Alternar para Modo Escuro (Dark)'}
+          >
+            {theme === 'dark' ? <Sun size={18} color="#f59e0b" /> : <Moon size={18} color="#3b82f6" />}
+          </button>
+
+          {/* Botão Nova Etiqueta (com seleção de nicho) */}
           <button 
             className="btn btn-primary"
-            onClick={() => setCurrentView('editor')}
+            onClick={() => setIsWizardOpen(true)}
             style={{ background: 'linear-gradient(135deg, #10b981, #06b6d4)', boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)' }}
           >
-            <PenTool size={16} />
-            <span>Abrir Editor Visual de Etiquetas</span>
+            <Plus size={16} />
+            <span>Nova Etiqueta (Por Nicho)</span>
           </button>
+
+          {/* Abrir Editor Direto */}
+          <button 
+            className="btn"
+            onClick={() => setCurrentView('editor')}
+          >
+            <PenTool size={16} color="var(--accent-blue)" />
+            <span>Abrir Editor</span>
+          </button>
+
           <button 
             className="btn" 
             onClick={() => setAutoRefresh(!autoRefresh)}
             style={{ opacity: autoRefresh ? 1 : 0.6 }}
           >
             <Clock size={16} />
-            {autoRefresh ? 'Auto-refresh On (15s)' : 'Auto-refresh Off'}
+            {autoRefresh ? 'Auto-refresh On' : 'Auto-refresh Off'}
           </button>
+
           <button className="btn" onClick={fetchData} disabled={loading}>
             <RefreshCw size={16} className={loading ? 'spin' : ''} />
             <span>Atualizar</span>
@@ -132,7 +182,7 @@ export default function App() {
           border: '1px solid rgba(239, 68, 68, 0.3)',
           padding: '1rem 1.5rem',
           borderRadius: '12px',
-          color: '#f87171',
+          color: 'var(--status-danger)',
           marginBottom: '1.5rem',
           display: 'flex',
           alignItems: 'center',
@@ -141,12 +191,47 @@ export default function App() {
           <XCircle size={20} />
           <div>
             <strong>Falha de Conectividade com a API Backend:</strong> {error}
-            <p style={{ fontSize: '0.8rem', color: '#94a3b8', marginTop: '0.2rem' }}>
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
               Verifique se o backend está rodando e se a rota /api/health está acessível.
             </p>
           </div>
         </div>
       )}
+
+      {/* Banner / Card de Chamada para Nova Etiqueta por Nicho */}
+      <div 
+        className="card"
+        style={{ 
+          marginBottom: '1.5rem',
+          background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.12), rgba(139, 92, 246, 0.12))',
+          border: '1px solid var(--border-color-glow)',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          padding: '1.25rem 1.75rem'
+        }}
+      >
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
+            <Sparkles size={20} color="var(--accent-blue)" />
+            <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+              Criação Guiada de Etiquetas Térmicas
+            </h3>
+          </div>
+          <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+            Selecione o nicho de aplicação (Gôndola, Produto, Logística, Farmácia, Hospital, etc.) e utilize formatos homologados de fábrica.
+          </p>
+        </div>
+
+        <button 
+          className="btn btn-primary"
+          onClick={() => setIsWizardOpen(true)}
+          style={{ whiteSpace: 'nowrap', padding: '0.75rem 1.4rem' }}
+        >
+          <Maximize2 size={16} />
+          <span>Selecionar Nicho & Tamanho</span>
+        </button>
+      </div>
 
       {/* Grid de Serviços */}
       <div className="grid">
@@ -155,7 +240,7 @@ export default function App() {
           <div className="card-header">
             <div>
               <div className="card-title">
-                <Globe size={20} color="#3b82f6" />
+                <Globe size={20} color="var(--accent-blue)" />
                 Frontend Web
               </div>
               <div className="card-subtitle">Interface SPA (React 19 + Vite)</div>
@@ -176,8 +261,10 @@ export default function App() {
               <span className="metric-value">Nginx / Traefik</span>
             </div>
             <div className="metric-item">
-              <span className="metric-label">Rede Docker</span>
-              <span className="metric-value">interna</span>
+              <span className="metric-label">Tema Ativo</span>
+              <span className="metric-value" style={{ textTransform: 'capitalize' }}>
+                {theme === 'dark' ? 'Modo Escuro (Dark)' : 'Modo Claro (Light)'}
+              </span>
             </div>
             <div className="metric-item">
               <span className="metric-label">Atualizado às</span>
@@ -191,7 +278,7 @@ export default function App() {
           <div className="card-header">
             <div>
               <div className="card-title">
-                <Server size={20} color="#8b5cf6" />
+                <Server size={20} color="var(--accent-purple)" />
                 Backend API
               </div>
               <div className="card-subtitle">Engine de Serviços (Node.js 20 / TypeScript)</div>
@@ -227,7 +314,7 @@ export default function App() {
           <div className="card-header">
             <div>
               <div className="card-title">
-                <Database size={20} color="#06b6d4" />
+                <Database size={20} color="var(--accent-cyan)" />
                 PostgreSQL
               </div>
               <div className="card-subtitle">Banco Relacional Principal</div>
@@ -249,7 +336,7 @@ export default function App() {
             </div>
           </div>
 
-          <div style={{ marginTop: '1rem', fontSize: '0.85rem', color: pgStatus?.status === 'OK' ? '#94a3b8' : '#f87171' }}>
+          <div style={{ marginTop: '1rem', fontSize: '0.85rem', color: pgStatus?.status === 'OK' ? 'var(--text-muted)' : 'var(--status-danger)' }}>
             {pgStatus?.message || 'Aguardando validação de conexão...'}
           </div>
         </div>
@@ -259,7 +346,7 @@ export default function App() {
           <div className="card-header">
             <div>
               <div className="card-title">
-                <HardDrive size={20} color="#10b981" />
+                <HardDrive size={20} color="var(--status-success)" />
                 MinIO / S3 Storage
               </div>
               <div className="card-subtitle">Armazenamento de Imagens e Artefatos</div>
@@ -281,7 +368,7 @@ export default function App() {
             </div>
           </div>
 
-          <div style={{ marginTop: '1rem', fontSize: '0.85rem', color: minioStatus?.status === 'OK' ? '#94a3b8' : '#f87171' }}>
+          <div style={{ marginTop: '1rem', fontSize: '0.85rem', color: minioStatus?.status === 'OK' ? 'var(--text-muted)' : 'var(--status-danger)' }}>
             {minioStatus?.message || 'Aguardando validação de conexão...'}
           </div>
         </div>
@@ -290,7 +377,7 @@ export default function App() {
       {/* Fluxo de CI/CD e Infraestrutura */}
       <div className="card" style={{ marginBottom: '2rem' }}>
         <div className="card-title" style={{ marginBottom: '0.5rem' }}>
-          <GitBranch size={20} color="#8b5cf6" />
+          <GitBranch size={20} color="var(--accent-purple)" />
           Esteira de Integração e Deploy (CI/CD Pipeline)
         </div>
         <p className="card-subtitle">
@@ -299,27 +386,27 @@ export default function App() {
 
         <div className="pipeline-flow">
           <div className="flow-step">
-            <GitBranch size={22} color="#3b82f6" />
+            <GitBranch size={22} color="var(--accent-blue)" />
             <span>1. Push main</span>
           </div>
           <div className="flow-arrow">➔</div>
           <div className="flow-step">
-            <Cpu size={22} color="#8b5cf6" />
+            <Cpu size={22} color="var(--accent-purple)" />
             <span>2. GitHub Actions</span>
           </div>
           <div className="flow-arrow">➔</div>
           <div className="flow-step">
-            <Layers size={22} color="#06b6d4" />
+            <Layers size={22} color="var(--accent-cyan)" />
             <span>3. GHCR Images</span>
           </div>
           <div className="flow-arrow">➔</div>
           <div className="flow-step">
-            <ShieldCheck size={22} color="#f59e0b" />
+            <ShieldCheck size={22} color="var(--status-warning)" />
             <span>4. Portainer Webhook</span>
           </div>
           <div className="flow-arrow">➔</div>
           <div className="flow-step">
-            <CheckCircle2 size={22} color="#10b981" />
+            <CheckCircle2 size={22} color="var(--status-success)" />
             <span>5. Live Deploy</span>
           </div>
         </div>
@@ -344,6 +431,13 @@ export default function App() {
           Ambiente: {version?.environment || 'production'} | Status: {health?.status || 'LOADING'}
         </p>
       </footer>
+
+      {/* Wizard Modal */}
+      <NewTemplateWizard
+        isOpen={isWizardOpen}
+        onClose={() => setIsWizardOpen(false)}
+        onSuccess={() => setCurrentView('editor')}
+      />
     </div>
   );
 }

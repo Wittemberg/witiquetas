@@ -158,6 +158,9 @@ const handleVersion = (_req: Request, res: Response) => {
 
 import templatesRouter from './routes/templates';
 import compileRouter from './routes/compile';
+import agentsRouter from './routes/agents';
+import printersRouter from './routes/printers';
+import printJobsRouter from './routes/printJobs';
 
 // Suporta tanto rotas diretas quanto rotas com prefixo /api (conforme Traefik/Nginx)
 app.use('/templates', templatesRouter);
@@ -165,6 +168,15 @@ app.use('/api/templates', templatesRouter);
 
 app.use('/compile', compileRouter);
 app.use('/api/compile', compileRouter);
+
+app.use('/agents', agentsRouter);
+app.use('/api/agents', agentsRouter);
+
+app.use('/printers', printersRouter);
+app.use('/api/printers', printersRouter);
+
+app.use('/print-jobs', printJobsRouter);
+app.use('/api/print-jobs', printJobsRouter);
 
 app.get('/health', handleHealthCheck);
 app.get('/api/health', handleHealthCheck);

@@ -300,9 +300,10 @@ export default function CanvasArea() {
         alignItems: 'center',
         justifyContent: 'center',
         overflow: 'auto',
-        background: '#070a11',
+        background: 'var(--canvas-bg)',
         padding: '2rem',
         position: 'relative',
+        transition: 'background-color 0.25s ease',
       }}
       onClick={(e) => {
         // Clicar fora deseleciona elementos
@@ -317,7 +318,7 @@ export default function CanvasArea() {
           width: stageWidthPx * zoom,
           height: stageHeightPx * zoom,
           backgroundColor: '#ffffff',
-          boxShadow: '0 12px 40px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.1)',
+          boxShadow: 'var(--shadow-elevated), 0 0 0 1px rgba(0,0,0,0.1)',
           position: 'relative',
           borderRadius: '2px',
           overflow: 'hidden',

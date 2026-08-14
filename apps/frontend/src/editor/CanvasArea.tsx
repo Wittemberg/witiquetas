@@ -893,6 +893,7 @@ export default function CanvasArea() {
   }, [document?.elements, widthMm, heightMm]);
 
   const [isIssuesPopoverOpen, setIsIssuesPopoverOpen] = useState(false);
+  const isBarcodeTooSmall = primarySelected?.type === 'barcode' && ((Number(primarySelected.width) || 0) < 25 || (Number(primarySelected.height) || 0) < 8);
 
   return (
     <div

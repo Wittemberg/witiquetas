@@ -24,6 +24,230 @@ import {
   AlertTriangle
 } from 'lucide-react';
 
+// =========================================================================
+// SUBCOMPONENTE DE RÉGUA HORIZONTAL EM MILÍMETROS (ALINHADA COM O CANVAS)
+// =========================================================================
+function HorizontalRuler({
+  widthMm,
+  dpi,
+  zoom,
+  cursorXmm,
+}: {
+  widthMm: number;
+  dpi: number;
+  zoom: number;
+  cursorXmm: number | null;
+}) {
+  const totalPx = mmToPx(widthMm, dpi) * zoom;
+  const majorTicks = [];
+  const mediumTicks = [];
+  const minorTicks = [];
+
+  for (let mm = 0; mm <= widthMm; mm += 1) {
+    const x = mmToPx(mm, dpi) * zoom;
+    if (mm % 10 === 0) {
+      majorTicks.push({ mm, x });
+    } else if (mm % 5 === 0) {
+      mediumTicks.push({ mm, x });
+    } else {
+      minorTicks.push({ mm, x });
+    }
+  }
+
+  const cursorXpx = cursorXmm !== null ? mmToPx(cursorXmm, dpi) * zoom : null;
+
+  return (
+    <svg
+      width={totalPx}
+      height={24}
+      style={{
+        display: 'block',
+        background: 'var(--aside-bg)',
+        borderBottom: '1px solid var(--border-color)',
+        overflow: 'hidden',
+        userSelect: 'none',
+      }}
+    >
+      {/* Traços menores (1 mm) */}
+      {minorTicks.map(({ mm, x }) => (
+        <line
+          key={`min-${mm}`}
+          x1={x}
+          y1={18}
+          x2={x}
+          y2={24}
+          stroke="var(--text-muted)"
+          strokeWidth={1}
+          opacity={0.35}
+        />
+      ))}
+
+      {/* Traços médios (5 mm) */}
+      {mediumTicks.map(({ mm, x }) => (
+        <line
+          key={`med-${mm}`}
+          x1={x}
+          y1={14}
+          x2={x}
+          y2={24}
+          stroke="var(--text-muted)"
+          strokeWidth={1}
+          opacity={0.7}
+        />
+      ))}
+
+      {/* Traços principais (10 mm) com rótulo numérico */}
+      {majorTicks.map(({ mm, x }) => (
+        <g key={`maj-${mm}`}>
+          <line
+            x1={x}
+            y1={6}
+            x2={x}
+            y2={24}
+            stroke="var(--accent-blue)"
+            strokeWidth={1.2}
+          />
+          <text
+            x={x + 2}
+            y={11}
+            fill="var(--text-secondary)"
+            fontSize={9}
+            fontFamily="var(--font-mono)"
+            fontWeight="bold"
+            textAnchor="start"
+          >
+            {mm}
+          </text>
+        </g>
+      ))}
+
+      {/* Marcador de posição do cursor em tempo real */}
+      {cursorXpx !== null && cursorXpx >= 0 && cursorXpx <= totalPx && (
+        <line
+          x1={cursorXpx}
+          y1={0}
+          x2={cursorXpx}
+          y2={24}
+          stroke="#ef4444"
+          strokeWidth={1.5}
+        />
+      )}
+    </svg>
+  );
+}
+
+// =========================================================================
+// SUBCOMPONENTE DE RÉGUA VERTICAL EM MILÍMETROS (ALINHADA COM O CANVAS)
+// =========================================================================
+function VerticalRuler({
+  heightMm,
+  dpi,
+  zoom,
+  cursorYmm,
+}: {
+  heightMm: number;
+  dpi: number;
+  zoom: number;
+  cursorYmm: number | null;
+}) {
+  const totalPx = mmToPx(heightMm, dpi) * zoom;
+  const majorTicks = [];
+  const mediumTicks = [];
+  const minorTicks = [];
+
+  for (let mm = 0; mm <= heightMm; mm += 1) {
+    const y = mmToPx(mm, dpi) * zoom;
+    if (mm % 10 === 0) {
+      majorTicks.push({ mm, y });
+    } else if (mm % 5 === 0) {
+      mediumTicks.push({ mm, y });
+    } else {
+      minorTicks.push({ mm, y });
+    }
+  }
+
+  const cursorYpx = cursorYmm !== null ? mmToPx(cursorYmm, dpi) * zoom : null;
+
+  return (
+    <svg
+      width={24}
+      height={totalPx}
+      style={{
+        display: 'block',
+        background: 'var(--aside-bg)',
+        borderRight: '1px solid var(--border-color)',
+        overflow: 'hidden',
+        userSelect: 'none',
+      }}
+    >
+      {/* Traços menores (1 mm) */}
+      {minorTicks.map(({ mm, y }) => (
+        <line
+          key={`min-${mm}`}
+          x1={18}
+          y1={y}
+          x2={24}
+          y2={y}
+          stroke="var(--text-muted)"
+          strokeWidth={1}
+          opacity={0.35}
+        />
+      ))}
+
+      {/* Traços médios (5 mm) */}
+      {mediumTicks.map(({ mm, y }) => (
+        <line
+          key={`med-${mm}`}
+          x1={14}
+          y1={y}
+          x2={24}
+          y2={y}
+          stroke="var(--text-muted)"
+          strokeWidth={1}
+          opacity={0.7}
+        />
+      ))}
+
+      {/* Traços principais (10 mm) com rótulo numérico */}
+      {majorTicks.map(({ mm, y }) => (
+        <g key={`maj-${mm}`}>
+          <line
+            x1={6}
+            y1={y}
+            x2={24}
+            y2={y}
+            stroke="var(--accent-blue)"
+            strokeWidth={1.2}
+          />
+          <text
+            x={1}
+            y={y + 8}
+            fill="var(--text-secondary)"
+            fontSize={8}
+            fontFamily="var(--font-mono)"
+            fontWeight="bold"
+            textAnchor="start"
+          >
+            {mm}
+          </text>
+        </g>
+      ))}
+
+      {/* Marcador de posição do cursor em tempo real */}
+      {cursorYpx !== null && cursorYpx >= 0 && cursorYpx <= totalPx && (
+        <line
+          x1={0}
+          y1={cursorYpx}
+          x2={24}
+          y2={cursorYpx}
+          stroke="#ef4444"
+          strokeWidth={1.5}
+        />
+      )}
+    </svg>
+  );
+}
+
 // Subcomponente para renderizar QR Code localmente via KonvaImage
 function KonvaQRCode({
   elem,
@@ -117,6 +341,9 @@ export default function CanvasArea() {
   const stageRef = useRef<any>(null);
   const transformerRef = useRef<any>(null);
 
+  // Posição atual do cursor do mouse em mm para feedback nas réguas
+  const [cursorMm, setCursorMm] = useState<{ x: number | null; y: number | null }>({ x: null, y: null });
+
   // Estados de seleção por área (Marquee Selection)
   const [isMarqueeActive, setIsMarqueeActive] = useState(false);
   const [marqueeStart, setMarqueeStart] = useState<{ x: number; y: number } | null>(null);
@@ -169,6 +396,27 @@ export default function CanvasArea() {
     (el) => el.x < 0 || el.y < 0 || el.x + el.width > widthMm || el.y + el.height > heightMm
   );
 
+  // Mouse Move Handler no Stage para rastreio nas réguas e Marquee
+  const handleStageMouseMove = () => {
+    if (!stageRef.current) return;
+    const stage = stageRef.current.getStage();
+    const pointer = stage.getPointerPosition();
+
+    if (pointer) {
+      const xMm = pxToMm(pointer.x / zoom, dpi);
+      const yMm = pxToMm(pointer.y / zoom, dpi);
+      setCursorMm({ x: Math.max(0, Math.min(widthMm, xMm)), y: Math.max(0, Math.min(heightMm, yMm)) });
+
+      if (isMarqueeActive) {
+        setMarqueeEnd({ x: pointer.x / zoom, y: pointer.y / zoom });
+      }
+    }
+  };
+
+  const handleStageMouseLeave = () => {
+    setCursorMm({ x: null, y: null });
+  };
+
   // Marquee Drag Handlers
   const handleStageMouseDown = (e: any) => {
     const clickedOnEmpty = e.target === stageRef.current;
@@ -183,15 +431,6 @@ export default function CanvasArea() {
         setMarqueeStart({ x: pointer.x / zoom, y: pointer.y / zoom });
         setMarqueeEnd({ x: pointer.x / zoom, y: pointer.y / zoom });
       }
-    }
-  };
-
-  const handleStageMouseMove = () => {
-    if (!isMarqueeActive || !stageRef.current) return;
-    const stage = stageRef.current.getStage();
-    const pointer = stage.getPointerPosition();
-    if (pointer) {
-      setMarqueeEnd({ x: pointer.x / zoom, y: pointer.y / zoom });
     }
   };
 
@@ -239,7 +478,6 @@ export default function CanvasArea() {
   const renderElement = (elem: LabelElement) => {
     if (elem.visible === false) return null;
 
-    const isSelected = selectedElementIds.includes(elem.id);
     const xPx = mmToPx(elem.x, dpi);
     const yPx = mmToPx(elem.y, dpi);
     const wPx = mmToPx(elem.width, dpi);
@@ -574,74 +812,87 @@ export default function CanvasArea() {
         </div>
       )}
 
-      {/* Réguas em Milímetros no Topo */}
-      {showRulers && (
-        <div className="ruler-container-h" style={{ display: 'flex', alignItems: 'center', paddingLeft: '24px' }}>
-          {Array.from({ length: Math.ceil(widthMm / 10) + 1 }).map((_, i) => (
-            <div
-              key={i}
-              style={{
-                position: 'absolute',
-                left: `${24 + mmToPx(i * 10, dpi) * zoom}px`,
-                borderLeft: '1px solid var(--border-color)',
-                height: '100%',
-                paddingLeft: '2px',
-              }}
-            >
-              {i * 10} mm
-            </div>
-          ))}
-        </div>
-      )}
-
-      <div style={{ display: 'flex', flex: 1, overflow: 'auto', position: 'relative' }}>
-        {/* Régua Vertical Lateral */}
-        {showRulers && (
-          <div className="ruler-container-v">
-            {Array.from({ length: Math.ceil(heightMm / 10) + 1 }).map((_, i) => (
-              <div
-                key={i}
-                style={{
-                  position: 'absolute',
-                  top: `${mmToPx(i * 10, dpi) * zoom}px`,
-                  borderTop: '1px solid var(--border-color)',
-                  width: '100%',
-                  paddingTop: '2px',
-                  fontSize: '8px',
-                }}
-              >
-                {i * 10}
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Prancheta Central */}
+      {/* Área Central com Rolagem e Prancheta Alinhada às Réguas */}
+      <div
+        style={{
+          flex: 1,
+          overflow: 'auto',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '2.5rem',
+        }}
+        onClick={(e) => {
+          if (e.target === e.currentTarget) {
+            setSelectedElementIds([]);
+          }
+        }}
+      >
+        {/* Container em Grid Unificado: Canto (mm) | Régua Horizontal | Régua Vertical | Canvas Konva */}
         <div
           style={{
-            flex: 1,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '2.5rem',
-          }}
-          onClick={(e) => {
-            if (e.target === e.currentTarget) {
-              setSelectedElementIds([]);
-            }
+            display: 'grid',
+            gridTemplateColumns: showRulers ? '24px auto' : 'auto',
+            gridTemplateRows: showRulers ? '24px auto' : 'auto',
+            boxShadow: 'var(--shadow-elevated), 0 0 0 1px var(--border-color)',
+            borderRadius: '6px',
+            overflow: 'hidden',
+            background: 'var(--aside-bg)',
           }}
         >
+          {/* Canto Superior Esquerdo: Unidade mm */}
+          {showRulers && (
+            <div
+              style={{
+                width: 24,
+                height: 24,
+                background: 'var(--aside-bg)',
+                borderRight: '1px solid var(--border-color)',
+                borderBottom: '1px solid var(--border-color)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '9px',
+                fontWeight: 800,
+                color: 'var(--accent-blue)',
+                fontFamily: 'var(--font-mono)',
+                userSelect: 'none',
+              }}
+              title="Unidade de medida: Milímetros (mm)"
+            >
+              mm
+            </div>
+          )}
+
+          {/* Régua Horizontal Superior (Alinhada 0 ➔ widthMm) */}
+          {showRulers && (
+            <HorizontalRuler
+              widthMm={widthMm}
+              dpi={dpi}
+              zoom={zoom}
+              cursorXmm={cursorMm.x}
+            />
+          )}
+
+          {/* Régua Vertical Lateral (Alinhada 0 ➔ heightMm) */}
+          {showRulers && (
+            <VerticalRuler
+              heightMm={heightMm}
+              dpi={dpi}
+              zoom={zoom}
+              cursorYmm={cursorMm.y}
+            />
+          )}
+
+          {/* Prancheta da Etiqueta (Fundo Branco) */}
           <div
             style={{
               width: stageWidthPx * zoom,
               height: stageHeightPx * zoom,
               backgroundColor: '#ffffff',
-              boxShadow: 'var(--shadow-elevated), 0 0 0 1px rgba(0,0,0,0.1)',
               position: 'relative',
-              borderRadius: '2px',
               overflow: 'hidden',
               cursor: isMarqueeActive ? 'crosshair' : 'default',
-              transition: 'width 0.15s ease, height 0.15s ease',
             }}
           >
             <Stage
@@ -652,6 +903,7 @@ export default function CanvasArea() {
               scaleY={zoom}
               onMouseDown={handleStageMouseDown}
               onMouseMove={handleStageMouseMove}
+              onMouseLeave={handleStageMouseLeave}
               onMouseUp={handleStageMouseUp}
             >
               {/* Camada da Grade */}

@@ -22,8 +22,9 @@ export interface BarcodeEncodingResult {
 }
 
 // 1. Auto-detecção inteligente de simbologia
-export function detectBarcodeFormat(value: string): BarcodeFormat {
-  const clean = value.trim();
+export function detectBarcodeFormat(value?: string | null): BarcodeFormat {
+  if (!value) return 'CODE128';
+  const clean = String(value).trim();
   const isOnlyDigits = /^\d+$/.test(clean);
 
   if (isOnlyDigits) {
@@ -37,18 +38,21 @@ export function detectBarcodeFormat(value: string): BarcodeFormat {
 }
 
 // 2. Validação de Dígito Verificador (Módulo 10 para GS1 / EAN / UPC / ITF)
-export function validateCheckDigit(format: BarcodeFormat, value: string): { isValid: boolean; expectedCheckDigit?: string; error?: string } {
-  const clean = value.trim();
+export function validateCheckDigit(format?: BarcodeFormat | null, value?: string | null): { isValid: boolean; expectedCheckDigit?: string; error?: string } {
+  if (!value) return { isValid: true };
+  const clean = String(value).trim();
+  const effFormat = format || 'AUTO';
+
   if (!/^\d+$/.test(clean)) {
-    if (format === 'CODE128') return { isValid: true };
+    if (effFormat === 'CODE128' || effFormat === 'AUTO') return { isValid: true };
     return { isValid: false, error: 'Apenas números são aceitos nesta simbologia.' };
   }
 
   let expectedLength = 0;
-  if (format === 'EAN13') expectedLength = 13;
-  else if (format === 'EAN8') expectedLength = 8;
-  else if (format === 'UPCA') expectedLength = 12;
-  else if (format === 'ITF14') expectedLength = 14;
+  if (effFormat === 'EAN13') expectedLength = 13;
+  else if (effFormat === 'EAN8') expectedLength = 8;
+  else if (effFormat === 'UPCA') expectedLength = 12;
+  else if (effFormat === 'ITF14') expectedLength = 14;
   else return { isValid: true };
 
   if (clean.length !== expectedLength) {
@@ -285,7 +289,8 @@ export function generateBarcodeModules(format: BarcodeFormat, value: string): Ba
   }
 }
 
-function appendBits(target: boolean[], bitString: string) {
+function appendBits(target: boolean[], bitString?: string | null) {
+  if (!bitString) return;
   for (let i = 0; i < bitString.length; i++) {
     target.push(bitString[i] === '1');
   }

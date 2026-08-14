@@ -66,8 +66,9 @@ export default function PropertyInspector() {
   const [onlyCompatibleFonts, setOnlyCompatibleFonts] = useState(true);
 
   const selectedElements = useMemo(() => {
-    return document.elements.filter((el) => selectedElementIds.includes(el.id));
-  }, [document.elements, selectedElementIds]);
+    const elements = document?.elements || [];
+    return elements.filter((el) => el && (selectedElementIds || []).includes(el.id));
+  }, [document?.elements, selectedElementIds]);
 
   const primarySelected = selectedElements.length > 0 ? selectedElements[0] : null;
 
@@ -84,10 +85,10 @@ export default function PropertyInspector() {
 
   // Filtragem de QR Codes
   const filteredQrCodes = useMemo(() => {
-    if (!qrSearch.trim()) return qrCodeLibrary;
+    if (!qrSearch.trim()) return qrCodeLibrary || [];
     const term = qrSearch.toLowerCase();
-    return qrCodeLibrary.filter(
-      (qr) => qr.name.toLowerCase().includes(term) || qr.url.toLowerCase().includes(term)
+    return (qrCodeLibrary || []).filter(
+      (qr) => qr && (qr.name.toLowerCase().includes(term) || qr.url.toLowerCase().includes(term))
     );
   }, [qrCodeLibrary, qrSearch]);
 
@@ -130,6 +131,10 @@ export default function PropertyInspector() {
   // ESTADO 1: NENHUM ELEMENTO SELECIONADO (PROPRIEDADES DO DOCUMENTO)
   // =========================================================================
   if (!primarySelected) {
+    const widthMm = Number(document?.dimensions?.widthMm) || 100;
+    const heightMm = Number(document?.dimensions?.heightMm) || 30;
+    const dpi = Number(document?.dimensions?.dpi) || 203;
+
     return (
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflowY: 'auto' }}>
         <div className="inspector-section">
@@ -138,14 +143,14 @@ export default function PropertyInspector() {
           <div>
             <label className="metric-label">Nome do Modelo</label>
             <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-              {document.title || 'Etiqueta Térmica'}
+              {document?.title || 'Etiqueta Térmica'}
             </div>
           </div>
 
           <div>
             <label className="metric-label">Dimensões Físicas</label>
             <div className="preview-dimension-badge" style={{ display: 'inline-block' }}>
-              {formatDimensionBR(document.dimensions.widthMm)} × {formatDimensionBR(document.dimensions.heightMm)} ({document.dimensions.dpi} DPI)
+              {formatDimensionBR(widthMm)} × {formatDimensionBR(heightMm)} ({dpi} DPI)
             </div>
           </div>
         </div>

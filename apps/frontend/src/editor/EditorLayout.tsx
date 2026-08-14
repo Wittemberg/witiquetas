@@ -209,9 +209,9 @@ export default function EditorLayout({
     }
   };
 
-  const widthMm = document.dimensions?.widthMm || 100;
-  const heightMm = document.dimensions?.heightMm || 30;
-  const dpi = document.dimensions?.dpi || 203;
+  const widthMm = Number(document?.dimensions?.widthMm) || 100;
+  const heightMm = Number(document?.dimensions?.heightMm) || 30;
+  const dpi = Number(document?.dimensions?.dpi) || 203;
 
   return (
     <div className="editor-root-container">
@@ -486,11 +486,12 @@ export default function EditorLayout({
             {/* Lista de Camadas Compacta */}
             <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '0.75rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
-                <label className="metric-label">Camadas ({document.elements.length})</label>
+                <label className="metric-label">Camadas ({(document?.elements || []).length})</label>
               </div>
 
               <div className="layers-compact-list">
-                {document.elements.map((el) => {
+                {(document?.elements || []).map((el) => {
+                  if (!el) return null;
                   const isSelected = selectedElementIds.includes(el.id);
                   const hasFlag = el.locked || el.visible === false;
 

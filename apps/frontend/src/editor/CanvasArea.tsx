@@ -37,13 +37,16 @@ function HorizontalRuler({
   zoom: number;
   cursorXmm: number | null;
 }) {
-  const totalPx = mmToPx(widthMm, dpi) * zoom;
+  const safeWidthMm = Math.max(10, Number(widthMm) || 100);
+  const safeDpi = Number(dpi) || 203;
+  const safeZoom = Math.max(0.1, Number(zoom) || 1.0);
+  const totalPx = mmToPx(safeWidthMm, safeDpi) * safeZoom;
   const majorTicks = [];
   const mediumTicks = [];
   const minorTicks = [];
 
-  for (let mm = 0; mm <= widthMm; mm += 1) {
-    const x = mmToPx(mm, dpi) * zoom;
+  for (let mm = 0; mm <= safeWidthMm; mm += 1) {
+    const x = mmToPx(mm, safeDpi) * safeZoom;
     if (mm % 10 === 0) {
       majorTicks.push({ mm, x });
     } else if (mm % 5 === 0) {
@@ -53,7 +56,7 @@ function HorizontalRuler({
     }
   }
 
-  const cursorXpx = cursorXmm !== null ? mmToPx(cursorXmm, dpi) * zoom : null;
+  const cursorXpx = cursorXmm !== null && !isNaN(Number(cursorXmm)) ? mmToPx(Number(cursorXmm), safeDpi) * safeZoom : null;
 
   return (
     <svg
@@ -142,13 +145,16 @@ function VerticalRuler({
   zoom: number;
   cursorYmm: number | null;
 }) {
-  const totalPx = mmToPx(heightMm, dpi) * zoom;
+  const safeHeightMm = Math.max(5, Number(heightMm) || 30);
+  const safeDpi = Number(dpi) || 203;
+  const safeZoom = Math.max(0.1, Number(zoom) || 1.0);
+  const totalPx = mmToPx(safeHeightMm, safeDpi) * safeZoom;
   const majorTicks = [];
   const mediumTicks = [];
   const minorTicks = [];
 
-  for (let mm = 0; mm <= heightMm; mm += 1) {
-    const y = mmToPx(mm, dpi) * zoom;
+  for (let mm = 0; mm <= safeHeightMm; mm += 1) {
+    const y = mmToPx(mm, safeDpi) * safeZoom;
     if (mm % 10 === 0) {
       majorTicks.push({ mm, y });
     } else if (mm % 5 === 0) {
@@ -158,7 +164,7 @@ function VerticalRuler({
     }
   }
 
-  const cursorYpx = cursorYmm !== null ? mmToPx(cursorYmm, dpi) * zoom : null;
+  const cursorYpx = cursorYmm !== null && !isNaN(Number(cursorYmm)) ? mmToPx(Number(cursorYmm), safeDpi) * safeZoom : null;
 
   return (
     <svg
@@ -335,15 +341,18 @@ export default function CanvasArea() {
     targetId: string | null;
   } | null>(null);
 
-  const { widthMm, heightMm, dpi } = document.dimensions;
+  const widthMm = Number(document?.dimensions?.widthMm) || 100;
+  const heightMm = Number(document?.dimensions?.heightMm) || 30;
+  const dpi = Number(document?.dimensions?.dpi) || 203;
   const stageWidthPx = mmToPx(widthMm, dpi);
   const stageHeightPx = mmToPx(heightMm, dpi);
-  const gridSizePx = mmToPx(gridSizeMm, dpi);
-  const safeAreaMarginPx = mmToPx(safeAreaMarginMm, dpi);
+  const gridSizePx = Math.max(4, mmToPx(Number(gridSizeMm) || 1, dpi));
+  const safeAreaMarginPx = mmToPx(Number(safeAreaMarginMm) || 1.5, dpi);
 
   const primarySelected = useMemo(() => {
-    return document.elements.find((el) => selectedElementIds.includes(el.id));
-  }, [document.elements, selectedElementIds]);
+    const elements = document?.elements || [];
+    return elements.find((el) => el && selectedElementIds.includes(el.id));
+  }, [document?.elements, selectedElementIds]);
 
   // Atualizar seleção do Transformer do Konva com proporção inteligente por tipo
   useEffect(() => {
@@ -578,12 +587,12 @@ export default function CanvasArea() {
           : priceElem.sampleValue || '9.99';
 
         // Parsing estrito do valor (sem concatenar prefixo nem quebrar formato)
-        const cleanNumber = (rawValueStr || '9.99').replace(',', '.').trim();
+        const cleanNumber = String(rawValueStr || '9.99').replace(',', '.').trim();
         const parts = cleanNumber.split('.');
         const integerPart = parts[0] || '0';
         const fractionPart = (parts[1] || '00').padEnd(2, '0').slice(0, 2);
 
-        const prefix = priceElem.prefix !== undefined ? priceElem.prefix.trim() : 'R$';
+        const prefix = priceElem.prefix !== undefined && priceElem.prefix !== null ? String(priceElem.prefix).trim() : 'R$';
         const isReduced = priceElem.reducedCents !== false; // Padrão Varejo Ativo
 
         // Auto-fit proporcional da caixa sem quebra de linhas
@@ -804,22 +813,26 @@ export default function CanvasArea() {
 
   const renderGridLines = () => {
     const lines = [];
-    for (let i = 0; i <= stageWidthPx; i += gridSizePx) {
+    const step = Math.max(4, gridSizePx || 10);
+    const maxW = Math.max(10, stageWidthPx || 100);
+    const maxH = Math.max(10, stageHeightPx || 100);
+
+    for (let i = 0; i <= maxW; i += step) {
       lines.push(
         <Line
           key={`v-${i}`}
-          points={[i, 0, i, stageHeightPx]}
+          points={[i, 0, i, maxH]}
           stroke="rgba(59, 130, 246, 0.12)"
           strokeWidth={1}
           dash={[2, 2]}
         />
       );
     }
-    for (let j = 0; j <= stageHeightPx; j += gridSizePx) {
+    for (let j = 0; j <= maxH; j += step) {
       lines.push(
         <Line
           key={`h-${j}`}
-          points={[0, j, stageWidthPx, j]}
+          points={[0, j, maxW, j]}
           stroke="rgba(59, 130, 246, 0.12)"
           strokeWidth={1}
           dash={[2, 2]}
@@ -849,30 +862,35 @@ export default function CanvasArea() {
 
   const issueList: IssueItem[] = useMemo(() => {
     const issues: IssueItem[] = [];
-    document.elements.forEach((el) => {
-      if (el.visible === false) return;
-      const isPhysical = el.x < 0 || el.y < 0 || el.x + el.width > widthMm || el.y + el.height > heightMm;
+    const elements = document?.elements || [];
+    elements.forEach((el) => {
+      if (!el || el.visible === false) return;
+      const x = Number(el.x) || 0;
+      const y = Number(el.y) || 0;
+      const w = Number(el.width) || 10;
+      const h = Number(el.height) || 10;
+      const isPhysical = x < 0 || y < 0 || x + w > widthMm || y + h > heightMm;
       if (isPhysical) {
         issues.push({
           id: el.id,
-          name: el.name || el.type.toUpperCase(),
+          name: el.name || (el.type ? el.type.toUpperCase() : 'ELEMENTO'),
           type: 'physical',
-          message: `"${el.name || el.type.toUpperCase()}" está parcialmente fora da etiqueta`,
+          message: `"${el.name || (el.type ? el.type.toUpperCase() : 'ELEMENTO')}" está parcialmente fora da etiqueta`,
         });
       } else {
-        const isBeyondSafe = el.x < 1.5 || el.y < 1.5 || el.x + el.width > widthMm - 1.5 || el.y + el.height > heightMm - 1.5;
+        const isBeyondSafe = x < 1.5 || y < 1.5 || x + w > widthMm - 1.5 || y + h > heightMm - 1.5;
         if (isBeyondSafe) {
           issues.push({
             id: el.id,
-            name: el.name || el.type.toUpperCase(),
+            name: el.name || (el.type ? el.type.toUpperCase() : 'ELEMENTO'),
             type: 'safeArea',
-            message: `"${el.name || el.type.toUpperCase()}" ultrapassa a margem segura (1.5 mm)`,
+            message: `"${el.name || (el.type ? el.type.toUpperCase() : 'ELEMENTO')}" ultrapassa a margem segura (1.5 mm)`,
           });
         }
       }
     });
     return issues;
-  }, [document.elements, widthMm, heightMm]);
+  }, [document?.elements, widthMm, heightMm]);
 
   const [isIssuesPopoverOpen, setIsIssuesPopoverOpen] = useState(false);
 

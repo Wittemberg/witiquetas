@@ -33,6 +33,8 @@ export const TextElementSchema = BaseElementSchema.extend({
   verticalAlignment: z.enum(['top', 'middle', 'bottom']).optional(),
   wrap: z.enum(['auto', 'none']).optional(),
   color: z.string().optional(),
+  autoFit: z.boolean().optional(),
+  singleLine: z.boolean().optional(),
 });
 
 export const PriceElementSchema = BaseElementSchema.extend({

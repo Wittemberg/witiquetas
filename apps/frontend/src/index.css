@@ -10,7 +10,7 @@
   --bg-card-hover: rgba(30, 41, 59, 0.7);
   --bg-card-active: rgba(59, 130, 246, 0.15);
   --bg-input: #0d1117;
-  --header-bg: rgba(15, 23, 42, 0.88);
+  --header-bg: rgba(15, 23, 42, 0.92);
   --aside-bg: #0d1117;
   --canvas-bg: #090d14;
   --modal-bg: #111827;
@@ -49,7 +49,7 @@
   --bg-card-hover: #f1f5f9;
   --bg-card-active: rgba(37, 99, 235, 0.08);
   --bg-input: #f1f5f9;
-  --header-bg: rgba(255, 255, 255, 0.95);
+  --header-bg: rgba(255, 255, 255, 0.96);
   --aside-bg: #ffffff;
   --canvas-bg: #e2e8f0;
   --modal-bg: #ffffff;
@@ -123,6 +123,7 @@ body {
   backdrop-filter: blur(12px);
   z-index: 30;
   flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .editor-workspace-row {
@@ -134,11 +135,11 @@ body {
 }
 
 /* ==========================================================================
-   PAINÉIS LATERAIS COM ROLAGEM CONTROLADA E ACCORDIONS
+   PAINEL LATERAL ESQUERDO (BIBLIOTECA DE CRIAÇÃO & CAMADAS COMPACTAS)
    ========================================================================== */
 
 .editor-sidebar-left {
-  width: 260px;
+  width: 250px;
   background: var(--aside-bg);
   border-right: 1px solid var(--border-color);
   display: flex;
@@ -147,7 +148,7 @@ body {
   overflow-y: auto;
   overflow-x: hidden;
   flex-shrink: 0;
-  transition: width 0.25s ease, transform 0.25s ease;
+  transition: width 0.2s ease, transform 0.2s ease;
   z-index: 20;
 }
 
@@ -158,8 +159,96 @@ body {
   border-right: none;
 }
 
+/* Grade de Criação de Elementos */
+.creation-palette-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.4rem;
+}
+
+.creation-tool-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  padding: 0.65rem 0.4rem;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-card);
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 0.72rem;
+  font-weight: 600;
+  transition: all 0.15s ease;
+  text-align: center;
+}
+
+.creation-tool-btn:hover {
+  background: var(--bg-card-hover);
+  border-color: var(--accent-blue);
+  transform: translateY(-1px);
+}
+
+/* Camadas Compactas (Uma Linha por Elemento) */
+.layers-compact-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.layer-compact-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.35rem 0.5rem;
+  border-radius: 6px;
+  background: var(--bg-card);
+  border: 1px solid transparent;
+  cursor: pointer;
+  font-size: 0.75rem;
+  transition: all 0.15s ease;
+}
+
+.layer-compact-row:hover {
+  background: var(--bg-card-hover);
+  border-color: var(--border-color);
+}
+
+.layer-compact-row.active {
+  background: var(--bg-card-active);
+  border-color: var(--accent-blue);
+  color: var(--accent-blue);
+}
+
+.layer-compact-left {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.layer-compact-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.15rem;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.layer-compact-row:hover .layer-compact-actions,
+.layer-compact-row.has-flag .layer-compact-actions {
+  opacity: 1;
+}
+
+/* ==========================================================================
+   PAINEL LATERAL DIREITO (PROPRIEDADES ESTREITAMENTE CONTEXTUAIS)
+   ========================================================================== */
+
 .editor-sidebar-right {
-  width: 320px;
+  width: 290px;
   background: var(--aside-bg);
   border-left: 1px solid var(--border-color);
   display: flex;
@@ -168,7 +257,7 @@ body {
   overflow-y: auto;
   overflow-x: hidden;
   flex-shrink: 0;
-  transition: width 0.25s ease, transform 0.25s ease;
+  transition: width 0.2s ease, transform 0.2s ease;
   z-index: 20;
 }
 
@@ -179,64 +268,74 @@ body {
   border-left: none;
 }
 
-/* Accordions compactos do Inspetor */
-.inspector-accordion {
+.inspector-section {
+  padding: 0.85rem 1rem;
   border-bottom: 1px solid var(--border-color);
-}
-
-.inspector-accordion-header {
-  padding: 0.75rem 1rem;
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  cursor: pointer;
-  user-select: none;
-  font-size: 0.8rem;
-  font-weight: 700;
-  color: var(--text-secondary);
-  background: var(--bg-card);
-  transition: background-color 0.15s ease;
+  flex-direction: column;
+  gap: 0.65rem;
 }
 
-.inspector-accordion-header:hover {
+.inspector-section-title {
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Grupos de Botões de Alinhamento Compactos */
+.btn-group-align {
+  display: flex;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--bg-input);
+}
+
+.btn-group-item {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.35rem 0.2rem;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-group-item:hover {
   background: var(--bg-card-hover);
   color: var(--text-primary);
 }
 
-.inspector-accordion-content {
-  padding: 0.85rem 1rem;
-  background: var(--aside-bg);
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-/* Grade 2x2 compacta e alinhada */
-.grid-2x2 {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.5rem;
+.btn-group-item.active {
+  background: var(--accent-blue);
+  color: #ffffff;
 }
 
 /* ==========================================================================
-   BOTÕES, INPUTS E CONTROLES
+   BOTÕES, INPUTS E CONTROLES GERAIS
    ========================================================================== */
 
 .btn {
   display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
-  padding: 0.45rem 0.85rem;
-  border-radius: 8px;
-  font-size: 0.825rem;
+  gap: 0.35rem;
+  padding: 0.4rem 0.75rem;
+  border-radius: 7px;
+  font-size: 0.8rem;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
   border: 1px solid var(--border-color);
   background: var(--bg-card);
   color: var(--text-primary);
   text-decoration: none;
   line-height: 1;
+  white-space: nowrap;
 }
 
 .btn:hover:not(:disabled) {
@@ -270,9 +369,9 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 34px;
-  height: 34px;
-  border-radius: 8px;
+  width: 32px;
+  height: 32px;
+  border-radius: 7px;
   border: 1px solid var(--border-color);
   background: var(--bg-card);
   cursor: pointer;
@@ -286,7 +385,7 @@ body {
 
 .inspector-input, .inspector-select {
   width: 100%;
-  padding: 0.4rem 0.6rem;
+  padding: 0.4rem 0.55rem;
   background: var(--bg-input);
   border: 1px solid var(--border-color);
   border-radius: 6px;
@@ -317,7 +416,7 @@ body {
 }
 
 /* ==========================================================================
-   WIZARD DE NICHO (GRID RESPONSIVO 4/3/2/1 SEM SCROLL DESNECESSÁRIO)
+   WIZARD DE NICHO & FORMATOS (SEM OVERFLOW, SEM CORTE DE BADGES)
    ========================================================================== */
 
 .wizard-modal-overlay {
@@ -333,8 +432,8 @@ body {
 }
 
 .wizard-modal-content {
-  width: min(94vw, 1100px);
-  max-height: 92vh;
+  width: min(94vw, 1080px);
+  max-height: 90vh;
   background-color: var(--modal-bg);
   border: 1px solid var(--border-color);
   border-radius: 16px;
@@ -345,7 +444,7 @@ body {
 }
 
 .wizard-header {
-  padding: 1.25rem 1.5rem;
+  padding: 1.15rem 1.5rem;
   border-bottom: 1px solid var(--border-color);
   display: flex;
   justify-content: space-between;
@@ -370,7 +469,7 @@ body {
   flex-shrink: 0;
 }
 
-/* Grid responsivo de nichos */
+/* Grid de Nichos */
 .niche-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -451,15 +550,12 @@ body {
   margin-top: 0.1rem;
 }
 
-/* ==========================================================================
-   SELEÇÃO DE TAMANHO & FICHA TÉCNICA
-   ========================================================================== */
-
+/* Barra de Busca de Tamanhos */
 .size-search-bar {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.5rem 0.75rem;
+  padding: 0.45rem 0.75rem;
   background: var(--bg-input);
   border: 1px solid var(--border-color);
   border-radius: 8px;
@@ -474,6 +570,7 @@ body {
   color: var(--text-primary);
 }
 
+/* Chips de Tamanho com Badge Seguro */
 .size-chips-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
@@ -484,13 +581,15 @@ body {
 }
 
 .size-chip {
-  padding: 0.6rem;
+  padding: 0.65rem;
   border-radius: 8px;
   border: 1px solid var(--border-color);
   background: var(--bg-card);
   cursor: pointer;
   transition: all 0.15s ease;
   position: relative;
+  display: flex;
+  flex-direction: column;
 }
 
 .size-chip:hover {
@@ -503,17 +602,19 @@ body {
   border-color: var(--accent-blue);
 }
 
+/* Badge "Mais Usado" Seguro sem Clipping */
 .size-featured-tag {
-  position: absolute;
-  top: -6px;
-  right: 6px;
+  display: inline-flex;
+  align-items: center;
   background: linear-gradient(135deg, #10b981, #059669);
   color: #ffffff;
-  font-size: 0.6rem;
+  font-size: 0.58rem;
   font-weight: 800;
   padding: 0.1rem 0.35rem;
   border-radius: 4px;
   text-transform: uppercase;
+  margin-bottom: 0.25rem;
+  align-self: flex-start;
 }
 
 .size-chip-dimension {
@@ -531,7 +632,7 @@ body {
   align-items: center;
 }
 
-/* Preview Proporcional e Ficha Técnica */
+/* Ficha Técnica */
 .preview-proportional-container {
   display: flex;
   flex-direction: column;
@@ -560,13 +661,12 @@ body {
   background: rgba(37, 99, 235, 0.12);
   color: var(--accent-blue);
   font-weight: 700;
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   padding: 0.2rem 0.5rem;
   border-radius: 4px;
   font-family: var(--font-mono);
 }
 
-/* Ficha Técnica sem quebra indevida */
 .technical-spec-grid {
   display: grid;
   grid-template-columns: auto 1fr;
@@ -588,86 +688,7 @@ body {
 }
 
 /* ==========================================================================
-   CAMADAS (ELEMENTOS EM USO)
-   ========================================================================== */
-
-.layers-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.3rem;
-  max-height: 200px;
-  overflow-y: auto;
-}
-
-.layer-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0.4rem 0.6rem;
-  border-radius: 6px;
-  background: var(--bg-card);
-  border: 1px solid var(--border-color);
-  cursor: pointer;
-  font-size: 0.78rem;
-  transition: all 0.15s ease;
-}
-
-.layer-item:hover {
-  background: var(--bg-card-hover);
-}
-
-.layer-item.active {
-  background: var(--bg-card-active);
-  border-color: var(--accent-blue);
-}
-
-.layer-item-title {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  font-weight: 600;
-  color: var(--text-primary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.layer-item-actions {
-  display: flex;
-  align-items: center;
-  gap: 0.2rem;
-}
-
-/* ==========================================================================
-   RÉGUAS EM MILÍMETROS
-   ========================================================================== */
-
-.ruler-container-h {
-  height: 20px;
-  background: var(--aside-bg);
-  border-bottom: 1px solid var(--border-color);
-  position: relative;
-  overflow: hidden;
-  font-family: var(--font-mono);
-  font-size: 9px;
-  color: var(--text-muted);
-  user-select: none;
-}
-
-.ruler-container-v {
-  width: 20px;
-  background: var(--aside-bg);
-  border-right: 1px solid var(--border-color);
-  position: relative;
-  overflow: hidden;
-  font-family: var(--font-mono);
-  font-size: 9px;
-  color: var(--text-muted);
-  user-select: none;
-}
-
-/* ==========================================================================
-   BADGES DE COMPATIBILIDADE & ESTADO
+   BADGES & INDICADORES DE ESTADO
    ========================================================================== */
 
 .badge {
@@ -705,7 +726,6 @@ body {
   border: 1px solid rgba(239, 68, 68, 0.3);
 }
 
-/* Indicador de Salvamento */
 .save-status-indicator {
   display: flex;
   align-items: center;
@@ -731,7 +751,7 @@ body {
 }
 
 /* ==========================================================================
-   CONTAINER DO DASHBOARD & UTILITÁRIOS
+   DASHBOARD & UTILITÁRIOS
    ========================================================================== */
 
 .container {
@@ -756,9 +776,9 @@ body {
 }
 
 .brand-icon {
-  width: 40px;
-  height: 40px;
-  border-radius: 10px;
+  width: 38px;
+  height: 38px;
+  border-radius: 9px;
   background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple));
   display: flex;
   align-items: center;
@@ -845,7 +865,6 @@ body {
   margin-top: 2rem;
 }
 
-/* Spinner */
 @keyframes spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }

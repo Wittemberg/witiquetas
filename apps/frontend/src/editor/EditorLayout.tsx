@@ -10,7 +10,6 @@ import {
   Grid,
   Eye,
   EyeOff,
-  Maximize2,
   ZoomIn,
   ZoomOut,
   Undo2,
@@ -21,7 +20,7 @@ import {
   QrCode,
   Square,
   Minus,
-  Save,
+  Image as ImageIcon,
   Moon,
   Sun,
   ChevronLeft,
@@ -31,7 +30,10 @@ import {
   PanelLeftOpen,
   PanelRightClose,
   PanelRightOpen,
-  Plus
+  Plus,
+  Lock,
+  Unlock,
+  Layers
 } from 'lucide-react';
 
 interface EditorLayoutProps {
@@ -48,14 +50,9 @@ export default function EditorLayout({
   const {
     document,
     selectedElementIds,
+    setSelectedElementId,
     zoom,
     setZoom,
-    snapToGrid,
-    setSnapToGrid,
-    showRulers,
-    setShowRulers,
-    showSafeArea,
-    setShowSafeArea,
     showPreviewData,
     setShowPreviewData,
     isDirty,
@@ -71,6 +68,8 @@ export default function EditorLayout({
     pasteSelection,
     nudgeElements,
     markSaved,
+    toggleLock,
+    toggleVisibility,
     isLeftSidebarCollapsed,
     isRightSidebarCollapsed,
     toggleLeftSidebar,
@@ -83,7 +82,6 @@ export default function EditorLayout({
   // Escuta de Atalhos Globais do Teclado
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Ignorar se o usuário estiver digitando em um input de texto
       const activeTag = (document.activeElement as HTMLElement)?.tagName?.toLowerCase();
       const isInputActive = activeTag === 'input' || activeTag === 'textarea' || activeTag === 'select';
 
@@ -175,14 +173,37 @@ export default function EditorLayout({
     selectedElementIds,
   ]);
 
+  const getElementIcon = (type: string) => {
+    switch (type) {
+      case 'text':
+        return <Type size={13} color="var(--accent-blue)" />;
+      case 'price':
+        return <DollarSign size={13} color="#ef4444" />;
+      case 'barcode':
+        return <Barcode size={13} color="var(--accent-cyan)" />;
+      case 'qrcode':
+        return <QrCode size={13} color="var(--status-success)" />;
+      case 'rectangle':
+        return <Square size={13} color="var(--status-warning)" />;
+      case 'line':
+        return <Minus size={13} color="var(--accent-purple)" />;
+      default:
+        return <Layers size={13} />;
+    }
+  };
+
+  const widthMm = document.dimensions?.widthMm || 100;
+  const heightMm = document.dimensions?.heightMm || 30;
+  const dpi = document.dimensions?.dpi || 203;
+
   return (
     <div className="editor-root-container">
       {/* =========================================================================
-         TOOLBAR SUPERIOR (56px FIXA)
+         TOOLBAR SUPERIOR ULTRA-LIMPA (56px FIXA)
          ========================================================================= */}
       <header className="editor-header-fixed">
-        {/* Lado Esquerdo: Navegação & Título */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+        {/* Lado Esquerdo: Navegação, Identificação e Estado */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
           {onBackToDashboard && (
             <button className="btn" onClick={onBackToDashboard} style={{ fontSize: '0.75rem', padding: '0.35rem 0.6rem' }}>
               <ChevronLeft size={14} />
@@ -190,24 +211,24 @@ export default function EditorLayout({
             </button>
           )}
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <div className="brand-icon" style={{ width: '28px', height: '28px', borderRadius: '6px' }}>
-              <Sparkles size={14} color="#ffffff" />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+            <div className="brand-icon" style={{ width: '26px', height: '26px', borderRadius: '6px' }}>
+              <Sparkles size={13} color="#ffffff" />
             </div>
-            <span style={{ fontWeight: 800, fontSize: '0.9rem', color: 'var(--text-primary)' }}>
+            <span style={{ fontWeight: 800, fontSize: '0.88rem', color: 'var(--text-primary)' }}>
               Witiquetas
             </span>
           </div>
 
-          <div style={{ width: '1px', height: '20px', background: 'var(--border-color)', margin: '0 0.2rem' }} />
+          <div style={{ width: '1px', height: '18px', background: 'var(--border-color)' }} />
 
           {/* Dimensões da Etiqueta */}
           <div className="preview-dimension-badge" style={{ fontSize: '0.75rem', padding: '0.2rem 0.5rem' }}>
-            {formatDimensionBR(document.dimensions.widthMm)} × {formatDimensionBR(document.dimensions.heightMm)} ({document.dimensions.dpi} DPI)
+            {formatDimensionBR(widthMm)} × {formatDimensionBR(heightMm)} ({dpi} DPI)
           </div>
 
-          {/* Indicador de Salvamento */}
-          <div className="save-status-indicator" style={{ marginLeft: '0.3rem' }}>
+          {/* Indicador Discreto de Salvamento */}
+          <div className="save-status-indicator">
             <div className={`save-status-dot ${isDirty ? 'unsaved' : 'saved'}`} />
             <span style={{ fontSize: '0.72rem', color: isDirty ? 'var(--status-warning)' : 'var(--status-success)' }}>
               {isDirty ? 'Alterações não salvas' : 'Salvo'}
@@ -215,35 +236,7 @@ export default function EditorLayout({
           </div>
         </div>
 
-        {/* Centro: Ferramentas de Adição de Elementos */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-          <button className="btn" onClick={() => addElement('text')} title="Adicionar Texto">
-            <Type size={14} color="var(--accent-blue)" />
-            <span>Texto</span>
-          </button>
-          <button className="btn" onClick={() => addElement('price')} title="Adicionar Preço">
-            <DollarSign size={14} color="#ef4444" />
-            <span>Preço</span>
-          </button>
-          <button className="btn" onClick={() => addElement('barcode')} title="Adicionar Código de Barras">
-            <Barcode size={14} color="var(--accent-cyan)" />
-            <span>Barras</span>
-          </button>
-          <button className="btn" onClick={() => addElement('qrcode')} title="Adicionar QR Code">
-            <QrCode size={14} color="var(--status-success)" />
-            <span>QR Code</span>
-          </button>
-          <button className="btn" onClick={() => addElement('rectangle')} title="Adicionar Retângulo / Moldura">
-            <Square size={14} color="var(--status-warning)" />
-            <span>Moldura</span>
-          </button>
-          <button className="btn" onClick={() => addElement('line')} title="Adicionar Linha Divisória">
-            <Minus size={14} color="var(--accent-purple)" />
-            <span>Linha</span>
-          </button>
-        </div>
-
-        {/* Lado Direito: Visualização, Zoom, Tema e Impressão */}
+        {/* Lado Direito: Ações Globais Essenciais (Desfazer, Zoom, Dados, Tema, Imprimir) */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           {/* Desfazer / Refazer */}
           <div style={{ display: 'flex', gap: '0.2rem' }}>
@@ -255,40 +248,9 @@ export default function EditorLayout({
             </button>
           </div>
 
-          <div style={{ width: '1px', height: '20px', background: 'var(--border-color)' }} />
+          <div style={{ width: '1px', height: '18px', background: 'var(--border-color)' }} />
 
-          {/* Toggles de Visualização */}
-          <button
-            className={`btn ${snapToGrid ? 'btn-primary' : ''}`}
-            style={{ padding: '0.35rem' }}
-            onClick={() => setSnapToGrid(!snapToGrid)}
-            title={snapToGrid ? 'Grade Ativada' : 'Ativar Grade'}
-          >
-            <Grid size={14} />
-          </button>
-
-          <button
-            className={`btn ${showSafeArea ? 'btn-primary' : ''}`}
-            style={{ padding: '0.35rem' }}
-            onClick={() => setShowSafeArea(!showSafeArea)}
-            title="Margem Segura de Impressão (1.5mm)"
-          >
-            <ShieldAlert size={14} />
-          </button>
-
-          <button
-            className={`btn ${showPreviewData ? 'btn-primary' : ''}`}
-            style={{ padding: '0.35rem 0.6rem', fontSize: '0.75rem' }}
-            onClick={() => setShowPreviewData(!showPreviewData)}
-            title="Alternar dados de exemplo do ERP"
-          >
-            {showPreviewData ? <Eye size={14} /> : <EyeOff size={14} />}
-            <span>Preview ERP</span>
-          </button>
-
-          <div style={{ width: '1px', height: '20px', background: 'var(--border-color)' }} />
-
-          {/* Zoom: - / 100% / + */}
+          {/* Controles de Zoom */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
             <button className="btn" style={{ padding: '0.35rem' }} onClick={() => setZoom(zoom - 0.15)} title="Diminuir Zoom">
               <ZoomOut size={14} />
@@ -306,7 +268,18 @@ export default function EditorLayout({
             </button>
           </div>
 
-          <div style={{ width: '1px', height: '20px', background: 'var(--border-color)' }} />
+          <div style={{ width: '1px', height: '18px', background: 'var(--border-color)' }} />
+
+          {/* Alternador Discreto de Dados: Exemplo / ERP */}
+          <button
+            className={`btn ${showPreviewData ? 'btn-primary' : ''}`}
+            style={{ padding: '0.35rem 0.6rem', fontSize: '0.75rem' }}
+            onClick={() => setShowPreviewData(!showPreviewData)}
+            title="Alternar dados comerciais de teste do ERP"
+          >
+            {showPreviewData ? <Eye size={13} /> : <EyeOff size={13} />}
+            <span>Dados ERP</span>
+          </button>
 
           {/* Alternância de Tema */}
           {onToggleTheme && (
@@ -315,17 +288,11 @@ export default function EditorLayout({
             </button>
           )}
 
-          {/* Novo Modelo via Nicho */}
-          <button className="btn" onClick={() => setIsWizardOpen(true)} style={{ fontSize: '0.75rem' }}>
-            <Plus size={14} />
-            <span>Novo Formato</span>
-          </button>
-
           {/* Botão de Ação Primária: Imprimir */}
           <button
             className="btn btn-primary"
             onClick={() => setIsCompileOpen(true)}
-            style={{ padding: '0.45rem 1rem', fontSize: '0.825rem' }}
+            style={{ padding: '0.45rem 1.1rem', fontSize: '0.825rem' }}
           >
             <Printer size={15} />
             <span>Imprimir</span>
@@ -334,49 +301,119 @@ export default function EditorLayout({
       </header>
 
       {/* =========================================================================
-         WORKSPACE (COLUNAS LATERAIS CONGELADAS & CANVAS CENTRAL)
+         WORKSPACE PRINCIPAL
          ========================================================================= */}
       <div className="editor-workspace-row">
-        {/* Painel Esquerdo: Ferramentas Rápidas e Modelos Recentes */}
+        {/* Painel Esquerdo: Biblioteca de Criação & Camadas */}
         <aside className={`editor-sidebar-left ${isLeftSidebarCollapsed ? 'collapsed' : ''}`}>
-          <div style={{ padding: '0.85rem 1rem', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)' }}>
-              BIBLIOTECA & FERRAMENTAS
+          {/* Header do Painel Esquerdo */}
+          <div style={{ padding: '0.75rem 0.85rem', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+              Elementos
             </span>
             <button className="btn" style={{ padding: '0.2rem', border: 'none' }} onClick={toggleLeftSidebar} title="Recolher Painel">
               <ChevronLeft size={14} />
             </button>
           </div>
 
-          <div style={{ padding: '0.85rem 1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-            <button className="btn btn-primary" style={{ width: '100%', justifyContent: 'center' }} onClick={() => setIsWizardOpen(true)}>
+          <div style={{ padding: '0.85rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            {/* Botão Novo Formato */}
+            <button
+              className="btn btn-primary"
+              style={{ width: '100%', justifyContent: 'center', fontSize: '0.78rem', padding: '0.45rem' }}
+              onClick={() => setIsWizardOpen(true)}
+            >
               <Plus size={14} />
-              <span>Novo Modelo por Nicho</span>
+              <span>Novo Formato / Nicho</span>
             </button>
 
-            <div style={{ marginTop: '0.5rem' }}>
-              <label className="metric-label">Dimensões da Etiqueta</label>
-              <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-                {document.title}
-              </div>
-              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
-                Resolução: {document.dimensions.dpi} DPI (~8 dots/mm)
+            {/* Paleta de Criação de Elementos (Item 161) */}
+            <div>
+              <label className="metric-label" style={{ marginBottom: '0.4rem' }}>Adicionar à Etiqueta</label>
+              <div className="creation-palette-grid">
+                <button className="creation-tool-btn" onClick={() => addElement('text')}>
+                  <Type size={16} color="var(--accent-blue)" />
+                  <span>Texto</span>
+                </button>
+                <button className="creation-tool-btn" onClick={() => addElement('price')}>
+                  <DollarSign size={16} color="#ef4444" />
+                  <span>Preço</span>
+                </button>
+                <button className="creation-tool-btn" onClick={() => addElement('barcode')}>
+                  <Barcode size={16} color="var(--accent-cyan)" />
+                  <span>Código Barras</span>
+                </button>
+                <button className="creation-tool-btn" onClick={() => addElement('qrcode')}>
+                  <QrCode size={16} color="var(--status-success)" />
+                  <span>QR Code</span>
+                </button>
+                <button className="creation-tool-btn" onClick={() => addElement('rectangle')}>
+                  <Square size={16} color="var(--status-warning)" />
+                  <span>Moldura</span>
+                </button>
+                <button className="creation-tool-btn" onClick={() => addElement('line')}>
+                  <Minus size={16} color="var(--accent-purple)" />
+                  <span>Linha</span>
+                </button>
               </div>
             </div>
 
-            <div style={{ marginTop: '0.5rem', borderTop: '1px solid var(--border-color)', paddingTop: '0.75rem' }}>
-              <label className="metric-label">Atalhos de Produtividade</label>
-              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
-                <div><kbd style={{ background: 'var(--bg-input)', padding: '0.1rem 0.3rem', borderRadius: '4px' }}>Ctrl+D</kbd> Duplicar com offset</div>
-                <div><kbd style={{ background: 'var(--bg-input)', padding: '0.1rem 0.3rem', borderRadius: '4px' }}>Ctrl+C / V</kbd> Copiar e Colar</div>
-                <div><kbd style={{ background: 'var(--bg-input)', padding: '0.1rem 0.3rem', borderRadius: '4px' }}>Shift + Setas</kbd> Nudge de precisão (2mm)</div>
-                <div><kbd style={{ background: 'var(--bg-input)', padding: '0.1rem 0.3rem', borderRadius: '4px' }}>Arrastar no Vazio</kbd> Seleção múltipla</div>
+            {/* Lista de Camadas Compacta (Item 180, 182, 183) */}
+            <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '0.75rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+                <label className="metric-label">Camadas ({document.elements.length})</label>
+              </div>
+
+              <div className="layers-compact-list">
+                {document.elements.map((el) => {
+                  const isSelected = selectedElementIds.includes(el.id);
+                  const hasFlag = el.locked || el.visible === false;
+
+                  return (
+                    <div
+                      key={el.id}
+                      className={`layer-compact-row ${isSelected ? 'active' : ''} ${hasFlag ? 'has-flag' : ''}`}
+                      onClick={() => setSelectedElementId(el.id)}
+                    >
+                      <div className="layer-compact-left">
+                        {getElementIcon(el.type)}
+                        <span>{el.name || el.type.toUpperCase()}</span>
+                      </div>
+
+                      <div className="layer-compact-actions">
+                        <button
+                          className="btn"
+                          style={{ padding: '0.15rem', border: 'none' }}
+                          title={el.locked ? 'Desbloquear elemento' : 'Bloquear no canvas'}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleLock(el.id);
+                          }}
+                        >
+                          {el.locked ? <Lock size={12} color="var(--status-warning)" /> : <Unlock size={12} color="var(--text-muted)" />}
+                        </button>
+
+                        <button
+                          className="btn"
+                          style={{ padding: '0.15rem', border: 'none' }}
+                          title={el.visible !== false ? 'Ocultar elemento' : 'Exibir elemento'}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleVisibility(el.id);
+                          }}
+                        >
+                          {el.visible !== false ? <Eye size={12} color="var(--text-muted)" /> : <EyeOff size={12} color="var(--status-danger)" />}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </div>
         </aside>
 
-        {/* Botão Flutuante de Abrir Painel Esquerdo se Recolhido */}
+        {/* Botão de Expansão do Painel Esquerdo se Recolhido */}
         {isLeftSidebarCollapsed && (
           <button
             className="btn"
@@ -390,7 +427,7 @@ export default function EditorLayout({
               boxShadow: 'var(--shadow-elevated)',
             }}
             onClick={toggleLeftSidebar}
-            title="Expandir Painel Esquerdo"
+            title="Expandir Biblioteca de Elementos"
           >
             <PanelLeftOpen size={16} color="var(--accent-blue)" />
           </button>
@@ -401,7 +438,7 @@ export default function EditorLayout({
           <CanvasArea />
         </main>
 
-        {/* Botão Flutuante de Abrir Painel Direito se Recolhido */}
+        {/* Botão de Expansão do Painel Direito se Recolhido */}
         {isRightSidebarCollapsed && (
           <button
             className="btn"
@@ -421,7 +458,7 @@ export default function EditorLayout({
           </button>
         )}
 
-        {/* Painel Direito: Inspetor de Propriedades e Camadas */}
+        {/* Painel Direito: Inspetor Contextual */}
         <aside className={`editor-sidebar-right ${isRightSidebarCollapsed ? 'collapsed' : ''}`}>
           <PropertyInspector />
         </aside>

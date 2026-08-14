@@ -7,7 +7,7 @@ import {
   pxToMm,
   MOCK_PRODUCT_DATA,
 } from './useEditorStore';
-import { LabelElement, QrCodeElement } from '@witiquetas/label-schema';
+import { LabelElement, QrCodeElement, TextElement, BarcodeElement, PriceElement } from '@witiquetas/label-schema';
 import { generateQRCodeDataUrl } from './qrCodeGenerator';
 import {
   Copy,
@@ -19,13 +19,11 @@ import {
   EyeOff,
   BringToFront,
   SendToBack,
-  Layers,
-  Sparkles,
   AlertTriangle
 } from 'lucide-react';
 
 // =========================================================================
-// SUBCOMPONENTE DE RÉGUA HORIZONTAL EM MILÍMETROS (ALINHADA COM O CANVAS)
+// SUBCOMPONENTE DE RÉGUA HORIZONTAL EM MILÍMETROS (0 ➔ widthMm)
 // =========================================================================
 function HorizontalRuler({
   widthMm,
@@ -59,7 +57,7 @@ function HorizontalRuler({
   return (
     <svg
       width={totalPx}
-      height={24}
+      height={22}
       style={{
         display: 'block',
         background: 'var(--aside-bg)',
@@ -68,48 +66,43 @@ function HorizontalRuler({
         userSelect: 'none',
       }}
     >
-      {/* Traços menores (1 mm) */}
       {minorTicks.map(({ mm, x }) => (
         <line
           key={`min-${mm}`}
           x1={x}
-          y1={18}
+          y1={16}
           x2={x}
-          y2={24}
+          y2={22}
           stroke="var(--text-muted)"
           strokeWidth={1}
           opacity={0.35}
         />
       ))}
-
-      {/* Traços médios (5 mm) */}
       {mediumTicks.map(({ mm, x }) => (
         <line
           key={`med-${mm}`}
           x1={x}
-          y1={14}
+          y1={12}
           x2={x}
-          y2={24}
+          y2={22}
           stroke="var(--text-muted)"
           strokeWidth={1}
           opacity={0.7}
         />
       ))}
-
-      {/* Traços principais (10 mm) com rótulo numérico */}
       {majorTicks.map(({ mm, x }) => (
         <g key={`maj-${mm}`}>
           <line
             x1={x}
-            y1={6}
+            y1={5}
             x2={x}
-            y2={24}
+            y2={22}
             stroke="var(--accent-blue)"
             strokeWidth={1.2}
           />
           <text
             x={x + 2}
-            y={11}
+            y={10}
             fill="var(--text-secondary)"
             fontSize={9}
             fontFamily="var(--font-mono)"
@@ -120,14 +113,12 @@ function HorizontalRuler({
           </text>
         </g>
       ))}
-
-      {/* Marcador de posição do cursor em tempo real */}
       {cursorXpx !== null && cursorXpx >= 0 && cursorXpx <= totalPx && (
         <line
           x1={cursorXpx}
           y1={0}
           x2={cursorXpx}
-          y2={24}
+          y2={22}
           stroke="#ef4444"
           strokeWidth={1.5}
         />
@@ -137,7 +128,7 @@ function HorizontalRuler({
 }
 
 // =========================================================================
-// SUBCOMPONENTE DE RÉGUA VERTICAL EM MILÍMETROS (ALINHADA COM O CANVAS)
+// SUBCOMPONENTE DE RÉGUA VERTICAL EM MILÍMETROS (0 ➔ heightMm)
 // =========================================================================
 function VerticalRuler({
   heightMm,
@@ -170,7 +161,7 @@ function VerticalRuler({
 
   return (
     <svg
-      width={24}
+      width={22}
       height={totalPx}
       style={{
         display: 'block',
@@ -180,41 +171,36 @@ function VerticalRuler({
         userSelect: 'none',
       }}
     >
-      {/* Traços menores (1 mm) */}
       {minorTicks.map(({ mm, y }) => (
         <line
           key={`min-${mm}`}
-          x1={18}
+          x1={16}
           y1={y}
-          x2={24}
+          x2={22}
           y2={y}
           stroke="var(--text-muted)"
           strokeWidth={1}
           opacity={0.35}
         />
       ))}
-
-      {/* Traços médios (5 mm) */}
       {mediumTicks.map(({ mm, y }) => (
         <line
           key={`med-${mm}`}
-          x1={14}
+          x1={12}
           y1={y}
-          x2={24}
+          x2={22}
           y2={y}
           stroke="var(--text-muted)"
           strokeWidth={1}
           opacity={0.7}
         />
       ))}
-
-      {/* Traços principais (10 mm) com rótulo numérico */}
       {majorTicks.map(({ mm, y }) => (
         <g key={`maj-${mm}`}>
           <line
-            x1={6}
+            x1={5}
             y1={y}
-            x2={24}
+            x2={22}
             y2={y}
             stroke="var(--accent-blue)"
             strokeWidth={1.2}
@@ -232,13 +218,11 @@ function VerticalRuler({
           </text>
         </g>
       ))}
-
-      {/* Marcador de posição do cursor em tempo real */}
       {cursorYpx !== null && cursorYpx >= 0 && cursorYpx <= totalPx && (
         <line
           x1={0}
           y1={cursorYpx}
-          x2={24}
+          x2={22}
           y2={cursorYpx}
           stroke="#ef4444"
           strokeWidth={1.5}
@@ -248,14 +232,13 @@ function VerticalRuler({
   );
 }
 
-// Subcomponente para renderizar QR Code localmente via KonvaImage
+// Subcomponente QR Code Local
 function KonvaQRCode({
   elem,
   xPx,
   yPx,
   wPx,
   hPx,
-  dpi,
   onDragEnd,
   onTransformEnd,
   onClick,
@@ -267,7 +250,6 @@ function KonvaQRCode({
   yPx: number;
   wPx: number;
   hPx: number;
-  dpi: number;
   onDragEnd: (e: any) => void;
   onTransformEnd: (e: any) => void;
   onClick: (e: any) => void;
@@ -341,15 +323,11 @@ export default function CanvasArea() {
   const stageRef = useRef<any>(null);
   const transformerRef = useRef<any>(null);
 
-  // Posição atual do cursor do mouse em mm para feedback nas réguas
   const [cursorMm, setCursorMm] = useState<{ x: number | null; y: number | null }>({ x: null, y: null });
-
-  // Estados de seleção por área (Marquee Selection)
   const [isMarqueeActive, setIsMarqueeActive] = useState(false);
   const [marqueeStart, setMarqueeStart] = useState<{ x: number; y: number } | null>(null);
   const [marqueeEnd, setMarqueeEnd] = useState<{ x: number; y: number } | null>(null);
 
-  // Menu de contexto com botão direito
   const [contextMenu, setContextMenu] = useState<{
     x: number;
     y: number;
@@ -362,7 +340,11 @@ export default function CanvasArea() {
   const gridSizePx = mmToPx(gridSizeMm, dpi);
   const safeAreaMarginPx = mmToPx(safeAreaMarginMm, dpi);
 
-  // Atualizar seleção do Transformer do Konva para seleção individual ou múltipla
+  const primarySelected = useMemo(() => {
+    return document.elements.find((el) => selectedElementIds.includes(el.id));
+  }, [document.elements, selectedElementIds]);
+
+  // Atualizar seleção do Transformer do Konva com proporção inteligente por tipo
   useEffect(() => {
     if (!transformerRef.current || !stageRef.current) return;
 
@@ -371,15 +353,17 @@ export default function CanvasArea() {
         .map((id) => stageRef.current.findOne(`#${id}`))
         .filter((node): node is any => !!node);
 
+      // Trava proporção 1:1 apenas para QR Code e Imagem
+      const shouldKeepRatio = primarySelected?.type === 'qrcode' || primarySelected?.type === 'image';
+      transformerRef.current.keepRatio(shouldKeepRatio);
       transformerRef.current.nodes(nodes);
       transformerRef.current.getLayer()?.batchDraw();
     } else {
       transformerRef.current.nodes([]);
       transformerRef.current.getLayer()?.batchDraw();
     }
-  }, [selectedElementIds, document.elements]);
+  }, [selectedElementIds, document.elements, primarySelected]);
 
-  // Fechar menu de contexto ao clicar em qualquer lugar
   useEffect(() => {
     const handleGlobalClick = () => setContextMenu(null);
     window.addEventListener('click', handleGlobalClick);
@@ -391,12 +375,10 @@ export default function CanvasArea() {
     return Math.round(valPx / gridSizePx) * gridSizePx;
   };
 
-  // Verificar se algum elemento ultrapassa as dimensões da etiqueta
   const outOfBoundsElement = document.elements.find(
     (el) => el.x < 0 || el.y < 0 || el.x + el.width > widthMm || el.y + el.height > heightMm
   );
 
-  // Mouse Move Handler no Stage para rastreio nas réguas e Marquee
   const handleStageMouseMove = () => {
     if (!stageRef.current) return;
     const stage = stageRef.current.getStage();
@@ -405,7 +387,10 @@ export default function CanvasArea() {
     if (pointer) {
       const xMm = pxToMm(pointer.x / zoom, dpi);
       const yMm = pxToMm(pointer.y / zoom, dpi);
-      setCursorMm({ x: Math.max(0, Math.min(widthMm, xMm)), y: Math.max(0, Math.min(heightMm, yMm)) });
+      setCursorMm({
+        x: Math.max(0, Math.min(widthMm, xMm)),
+        y: Math.max(0, Math.min(heightMm, yMm)),
+      });
 
       if (isMarqueeActive) {
         setMarqueeEnd({ x: pointer.x / zoom, y: pointer.y / zoom });
@@ -417,7 +402,6 @@ export default function CanvasArea() {
     setCursorMm({ x: null, y: null });
   };
 
-  // Marquee Drag Handlers
   const handleStageMouseDown = (e: any) => {
     const clickedOnEmpty = e.target === stageRef.current;
     if (clickedOnEmpty) {
@@ -445,7 +429,6 @@ export default function CanvasArea() {
     const y1 = Math.min(marqueeStart.y, marqueeEnd.y);
     const y2 = Math.max(marqueeStart.y, marqueeEnd.y);
 
-    // Se o arrasto for significativo (> 5px), selecionar os elementos interceptados
     if (x2 - x1 > 5 || y2 - y1 > 5) {
       const selected: string[] = [];
       document.elements.forEach((el) => {
@@ -474,7 +457,7 @@ export default function CanvasArea() {
     setMarqueeEnd(null);
   };
 
-  // Renderizador de Elementos
+  // Renderizador Inteligente de Elementos
   const renderElement = (elem: LabelElement) => {
     if (elem.visible === false) return null;
 
@@ -519,8 +502,15 @@ export default function CanvasArea() {
       node.scaleX(1);
       node.scaleY(1);
 
-      const newWPx = Math.max(10, node.width() * scaleX);
-      const newHPx = Math.max(10, node.height() * scaleY);
+      let newWPx = Math.max(10, node.width() * scaleX);
+      let newHPx = Math.max(8, node.height() * scaleY);
+
+      // QR Code sempre quadrado 1:1
+      if (elem.type === 'qrcode') {
+        const side = Math.max(newWPx, newHPx);
+        newWPx = side;
+        newHPx = side;
+      }
 
       updateElement(elem.id, {
         x: pxToMm(node.x(), dpi),
@@ -532,33 +522,47 @@ export default function CanvasArea() {
 
     switch (elem.type) {
       case 'text': {
-        const textContent = showPreviewData && elem.field && MOCK_PRODUCT_DATA[elem.field]
-          ? MOCK_PRODUCT_DATA[elem.field]
-          : elem.text;
+        const textElem = elem as TextElement;
+        const textContent = showPreviewData && textElem.field && MOCK_PRODUCT_DATA[textElem.field]
+          ? MOCK_PRODUCT_DATA[textElem.field]
+          : textElem.text;
 
-        const isBold = elem.fontWeight === 'bold' || elem.fontWeight === '700' || elem.fontWeight === '600';
-        const isItalic = elem.fontStyle === 'italic';
+        const isBold = textElem.fontWeight === 'bold' || textElem.fontWeight === '700' || textElem.fontWeight === '600';
+        const isItalic = textElem.fontStyle === 'italic';
         const fontStyleStr = isBold && isItalic ? 'italic bold' : isBold ? 'bold' : isItalic ? 'italic' : 'normal';
+
+        // AutoFit Inteligente: se o texto não couber na largura/altura, reduz progressivamente a fonte respeitando 6pt
+        let calculatedFontSize = textElem.fontSize * (dpi / 72);
+        if (textElem.autoFit !== false && textElem.singleLine) {
+          const estimatedChars = textContent.length || 1;
+          const maxAllowedSize = (wPx / estimatedChars) * 1.6;
+          if (maxAllowedSize < calculatedFontSize) {
+            calculatedFontSize = Math.max(6 * (dpi / 72), maxAllowedSize);
+          }
+        }
 
         return (
           <Text
-            key={elem.id}
-            id={elem.id}
+            key={textElem.id}
+            id={textElem.id}
             x={xPx}
             y={yPx}
             width={wPx}
             height={hPx}
             text={textContent}
-            fontFamily={elem.fontFamily || 'Roboto'}
-            fontSize={elem.fontSize * (dpi / 72)}
+            fontFamily={textElem.fontFamily || 'Roboto'}
+            fontSize={calculatedFontSize}
             fontStyle={fontStyleStr}
-            textDecoration={elem.textDecoration || 'none'}
-            align={elem.alignment || 'left'}
-            verticalAlign={elem.verticalAlignment || 'top'}
-            fill={elem.color || '#000000'}
-            draggable={!elem.locked}
+            textDecoration={textElem.textDecoration || 'none'}
+            align={textElem.alignment || 'left'}
+            verticalAlign={textElem.verticalAlignment || 'top'}
+            wrap={textElem.singleLine ? 'none' : textElem.wrap || 'word'}
+            ellipsis={!!textElem.singleLine}
+            fill={textElem.color || '#000000'}
+            draggable={!textElem.locked}
             onClick={handleClick}
             onTap={handleClick}
+            onDblClick={() => setSelectedElementId(textElem.id)}
             onContextMenu={handleContextMenu}
             onDragEnd={handleDragEnd}
             onTransformEnd={handleTransformEnd}
@@ -567,101 +571,119 @@ export default function CanvasArea() {
       }
 
       case 'price': {
-        const rawPriceStr = showPreviewData && elem.field && MOCK_PRODUCT_DATA[elem.field]
-          ? MOCK_PRODUCT_DATA[elem.field]
+        const priceElem = elem as PriceElement;
+        const rawPriceStr = showPreviewData && priceElem.field && MOCK_PRODUCT_DATA[priceElem.field]
+          ? MOCK_PRODUCT_DATA[priceElem.field]
           : '9.99';
 
         const [integerPart, fractionPart] = rawPriceStr.split('.');
-        const integerSize = elem.integerFontSize * (dpi / 72);
-        const fractionSize = elem.fractionFontSize * (dpi / 72);
-        const currencySize = (elem.currencyFontSize || 12) * (dpi / 72);
+        const scaleFactor = Math.min(wPx / 140, hPx / 50, 1.8);
+        const integerSize = Math.max(12, priceElem.integerFontSize * (dpi / 72) * Math.max(0.6, scaleFactor));
+        const fractionSize = Math.max(8, priceElem.fractionFontSize * (dpi / 72) * Math.max(0.6, scaleFactor));
+        const currencySize = Math.max(7, (priceElem.currencyFontSize || 12) * (dpi / 72) * Math.max(0.6, scaleFactor));
 
         return (
           <Group
-            key={elem.id}
-            id={elem.id}
+            key={priceElem.id}
+            id={priceElem.id}
             x={xPx}
             y={yPx}
             width={wPx}
             height={hPx}
-            draggable={!elem.locked}
+            draggable={!priceElem.locked}
             onClick={handleClick}
             onTap={handleClick}
+            onDblClick={() => setSelectedElementId(priceElem.id)}
             onContextMenu={handleContextMenu}
             onDragEnd={handleDragEnd}
             onTransformEnd={handleTransformEnd}
           >
             <Text
-              text={elem.prefix || 'R$'}
-              fontFamily={elem.fontFamily || 'Roboto'}
+              text={priceElem.prefix || 'R$'}
+              fontFamily={priceElem.fontFamily || 'Roboto'}
               fontSize={currencySize}
               fontStyle="bold"
-              fill={elem.color || '#dc2626'}
+              fill={priceElem.color || '#dc2626'}
               x={0}
-              y={0}
+              y={Math.max(0, (hPx - integerSize) / 2)}
             />
             <Text
               text={integerPart}
-              fontFamily={elem.fontFamily || 'Roboto'}
+              fontFamily={priceElem.fontFamily || 'Roboto'}
               fontSize={integerSize}
               fontStyle="bold"
-              fill={elem.color || '#dc2626'}
+              fill={priceElem.color || '#dc2626'}
               x={currencySize * 1.5}
-              y={0}
+              y={Math.max(0, (hPx - integerSize) / 2)}
             />
             <Text
               text={`,${fractionPart || '00'}`}
-              fontFamily={elem.fontFamily || 'Roboto'}
+              fontFamily={priceElem.fontFamily || 'Roboto'}
               fontSize={fractionSize}
               fontStyle="bold"
-              fill={elem.color || '#dc2626'}
+              fill={priceElem.color || '#dc2626'}
               x={currencySize * 1.5 + integerSize * (integerPart?.length || 1) * 0.55}
-              y={0}
+              y={Math.max(0, (hPx - integerSize) / 2)}
             />
           </Group>
         );
       }
 
       case 'barcode': {
-        const valueStr = showPreviewData && elem.field && MOCK_PRODUCT_DATA[elem.field]
-          ? MOCK_PRODUCT_DATA[elem.field]
-          : elem.value;
+        const barcodeElem = elem as BarcodeElement;
+        const valueStr = showPreviewData && barcodeElem.field && MOCK_PRODUCT_DATA[barcodeElem.field]
+          ? MOCK_PRODUCT_DATA[barcodeElem.field]
+          : barcodeElem.value || '7894900011517';
+
+        // EAN-13: 13 dígitos contínuos indissociáveis das barras
+        const barHeight = barcodeElem.showText ? hPx * 0.72 : hPx;
+        const barCount = 30;
+        const barUnitWidth = wPx / (barCount * 1.2);
 
         return (
           <Group
-            key={elem.id}
-            id={elem.id}
+            key={barcodeElem.id}
+            id={barcodeElem.id}
             x={xPx}
             y={yPx}
             width={wPx}
             height={hPx}
-            draggable={!elem.locked}
+            draggable={!barcodeElem.locked}
             onClick={handleClick}
             onTap={handleClick}
+            onDblClick={() => setSelectedElementId(barcodeElem.id)}
             onContextMenu={handleContextMenu}
             onDragEnd={handleDragEnd}
             onTransformEnd={handleTransformEnd}
           >
-            {Array.from({ length: 24 }).map((_, i) => (
-              <Rect
-                key={i}
-                x={(wPx / 24) * i}
-                y={0}
-                width={(wPx / 24) * (i % 3 === 0 ? 0.7 : 0.4)}
-                height={hPx * 0.75}
-                fill="#000000"
-              />
-            ))}
-            {elem.showText && (
+            {/* Barras EAN */}
+            {Array.from({ length: barCount }).map((_, i) => {
+              const isThick = (i % 3 === 0 || i % 7 === 0) && i > 2 && i < barCount - 2;
+              return (
+                <Rect
+                  key={i}
+                  x={i * (wPx / barCount)}
+                  y={0}
+                  width={isThick ? barUnitWidth * 1.8 : barUnitWidth}
+                  height={barHeight}
+                  fill="#000000"
+                />
+              );
+            })}
+
+            {/* Numeração Humana: NUNCA QUEBRA LINHA (13 DÍGITOS JUNTOS) */}
+            {barcodeElem.showText !== false && (
               <Text
                 text={valueStr}
                 x={0}
-                y={hPx * 0.78}
+                y={barHeight + 2}
                 width={wPx}
-                fontFamily="Courier New"
-                fontSize={10 * (dpi / 72)}
+                fontFamily="Courier New, monospace"
+                fontSize={Math.max(7, Math.min(11, (wPx / 13) * 1.1))}
                 align="center"
                 fontStyle="bold"
+                wrap="none"
+                ellipsis={false}
                 fill="#000000"
               />
             )}
@@ -678,7 +700,6 @@ export default function CanvasArea() {
             yPx={yPx}
             wPx={wPx}
             hPx={hPx}
-            dpi={dpi}
             onClick={handleClick}
             onDblClick={() => setSelectedElementId(elem.id)}
             onContextMenu={handleContextMenu}
@@ -733,7 +754,6 @@ export default function CanvasArea() {
     }
   };
 
-  // Linhas da Grade de Fundo
   const renderGridLines = () => {
     const lines = [];
     for (let i = 0; i <= stageWidthPx; i += gridSizePx) {
@@ -761,7 +781,6 @@ export default function CanvasArea() {
     return lines;
   };
 
-  // Marquee Selection Box
   const marqueeBoxProps = useMemo(() => {
     if (!isMarqueeActive || !marqueeStart || !marqueeEnd) return null;
     return {
@@ -771,6 +790,9 @@ export default function CanvasArea() {
       height: Math.abs(marqueeEnd.y - marqueeStart.y),
     };
   }, [isMarqueeActive, marqueeStart, marqueeEnd]);
+
+  // Alerta de tamanho para código de barras EAN-13
+  const isBarcodeTooSmall = primarySelected?.type === 'barcode' && (primarySelected.width < 25 || primarySelected.height < 8);
 
   return (
     <div
@@ -786,7 +808,7 @@ export default function CanvasArea() {
       }}
       onContextMenu={(e) => e.preventDefault()}
     >
-      {/* Alerta de elemento fora dos limites da etiqueta */}
+      {/* Alertas Flutuantes Discretos */}
       {outOfBoundsElement && (
         <div
           style={{
@@ -794,9 +816,9 @@ export default function CanvasArea() {
             top: '12px',
             left: '50%',
             transform: 'translateX(-50%)',
-            background: 'rgba(245, 158, 11, 0.9)',
+            background: 'rgba(245, 158, 11, 0.92)',
             color: '#000000',
-            padding: '0.35rem 0.85rem',
+            padding: '0.3rem 0.8rem',
             borderRadius: '20px',
             fontSize: '0.75rem',
             fontWeight: 700,
@@ -808,11 +830,36 @@ export default function CanvasArea() {
           }}
         >
           <AlertTriangle size={14} />
-          <span>Parte do elemento está fora da área imprimível da etiqueta</span>
+          <span>Elemento fora da área imprimível da etiqueta</span>
         </div>
       )}
 
-      {/* Área Central com Rolagem e Prancheta Alinhada às Réguas */}
+      {isBarcodeTooSmall && (
+        <div
+          style={{
+            position: 'absolute',
+            top: '12px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            background: 'rgba(239, 68, 68, 0.92)',
+            color: '#ffffff',
+            padding: '0.3rem 0.8rem',
+            borderRadius: '20px',
+            fontSize: '0.75rem',
+            fontWeight: 700,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.4rem',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+            zIndex: 10,
+          }}
+        >
+          <AlertTriangle size={14} />
+          <span>Tamanho pequeno para leitura segura em impressoras 203 DPI</span>
+        </div>
+      )}
+
+      {/* Área Central: Prancheta com Réguas Precisas (0,0) */}
       <div
         style={{
           flex: 1,
@@ -828,24 +875,23 @@ export default function CanvasArea() {
           }
         }}
       >
-        {/* Container em Grid Unificado: Canto (mm) | Régua Horizontal | Régua Vertical | Canvas Konva */}
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: showRulers ? '24px auto' : 'auto',
-            gridTemplateRows: showRulers ? '24px auto' : 'auto',
+            gridTemplateColumns: showRulers ? '22px auto' : 'auto',
+            gridTemplateRows: showRulers ? '22px auto' : 'auto',
             boxShadow: 'var(--shadow-elevated), 0 0 0 1px var(--border-color)',
-            borderRadius: '6px',
+            borderRadius: '4px',
             overflow: 'hidden',
             background: 'var(--aside-bg)',
           }}
         >
-          {/* Canto Superior Esquerdo: Unidade mm */}
+          {/* Canto mm */}
           {showRulers && (
             <div
               style={{
-                width: 24,
-                height: 24,
+                width: 22,
+                height: 22,
                 background: 'var(--aside-bg)',
                 borderRight: '1px solid var(--border-color)',
                 borderBottom: '1px solid var(--border-color)',
@@ -858,13 +904,13 @@ export default function CanvasArea() {
                 fontFamily: 'var(--font-mono)',
                 userSelect: 'none',
               }}
-              title="Unidade de medida: Milímetros (mm)"
+              title="Milímetros (mm)"
             >
               mm
             </div>
           )}
 
-          {/* Régua Horizontal Superior (Alinhada 0 ➔ widthMm) */}
+          {/* Régua Horizontal */}
           {showRulers && (
             <HorizontalRuler
               widthMm={widthMm}
@@ -874,7 +920,7 @@ export default function CanvasArea() {
             />
           )}
 
-          {/* Régua Vertical Lateral (Alinhada 0 ➔ heightMm) */}
+          {/* Régua Vertical */}
           {showRulers && (
             <VerticalRuler
               heightMm={heightMm}
@@ -884,7 +930,7 @@ export default function CanvasArea() {
             />
           )}
 
-          {/* Prancheta da Etiqueta (Fundo Branco) */}
+          {/* Canvas da Etiqueta */}
           <div
             style={{
               width: stageWidthPx * zoom,
@@ -906,10 +952,8 @@ export default function CanvasArea() {
               onMouseLeave={handleStageMouseLeave}
               onMouseUp={handleStageMouseUp}
             >
-              {/* Camada da Grade */}
               {snapToGrid && <Layer>{renderGridLines()}</Layer>}
 
-              {/* Linha Guia de Margem Segura (1.5 mm) */}
               {showSafeArea && (
                 <Layer>
                   <Rect
@@ -924,11 +968,9 @@ export default function CanvasArea() {
                 </Layer>
               )}
 
-              {/* Camada dos Elementos Visuais */}
               <Layer>
                 {document.elements.map(renderElement)}
 
-                {/* Caixa do Marquee de Seleção */}
                 {marqueeBoxProps && (
                   <Rect
                     x={marqueeBoxProps.x}
@@ -942,7 +984,6 @@ export default function CanvasArea() {
                   />
                 )}
 
-                {/* Konva Transformer para elementos selecionados */}
                 <Transformer
                   ref={transformerRef}
                   rotateEnabled={true}
@@ -958,7 +999,7 @@ export default function CanvasArea() {
         </div>
       </div>
 
-      {/* Menu de Contexto no Botão Direito */}
+      {/* Menu de Contexto com Botão Direito */}
       {contextMenu && (
         <div
           style={{

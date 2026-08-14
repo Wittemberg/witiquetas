@@ -334,16 +334,9 @@ export default function NewTemplateWizard({ isOpen, onClose, onSuccess }: Wizard
 
         {/* Footer do Wizard */}
         <div className="wizard-footer">
-          {step === 'niche' ? (
-            <button className="btn" onClick={onClose}>
-              Cancelar
-            </button>
-          ) : (
-            <button className="btn" onClick={() => setStep('niche')}>
-              <ArrowLeft size={14} />
-              <span>Voltar aos Nichos</span>
-            </button>
-          )}
+          <button className="btn" onClick={onClose}>
+            Cancelar
+          </button>
 
           {step === 'niche' ? (
             <button

@@ -18,8 +18,10 @@ export function pxToMm(px: number, dpi: number = 203): number {
 }
 
 // Formatador dimensional consistente pt-BR (ex: "30 mm" ou "25,4 mm")
-export function formatDimensionBR(mm: number): string {
-  const rounded = Number.isInteger(mm) ? mm.toString() : mm.toFixed(2).replace(/\.?0+$/, '').replace('.', ',');
+export function formatDimensionBR(mm?: number | null): string {
+  if (mm === undefined || mm === null || isNaN(Number(mm))) return '0 mm';
+  const val = Number(mm);
+  const rounded = Number.isInteger(val) ? val.toString() : val.toFixed(2).replace(/\.?0+$/, '').replace('.', ',');
   return `${rounded} mm`;
 }
 
@@ -536,6 +538,20 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           height: 1,
           strokeWidth: 1,
           color: '#000000',
+          locked: false,
+          visible: true,
+        };
+        break;
+      case 'image':
+        newElem = {
+          id: newId,
+          name: 'Logotipo / Imagem',
+          type: 'image',
+          src: 'https://via.placeholder.com/150',
+          x: 5,
+          y: 5,
+          width: Math.min(20, document.dimensions.widthMm - 10),
+          height: Math.min(20, document.dimensions.heightMm - 10),
           locked: false,
           visible: true,
         };

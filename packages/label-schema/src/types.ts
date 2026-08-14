@@ -26,6 +26,8 @@ export interface TextElement extends BaseElement {
   verticalAlignment?: 'top' | 'middle' | 'bottom';
   wrap?: 'auto' | 'none';
   color?: string;
+  autoFit?: boolean; // Redução/ajuste inteligente para não estourar a caixa
+  singleLine?: boolean; // Forçar texto em uma única linha
 }
 
 export interface PriceElement extends BaseElement {

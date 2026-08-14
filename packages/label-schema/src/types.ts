@@ -43,10 +43,10 @@ export interface PriceElement extends BaseElement {
 
 export interface BarcodeElement extends BaseElement {
   type: 'barcode';
-  format: 'EAN13' | 'CODE128' | 'EAN8';
-  field?: string; // Ex: "produto.ean"
-  value: string; // Valor padrão se não vinculado
-  showText?: boolean; // Exibir números abaixo das barras
+  format: 'AUTO' | 'EAN13' | 'EAN8' | 'UPCA' | 'UPCE' | 'CODE128' | 'ITF14';
+  field?: string; // Ex: "produto.ean" (Fonte da verdade)
+  value: string; // Valor manual / exemplo para visualização
+  showText?: boolean; // Exibir numeração humana abaixo das barras
   fontFamily?: string;
   fontSize?: number;
 }

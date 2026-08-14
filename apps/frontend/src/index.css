@@ -873,3 +873,42 @@ body {
 .spin {
   animation: spin 1s linear infinite;
 }
+
+/* Indicador de Salvamento */
+.save-status-indicator {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.72rem;
+}
+
+.save-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+
+.save-status-dot.saved {
+  background-color: var(--status-success);
+  box-shadow: 0 0 6px rgba(16, 185, 129, 0.4);
+}
+
+.save-status-dot.unsaved {
+  background-color: var(--status-warning);
+  box-shadow: 0 0 6px rgba(245, 158, 11, 0.4);
+}
+
+.save-status-dot.saving {
+  background-color: var(--accent-blue);
+  animation: pulse 1s infinite alternate;
+}
+
+.save-status-dot.error {
+  background-color: var(--status-danger);
+  box-shadow: 0 0 6px rgba(239, 68, 68, 0.4);
+}
+
+@keyframes pulse {
+  0% { opacity: 0.4; }
+  100% { opacity: 1; }
+}

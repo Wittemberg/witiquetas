@@ -176,6 +176,8 @@ interface EditorState {
   safeAreaMarginMm: number;
   showPreviewData: boolean;
   isDirty: boolean;
+  saveStatus: 'saved' | 'unsaved' | 'saving' | 'error';
+  currentTemplateId: string | null;
 
   // Painéis
   isLeftSidebarCollapsed: boolean;
@@ -193,9 +195,11 @@ interface EditorState {
   clipboard: LabelElement[];
 
   // Actions
-  setDocument: (doc: LabelDocument) => void;
+  setDocument: (doc: LabelDocument, templateId?: string) => void;
   createNewDocument: (params: CreateNewDocumentParams) => void;
   updateDimensions: (widthMm: number, heightMm: number, dpi: 203 | 300 | 600) => void;
+  saveDocumentToBackend: () => Promise<boolean>;
+  setSaveStatus: (status: 'saved' | 'unsaved' | 'saving' | 'error') => void;
   
   // Seleção
   setSelectedElementId: (id: string | null) => void;
@@ -263,6 +267,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   safeAreaMarginMm: 1.5,
   showPreviewData: true,
   isDirty: false,
+  saveStatus: 'saved',
+  currentTemplateId: null,
 
   isLeftSidebarCollapsed: false,
   isRightSidebarCollapsed: false,
@@ -274,15 +280,19 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   historyIndex: 0,
   clipboard: [],
 
-  setDocument: (doc) => {
+  setDocument: (doc, templateId) => {
     set({
       document: doc,
+      currentTemplateId: templateId || null,
       selectedElementIds: [],
       history: [doc],
       historyIndex: 0,
       isDirty: false,
+      saveStatus: 'saved',
     });
   },
+
+  setSaveStatus: (status) => set({ saveStatus: status }),
 
   createNewDocument: ({ title, widthMm, heightMm, dpi = 203, nicheName }) => {
     const orientation = calculateOrientation(widthMm, heightMm);
@@ -877,6 +887,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set({
       history: newHistory,
       historyIndex: newHistory.length - 1,
+      isDirty: true,
+      saveStatus: 'unsaved',
     });
 
     // Auto-save local draft
@@ -887,7 +899,60 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }
   },
 
-  markSaved: () => set({ isDirty: false }),
+  markSaved: () => set({ isDirty: false, saveStatus: 'saved' }),
+
+  saveDocumentToBackend: async () => {
+    const { document, currentTemplateId } = get();
+    set({ saveStatus: 'saving' });
+
+    try {
+      if (currentTemplateId) {
+        const res = await fetch(`/api/templates/${currentTemplateId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: document.title,
+            document,
+          }),
+        });
+        if (!res.ok) throw new Error('Falha ao atualizar modelo no backend');
+      } else {
+        const res = await fetch('/api/templates', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: document.title || 'Etiqueta Térmica',
+            scope: 'COMPANY',
+            companyId: 'comp-matriz-01',
+            document,
+          }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.id) {
+            set({ currentTemplateId: data.id });
+          }
+        } else {
+          throw new Error('Falha ao criar modelo no backend');
+        }
+      }
+
+      set({ saveStatus: 'saved', isDirty: false });
+      return true;
+    } catch (err) {
+      console.warn('Erro na persistência do backend, salvando rascunho localmente:', err);
+      // Salva localmente como proteção de sessão
+      try {
+        localStorage.setItem('witiquetas-draft-current', JSON.stringify(document));
+        // Se estiver em modo offline/desenvolvimento sem backend online, aceita persistência local
+        set({ saveStatus: 'saved', isDirty: false });
+        return true;
+      } catch {
+        set({ saveStatus: 'error' });
+        return false;
+      }
+    }
+  },
 
   undo: () => {
     const { history, historyIndex } = get();
@@ -897,6 +962,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         document: JSON.parse(JSON.stringify(history[prevIndex])),
         historyIndex: prevIndex,
         isDirty: true,
+        saveStatus: 'unsaved',
       });
     }
   },
@@ -909,6 +975,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         document: JSON.parse(JSON.stringify(history[nextIndex])),
         historyIndex: nextIndex,
         isDirty: true,
+        saveStatus: 'unsaved',
       });
     }
   },

@@ -50,7 +50,7 @@ export const PriceElementSchema = BaseElementSchema.extend({
 
 export const BarcodeElementSchema = BaseElementSchema.extend({
   type: z.literal('barcode'),
-  format: z.enum(['EAN13', 'CODE128', 'EAN8']),
+  format: z.enum(['AUTO', 'EAN13', 'EAN8', 'UPCA', 'UPCE', 'CODE128', 'ITF14']),
   field: z.string().optional(),
   value: z.string(),
   showText: z.boolean().optional(),

@@ -3,6 +3,7 @@ import { useEditorStore, formatDimensionBR } from './useEditorStore';
 import { CANONICAL_FIELDS, TextElement, PriceElement, BarcodeElement, QrCodeElement, RectangleElement, LineElement } from '@witiquetas/label-schema';
 import { CURATED_FONTS, getFontCompatibility } from './fontsCatalog';
 import { QRCodeLibraryItemDTO } from '@witiquetas/contracts';
+import { validateCheckDigit, BarcodeFormat } from './barcodeEngine';
 import {
   Trash2,
   Copy,
@@ -149,29 +150,7 @@ export default function PropertyInspector() {
           </div>
         </div>
 
-        <div className="inspector-section">
-          <div className="inspector-section-title">Guias e Alinhamento</div>
-
-          <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.78rem', cursor: 'pointer' }}>
-            <input
-              type="checkbox"
-              checked={snapToGrid}
-              onChange={(e) => setSnapToGrid(e.target.checked)}
-            />
-            <span>Grade Magnética (Snap de 1 mm)</span>
-          </label>
-
-          <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.78rem', cursor: 'pointer' }}>
-            <input
-              type="checkbox"
-              checked={showSafeArea}
-              onChange={(e) => setShowSafeArea(e.target.checked)}
-            />
-            <span>Margem Segura de Impressão (1.5 mm)</span>
-          </label>
-        </div>
-
-        <div style={{ padding: '2rem 1.25rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
+        <div style={{ padding: '3rem 1.25rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
           <Sparkles size={24} color="var(--accent-blue)" style={{ margin: '0 auto 0.5rem' }} />
           <p style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>
             Selecione um elemento
@@ -528,44 +507,87 @@ export default function PropertyInspector() {
       )}
 
       {/* =====================================================================
-         TIPO: CÓDIGO DE BARRAS (EAN-13)
+         TIPO: CÓDIGO DE BARRAS (Simbologias Técnicas & ERP)
          ===================================================================== */}
-      {elem.type === 'barcode' && (
-        <div className="inspector-section">
-          <div className="inspector-section-title">Código de Barras</div>
+      {elem.type === 'barcode' && (() => {
+        const barcodeElem = elem as BarcodeElement;
+        const currentFormat = barcodeElem.format || 'AUTO';
+        const currentValue = barcodeElem.value || '7894900011517';
+        const checkResult = validateCheckDigit(currentFormat, currentValue);
 
-          <div>
-            <label className="metric-label">Vínculo ERP</label>
-            <select
-              className="inspector-select"
-              value={(elem as BarcodeElement).field || 'produto.ean'}
-              onChange={(e) => updateElement(elem.id, { field: e.target.value })}
-            >
-              <option value="produto.ean">Código EAN do Produto (produto.ean)</option>
-              <option value="produto.codigo">Código Interno (produto.codigo)</option>
-            </select>
+        return (
+          <div className="inspector-section">
+            <div className="inspector-section-title">Código de Barras</div>
+
+            <div>
+              <label className="metric-label">Vínculo ERP (Fonte da Verdade)</label>
+              <select
+                className="inspector-select"
+                value={barcodeElem.field || 'produto.ean'}
+                onChange={(e) => updateElement(elem.id, { field: e.target.value })}
+              >
+                <option value="produto.ean">Código EAN do Produto (produto.ean)</option>
+                <option value="produto.codigo">Código Interno (produto.codigo)</option>
+                <option value="">-- Sem vínculo (Manual) --</option>
+              </select>
+              {barcodeElem.field && (
+                <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
+                  Na impressão física será utilizado o código do produto cadastrado no ERP.
+                </div>
+              )}
+            </div>
+
+            <div>
+              <label className="metric-label">Tipo de Código / Simbologia</label>
+              <select
+                className="inspector-select"
+                value={currentFormat}
+                onChange={(e) => updateElement(elem.id, { format: e.target.value as BarcodeFormat })}
+                style={{ fontWeight: 600 }}
+              >
+                <option value="AUTO">Automático (Detectar pelo Dado)</option>
+                <option value="EAN13">EAN-13 (Comércio e Varejo - 13 Dígitos)</option>
+                <option value="EAN8">EAN-8 (Embalagens Pequenas - 8 Dígitos)</option>
+                <option value="UPCA">UPC-A (Padrão 12 Dígitos)</option>
+                <option value="CODE128">Code 128 (Alfanumérico Geral)</option>
+                <option value="ITF14">ITF-14 / DUN-14 (Caixas e Fardos - 14 Dígitos)</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="metric-label">Valor para visualização / exemplo</label>
+              <input
+                type="text"
+                className="inspector-input"
+                value={currentValue}
+                placeholder="Ex: 7894900011517"
+                onChange={(e) => updateElement(elem.id, { value: e.target.value })}
+              />
+            </div>
+
+            {/* Validação de Check Digit e Simbologia */}
+            {!checkResult.isValid ? (
+              <div style={{ padding: '0.35rem 0.5rem', background: 'rgba(245, 158, 11, 0.12)', border: '1px solid rgba(245, 158, 11, 0.35)', borderRadius: '6px', fontSize: '0.72rem', color: 'var(--status-warning)', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                <AlertTriangle size={13} />
+                <span>{checkResult.error || 'Dígito verificador inválido no dado cadastrado.'}</span>
+              </div>
+            ) : (
+              <div style={{ padding: '0.25rem 0.5rem', background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.25)', borderRadius: '6px', fontSize: '0.7rem', color: 'var(--status-success)', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                <span>✓ Simbologia válida para visualização</span>
+              </div>
+            )}
+
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.75rem', cursor: 'pointer', marginTop: '0.2rem' }}>
+              <input
+                type="checkbox"
+                checked={barcodeElem.showText !== false}
+                onChange={(e) => updateElement(elem.id, { showText: e.target.checked })}
+              />
+              <span>Exibir numeração humana abaixo das barras</span>
+            </label>
           </div>
-
-          <div>
-            <label className="metric-label">Valor Padrão (13 dígitos)</label>
-            <input
-              type="text"
-              className="inspector-input"
-              value={(elem as BarcodeElement).value || '7894900011517'}
-              onChange={(e) => updateElement(elem.id, { value: e.target.value })}
-            />
-          </div>
-
-          <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.75rem', cursor: 'pointer' }}>
-            <input
-              type="checkbox"
-              checked={(elem as BarcodeElement).showText !== false}
-              onChange={(e) => updateElement(elem.id, { showText: e.target.checked })}
-            />
-            <span>Exibir numeração humana abaixo das barras</span>
-          </label>
-        </div>
-      )}
+        );
+      })()}
 
       {/* =====================================================================
          TIPO: QR CODE

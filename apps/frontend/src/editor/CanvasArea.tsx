@@ -9,6 +9,7 @@ import {
 } from './useEditorStore';
 import { LabelElement, QrCodeElement, TextElement, BarcodeElement, PriceElement } from '@witiquetas/label-schema';
 import { generateQRCodeDataUrl } from './qrCodeGenerator';
+import { generateBarcodeModules } from './barcodeEngine';
 import {
   Copy,
   Scissors,
@@ -635,10 +636,31 @@ export default function CanvasArea() {
           ? MOCK_PRODUCT_DATA[barcodeElem.field]
           : barcodeElem.value || '7894900011517';
 
-        // EAN-13: 13 dígitos contínuos indissociáveis das barras
-        const barHeight = barcodeElem.showText ? hPx * 0.72 : hPx;
-        const barCount = 30;
-        const barUnitWidth = wPx / (barCount * 1.2);
+        // Motor Matemático de Módulos (Sem esticar nem gerar barras decorativas)
+        const encoding = generateBarcodeModules(barcodeElem.format || 'AUTO', valueStr);
+        const totalModules = encoding.totalModules || 95;
+        const moduleWidth = wPx / totalModules;
+        const showHumanText = barcodeElem.showText !== false;
+        const barHeight = showHumanText ? Math.max(6, hPx - 13) : hPx;
+
+        // Agrupamento de módulos pretos contíguos em retângulos exatos
+        const barRuns: { start: number; length: number }[] = [];
+        let currentRun: { start: number; length: number } | null = null;
+        encoding.modules.forEach((isBlack, idx) => {
+          if (isBlack) {
+            if (!currentRun) {
+              currentRun = { start: idx, length: 1 };
+            } else {
+              currentRun.length++;
+            }
+          } else {
+            if (currentRun) {
+              barRuns.push(currentRun);
+              currentRun = null;
+            }
+          }
+        });
+        if (currentRun) barRuns.push(currentRun);
 
         return (
           <Group
@@ -656,30 +678,27 @@ export default function CanvasArea() {
             onDragEnd={handleDragEnd}
             onTransformEnd={handleTransformEnd}
           >
-            {/* Barras EAN */}
-            {Array.from({ length: barCount }).map((_, i) => {
-              const isThick = (i % 3 === 0 || i % 7 === 0) && i > 2 && i < barCount - 2;
-              return (
-                <Rect
-                  key={i}
-                  x={i * (wPx / barCount)}
-                  y={0}
-                  width={isThick ? barUnitWidth * 1.8 : barUnitWidth}
-                  height={barHeight}
-                  fill="#000000"
-                />
-              );
-            })}
+            {/* Renderização Exata dos Módulos das Barras */}
+            {barRuns.map((run, i) => (
+              <Rect
+                key={i}
+                x={run.start * moduleWidth}
+                y={0}
+                width={run.length * moduleWidth}
+                height={barHeight}
+                fill="#000000"
+              />
+            ))}
 
-            {/* Numeração Humana: NUNCA QUEBRA LINHA (13 DÍGITOS JUNTOS) */}
-            {barcodeElem.showText !== false && (
+            {/* Numeração Humana: SOMENTE CAMADA VISUAL (NUNCA QUEBRA LINHA) */}
+            {showHumanText && (
               <Text
                 text={valueStr}
                 x={0}
                 y={barHeight + 2}
                 width={wPx}
                 fontFamily="Courier New, monospace"
-                fontSize={Math.max(7, Math.min(11, (wPx / 13) * 1.1))}
+                fontSize={Math.max(8, Math.min(12, hPx * 0.22, (wPx / (valueStr.length || 1)) * 0.9))}
                 align="center"
                 fontStyle="bold"
                 wrap="none"
@@ -961,9 +980,9 @@ export default function CanvasArea() {
                     y={safeAreaMarginPx}
                     width={stageWidthPx - safeAreaMarginPx * 2}
                     height={stageHeightPx - safeAreaMarginPx * 2}
-                    stroke="rgba(245, 158, 11, 0.4)"
-                    strokeWidth={1}
-                    dash={[4, 4]}
+                    stroke="rgba(245, 158, 11, 0.85)"
+                    strokeWidth={1.5}
+                    dash={[6, 4]}
                   />
                 </Layer>
               )}

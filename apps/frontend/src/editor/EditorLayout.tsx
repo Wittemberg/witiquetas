@@ -33,7 +33,10 @@ import {
   Plus,
   Lock,
   Unlock,
-  Layers
+  Layers,
+  Save,
+  AlertCircle,
+  Loader2
 } from 'lucide-react';
 
 interface EditorLayoutProps {
@@ -56,6 +59,14 @@ export default function EditorLayout({
     showPreviewData,
     setShowPreviewData,
     isDirty,
+    saveStatus,
+    saveDocumentToBackend,
+    snapToGrid,
+    setSnapToGrid,
+    showSafeArea,
+    setShowSafeArea,
+    showRulers,
+    setShowRulers,
     undo,
     redo,
     addElement,
@@ -67,7 +78,6 @@ export default function EditorLayout({
     cutSelection,
     pasteSelection,
     nudgeElements,
-    markSaved,
     toggleLock,
     toggleVisibility,
     isLeftSidebarCollapsed,
@@ -78,6 +88,8 @@ export default function EditorLayout({
 
   const [isWizardOpen, setIsWizardOpen] = useState(false);
   const [isCompileOpen, setIsCompileOpen] = useState(false);
+  const [isViewMenuOpen, setIsViewMenuOpen] = useState(false);
+  const [isUnsavedExitModalOpen, setIsUnsavedExitModalOpen] = useState(false);
 
   // Escuta de Atalhos Globais do Teclado
   useEffect(() => {
@@ -126,7 +138,7 @@ export default function EditorLayout({
           }
         } else if (e.key === 's' || e.key === 'S') {
           e.preventDefault();
-          markSaved();
+          saveDocumentToBackend();
         }
       } else {
         if (e.key === 'Delete' || e.key === 'Backspace') {
@@ -137,6 +149,7 @@ export default function EditorLayout({
         } else if (e.key === 'Escape') {
           if (!isInputActive) {
             clearSelection();
+            setIsViewMenuOpen(false);
           }
         } else if (
           e.key === 'ArrowLeft' ||
@@ -169,9 +182,17 @@ export default function EditorLayout({
     clearSelection,
     removeSelectedElements,
     nudgeElements,
-    markSaved,
+    saveDocumentToBackend,
     selectedElementIds,
   ]);
+
+  const handleBackClick = () => {
+    if (isDirty) {
+      setIsUnsavedExitModalOpen(true);
+    } else {
+      onBackToDashboard?.();
+    }
+  };
 
   const getElementIcon = (type: string) => {
     switch (type) {
@@ -205,7 +226,7 @@ export default function EditorLayout({
         {/* Lado Esquerdo: Navegação, Identificação e Estado */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
           {onBackToDashboard && (
-            <button className="btn" onClick={onBackToDashboard} style={{ fontSize: '0.75rem', padding: '0.35rem 0.6rem' }}>
+            <button className="btn" onClick={handleBackClick} style={{ fontSize: '0.75rem', padding: '0.35rem 0.6rem' }}>
               <ChevronLeft size={14} />
               <span>Modelos</span>
             </button>
@@ -227,16 +248,47 @@ export default function EditorLayout({
             {formatDimensionBR(widthMm)} × {formatDimensionBR(heightMm)} ({dpi} DPI)
           </div>
 
-          {/* Indicador Discreto de Salvamento */}
-          <div className="save-status-indicator">
-            <div className={`save-status-dot ${isDirty ? 'unsaved' : 'saved'}`} />
-            <span style={{ fontSize: '0.72rem', color: isDirty ? 'var(--status-warning)' : 'var(--status-success)' }}>
-              {isDirty ? 'Alterações não salvas' : 'Salvo'}
-            </span>
+          {/* Indicador e Ação Explícita de Salvamento (Item 223, 224, 225) */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+            <div className="save-status-indicator">
+              <div className={`save-status-dot ${saveStatus === 'unsaved' ? 'unsaved' : saveStatus === 'error' ? 'unsaved' : 'saved'}`} />
+              <span style={{ fontSize: '0.72rem', color: saveStatus === 'unsaved' ? 'var(--status-warning)' : saveStatus === 'error' ? 'var(--status-danger)' : 'var(--status-success)' }}>
+                {saveStatus === 'saving'
+                  ? 'Salvando...'
+                  : saveStatus === 'unsaved'
+                  ? 'Não salvo'
+                  : saveStatus === 'error'
+                  ? 'Erro ao salvar'
+                  : 'Salvo'}
+              </span>
+            </div>
+
+            {(saveStatus === 'unsaved' || saveStatus === 'error') && (
+              <button
+                className="btn"
+                style={{
+                  padding: '0.2rem 0.55rem',
+                  fontSize: '0.72rem',
+                  fontWeight: 700,
+                  background: 'var(--accent-blue)',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '4px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.3rem',
+                }}
+                onClick={() => saveDocumentToBackend()}
+                title="Salvar modelo no servidor (Ctrl+S)"
+              >
+                {saveStatus === 'saving' ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
+                <span>{saveStatus === 'error' ? 'Tentar novamente' : 'Salvar'}</span>
+              </button>
+            )}
           </div>
         </div>
 
-        {/* Lado Direito: Ações Globais Essenciais (Desfazer, Zoom, Dados, Tema, Imprimir) */}
+        {/* Lado Direito: Ações Globais Essenciais (Desfazer, Zoom, Guias [▦], Dados, Tema, Imprimir) */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           {/* Desfazer / Refazer */}
           <div style={{ display: 'flex', gap: '0.2rem' }}>
@@ -269,6 +321,71 @@ export default function EditorLayout({
           </div>
 
           <div style={{ width: '1px', height: '18px', background: 'var(--border-color)' }} />
+
+          {/* Menu Suspenso de Visualização & Guias [▦] (Item 222) */}
+          <div style={{ position: 'relative' }}>
+            <button
+              className={`btn ${isViewMenuOpen ? 'btn-primary' : ''}`}
+              style={{ padding: '0.35rem 0.6rem', fontSize: '0.75rem' }}
+              onClick={() => setIsViewMenuOpen(!isViewMenuOpen)}
+              title="Opções de Visualização, Grade e Margens"
+            >
+              <Grid size={13} />
+              <span>Guias</span>
+            </button>
+
+            {isViewMenuOpen && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '100%',
+                  right: 0,
+                  marginTop: '6px',
+                  background: 'var(--bg-card)',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: '8px',
+                  padding: '0.75rem 0.85rem',
+                  boxShadow: 'var(--shadow-elevated)',
+                  zIndex: 50,
+                  minWidth: '220px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.55rem',
+                }}
+              >
+                <div style={{ fontSize: '0.7rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+                  Visualização & Guias
+                </div>
+
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.78rem', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={snapToGrid}
+                    onChange={(e) => setSnapToGrid(e.target.checked)}
+                  />
+                  <span>Grade Magnética (1 mm)</span>
+                </label>
+
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.78rem', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={showSafeArea}
+                    onChange={(e) => setShowSafeArea(e.target.checked)}
+                  />
+                  <span>Margem Segura (1.5 mm)</span>
+                </label>
+
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.78rem', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={showRulers}
+                    onChange={(e) => setShowRulers(e.target.checked)}
+                  />
+                  <span>Réguas em Milímetros</span>
+                </label>
+              </div>
+            )}
+          </div>
 
           {/* Alternador Discreto de Dados: Exemplo / ERP */}
           <button
@@ -327,7 +444,7 @@ export default function EditorLayout({
               <span>Novo Formato / Nicho</span>
             </button>
 
-            {/* Paleta de Criação de Elementos (Item 161) */}
+            {/* Paleta de Criação de Elementos */}
             <div>
               <label className="metric-label" style={{ marginBottom: '0.4rem' }}>Adicionar à Etiqueta</label>
               <div className="creation-palette-grid">
@@ -358,7 +475,7 @@ export default function EditorLayout({
               </div>
             </div>
 
-            {/* Lista de Camadas Compacta (Item 180, 182, 183) */}
+            {/* Lista de Camadas Compacta */}
             <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '0.75rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
                 <label className="metric-label">Camadas ({document.elements.length})</label>
@@ -463,6 +580,45 @@ export default function EditorLayout({
           <PropertyInspector />
         </aside>
       </div>
+
+      {/* Modal de Confirmação de Saída com Alterações Não Salvas (Item 227) */}
+      {isUnsavedExitModalOpen && (
+        <div className="wizard-modal-overlay">
+          <div className="wizard-modal-content" style={{ maxWidth: '420px', padding: '1.5rem' }}>
+            <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '0.5rem' }}>
+              Alterações não salvas
+            </h3>
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '1.25rem', lineHeight: 1.5 }}>
+              Você possui alterações que ainda não foram salvas neste modelo. Deseja salvar antes de retornar aos modelos?
+            </p>
+            <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+              <button className="btn" onClick={() => setIsUnsavedExitModalOpen(false)}>
+                Continuar Editando
+              </button>
+              <button
+                className="btn"
+                style={{ color: 'var(--status-danger)' }}
+                onClick={() => {
+                  setIsUnsavedExitModalOpen(false);
+                  onBackToDashboard?.();
+                }}
+              >
+                Descartar e Sair
+              </button>
+              <button
+                className="btn btn-primary"
+                onClick={async () => {
+                  await saveDocumentToBackend();
+                  setIsUnsavedExitModalOpen(false);
+                  onBackToDashboard?.();
+                }}
+              >
+                Salvar e Sair
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modais */}
       <NewTemplateWizard isOpen={isWizardOpen} onClose={() => setIsWizardOpen(false)} />

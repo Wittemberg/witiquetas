@@ -119,8 +119,11 @@ export default function NewTemplateWizard({ isOpen, onClose, onSuccess }: Wizard
   const handleCreate = () => {
     if (!selectedSize || !selectedNiche) return;
 
+    const safeSizeLabel = selectedSize.label || `${selectedSize.widthMm}x${selectedSize.heightMm}mm`;
+    const safeTitle = customTitle.trim() || `${selectedNiche.name} - ${safeSizeLabel}`;
+
     createNewDocument({
-      title: customTitle.trim() || `${selectedNiche.name} - ${selectedSize.label}`,
+      title: safeTitle,
       widthMm: selectedSize.widthMm,
       heightMm: selectedSize.heightMm,
       dpi: 203,

@@ -573,15 +573,34 @@ export default function CanvasArea() {
 
       case 'price': {
         const priceElem = elem as PriceElement;
-        const rawPriceStr = showPreviewData && priceElem.field && MOCK_PRODUCT_DATA[priceElem.field]
+        const rawValueStr = showPreviewData && priceElem.field && MOCK_PRODUCT_DATA[priceElem.field]
           ? MOCK_PRODUCT_DATA[priceElem.field]
-          : '9.99';
+          : priceElem.sampleValue || '9.99';
 
-        const [integerPart, fractionPart] = rawPriceStr.split('.');
-        const scaleFactor = Math.min(wPx / 140, hPx / 50, 1.8);
-        const integerSize = Math.max(12, priceElem.integerFontSize * (dpi / 72) * Math.max(0.6, scaleFactor));
-        const fractionSize = Math.max(8, priceElem.fractionFontSize * (dpi / 72) * Math.max(0.6, scaleFactor));
-        const currencySize = Math.max(7, (priceElem.currencyFontSize || 12) * (dpi / 72) * Math.max(0.6, scaleFactor));
+        // Parsing estrito do valor (sem concatenar prefixo nem quebrar formato)
+        const cleanNumber = (rawValueStr || '9.99').replace(',', '.').trim();
+        const parts = cleanNumber.split('.');
+        const integerPart = parts[0] || '0';
+        const fractionPart = (parts[1] || '00').padEnd(2, '0').slice(0, 2);
+
+        const prefix = priceElem.prefix !== undefined ? priceElem.prefix.trim() : 'R$';
+        const isReduced = priceElem.reducedCents !== false; // Padrão Varejo Ativo
+
+        // Auto-fit proporcional da caixa sem quebra de linhas
+        const approxChars = (prefix ? prefix.length * 0.55 : 0) + integerPart.length * 0.6 + (isReduced ? 1.4 : 2.2);
+        const maxFontByWidth = (wPx / Math.max(1, approxChars)) * 1.35;
+        const maxFontByHeight = hPx * 0.88;
+        const integerSize = Math.max(9, Math.min(maxFontByHeight, maxFontByWidth));
+
+        const centsSize = isReduced ? integerSize * 0.60 : integerSize;
+        const prefixSize = isReduced ? integerSize * 0.48 : integerSize * 0.65;
+
+        const prefixWidth = prefix ? prefix.length * prefixSize * 0.65 + 4 : 0;
+        const integerWidth = integerPart.length * integerSize * 0.58;
+
+        const baseY = Math.max(0, (hPx - integerSize) / 2);
+        const centsY = isReduced ? baseY : baseY;
+        const prefixY = isReduced ? baseY + (integerSize - prefixSize) * 0.5 : baseY + (integerSize - prefixSize) * 0.4;
 
         return (
           <Group
@@ -599,32 +618,42 @@ export default function CanvasArea() {
             onDragEnd={handleDragEnd}
             onTransformEnd={handleTransformEnd}
           >
-            <Text
-              text={priceElem.prefix || 'R$'}
-              fontFamily={priceElem.fontFamily || 'Roboto'}
-              fontSize={currencySize}
-              fontStyle="bold"
-              fill={priceElem.color || '#dc2626'}
-              x={0}
-              y={Math.max(0, (hPx - integerSize) / 2)}
-            />
+            {/* Prefixo de Moeda (Ex: R$) */}
+            {prefix && (
+              <Text
+                text={prefix}
+                fontFamily={priceElem.fontFamily || 'Roboto'}
+                fontSize={prefixSize}
+                fontStyle="bold"
+                fill={priceElem.color || '#dc2626'}
+                x={0}
+                y={prefixY}
+                wrap="none"
+              />
+            )}
+
+            {/* Número Inteiro */}
             <Text
               text={integerPart}
               fontFamily={priceElem.fontFamily || 'Roboto'}
               fontSize={integerSize}
               fontStyle="bold"
               fill={priceElem.color || '#dc2626'}
-              x={currencySize * 1.5}
-              y={Math.max(0, (hPx - integerSize) / 2)}
+              x={prefixWidth}
+              y={baseY}
+              wrap="none"
             />
+
+            {/* Centavos Reduzidos (Padrão Varejo Superior) ou Centavos Normais */}
             <Text
-              text={`,${fractionPart || '00'}`}
+              text={`,${fractionPart}`}
               fontFamily={priceElem.fontFamily || 'Roboto'}
-              fontSize={fractionSize}
+              fontSize={centsSize}
               fontStyle="bold"
               fill={priceElem.color || '#dc2626'}
-              x={currencySize * 1.5 + integerSize * (integerPart?.length || 1) * 0.55}
-              y={Math.max(0, (hPx - integerSize) / 2)}
+              x={prefixWidth + integerWidth + 1}
+              y={centsY}
+              wrap="none"
             />
           </Group>
         );
@@ -810,8 +839,42 @@ export default function CanvasArea() {
     };
   }, [isMarqueeActive, marqueeStart, marqueeEnd]);
 
-  // Alerta de tamanho para código de barras EAN-13
-  const isBarcodeTooSmall = primarySelected?.type === 'barcode' && (primarySelected.width < 25 || primarySelected.height < 8);
+  // Diagnóstico e Validação de Limites Físicos e Margem Segura (Item 257-262)
+  interface IssueItem {
+    id: string;
+    name: string;
+    type: 'physical' | 'safeArea';
+    message: string;
+  }
+
+  const issueList: IssueItem[] = useMemo(() => {
+    const issues: IssueItem[] = [];
+    document.elements.forEach((el) => {
+      if (el.visible === false) return;
+      const isPhysical = el.x < 0 || el.y < 0 || el.x + el.width > widthMm || el.y + el.height > heightMm;
+      if (isPhysical) {
+        issues.push({
+          id: el.id,
+          name: el.name || el.type.toUpperCase(),
+          type: 'physical',
+          message: `"${el.name || el.type.toUpperCase()}" está parcialmente fora da etiqueta`,
+        });
+      } else {
+        const isBeyondSafe = el.x < 1.5 || el.y < 1.5 || el.x + el.width > widthMm - 1.5 || el.y + el.height > heightMm - 1.5;
+        if (isBeyondSafe) {
+          issues.push({
+            id: el.id,
+            name: el.name || el.type.toUpperCase(),
+            type: 'safeArea',
+            message: `"${el.name || el.type.toUpperCase()}" ultrapassa a margem segura (1.5 mm)`,
+          });
+        }
+      }
+    });
+    return issues;
+  }, [document.elements, widthMm, heightMm]);
+
+  const [isIssuesPopoverOpen, setIsIssuesPopoverOpen] = useState(false);
 
   return (
     <div
@@ -827,33 +890,99 @@ export default function CanvasArea() {
       }}
       onContextMenu={(e) => e.preventDefault()}
     >
-      {/* Alertas Flutuantes Discretos */}
-      {outOfBoundsElement && (
-        <div
-          style={{
-            position: 'absolute',
-            top: '12px',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            background: 'rgba(245, 158, 11, 0.92)',
-            color: '#000000',
-            padding: '0.3rem 0.8rem',
-            borderRadius: '20px',
-            fontSize: '0.75rem',
-            fontWeight: 700,
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.4rem',
-            boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
-            zIndex: 10,
-          }}
-        >
-          <AlertTriangle size={14} />
-          <span>Elemento fora da área imprimível da etiqueta</span>
+      {/* Banner Flutuante Interativo de Diagnóstico (Item 257-262) */}
+      {issueList.length > 0 && (
+        <div style={{ position: 'absolute', top: '12px', left: '50%', transform: 'translateX(-50%)', zIndex: 30 }}>
+          <div
+            style={{
+              background: issueList.some(i => i.type === 'physical') ? 'rgba(239, 68, 68, 0.95)' : 'rgba(245, 158, 11, 0.95)',
+              color: '#ffffff',
+              padding: '0.35rem 0.85rem',
+              borderRadius: '20px',
+              fontSize: '0.75rem',
+              fontWeight: 700,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              boxShadow: '0 4px 14px rgba(0,0,0,0.25)',
+              cursor: 'pointer',
+            }}
+            onClick={() => {
+              if (issueList.length === 1) {
+                setSelectedElementId(issueList[0].id);
+              } else {
+                setIsIssuesPopoverOpen(!isIssuesPopoverOpen);
+              }
+            }}
+            title="Clique para localizar e corrigir os elementos"
+          >
+            <AlertTriangle size={14} />
+            <span>
+              {issueList.length === 1
+                ? issueList[0].message
+                : `⚠ ${issueList.length} elementos precisam de atenção (${issueList.filter(i => i.type === 'physical').length} fora da área)`}
+            </span>
+            {issueList.length > 1 && (
+              <span style={{ fontSize: '0.68rem', textDecoration: 'underline', opacity: 0.9 }}>
+                {isIssuesPopoverOpen ? 'Fechar' : 'Ver lista'}
+              </span>
+            )}
+          </div>
+
+          {/* Lista Compacta de Itens Problemáticos ao Clicar (Item 258, 261) */}
+          {isIssuesPopoverOpen && issueList.length > 1 && (
+            <div
+              style={{
+                position: 'absolute',
+                top: '100%',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                marginTop: '6px',
+                background: 'var(--bg-card)',
+                border: '1px solid var(--border-color)',
+                borderRadius: '8px',
+                padding: '0.5rem',
+                boxShadow: 'var(--shadow-elevated)',
+                minWidth: '280px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.3rem',
+              }}
+            >
+              <div style={{ fontSize: '0.7rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', padding: '0.2rem 0.4rem' }}>
+                Elementos com Atenção
+              </div>
+              {issueList.map((issue) => (
+                <div
+                  key={issue.id}
+                  style={{
+                    padding: '0.35rem 0.5rem',
+                    borderRadius: '5px',
+                    background: 'var(--bg-input)',
+                    border: issue.type === 'physical' ? '1px solid rgba(239, 68, 68, 0.4)' : '1px solid rgba(245, 158, 11, 0.4)',
+                    fontSize: '0.72rem',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                  }}
+                  onClick={() => {
+                    setSelectedElementId(issue.id);
+                    setIsIssuesPopoverOpen(false);
+                  }}
+                >
+                  <span style={{ fontWeight: 700, color: issue.type === 'physical' ? 'var(--status-danger)' : 'var(--status-warning)' }}>
+                    {issue.message}
+                  </span>
+                  <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Focar ➔</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
-      {isBarcodeTooSmall && (
+      {isBarcodeTooSmall && issueList.length === 0 && (
         <div
           style={{
             position: 'absolute',

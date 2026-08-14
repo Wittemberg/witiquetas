@@ -33,11 +33,14 @@ export interface TextElement extends BaseElement {
 export interface PriceElement extends BaseElement {
   type: 'price';
   field: string; // Ex: "produto.preco" ou "produto.promocao.preco"
-  prefix?: string; // Ex: "R$"
+  prefix?: string; // Ex: "R$", "$", "€"
+  sampleValue?: string; // Valor manual para visualização / testes (ex: "9,99")
+  reducedCents?: boolean; // Padrão Varejo: Centavos reduzidos a ~60% do inteiro (padrão true)
+  centsAlignment?: 'top' | 'baseline'; // Alinhamento superior tradicional dos centavos
   fontFamily?: string;
-  integerFontSize: number; // Tamanho da parte inteira
-  fractionFontSize: number; // Tamanho dos centavos
-  currencyFontSize?: number; // Tamanho do R$
+  integerFontSize?: number; // Tamanho da parte inteira (calculado automaticamente se não definido)
+  fractionFontSize?: number; // Tamanho dos centavos
+  currencyFontSize?: number; // Tamanho do prefixo R$
   color?: string;
 }
 

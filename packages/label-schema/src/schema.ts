@@ -40,10 +40,13 @@ export const TextElementSchema = BaseElementSchema.extend({
 export const PriceElementSchema = BaseElementSchema.extend({
   type: z.literal('price'),
   field: z.string(),
-  prefix: z.string().optional(),
+  prefix: z.string().max(8).optional(),
+  sampleValue: z.string().optional(),
+  reducedCents: z.boolean().optional(),
+  centsAlignment: z.enum(['top', 'baseline']).optional(),
   fontFamily: z.string().optional(),
-  integerFontSize: z.number().positive(),
-  fractionFontSize: z.number().positive(),
+  integerFontSize: z.number().positive().optional(),
+  fractionFontSize: z.number().positive().optional(),
   currencyFontSize: z.number().positive().optional(),
   color: z.string().optional(),
 });

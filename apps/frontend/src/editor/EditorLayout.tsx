@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { useEditorStore, formatDimensionBR } from './useEditorStore';
+import { useEditorStore, formatDimensionBR, isEditingTextInput } from './useEditorStore';
 import CanvasArea from './CanvasArea';
 import PropertyInspector from './PropertyInspector';
 import NewTemplateWizard from './NewTemplateWizard';
 import CompileModal from './CompileModal';
+import ImportModal from './ImportModal';
 import {
   Sparkles,
   Printer,
   Grid,
+  FileUp,
   Eye,
   EyeOff,
   ZoomIn,
@@ -88,76 +90,70 @@ export default function EditorLayout({
 
   const [isWizardOpen, setIsWizardOpen] = useState(false);
   const [isCompileOpen, setIsCompileOpen] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [isViewMenuOpen, setIsViewMenuOpen] = useState(false);
   const [isUnsavedExitModalOpen, setIsUnsavedExitModalOpen] = useState(false);
 
-  // Escuta de Atalhos Globais do Teclado
+  // Escuta de Atalhos Globais do Teclado (Isolamento Estrito com isEditingTextInput)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      const activeTag = (document.activeElement as HTMLElement)?.tagName?.toLowerCase();
-      const isInputActive = activeTag === 'input' || activeTag === 'textarea' || activeTag === 'select';
-
+      const isInputActive = isEditingTextInput();
       const isCtrlOrCmd = e.ctrlKey || e.metaKey;
 
+      // Se o usuário estiver digitando em um campo de texto, inputs têm prioridade absoluta
+      if (isInputActive) {
+        // Apenas Ctrl+S é permitido durante edição de campo
+        if (isCtrlOrCmd && (e.key === 's' || e.key === 'S')) {
+          e.preventDefault();
+          saveDocumentToBackend();
+        }
+        return;
+      }
+
+      // Atalhos do Canvas quando nenhum input de texto estiver focado
       if (isCtrlOrCmd) {
         if (e.key === 'z' || e.key === 'Z') {
-          if (!isInputActive) {
-            e.preventDefault();
-            if (e.shiftKey) redo();
-            else undo();
-          }
+          e.preventDefault();
+          if (e.shiftKey) redo();
+          else undo();
         } else if (e.key === 'y' || e.key === 'Y') {
-          if (!isInputActive) {
-            e.preventDefault();
-            redo();
-          }
+          e.preventDefault();
+          redo();
         } else if (e.key === 'c' || e.key === 'C') {
-          if (!isInputActive) {
-            e.preventDefault();
-            copySelection();
-          }
+          e.preventDefault();
+          copySelection();
         } else if (e.key === 'x' || e.key === 'X') {
-          if (!isInputActive) {
-            e.preventDefault();
-            cutSelection();
-          }
+          e.preventDefault();
+          cutSelection();
         } else if (e.key === 'v' || e.key === 'V') {
-          if (!isInputActive) {
-            e.preventDefault();
-            pasteSelection();
-          }
+          e.preventDefault();
+          pasteSelection();
         } else if (e.key === 'd' || e.key === 'D') {
-          if (!isInputActive) {
-            e.preventDefault();
-            duplicateSelectedElements();
-          }
+          e.preventDefault();
+          duplicateSelectedElements();
         } else if (e.key === 'a' || e.key === 'A') {
-          if (!isInputActive) {
-            e.preventDefault();
-            selectAll();
-          }
+          e.preventDefault();
+          selectAll();
         } else if (e.key === 's' || e.key === 'S') {
           e.preventDefault();
           saveDocumentToBackend();
         }
       } else {
         if (e.key === 'Delete' || e.key === 'Backspace') {
-          if (!isInputActive && selectedElementIds.length > 0) {
+          if (selectedElementIds.length > 0) {
             e.preventDefault();
             removeSelectedElements();
           }
         } else if (e.key === 'Escape') {
-          if (!isInputActive) {
-            clearSelection();
-            setIsViewMenuOpen(false);
-          }
+          clearSelection();
+          setIsViewMenuOpen(false);
         } else if (
           e.key === 'ArrowLeft' ||
           e.key === 'ArrowRight' ||
           e.key === 'ArrowUp' ||
           e.key === 'ArrowDown'
         ) {
-          if (!isInputActive && selectedElementIds.length > 0) {
+          if (selectedElementIds.length > 0) {
             e.preventDefault();
             const step = e.shiftKey ? 2.0 : 0.5;
             if (e.key === 'ArrowLeft') nudgeElements(-step, 0);
@@ -434,15 +430,27 @@ export default function EditorLayout({
           </div>
 
           <div style={{ padding: '0.85rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            {/* Botão Novo Formato */}
-            <button
-              className="btn btn-primary"
-              style={{ width: '100%', justifyContent: 'center', fontSize: '0.78rem', padding: '0.45rem' }}
-              onClick={() => setIsWizardOpen(true)}
-            >
-              <Plus size={14} />
-              <span>Novo Formato / Nicho</span>
-            </button>
+            {/* Botões de Ação do Topo da Barra Lateral */}
+            <div style={{ display: 'flex', gap: '0.4rem' }}>
+              <button
+                className="btn btn-primary"
+                style={{ flex: 1, justifyContent: 'center', fontSize: '0.78rem', padding: '0.45rem' }}
+                onClick={() => setIsWizardOpen(true)}
+              >
+                <Plus size={14} />
+                <span>Novo Formato</span>
+              </button>
+
+              <button
+                className="btn"
+                style={{ justifyContent: 'center', fontSize: '0.78rem', padding: '0.45rem 0.6rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
+                onClick={() => setIsImportModalOpen(true)}
+                title="Importar modelo legado ou ZPL"
+              >
+                <FileUp size={14} color="var(--accent-blue)" />
+                <span>Importar</span>
+              </button>
+            </div>
 
             {/* Paleta de Criação de Elementos */}
             <div>
@@ -623,6 +631,7 @@ export default function EditorLayout({
       {/* Modais */}
       <NewTemplateWizard isOpen={isWizardOpen} onClose={() => setIsWizardOpen(false)} />
       <CompileModal isOpen={isCompileOpen} onClose={() => setIsCompileOpen(false)} />
+      <ImportModal isOpen={isImportModalOpen} onClose={() => setIsImportModalOpen(false)} />
     </div>
   );
 }

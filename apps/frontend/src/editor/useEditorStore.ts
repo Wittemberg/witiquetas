@@ -25,6 +25,24 @@ export function formatDimensionBR(mm?: number | null): string {
   return `${rounded} mm`;
 }
 
+// Verificador central de foco em campos de texto (Item 242-245, 265)
+export function isEditingTextInput(): boolean {
+  if (typeof window === 'undefined' || typeof document === 'undefined') return false;
+  const active = document.activeElement as HTMLElement | null;
+  if (!active) return false;
+
+  const tag = active.tagName?.toLowerCase();
+  if (tag === 'input') {
+    const type = (active as HTMLInputElement).type?.toLowerCase() || 'text';
+    return !['button', 'submit', 'reset', 'checkbox', 'radio', 'range', 'color'].includes(type);
+  }
+  if (tag === 'textarea' || tag === 'select') return true;
+  if (active.isContentEditable) return true;
+  if (active.getAttribute('role') === 'textbox') return true;
+
+  return false;
+}
+
 // Dados comerciais de teste simulados para o modo Preview
 export const MOCK_PRODUCT_DATA: Record<string, string> = {
   'produto.codigo': '789123',

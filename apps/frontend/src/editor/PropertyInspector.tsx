@@ -448,63 +448,101 @@ export default function PropertyInspector() {
       )}
 
       {/* =====================================================================
-         TIPO: PREÇO
+         TIPO: PREÇO (Padrão Varejo & Centavos Reduzidos)
          ===================================================================== */}
-      {elem.type === 'price' && (
-        <div className="inspector-section">
-          <div className="inspector-section-title">Formatação do Preço</div>
+      {elem.type === 'price' && (() => {
+        const priceElem = elem as PriceElement;
+        const currentPrefix = priceElem.prefix !== undefined ? priceElem.prefix : 'R$';
 
-          <div>
-            <label className="metric-label">Vínculo com Campo de Preço</label>
-            <select
-              className="inspector-select"
-              value={(elem as PriceElement).field || 'produto.preco'}
-              onChange={(e) => updateElement(elem.id, { field: e.target.value })}
-            >
-              <option value="produto.preco">Preço Normal (produto.preco)</option>
-              <option value="produto.promocao.preco">Preço Promocional (produto.promocao.preco)</option>
-              <option value="produto.referencia.preco">Preço por Unidade Referência</option>
-            </select>
-          </div>
+        return (
+          <div className="inspector-section">
+            <div className="inspector-section-title">Formatação do Preço</div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
             <div>
-              <label className="metric-label">Prefixo</label>
+              <label className="metric-label">Vínculo ERP (Fonte da Verdade)</label>
+              <select
+                className="inspector-select"
+                value={priceElem.field || 'produto.preco'}
+                onChange={(e) => updateElement(elem.id, { field: e.target.value })}
+              >
+                <option value="produto.preco">Preço Normal (produto.preco)</option>
+                <option value="produto.promocao.preco">Preço Promocional (produto.promocao.preco)</option>
+                <option value="produto.referencia.preco">Preço por Unidade Referência</option>
+                <option value="">-- Sem vínculo (Manual) --</option>
+              </select>
+              {priceElem.field && (
+                <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
+                  Na impressão será utilizado o preço do produto no ERP.
+                </div>
+              )}
+            </div>
+
+            <div>
+              <label className="metric-label">Valor para visualização / exemplo</label>
               <input
                 type="text"
                 className="inspector-input"
-                value={(elem as PriceElement).prefix || 'R$'}
-                onChange={(e) => updateElement(elem.id, { prefix: e.target.value })}
+                value={priceElem.sampleValue || '9,99'}
+                placeholder="Ex: 9,99"
+                onChange={(e) => updateElement(elem.id, { sampleValue: e.target.value })}
               />
             </div>
-            <div>
-              <label className="metric-label">Cor do Preço</label>
-              <input
-                type="color"
-                className="inspector-input"
-                style={{ height: '32px', padding: '2px' }}
-                value={(elem as PriceElement).color || '#dc2626'}
-                onChange={(e) => updateElement(elem.id, { color: e.target.value })}
-              />
-            </div>
-          </div>
 
-          <div>
-            <label className="metric-label">Fonte</label>
-            <select
-              className="inspector-select"
-              value={(elem as PriceElement).fontFamily || 'Roboto'}
-              onChange={(e) => updateElement(elem.id, { fontFamily: e.target.value })}
-            >
-              {filteredFonts.map((f) => (
-                <option key={f.family} value={f.family}>
-                  {f.family}
-                </option>
-              ))}
-            </select>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+              <div>
+                <label className="metric-label">Prefixo</label>
+                <select
+                  className="inspector-select"
+                  value={currentPrefix}
+                  onChange={(e) => updateElement(elem.id, { prefix: e.target.value })}
+                >
+                  <option value="R$">R$ (Real)</option>
+                  <option value="$">$ (Dólar)</option>
+                  <option value="US$">US$</option>
+                  <option value="€">€ (Euro)</option>
+                  <option value="">Nenhum</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="metric-label">Cor do Preço</label>
+                <input
+                  type="color"
+                  className="inspector-input"
+                  style={{ height: '32px', padding: '2px' }}
+                  value={priceElem.color || '#dc2626'}
+                  onChange={(e) => updateElement(elem.id, { color: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="metric-label">Fonte</label>
+              <select
+                className="inspector-select"
+                value={priceElem.fontFamily || 'Roboto'}
+                onChange={(e) => updateElement(elem.id, { fontFamily: e.target.value })}
+              >
+                {filteredFonts.map((f) => (
+                  <option key={f.family} value={f.family}>
+                    {f.family}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Centavos Reduzidos Padrão Varejo (Item 251–254) */}
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.75rem', cursor: 'pointer', marginTop: '0.2rem' }}>
+              <input
+                type="checkbox"
+                checked={priceElem.reducedCents !== false}
+                onChange={(e) => updateElement(elem.id, { reducedCents: e.target.checked })}
+              />
+              <span>Centavos reduzidos (Padrão Varejo - 60%)</span>
+            </label>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* =====================================================================
          TIPO: CÓDIGO DE BARRAS (Simbologias Técnicas & ERP)

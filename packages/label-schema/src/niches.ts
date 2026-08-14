@@ -379,23 +379,35 @@ export interface NicheSizeItem extends LabelSize {
   order: number;
 }
 
-// Obter tamanhos filtrados e ordenados por nicho
+// Obter tamanhos filtrados e ordenados por nicho (Mais Usado primeiro, depois ordem dimensional natural)
 export function getSizesByNiche(nicheIdOrSlug: string): NicheSizeItem[] {
   const niche = NICHES.find((n) => n.id === nicheIdOrSlug || n.slug === nicheIdOrSlug);
   if (!niche) return [];
 
   const relations = NICHE_SIZE_RELATIONS.filter((r) => r.nicheId === niche.id);
-  relations.sort((a, b) => a.order - b.order);
 
-  return relations
-    .map((r) => {
-      const size = sizeMap.get(r.sizeId);
-      if (!size) return null;
-      return {
+  const items: NicheSizeItem[] = [];
+  const seenIds = new Set<string>();
+
+  for (const r of relations) {
+    const size = sizeMap.get(r.sizeId);
+    if (size && !seenIds.has(size.id)) {
+      seenIds.add(size.id);
+      items.push({
         ...size,
         featured: !!r.featured,
         order: r.order,
-      };
-    })
-    .filter((item): item is NicheSizeItem => item !== null);
+      });
+    }
+  }
+
+  // Ordenação: 1º featured: true; 2º widthMm crescente; 3º heightMm crescente
+  items.sort((a, b) => {
+    if (a.featured && !b.featured) return -1;
+    if (!a.featured && b.featured) return 1;
+    if (a.widthMm !== b.widthMm) return a.widthMm - b.widthMm;
+    return a.heightMm - b.heightMm;
+  });
+
+  return items;
 }

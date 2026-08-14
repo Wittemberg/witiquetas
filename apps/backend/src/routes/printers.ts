@@ -1,9 +1,9 @@
 import { Router, Request, Response } from 'express';
-import { PrinterDTO, CreatePrinterDTO } from '@witiquetas/contracts';
+import { PrinterDTO, CreatePrinterDTO, PrinterProfileDTO } from '@witiquetas/contracts';
 
 const router = Router();
 
-// Storage em memória inicial com modelos pré-configurados
+// Storage em memória inicial com modelos pré-configurados e perfis de capacidades homologadas
 const defaultPrinters: PrinterDTO[] = [
   {
     id: 'prn-gondola-elgin-tcp',
@@ -19,6 +19,17 @@ const defaultPrinters: PrinterDTO[] = [
     isDefault: true,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
+    capabilities: {
+      nativeFonts: ['Roboto', 'Arial', 'Courier New', 'Noto Sans'],
+      supportedFonts: ['Roboto', 'Arial', 'Inter', 'Noto Sans', 'Montserrat', 'Noto Serif', 'Courier New', 'Roboto Mono'],
+      maxWidthMm: 104,
+      maxDpi: 203,
+      supportsQrCode: true,
+      supportsEan13: true,
+      supportsCode128: true,
+      supportsImages: true,
+      notes: 'Equipamento homologado com cabeçote térmico de 4 polegadas (104 mm).',
+    },
   },
   {
     id: 'prn-expedicao-argox-tcp',
@@ -34,6 +45,43 @@ const defaultPrinters: PrinterDTO[] = [
     isDefault: false,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
+    capabilities: {
+      nativeFonts: ['Courier New', 'Arial', 'Roboto'],
+      supportedFonts: ['Roboto', 'Arial', 'Inter', 'Noto Sans', 'Noto Serif', 'Courier New', 'Roboto Mono'],
+      maxWidthMm: 104,
+      maxDpi: 203,
+      supportsQrCode: true,
+      supportsEan13: true,
+      supportsCode128: true,
+      supportsImages: true,
+      notes: 'Equipamento homologado padrão Argox PPLA.',
+    },
+  },
+  {
+    id: 'prn-zebra-zd220-tcp',
+    companyId: 'comp-matriz-01',
+    name: 'Zebra ZD220 (E-commerce / Farmácia)',
+    model: 'Zebra ZD220',
+    protocol: 'RAW_TCP',
+    host: '192.168.1.202',
+    port: 9100,
+    language: 'ZPL',
+    dpi: 203,
+    active: true,
+    isDefault: false,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    capabilities: {
+      nativeFonts: ['Roboto', 'Arial', 'Courier New', 'Noto Sans'],
+      supportedFonts: ['Roboto', 'Arial', 'Inter', 'Noto Sans', 'Montserrat', 'Noto Serif', 'Courier New', 'Roboto Mono'],
+      maxWidthMm: 104,
+      maxDpi: 203,
+      supportsQrCode: true,
+      supportsEan13: true,
+      supportsCode128: true,
+      supportsImages: true,
+      notes: 'Equipamento homologado Zebra ZPL.',
+    },
   },
 ];
 
@@ -93,6 +141,16 @@ router.post('/', (req: Request, res: Response) => {
     isDefault: !!body.isDefault,
     createdAt: now,
     updatedAt: now,
+    capabilities: {
+      nativeFonts: ['Roboto', 'Arial', 'Courier New'],
+      supportedFonts: ['Roboto', 'Arial', 'Inter', 'Noto Sans', 'Montserrat', 'Noto Serif', 'Courier New', 'Roboto Mono'],
+      maxWidthMm: 104,
+      maxDpi: body.dpi || 203,
+      supportsQrCode: true,
+      supportsEan13: true,
+      supportsCode128: true,
+      supportsImages: true,
+    },
   };
 
   printersStore.set(id, newPrinter);

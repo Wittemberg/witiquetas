@@ -1,451 +1,365 @@
 import React, { useState, useMemo } from 'react';
 import {
   NICHES,
+  NicheDefinition,
+  NicheSizeItem,
   getSizesByNiche,
   calculateOrientation,
-  formatDimension,
-  THERMAL_STANDARD_MAX_WIDTH_MM,
-  Niche,
-  NicheSizeItem,
+  formatDimensionLabel,
 } from '@witiquetas/label-schema';
+import { useEditorStore, formatDimensionBR } from './useEditorStore';
 import {
-  ShoppingCart,
-  Barcode,
-  Truck,
-  Pill,
-  Activity,
-  FlaskConical,
-  Droplet,
   Sparkles,
-  Tag,
-  Archive,
-  Layers,
   Search,
-  X,
-  Plus,
-  ArrowLeft,
   ArrowRight,
+  ArrowLeft,
   Check,
-  AlertTriangle,
-  Info,
+  Tag,
+  Star,
+  Layers,
+  X,
+  Store,
+  Pill,
+  ShoppingBag,
+  Truck,
+  Shirt,
+  Gem,
+  Package,
+  Wrench,
+  Wine,
+  Leaf,
+  FileCheck,
   Maximize2
 } from 'lucide-react';
-import { useEditorStore } from './useEditorStore';
 
-// Mapeamento de Ícones para os Nichos
-const NICHE_ICONS: Record<string, React.ElementType> = {
-  ShoppingCart,
-  Barcode,
-  Truck,
-  Pill,
-  Activity,
-  FlaskConical,
-  Droplet,
-  Sparkles,
-  Tag,
-  Archive,
-  Layers,
-};
-
-interface NewTemplateWizardProps {
+interface WizardProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess: () => void;
+  onSuccess?: () => void;
 }
 
-export default function NewTemplateWizard({ isOpen, onClose, onSuccess }: NewTemplateWizardProps) {
+export default function NewTemplateWizard({ isOpen, onClose, onSuccess }: WizardProps) {
   const { createNewDocument } = useEditorStore();
 
-  // Estados do Wizard
-  const [step, setStep] = useState<1 | 2>(1);
-  const [selectedNiche, setSelectedNiche] = useState<Niche | null>(null);
+  const [step, setStep] = useState<'niche' | 'size'>('niche');
+  const [selectedNiche, setSelectedNiche] = useState<NicheDefinition | null>(null);
   const [selectedSize, setSelectedSize] = useState<NicheSizeItem | null>(null);
-  const [isCustomSize, setIsCustomSize] = useState(false);
+  const [searchNiche, setSearchNiche] = useState('');
+  const [searchSize, setSearchSize] = useState('');
+  const [customTitle, setCustomTitle] = useState('');
 
-  // Estados do Tamanho Personalizado
-  const [customWidthStr, setCustomWidthStr] = useState('100');
-  const [customHeightStr, setCustomHeightStr] = useState('50');
+  // Ícones por nicho
+  const getNicheIcon = (iconName: string) => {
+    switch (iconName) {
+      case 'Store':
+        return <Store size={18} />;
+      case 'Pill':
+        return <Pill size={18} />;
+      case 'ShoppingBag':
+        return <ShoppingBag size={18} />;
+      case 'Truck':
+        return <Truck size={18} />;
+      case 'Shirt':
+        return <Shirt size={18} />;
+      case 'Gem':
+        return <Gem size={18} />;
+      case 'Package':
+        return <Package size={18} />;
+      case 'Wrench':
+        return <Wrench size={18} />;
+      case 'Wine':
+        return <Wine size={18} />;
+      case 'Leaf':
+        return <Leaf size={18} />;
+      case 'FileCheck':
+        return <FileCheck size={18} />;
+      default:
+        return <Tag size={18} />;
+    }
+  };
 
-  // Filtro de busca de tamanho
-  const [sizeSearch, setSizeSearch] = useState('');
+  // Filtragem dos 11 nichos
+  const filteredNiches = useMemo(() => {
+    if (!searchNiche.trim()) return NICHES;
+    const term = searchNiche.toLowerCase();
+    return NICHES.filter(
+      (n) =>
+        n.name.toLowerCase().includes(term) ||
+        n.description.toLowerCase().includes(term) ||
+        n.tags.some((t) => t.toLowerCase().includes(term))
+    );
+  }, [searchNiche]);
 
-  // Obter tamanhos do nicho selecionado
-  const nicheSizes = useMemo(() => {
+  // Tamanhos filtrados do nicho selecionado (com ordenação Mais Usado primeiro)
+  const availableSizes = useMemo(() => {
     if (!selectedNiche) return [];
-    return getSizesByNiche(selectedNiche.id);
-  }, [selectedNiche]);
-
-  // Filtragem pela busca
-  const filteredSizes = useMemo(() => {
-    if (!sizeSearch.trim()) return nicheSizes;
-    const term = sizeSearch.toLowerCase().replace(',', '.').trim();
-    return nicheSizes.filter((s) => {
-      const formatted = `${s.widthMm}x${s.heightMm}`.toLowerCase();
-      const name = s.name.toLowerCase();
-      return (
-        formatted.includes(term) ||
-        name.includes(term) ||
+    const sizes = getSizesByNiche(selectedNiche.id);
+    if (!searchSize.trim()) return sizes;
+    const term = searchSize.toLowerCase();
+    return sizes.filter(
+      (s) =>
+        s.label.toLowerCase().includes(term) ||
+        s.description.toLowerCase().includes(term) ||
         s.widthMm.toString().includes(term) ||
         s.heightMm.toString().includes(term)
-      );
-    });
-  }, [nicheSizes, sizeSearch]);
-
-  // Parsing do tamanho personalizado
-  const customWidthNum = useMemo(() => {
-    const val = parseFloat(customWidthStr.replace(',', '.'));
-    return isNaN(val) ? 0 : val;
-  }, [customWidthStr]);
-
-  const customHeightNum = useMemo(() => {
-    const val = parseFloat(customHeightStr.replace(',', '.'));
-    return isNaN(val) ? 0 : val;
-  }, [customHeightStr]);
-
-  // Dimensões finais selecionadas
-  const activeWidth = isCustomSize ? customWidthNum : selectedSize?.widthMm ?? 100;
-  const activeHeight = isCustomSize ? customHeightNum : selectedSize?.heightMm ?? 30;
-  const orientation = calculateOrientation(activeWidth, activeHeight);
-
-  // Alerta se ultrapassar 104 mm de largura
-  const isOverThermalWidthLimit = activeWidth > THERMAL_STANDARD_MAX_WIDTH_MM;
-
-  // Validação para habilitar criação
-  const isSelectionValid =
-    selectedNiche !== null &&
-    ((!isCustomSize && selectedSize !== null) ||
-      (isCustomSize && customWidthNum > 0 && customHeightNum > 0));
+    );
+  }, [selectedNiche, searchSize]);
 
   if (!isOpen) return null;
 
-  // Ação ao selecionar nicho
-  const handleSelectNiche = (niche: Niche) => {
+  const handleSelectNiche = (niche: NicheDefinition) => {
     setSelectedNiche(niche);
-    setIsCustomSize(false);
-    setSizeSearch('');
     const sizes = getSizesByNiche(niche.id);
     if (sizes.length > 0) {
-      // Prioriza o tamanho com destaque ou o primeiro da lista
-      const featured = sizes.find((s) => s.featured) || sizes[0];
-      setSelectedSize(featured);
-    } else {
-      setSelectedSize(null);
+      setSelectedSize(sizes[0]);
     }
-    setStep(2);
+    setStep('size');
   };
 
-  // Finalizar criação e inicializar documento
-  const handleCreateLabel = () => {
-    if (!isSelectionValid || !selectedNiche) return;
+  const handleCreate = () => {
+    if (!selectedSize || !selectedNiche) return;
 
-    const title = `${selectedNiche.name} (${activeWidth}x${activeHeight}mm)`;
     createNewDocument({
-      title,
-      widthMm: activeWidth,
-      heightMm: activeHeight,
+      title: customTitle.trim() || `${selectedNiche.name} - ${selectedSize.label}`,
+      widthMm: selectedSize.widthMm,
+      heightMm: selectedSize.heightMm,
       dpi: 203,
       nicheName: selectedNiche.name,
     });
 
-    onSuccess();
     onClose();
+    onSuccess?.();
   };
-
-  // Calcular proporção visual para a caixa de preview (limitada a max 300px x 180px)
-  const maxBoxW = 280;
-  const maxBoxH = 150;
-  let previewBoxW = maxBoxW;
-  let previewBoxH = maxBoxH;
-
-  if (activeWidth > 0 && activeHeight > 0) {
-    const ratio = activeWidth / activeHeight;
-    if (ratio >= maxBoxW / maxBoxH) {
-      previewBoxW = maxBoxW;
-      previewBoxH = Math.max(35, Math.round(maxBoxW / ratio));
-    } else {
-      previewBoxH = maxBoxH;
-      previewBoxW = Math.max(45, Math.round(maxBoxH * ratio));
-    }
-  }
 
   return (
     <div className="wizard-modal-overlay">
       <div className="wizard-modal-content">
         {/* Header do Wizard */}
         <div className="wizard-header">
-          <div>
-            <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-              <Maximize2 size={22} color="var(--accent-blue)" />
-              {step === 1 ? 'Nova Etiqueta — O que você deseja etiquetar?' : `Formatos para: ${selectedNiche?.name}`}
-            </h2>
-            <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
-              {step === 1
-                ? 'Etapa 1 de 2: Selecione o nicho de aplicação para visualizar os tamanhos homologados.'
-                : 'Etapa 2 de 2: Escolha uma das medidas padronizadas ou informe um tamanho personalizado.'}
-            </p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+            <div className="niche-card-icon" style={{ width: '36px', height: '36px' }}>
+              <Sparkles size={18} />
+            </div>
+            <div>
+              <h2 style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                {step === 'niche' ? '1. Escolha a Aplicação / Segmento Comercial' : '2. Selecione o Tamanho da Etiqueta'}
+              </h2>
+              <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                {step === 'niche'
+                  ? 'Formatos e boas práticas homologados para impressoras térmicas (PPLA / PPLB / ZPL).'
+                  : `Configurando medidas homologadas para: ${selectedNiche?.name}`}
+              </p>
+            </div>
           </div>
           <button className="btn" style={{ padding: '0.4rem', border: 'none' }} onClick={onClose}>
-            <X size={20} />
+            <X size={18} />
           </button>
         </div>
 
-        {/* Corpo do Wizard */}
+        {/* Corpo do Modal */}
         <div className="wizard-body">
-          {step === 1 ? (
-            /* ======================================================
-               ETAPA 1: SELEÇÃO DE NICHO
-               ====================================================== */
-            <div>
-              <div style={{ marginBottom: '1.2rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
-                  Selecione o segmento / nicho da etiqueta:
-                </span>
-                <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                  11 categorias disponíveis
-                </span>
+          {/* =========================================================================
+             ETAPA 1: SELEÇÃO DE NICHO (GRID 4/3/2/1 COLUNAS SEM SCROLL INTERNO)
+             ========================================================================= */}
+          {step === 'niche' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+              {/* Barra de Busca de Nicho */}
+              <div className="size-search-bar">
+                <Search size={16} color="var(--text-muted)" />
+                <input
+                  type="text"
+                  className="size-search-input"
+                  placeholder="Pesquisar nicho ou aplicação (ex: Gôndola, Farmácia, E-commerce, Roupas)..."
+                  value={searchNiche}
+                  onChange={(e) => setSearchNiche(e.target.value)}
+                  autoFocus
+                />
               </div>
 
+              {/* Grid Responsivo de 4 Colunas */}
               <div className="niche-grid">
-                {NICHES.map((niche) => {
-                  const IconComp = NICHE_ICONS[niche.iconName] || Layers;
-                  const isSelected = selectedNiche?.id === niche.id;
-                  const sizesCount = getSizesByNiche(niche.id).length;
-
-                  return (
-                    <div
-                      key={niche.id}
-                      className={`niche-card ${isSelected ? 'selected' : ''}`}
-                      onClick={() => handleSelectNiche(niche)}
-                    >
-                      <div className="niche-card-header">
-                        <div className="niche-card-icon">
-                          <IconComp size={20} />
-                        </div>
-                        <div>
-                          <div className="niche-card-title">{niche.name}</div>
-                          <span style={{ fontSize: '0.7rem', color: 'var(--accent-blue)', fontWeight: 600 }}>
-                            {sizesCount} {sizesCount === 1 ? 'tamanho' : 'tamanhos'}
-                          </span>
-                        </div>
-                      </div>
-                      <p className="niche-card-desc">{niche.description}</p>
+                {filteredNiches.map((niche) => (
+                  <div
+                    key={niche.id}
+                    className={`niche-card ${selectedNiche?.id === niche.id ? 'selected' : ''}`}
+                    onClick={() => handleSelectNiche(niche)}
+                  >
+                    <div className="niche-card-header">
+                      <div className="niche-card-icon">{getNicheIcon(niche.icon)}</div>
+                      <div className="niche-card-title">{niche.name}</div>
                     </div>
-                  );
-                })}
+                    <p className="niche-card-desc">{niche.description}</p>
+                  </div>
+                ))}
               </div>
             </div>
-          ) : (
-            /* ======================================================
-               ETAPA 2: SELEÇÃO DE TAMANHO & PREVIEW
-               ====================================================== */
-            <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '1.5rem', height: '100%' }}>
-              {/* Coluna Esquerda: Lista de Tamanhos e Busca */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                {/* Barra de Busca */}
-                <div className="size-search-bar">
-                  <Search size={18} color="var(--text-muted)" />
-                  <input
-                    type="text"
-                    className="size-search-input"
-                    placeholder="🔍 Procurar tamanho no nicho... (ex: 100, 40, 105)"
-                    value={sizeSearch}
-                    onChange={(e) => setSizeSearch(e.target.value)}
-                  />
-                  {sizeSearch && (
-                    <button
-                      onClick={() => setSizeSearch('')}
-                      style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
-                    >
-                      <X size={16} />
-                    </button>
-                  )}
+          )}
+
+          {/* =========================================================================
+             ETAPA 2: SELEÇÃO DE TAMANHO & FICHA TÉCNICA
+             ========================================================================= */}
+          {step === 'size' && selectedNiche && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              {/* Botão de Trocar Nicho no Topo junto com Identificador */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-card)', padding: '0.6rem 0.85rem', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <div className="niche-card-icon" style={{ width: '28px', height: '28px' }}>
+                    {getNicheIcon(selectedNiche.icon)}
+                  </div>
+                  <div>
+                    <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                      Nicho: {selectedNiche.name}
+                    </span>
+                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginLeft: '0.5rem' }}>
+                      ({availableSizes.length} tamanhos homologados)
+                    </span>
+                  </div>
                 </div>
 
-                {/* Grade de Tamanhos Filtrados */}
-                <div>
-                  <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.6rem' }}>
-                    Tamanhos Padronizados ({filteredSizes.length}):
+                <button
+                  className="btn"
+                  style={{ fontSize: '0.75rem', padding: '0.35rem 0.65rem' }}
+                  onClick={() => setStep('niche')}
+                >
+                  <ArrowLeft size={13} />
+                  <span>← Trocar Nicho</span>
+                </button>
+              </div>
+
+              {/* Grid Duplo: Seleção de Tamanhos à Esquerda e Ficha Técnica com Preview Proporcional à Direita */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'minmax(280px, 1.2fr) minmax(280px, 1fr)', gap: '1.25rem' }}>
+                {/* Coluna Esquerda: Chips de Tamanhos */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                  <div className="size-search-bar">
+                    <Search size={15} color="var(--text-muted)" />
+                    <input
+                      type="text"
+                      className="size-search-input"
+                      placeholder="Filtrar medidas (ex: 100x30, 40, gôndola)..."
+                      value={searchSize}
+                      onChange={(e) => setSearchSize(e.target.value)}
+                    />
                   </div>
 
                   <div className="size-chips-grid">
-                    {filteredSizes.map((size) => {
-                      const isSelected = !isCustomSize && selectedSize?.id === size.id;
-                      const sizeOrientation = calculateOrientation(size.widthMm, size.heightMm);
-
+                    {availableSizes.map((size) => {
+                      const isSelected = selectedSize?.id === size.id;
                       return (
                         <div
                           key={size.id}
                           className={`size-chip ${isSelected ? 'selected' : ''}`}
-                          onClick={() => {
-                            setSelectedSize(size);
-                            setIsCustomSize(false);
-                          }}
+                          onClick={() => setSelectedSize(size)}
                         >
-                          {size.featured && (
-                            <span className="size-featured-tag">★ Mais Usado</span>
-                          )}
-                          <div className="size-chip-dimension">{size.name}</div>
+                          {size.featured && <span className="size-featured-tag">★ Mais Usado</span>}
+                          <div className="size-chip-dimension">{size.label}</div>
                           <div className="size-chip-meta">
-                            <span style={{ textTransform: 'capitalize' }}>{sizeOrientation}</span>
-                            {isSelected && <Check size={14} color="var(--accent-blue)" />}
+                            <span>{size.category}</span>
+                            <span>{size.widthMm} x {size.heightMm} mm</span>
                           </div>
                         </div>
                       );
                     })}
-
-                    {/* Botão de Tamanho Personalizado */}
-                    <div
-                      className={`size-chip ${isCustomSize ? 'selected' : ''}`}
-                      onClick={() => setIsCustomSize(true)}
-                      style={{ borderStyle: 'dashed' }}
-                    >
-                      <div className="size-chip-dimension" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--accent-blue)' }}>
-                        <Plus size={16} />
-                        <span>Tamanho Personalizado</span>
-                      </div>
-                      <div className="size-chip-meta">
-                        <span>Informar mm manual</span>
-                        {isCustomSize && <Check size={14} color="var(--accent-blue)" />}
-                      </div>
-                    </div>
                   </div>
                 </div>
 
-                {/* Formulário de Tamanho Personalizado */}
-                {isCustomSize && (
-                  <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color-glow)', padding: '1rem', borderRadius: '12px' }}>
-                    <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                      <Plus size={16} color="var(--accent-blue)" />
-                      Configurar Dimensões Personalizadas
-                    </div>
-
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                      <div>
-                        <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', display: 'block', marginBottom: '0.3rem' }}>
-                          Largura (mm)
-                        </label>
-                        <input
-                          type="text"
-                          className="inspector-input"
-                          placeholder="Ex: 100 ou 50,8"
-                          value={customWidthStr}
-                          onChange={(e) => setCustomWidthStr(e.target.value)}
-                        />
-                      </div>
-
-                      <div>
-                        <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', display: 'block', marginBottom: '0.3rem' }}>
-                          Altura (mm)
-                        </label>
-                        <input
-                          type="text"
-                          className="inspector-input"
-                          placeholder="Ex: 30 ou 25,4"
-                          value={customHeightStr}
-                          onChange={(e) => setCustomHeightStr(e.target.value)}
-                        />
-                      </div>
-                    </div>
-
-                    {/* Alerta de Limite Térmico */}
-                    {isOverThermalWidthLimit && (
-                      <div style={{ marginTop: '0.75rem', padding: '0.6rem 0.8rem', background: 'rgba(245, 158, 11, 0.15)', border: '1px solid rgba(245, 158, 11, 0.3)', borderRadius: '8px', color: '#fbbf24', fontSize: '0.75rem', display: 'flex', gap: '0.5rem', alignItems: 'flex-start' }}>
-                        <AlertTriangle size={16} style={{ flexShrink: 0, marginTop: '2px' }} />
-                        <span>
-                          <strong>Aviso de Cabeçote Térmico:</strong> A maioria das impressoras térmicas padrão (4 polegadas) suporta no máximo <strong>104 mm</strong> de largura. Certifique-se de que sua impressora suporta larguras maiores.
+                {/* Coluna Direita: Ficha Técnica e Preview Proporcional */}
+                {selectedSize && (
+                  <div className="preview-proportional-container">
+                    {/* Visualizador Proporcional */}
+                    <div
+                      style={{
+                        width: '100%',
+                        height: '140px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        marginBottom: '1rem',
+                      }}
+                    >
+                      <div
+                        className="preview-label-box"
+                        style={{
+                          width: `${Math.min(220, Math.max(70, (selectedSize.widthMm / 104) * 200))}px`,
+                          height: `${Math.min(120, Math.max(40, (selectedSize.heightMm / 104) * 200))}px`,
+                        }}
+                      >
+                        <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#0f172a' }}>
+                          {selectedSize.label}
+                        </span>
+                        <span style={{ fontSize: '0.65rem', color: '#64748b' }}>
+                          {formatDimensionBR(selectedSize.widthMm)} × {formatDimensionBR(selectedSize.heightMm)}
                         </span>
                       </div>
-                    )}
+                    </div>
+
+                    {/* Ficha Técnica 2 Colunas Sem Quebra Indevida */}
+                    <div className="technical-spec-grid">
+                      <span className="technical-spec-label">Segmento:</span>
+                      <span className="technical-spec-value">{selectedNiche.name}</span>
+
+                      <span className="technical-spec-label">Dimensões Reais:</span>
+                      <span className="technical-spec-value">
+                        {formatDimensionBR(selectedSize.widthMm)} de largura × {formatDimensionBR(selectedSize.heightMm)} de altura
+                      </span>
+
+                      <span className="technical-spec-label">Orientação:</span>
+                      <span className="technical-spec-value" style={{ textTransform: 'capitalize' }}>
+                        {calculateOrientation(selectedSize.widthMm, selectedSize.heightMm)}
+                      </span>
+
+                      <span className="technical-spec-label">Resolução Nativa:</span>
+                      <span className="technical-spec-value">203 DPI (~8 pontos/mm)</span>
+
+                      <span className="technical-spec-label">Cabeçote Térmico:</span>
+                      <span className="technical-spec-value">Padrão 104 mm (4 polegadas)</span>
+                    </div>
                   </div>
                 )}
               </div>
 
-              {/* Coluna Direita: Preview Proporcional e Metadados */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
-                  Representação Proporcional:
-                </div>
-
-                <div className="preview-proportional-container">
-                  {/* Caixa da Etiqueta Proporcional */}
-                  <div
-                    className="preview-label-box"
-                    style={{
-                      width: `${previewBoxW}px`,
-                      height: `${previewBoxH}px`,
-                    }}
-                  >
-                    <span className="preview-dimension-badge">
-                      {formatDimension(activeWidth, activeHeight)}
-                    </span>
-                    <span style={{ fontSize: '0.65rem', color: '#64748b', marginTop: '0.3rem', fontWeight: 600 }}>
-                      Orientação: {orientation.toUpperCase()}
-                    </span>
-                  </div>
-
-                  {/* Detalhes Técnicos */}
-                  <div style={{ marginTop: '1.25rem', width: '100%', display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.6rem', borderTop: '1px solid var(--border-color)', paddingTop: '0.8rem' }}>
-                    <div>
-                      <span className="metric-label">Nicho:</span>
-                      <span className="metric-value" style={{ fontSize: '0.85rem' }}>{selectedNiche?.name}</span>
-                    </div>
-                    <div>
-                      <span className="metric-label">Orientação:</span>
-                      <span className="metric-value" style={{ fontSize: '0.85rem', textTransform: 'capitalize' }}>{orientation}</span>
-                    </div>
-                    <div>
-                      <span className="metric-label">Resolução:</span>
-                      <span className="metric-value" style={{ fontSize: '0.85rem' }}>203 DPI (~8 dots/mm)</span>
-                    </div>
-                    <div>
-                      <span className="metric-label">Compatibilidade:</span>
-                      <span className="metric-value" style={{ fontSize: '0.85rem', color: 'var(--status-success)' }}>PPLA / PPLB / ZPL</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div style={{ padding: '0.75rem', background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '10px', fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                  <Info size={16} color="var(--accent-blue)" style={{ flexShrink: 0 }} />
-                  <span>
-                    O editor abrirá automaticamente ajustado às dimensões exatas selecionadas, evitando quebras na impressão.
-                  </span>
-                </div>
+              {/* Título Personalizado Opcional */}
+              <div style={{ marginTop: '0.25rem' }}>
+                <label className="metric-label">Nome do Modelo (Opcional)</label>
+                <input
+                  type="text"
+                  className="inspector-input"
+                  placeholder={`Ex: ${selectedNiche.name} - ${selectedSize?.label || 'Padrão'}`}
+                  value={customTitle}
+                  onChange={(e) => setCustomTitle(e.target.value)}
+                />
               </div>
             </div>
           )}
         </div>
 
-        {/* Rodapé com Navegação */}
+        {/* Footer do Wizard */}
         <div className="wizard-footer">
-          {step === 1 ? (
-            <div>
-              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                Clique em um nicho para prosseguir aos tamanhos.
-              </span>
-            </div>
-          ) : (
-            <button className="btn" onClick={() => setStep(1)}>
-              <ArrowLeft size={16} />
-              <span>Trocar Nicho</span>
-            </button>
-          )}
-
-          <div style={{ display: 'flex', gap: '0.75rem' }}>
+          {step === 'niche' ? (
             <button className="btn" onClick={onClose}>
               Cancelar
             </button>
+          ) : (
+            <button className="btn" onClick={() => setStep('niche')}>
+              <ArrowLeft size={14} />
+              <span>Voltar aos Nichos</span>
+            </button>
+          )}
 
-            {step === 2 && (
-              <button
-                className="btn btn-primary"
-                onClick={handleCreateLabel}
-                disabled={!isSelectionValid}
-              >
-                <span>Criar Etiqueta</span>
-                <ArrowRight size={16} />
-              </button>
-            )}
-          </div>
+          {step === 'niche' ? (
+            <button
+              className="btn btn-primary"
+              disabled={!selectedNiche}
+              onClick={() => selectedNiche && handleSelectNiche(selectedNiche)}
+            >
+              <span>Avançar para Tamanhos</span>
+              <ArrowRight size={14} />
+            </button>
+          ) : (
+            <button className="btn btn-primary" onClick={handleCreate} disabled={!selectedSize}>
+              <Check size={14} />
+              <span>Criar Etiqueta no Editor</span>
+            </button>
+          )}
         </div>
       </div>
     </div>

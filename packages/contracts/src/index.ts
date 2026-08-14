@@ -24,6 +24,58 @@ export interface UpdateTemplateDTO {
 }
 
 // ==========================================
+// BIBLIOTECA DE QR CODES REUTILIZÁVEIS
+// ==========================================
+export interface QRCodeLibraryItemDTO {
+  id: string;
+  companyId: string;
+  name: string;
+  url: string;
+  favorite?: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateQRCodeDTO {
+  name: string;
+  url: string;
+  favorite?: boolean;
+}
+
+export interface UpdateQRCodeDTO {
+  name?: string;
+  url?: string;
+  favorite?: boolean;
+}
+
+// ==========================================
+// MATRIZ DE CAPACIDADES E FONTES DE IMPRESSORAS
+// ==========================================
+export type FontCompatibilityStatus = 'NATIVE' | 'COMPATIBLE' | 'LIMITED' | 'INCOMPATIBLE';
+
+export interface PrinterCapabilitiesDTO {
+  nativeFonts: string[];
+  supportedFonts: string[];
+  maxWidthMm: number;
+  maxDpi: number;
+  supportsQrCode: boolean;
+  supportsEan13: boolean;
+  supportsCode128: boolean;
+  supportsImages: boolean;
+  notes?: string;
+}
+
+export interface PrinterProfileDTO {
+  id: string;
+  manufacturer: string;
+  model: string;
+  dpi: number;
+  language: 'PPLA' | 'PPLB' | 'ZPL';
+  capabilities: PrinterCapabilitiesDTO;
+  isHomologated: boolean;
+}
+
+// ==========================================
 // LOCAL AGENTS & PAIRING
 // ==========================================
 export type AgentStatus = 'ONLINE' | 'OFFLINE' | 'UNPAIRED' | 'ERROR';
@@ -93,6 +145,7 @@ export interface PrinterDTO {
   isDefault: boolean;
   createdAt: string;
   updatedAt: string;
+  capabilities?: PrinterCapabilitiesDTO;
 }
 
 export interface CreatePrinterDTO {

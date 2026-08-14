@@ -1,5 +1,11 @@
 import { create } from 'zustand';
-import { LabelDocument, LabelElement, ElementType, calculateOrientation } from '@witiquetas/label-schema';
+import {
+  LabelDocument,
+  LabelElement,
+  ElementType,
+  calculateOrientation,
+} from '@witiquetas/label-schema';
+import { QRCodeLibraryItemDTO, PrinterDTO } from '@witiquetas/contracts';
 
 // Converter Milímetros ➔ Pixels com base no DPI (ex: 203 DPI = ~8 dots/mm)
 export function mmToPx(mm: number, dpi: number = 203): number {
@@ -9,6 +15,12 @@ export function mmToPx(mm: number, dpi: number = 203): number {
 // Converter Pixels ➔ Milímetros
 export function pxToMm(px: number, dpi: number = 203): number {
   return parseFloat(((px * 25.4) / dpi).toFixed(2));
+}
+
+// Formatador dimensional consistente pt-BR (ex: "30 mm" ou "25,4 mm")
+export function formatDimensionBR(mm: number): string {
+  const rounded = Number.isInteger(mm) ? mm.toString() : mm.toFixed(2).replace(/\.?0+$/, '').replace('.', ',');
+  return `${rounded} mm`;
 }
 
 // Dados comerciais de teste simulados para o modo Preview
@@ -27,11 +39,11 @@ export const MOCK_PRODUCT_DATA: Record<string, string> = {
   'produto.fabricante': 'COCA-COLA',
   'empresa.razaoSocial': 'WR TECNOLOGIA SUPERMERCADOS LTDA',
   'empresa.nomeFantasia': 'SUPERMERCADO WR',
-  'impressao.data': '13/08/2026',
-  'impressao.hora': '19:30',
+  'impressao.data': '14/08/2026',
+  'impressao.hora': '15:30',
 };
 
-// Documento padrão de inicialização (100x30mm em 203 DPI)
+// Documento inicial padrão (100x30mm em 203 DPI)
 const initialDocument: LabelDocument = {
   schemaVersion: 1,
   title: 'Etiqueta de Gôndola Padrão (100x30mm)',
@@ -44,6 +56,7 @@ const initialDocument: LabelDocument = {
   elements: [
     {
       id: 'header-bg',
+      name: 'Faixa de Cabeçalho',
       type: 'rectangle',
       x: 0,
       y: 0,
@@ -51,23 +64,29 @@ const initialDocument: LabelDocument = {
       height: 6,
       strokeWidth: 0,
       fillColor: '#1e293b',
+      locked: false,
+      visible: true,
     },
     {
       id: 'header-text',
+      name: 'Texto Destaque',
       type: 'text',
       text: 'OFERTA ESPECIAL',
       x: 2,
       y: 1,
       width: 96,
       height: 4,
-      fontFamily: 'Inter',
+      fontFamily: 'Roboto',
       fontSize: 10,
       fontWeight: 'bold',
       alignment: 'center',
       color: '#ffffff',
+      locked: false,
+      visible: true,
     },
     {
       id: 'prod-desc',
+      name: 'Nome do Produto',
       type: 'text',
       text: 'REFRIGERANTE COCA-COLA 2L',
       field: 'produto.descricao',
@@ -75,17 +94,21 @@ const initialDocument: LabelDocument = {
       y: 8,
       width: 60,
       height: 10,
-      fontFamily: 'Inter',
+      fontFamily: 'Roboto',
       fontSize: 12,
       fontWeight: 'bold',
       alignment: 'left',
       color: '#0f172a',
+      locked: false,
+      visible: true,
     },
     {
       id: 'prod-price',
+      name: 'Preço Principal',
       type: 'price',
       field: 'produto.preco',
       prefix: 'R$',
+      fontFamily: 'Roboto',
       x: 65,
       y: 7,
       width: 31,
@@ -94,9 +117,12 @@ const initialDocument: LabelDocument = {
       fractionFontSize: 14,
       currencyFontSize: 12,
       color: '#dc2626',
+      locked: false,
+      visible: true,
     },
     {
       id: 'prod-ean',
+      name: 'Código de Barras EAN',
       type: 'barcode',
       format: 'EAN13',
       field: 'produto.ean',
@@ -106,9 +132,12 @@ const initialDocument: LabelDocument = {
       width: 50,
       height: 9,
       showText: true,
+      locked: false,
+      visible: true,
     },
     {
       id: 'company-name',
+      name: 'Nome da Empresa',
       type: 'text',
       text: 'SUPERMERCADO WR',
       field: 'empresa.nomeFantasia',
@@ -116,10 +145,12 @@ const initialDocument: LabelDocument = {
       y: 22,
       width: 40,
       height: 5,
-      fontFamily: 'Inter',
+      fontFamily: 'Roboto',
       fontSize: 8,
       alignment: 'right',
       color: '#475569',
+      locked: false,
+      visible: true,
     },
   ],
 };
@@ -134,52 +165,120 @@ export interface CreateNewDocumentParams {
 
 interface EditorState {
   document: LabelDocument;
-  selectedElementId: string | null;
-  zoom: number; // Escala do canvas (1 = 100%)
+  selectedElementIds: string[];
+  zoom: number; // 1 = 100%
   snapToGrid: boolean;
   gridSizeMm: number;
+  showRulers: boolean;
+  showSafeArea: boolean;
+  safeAreaMarginMm: number;
   showPreviewData: boolean;
-  
+  isDirty: boolean;
+
+  // Painéis
+  isLeftSidebarCollapsed: boolean;
+  isRightSidebarCollapsed: boolean;
+
+  // Impressora Ativa e Biblioteca de QR Codes
+  selectedPrinter: PrinterDTO | null;
+  qrCodeLibrary: QRCodeLibraryItemDTO[];
+
   // Histórico Undo / Redo
   history: LabelDocument[];
   historyIndex: number;
+
+  // Área de transferência
+  clipboard: LabelElement[];
 
   // Actions
   setDocument: (doc: LabelDocument) => void;
   createNewDocument: (params: CreateNewDocumentParams) => void;
   updateDimensions: (widthMm: number, heightMm: number, dpi: 203 | 300 | 600) => void;
+  
+  // Seleção
   setSelectedElementId: (id: string | null) => void;
+  setSelectedElementIds: (ids: string[]) => void;
+  toggleSelectElement: (id: string, multi?: boolean) => void;
+  selectAll: () => void;
+  clearSelection: () => void;
+
+  // Visualização e Ferramentas
   setZoom: (zoom: number) => void;
   setSnapToGrid: (snap: boolean) => void;
+  setShowRulers: (show: boolean) => void;
+  setShowSafeArea: (show: boolean) => void;
   setShowPreviewData: (show: boolean) => void;
+  toggleLeftSidebar: () => void;
+  toggleRightSidebar: () => void;
 
+  // Impressora & QR Codes
+  setSelectedPrinter: (printer: PrinterDTO | null) => void;
+  setQRCodeLibrary: (items: QRCodeLibraryItemDTO[]) => void;
+  addQRCodeToLibrary: (item: QRCodeLibraryItemDTO) => void;
+
+  // CRUD de Elementos
   addElement: (type: ElementType) => void;
   updateElement: (id: string, patch: Partial<LabelElement>) => void;
+  updateSelectedElements: (patch: Partial<LabelElement>) => void;
   removeElement: (id: string) => void;
-  duplicateElement: (id: string) => void;
-  
+  removeSelectedElements: () => void;
+  duplicateSelectedElements: () => void;
+  renameElement: (id: string, name: string) => void;
+  toggleLock: (id: string) => void;
+  toggleVisibility: (id: string) => void;
+
+  // Camadas (Z-Index)
+  bringToFront: (id: string) => void;
+  sendToBack: (id: string) => void;
+  bringForward: (id: string) => void;
+  sendBackward: (id: string) => void;
+
+  // Clipboard (Copiar / Recortar / Colar)
+  copySelection: () => void;
+  cutSelection: () => void;
+  pasteSelection: () => void;
+
+  // Alinhamento & Nudge
+  alignElements: (direction: 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom') => void;
+  distributeElements: (direction: 'horizontal' | 'vertical') => void;
+  nudgeElements: (dxMm: number, dyMm: number) => void;
+
+  // Histórico & Auto-save
   undo: () => void;
   redo: () => void;
   pushHistory: () => void;
+  markSaved: () => void;
 }
 
 export const useEditorStore = create<EditorState>((set, get) => ({
   document: initialDocument,
-  selectedElementId: 'prod-desc',
-  zoom: 2.5, // 250% de zoom padrão
+  selectedElementIds: ['prod-desc'],
+  zoom: 1.0, // Zoom padrão inicial de 100%
   snapToGrid: true,
-  gridSizeMm: 2,
+  gridSizeMm: 1,
+  showRulers: true,
+  showSafeArea: false,
+  safeAreaMarginMm: 1.5,
   showPreviewData: true,
+  isDirty: false,
+
+  isLeftSidebarCollapsed: false,
+  isRightSidebarCollapsed: false,
+
+  selectedPrinter: null,
+  qrCodeLibrary: [],
 
   history: [initialDocument],
   historyIndex: 0,
+  clipboard: [],
 
   setDocument: (doc) => {
     set({
       document: doc,
-      selectedElementId: null,
+      selectedElementIds: [],
       history: [doc],
       historyIndex: 0,
+      isDirty: false,
     });
   },
 
@@ -187,11 +286,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const orientation = calculateOrientation(widthMm, heightMm);
     const elements: LabelElement[] = [];
 
-    // Gerar elementos iniciais proporcionais às dimensões da etiqueta
     if (widthMm >= 40 && heightMm >= 20) {
-      // Descrição do Produto
       elements.push({
         id: `elem-desc-${Date.now()}`,
+        name: 'Nome do Produto',
         type: 'text',
         text: 'NOME / DESCRIÇÃO DO PRODUTO',
         field: 'produto.descricao',
@@ -199,20 +297,23 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         y: Math.round(heightMm * 0.08),
         width: Math.round(widthMm * 0.9),
         height: Math.max(5, Math.round(heightMm * 0.2)),
-        fontFamily: 'Inter',
+        fontFamily: 'Roboto',
         fontSize: Math.min(14, Math.max(8, Math.round(widthMm * 0.12))),
         fontWeight: 'bold',
         alignment: 'left',
         color: '#0f172a',
+        locked: false,
+        visible: true,
       });
 
-      // Se houver espaço para preço e barcode
       if (heightMm >= 30) {
         elements.push({
           id: `elem-price-${Date.now() + 1}`,
+          name: 'Preço Promocional',
           type: 'price',
           field: 'produto.preco',
           prefix: 'R$',
+          fontFamily: 'Roboto',
           x: Math.round(widthMm * 0.55),
           y: Math.round(heightMm * 0.35),
           width: Math.round(widthMm * 0.4),
@@ -221,10 +322,13 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           fractionFontSize: Math.min(16, Math.max(10, Math.round(heightMm * 0.3))),
           currencyFontSize: 10,
           color: '#dc2626',
+          locked: false,
+          visible: true,
         });
 
         elements.push({
           id: `elem-ean-${Date.now() + 2}`,
+          name: 'Código de Barras EAN',
           type: 'barcode',
           format: 'EAN13',
           field: 'produto.ean',
@@ -234,12 +338,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           width: Math.min(widthMm * 0.48, 50),
           height: Math.round(heightMm * 0.4),
           showText: true,
+          locked: false,
+          visible: true,
         });
       }
     } else {
-      // Etiqueta bem pequena (ex: 25x12 ou jóias)
       elements.push({
         id: `elem-text-${Date.now()}`,
+        name: 'Item / Código',
         type: 'text',
         text: 'ITEM REF',
         field: 'produto.descricao',
@@ -247,11 +353,13 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         y: 1,
         width: widthMm - 2,
         height: heightMm - 2,
-        fontFamily: 'Inter',
+        fontFamily: 'Roboto',
         fontSize: 8,
         fontWeight: 'normal',
         alignment: 'center',
         color: '#0f172a',
+        locked: false,
+        visible: true,
       });
     }
 
@@ -271,9 +379,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
     set({
       document: newDoc,
-      selectedElementId: elements.length > 0 ? elements[0].id : null,
+      selectedElementIds: elements.length > 0 ? [elements[0].id] : [],
       history: [newDoc],
       historyIndex: 0,
+      isDirty: false,
+      zoom: 1.0,
     });
   },
 
@@ -290,14 +400,38 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         orientation: orientation === 'quadrada' ? 'portrait' : orientation === 'horizontal' ? 'landscape' : 'portrait',
       },
     };
-    set({ document: updated });
+    set({ document: updated, isDirty: true });
     pushHistory();
   },
 
-  setSelectedElementId: (id) => set({ selectedElementId: id }),
-  setZoom: (zoom) => set({ zoom: Math.max(0.5, Math.min(5, zoom)) }),
+  setSelectedElementId: (id) => set({ selectedElementIds: id ? [id] : [] }),
+  setSelectedElementIds: (ids) => set({ selectedElementIds: ids }),
+  toggleSelectElement: (id, multi = false) => {
+    const { selectedElementIds } = get();
+    if (!multi) {
+      set({ selectedElementIds: [id] });
+    } else {
+      if (selectedElementIds.includes(id)) {
+        set({ selectedElementIds: selectedElementIds.filter((item) => item !== id) });
+      } else {
+        set({ selectedElementIds: [...selectedElementIds, id] });
+      }
+    }
+  },
+  selectAll: () => set({ selectedElementIds: get().document.elements.map((el) => el.id) }),
+  clearSelection: () => set({ selectedElementIds: [] }),
+
+  setZoom: (zoom) => set({ zoom: Math.max(0.25, Math.min(6, zoom)) }),
   setSnapToGrid: (snapToGrid) => set({ snapToGrid }),
+  setShowRulers: (showRulers) => set({ showRulers }),
+  setShowSafeArea: (showSafeArea) => set({ showSafeArea }),
   setShowPreviewData: (showPreviewData) => set({ showPreviewData }),
+  toggleLeftSidebar: () => set((state) => ({ isLeftSidebarCollapsed: !state.isLeftSidebarCollapsed })),
+  toggleRightSidebar: () => set((state) => ({ isRightSidebarCollapsed: !state.isRightSidebarCollapsed })),
+
+  setSelectedPrinter: (printer) => set({ selectedPrinter: printer }),
+  setQRCodeLibrary: (items) => set({ qrCodeLibrary: items }),
+  addQRCodeToLibrary: (item) => set((state) => ({ qrCodeLibrary: [item, ...state.qrCodeLibrary] })),
 
   addElement: (type) => {
     const { document, pushHistory } = get();
@@ -308,25 +442,30 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       case 'text':
         newElem = {
           id: newId,
+          name: 'Texto Manual',
           type: 'text',
           text: 'Novo Texto',
           x: 10,
           y: 10,
           width: Math.min(40, document.dimensions.widthMm - 10),
           height: 6,
-          fontFamily: 'Inter',
+          fontFamily: 'Roboto',
           fontSize: 12,
           fontWeight: 'normal',
           alignment: 'left',
           color: '#0f172a',
+          locked: false,
+          visible: true,
         };
         break;
       case 'price':
         newElem = {
           id: newId,
+          name: 'Preço em R$',
           type: 'price',
           field: 'produto.preco',
           prefix: 'R$',
+          fontFamily: 'Roboto',
           x: 10,
           y: 10,
           width: Math.min(30, document.dimensions.widthMm - 10),
@@ -335,11 +474,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           fractionFontSize: 12,
           currencyFontSize: 10,
           color: '#dc2626',
+          locked: false,
+          visible: true,
         };
         break;
       case 'barcode':
         newElem = {
           id: newId,
+          name: 'Código de Barras',
           type: 'barcode',
           format: 'EAN13',
           field: 'produto.ean',
@@ -349,34 +491,28 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           width: Math.min(45, document.dimensions.widthMm - 10),
           height: Math.min(12, document.dimensions.heightMm - 10),
           showText: true,
+          locked: false,
+          visible: true,
         };
         break;
       case 'qrcode':
         newElem = {
           id: newId,
+          name: 'QR Code Link',
           type: 'qrcode',
-          value: 'https://witiquetas.wrtec.com.br',
+          value: 'https://witiquetas.wrtec.com.br/clube',
           x: 10,
           y: 10,
           width: Math.min(15, document.dimensions.widthMm - 10),
           height: Math.min(15, document.dimensions.heightMm - 10),
-        };
-        break;
-      case 'line':
-        newElem = {
-          id: newId,
-          type: 'line',
-          x: 2,
-          y: 10,
-          width: document.dimensions.widthMm - 4,
-          height: 1,
-          strokeWidth: 1,
-          color: '#000000',
+          locked: false,
+          visible: true,
         };
         break;
       case 'rectangle':
         newElem = {
           id: newId,
+          name: 'Retângulo / Moldura',
           type: 'rectangle',
           x: 5,
           y: 5,
@@ -385,6 +521,23 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           strokeWidth: 1,
           strokeColor: '#000000',
           fillColor: 'transparent',
+          locked: false,
+          visible: true,
+        };
+        break;
+      case 'line':
+        newElem = {
+          id: newId,
+          name: 'Linha Divisória',
+          type: 'line',
+          x: 2,
+          y: 10,
+          width: document.dimensions.widthMm - 4,
+          height: 1,
+          strokeWidth: 1,
+          color: '#000000',
+          locked: false,
+          visible: true,
         };
         break;
       default:
@@ -398,7 +551,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
     set({
       document: updated,
-      selectedElementId: newId,
+      selectedElementIds: [newId],
+      isDirty: true,
     });
     pushHistory();
   },
@@ -414,48 +568,286 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       elements: updatedElements,
     };
 
-    set({ document: updated });
+    set({ document: updated, isDirty: true });
+    pushHistory();
+  },
+
+  updateSelectedElements: (patch) => {
+    const { document, selectedElementIds, pushHistory } = get();
+    if (selectedElementIds.length === 0) return;
+
+    const updatedElements = document.elements.map((el) =>
+      selectedElementIds.includes(el.id) ? ({ ...el, ...patch } as LabelElement) : el
+    );
+
+    set({ document: { ...document, elements: updatedElements }, isDirty: true });
     pushHistory();
   },
 
   removeElement: (id) => {
-    const { document, selectedElementId, pushHistory } = get();
+    const { document, selectedElementIds, pushHistory } = get();
     const updatedElements = document.elements.filter((el) => el.id !== id);
 
-    const updated: LabelDocument = {
-      ...document,
-      elements: updatedElements,
-    };
-
     set({
-      document: updated,
-      selectedElementId: selectedElementId === id ? null : selectedElementId,
+      document: { ...document, elements: updatedElements },
+      selectedElementIds: selectedElementIds.filter((item) => item !== id),
+      isDirty: true,
     });
     pushHistory();
   },
 
-  duplicateElement: (id) => {
-    const { document, pushHistory } = get();
-    const target = document.elements.find((el) => el.id === id);
-    if (!target) return;
+  removeSelectedElements: () => {
+    const { document, selectedElementIds, pushHistory } = get();
+    if (selectedElementIds.length === 0) return;
 
-    const newId = `elem-${Date.now()}`;
-    const clone: LabelElement = {
-      ...JSON.parse(JSON.stringify(target)),
-      id: newId,
-      x: target.x + 2,
-      y: target.y + 2,
-    };
+    const updatedElements = document.elements.filter((el) => !selectedElementIds.includes(el.id));
+    set({
+      document: { ...document, elements: updatedElements },
+      selectedElementIds: [],
+      isDirty: true,
+    });
+    pushHistory();
+  },
 
-    const updated: LabelDocument = {
-      ...document,
-      elements: [...document.elements, clone],
-    };
+  duplicateSelectedElements: () => {
+    const { document, selectedElementIds, pushHistory } = get();
+    if (selectedElementIds.length === 0) return;
+
+    const newClones: LabelElement[] = [];
+    const newSelectedIds: string[] = [];
+
+    document.elements.forEach((el) => {
+      if (selectedElementIds.includes(el.id)) {
+        const newId = `elem-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`;
+        const clone: LabelElement = {
+          ...JSON.parse(JSON.stringify(el)),
+          id: newId,
+          name: el.name ? `${el.name} (Cópia)` : undefined,
+          x: Math.min(el.x + 2, document.dimensions.widthMm - el.width),
+          y: Math.min(el.y + 2, document.dimensions.heightMm - el.height),
+        };
+        newClones.push(clone);
+        newSelectedIds.push(newId);
+      }
+    });
 
     set({
-      document: updated,
-      selectedElementId: newId,
+      document: { ...document, elements: [...document.elements, newClones] },
+      selectedElementIds: newSelectedIds,
+      isDirty: true,
     });
+    pushHistory();
+  },
+
+  renameElement: (id, name) => {
+    const { updateElement } = get();
+    updateElement(id, { name: name.trim() });
+  },
+
+  toggleLock: (id) => {
+    const { document, pushHistory } = get();
+    const updated = document.elements.map((el) =>
+      el.id === id ? { ...el, locked: !el.locked } : el
+    );
+    set({ document: { ...document, elements: updated as any }, isDirty: true });
+    pushHistory();
+  },
+
+  toggleVisibility: (id) => {
+    const { document, pushHistory } = get();
+    const updated = document.elements.map((el) =>
+      el.id === id ? { ...el, visible: el.visible !== false ? false : true } : el
+    );
+    set({ document: { ...document, elements: updated as any }, isDirty: true });
+    pushHistory();
+  },
+
+  bringToFront: (id) => {
+    const { document, pushHistory } = get();
+    const item = document.elements.find((el) => el.id === id);
+    if (!item) return;
+    const filtered = document.elements.filter((el) => el.id !== id);
+    set({ document: { ...document, elements: [...filtered, item] }, isDirty: true });
+    pushHistory();
+  },
+
+  sendToBack: (id) => {
+    const { document, pushHistory } = get();
+    const item = document.elements.find((el) => el.id === id);
+    if (!item) return;
+    const filtered = document.elements.filter((el) => el.id !== id);
+    set({ document: { ...document, elements: [item, ...filtered] }, isDirty: true });
+    pushHistory();
+  },
+
+  bringForward: (id) => {
+    const { document, pushHistory } = get();
+    const index = document.elements.findIndex((el) => el.id === id);
+    if (index === -1 || index === document.elements.length - 1) return;
+    const newElements = [...document.elements];
+    const temp = newElements[index];
+    newElements[index] = newElements[index + 1];
+    newElements[index + 1] = temp;
+    set({ document: { ...document, elements: newElements }, isDirty: true });
+    pushHistory();
+  },
+
+  sendBackward: (id) => {
+    const { document, pushHistory } = get();
+    const index = document.elements.findIndex((el) => el.id === id);
+    if (index <= 0) return;
+    const newElements = [...document.elements];
+    const temp = newElements[index];
+    newElements[index] = newElements[index - 1];
+    newElements[index - 1] = temp;
+    set({ document: { ...document, elements: newElements }, isDirty: true });
+    pushHistory();
+  },
+
+  copySelection: () => {
+    const { document, selectedElementIds } = get();
+    const targets = document.elements.filter((el) => selectedElementIds.includes(el.id));
+    if (targets.length > 0) {
+      set({ clipboard: JSON.parse(JSON.stringify(targets)) });
+    }
+  },
+
+  cutSelection: () => {
+    const { copySelection, removeSelectedElements } = get();
+    copySelection();
+    removeSelectedElements();
+  },
+
+  pasteSelection: () => {
+    const { document, clipboard, pushHistory } = get();
+    if (clipboard.length === 0) return;
+
+    const newClones: LabelElement[] = [];
+    const newSelectedIds: string[] = [];
+
+    clipboard.forEach((el) => {
+      const newId = `elem-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`;
+      const clone: LabelElement = {
+        ...JSON.parse(JSON.stringify(el)),
+        id: newId,
+        x: Math.min(el.x + 2, document.dimensions.widthMm - el.width),
+        y: Math.min(el.y + 2, document.dimensions.heightMm - el.height),
+      };
+      newClones.push(clone);
+      newSelectedIds.push(newId);
+    });
+
+    set({
+      document: { ...document, elements: [...document.elements, ...newClones] },
+      selectedElementIds: newSelectedIds,
+      isDirty: true,
+    });
+    pushHistory();
+  },
+
+  alignElements: (direction) => {
+    const { document, selectedElementIds, pushHistory } = get();
+    if (selectedElementIds.length < 2) return;
+
+    const targets = document.elements.filter((el) => selectedElementIds.includes(el.id));
+    let refVal = 0;
+
+    if (direction === 'left') {
+      refVal = Math.min(...targets.map((el) => el.x));
+    } else if (direction === 'right') {
+      refVal = Math.max(...targets.map((el) => el.x + el.width));
+    } else if (direction === 'top') {
+      refVal = Math.min(...targets.map((el) => el.y));
+    } else if (direction === 'bottom') {
+      refVal = Math.max(...targets.map((el) => el.y + el.height));
+    } else if (direction === 'center') {
+      const minX = Math.min(...targets.map((el) => el.x));
+      const maxX = Math.max(...targets.map((el) => el.x + el.width));
+      refVal = (minX + maxX) / 2;
+    } else if (direction === 'middle') {
+      const minY = Math.min(...targets.map((el) => el.y));
+      const maxY = Math.max(...targets.map((el) => el.y + el.height));
+      refVal = (minY + maxY) / 2;
+    }
+
+    const updatedElements = document.elements.map((el) => {
+      if (!selectedElementIds.includes(el.id)) return el;
+      if (direction === 'left') return { ...el, x: refVal };
+      if (direction === 'right') return { ...el, x: refVal - el.width };
+      if (direction === 'top') return { ...el, y: refVal };
+      if (direction === 'bottom') return { ...el, y: refVal - el.height };
+      if (direction === 'center') return { ...el, x: refVal - el.width / 2 };
+      if (direction === 'middle') return { ...el, y: refVal - el.height / 2 };
+      return el;
+    });
+
+    set({ document: { ...document, elements: updatedElements }, isDirty: true });
+    pushHistory();
+  },
+
+  distributeElements: (direction) => {
+    const { document, selectedElementIds, pushHistory } = get();
+    if (selectedElementIds.length < 3) return;
+
+    const targets = document.elements
+      .filter((el) => selectedElementIds.includes(el.id))
+      .sort((a, b) => (direction === 'horizontal' ? a.x - b.x : a.y - b.y));
+
+    if (direction === 'horizontal') {
+      const minX = targets[0].x;
+      const last = targets[targets.length - 1];
+      const maxX = last.x + last.width;
+      const totalElementsWidth = targets.reduce((sum, el) => sum + el.width, 0);
+      const gap = (maxX - minX - totalElementsWidth) / (targets.length - 1);
+
+      let currentX = minX;
+      const updatedMap = new Map<string, number>();
+      targets.forEach((el) => {
+        updatedMap.set(el.id, currentX);
+        currentX += el.width + gap;
+      });
+
+      const updated = document.elements.map((el) =>
+        updatedMap.has(el.id) ? { ...el, x: updatedMap.get(el.id)! } : el
+      );
+      set({ document: { ...document, elements: updated }, isDirty: true });
+    } else {
+      const minY = targets[0].y;
+      const last = targets[targets.length - 1];
+      const maxY = last.y + last.height;
+      const totalElementsHeight = targets.reduce((sum, el) => sum + el.height, 0);
+      const gap = (maxY - minY - totalElementsHeight) / (targets.length - 1);
+
+      let currentY = minY;
+      const updatedMap = new Map<string, number>();
+      targets.forEach((el) => {
+        updatedMap.set(el.id, currentY);
+        currentY += el.height + gap;
+      });
+
+      const updated = document.elements.map((el) =>
+        updatedMap.has(el.id) ? { ...el, y: updatedMap.get(el.id)! } : el
+      );
+      set({ document: { ...document, elements: updated }, isDirty: true });
+    }
+
+    pushHistory();
+  },
+
+  nudgeElements: (dxMm, dyMm) => {
+    const { document, selectedElementIds, pushHistory } = get();
+    if (selectedElementIds.length === 0) return;
+
+    const updatedElements = document.elements.map((el) => {
+      if (!selectedElementIds.includes(el.id) || el.locked) return el;
+      return {
+        ...el,
+        x: Math.max(0, parseFloat((el.x + dxMm).toFixed(2))),
+        y: Math.max(0, parseFloat((el.y + dyMm).toFixed(2))),
+      };
+    });
+
+    set({ document: { ...document, elements: updatedElements }, isDirty: true });
     pushHistory();
   },
 
@@ -463,11 +855,23 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const { document, history, historyIndex } = get();
     const newHistory = history.slice(0, historyIndex + 1);
     newHistory.push(JSON.parse(JSON.stringify(document)));
+    // Limitar histórico a 50 passos
+    if (newHistory.length > 50) newHistory.shift();
+
     set({
       history: newHistory,
       historyIndex: newHistory.length - 1,
     });
+
+    // Auto-save local draft
+    try {
+      localStorage.setItem('witiquetas-draft-current', JSON.stringify(document));
+    } catch {
+      // ignore
+    }
   },
+
+  markSaved: () => set({ isDirty: false }),
 
   undo: () => {
     const { history, historyIndex } = get();
@@ -476,6 +880,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       set({
         document: JSON.parse(JSON.stringify(history[prevIndex])),
         historyIndex: prevIndex,
+        isDirty: true,
       });
     }
   },
@@ -487,6 +892,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       set({
         document: JSON.parse(JSON.stringify(history[nextIndex])),
         historyIndex: nextIndex,
+        isDirty: true,
       });
     }
   },

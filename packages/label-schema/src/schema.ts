@@ -9,6 +9,7 @@ export const LabelDimensionsSchema = z.object({
 
 export const BaseElementSchema = z.object({
   id: z.string(),
+  name: z.string().optional(),
   type: z.enum(['text', 'price', 'barcode', 'qrcode', 'line', 'rectangle', 'image']),
   x: z.number(),
   y: z.number(),
@@ -25,8 +26,9 @@ export const TextElementSchema = BaseElementSchema.extend({
   field: z.string().optional(),
   fontFamily: z.string(),
   fontSize: z.number().positive(),
-  fontWeight: z.enum(['normal', 'bold']).optional(),
+  fontWeight: z.union([z.enum(['normal', 'bold']), z.string()]).optional(),
   fontStyle: z.enum(['normal', 'italic']).optional(),
+  textDecoration: z.enum(['none', 'underline']).optional(),
   alignment: z.enum(['left', 'center', 'right']).optional(),
   verticalAlignment: z.enum(['top', 'middle', 'bottom']).optional(),
   wrap: z.enum(['auto', 'none']).optional(),
@@ -37,6 +39,7 @@ export const PriceElementSchema = BaseElementSchema.extend({
   type: z.literal('price'),
   field: z.string(),
   prefix: z.string().optional(),
+  fontFamily: z.string().optional(),
   integerFontSize: z.number().positive(),
   fractionFontSize: z.number().positive(),
   currencyFontSize: z.number().positive().optional(),
@@ -57,6 +60,7 @@ export const QrCodeElementSchema = BaseElementSchema.extend({
   type: z.literal('qrcode'),
   field: z.string().optional(),
   value: z.string(),
+  qrLibraryId: z.string().optional(),
 });
 
 export const LineElementSchema = BaseElementSchema.extend({
@@ -77,6 +81,7 @@ export const RectangleElementSchema = BaseElementSchema.extend({
 export const ImageElementSchema = BaseElementSchema.extend({
   type: z.literal('image'),
   src: z.string(),
+  fit: z.enum(['contain', 'cover', 'fill']).optional(),
 });
 
 export const LabelElementSchema = z.discriminatedUnion('type', [

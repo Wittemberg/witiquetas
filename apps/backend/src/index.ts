@@ -161,6 +161,7 @@ import compileRouter from './routes/compile';
 import agentsRouter from './routes/agents';
 import printersRouter from './routes/printers';
 import printJobsRouter from './routes/printJobs';
+import qrcodesRouter from './routes/qrcodes';
 
 // Suporta tanto rotas diretas quanto rotas com prefixo /api (conforme Traefik/Nginx)
 app.use('/templates', templatesRouter);
@@ -177,6 +178,9 @@ app.use('/api/printers', printersRouter);
 
 app.use('/print-jobs', printJobsRouter);
 app.use('/api/print-jobs', printJobsRouter);
+
+app.use('/qrcodes', qrcodesRouter);
+app.use('/api/qrcodes', qrcodesRouter);
 
 app.get('/health', handleHealthCheck);
 app.get('/api/health', handleHealthCheck);

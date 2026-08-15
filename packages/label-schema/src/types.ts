@@ -56,6 +56,12 @@ export interface TextElement extends BaseElement {
   color?: string;
   autoFit?: boolean; // Redução/ajuste inteligente para não estourar a caixa
   singleLine?: boolean; // Forçar texto em uma única linha
+  // Propriedades técnicas de fidelidade nativa da impressora
+  printerFontId?: string | number; // ID nativo da fonte na impressora (ex: 1..5 em PPLB, A..Z em ZPL)
+  horizontalMultiplier?: number; // Multiplicador horizontal de fonte nativo (1..8)
+  verticalMultiplier?: number; // Multiplicador vertical de fonte nativo (1..8)
+  scaleX?: number; // Fator de escala horizontal derivado para renderização
+  reversePrint?: boolean; // Impressão reversa (branco sobre preto)
 }
 
 export interface PriceElement extends BaseElement {
@@ -70,6 +76,12 @@ export interface PriceElement extends BaseElement {
   fractionFontSize?: number; // Tamanho dos centavos
   currencyFontSize?: number; // Tamanho do prefixo R$
   color?: string;
+  // Propriedades técnicas de fidelidade nativa da impressora
+  printerFontId?: string | number;
+  horizontalMultiplier?: number;
+  verticalMultiplier?: number;
+  scaleX?: number;
+  reversePrint?: boolean;
 }
 
 export interface BarcodeElement extends BaseElement {
@@ -80,6 +92,11 @@ export interface BarcodeElement extends BaseElement {
   showText?: boolean; // Exibir numeração humana abaixo das barras
   fontFamily?: string;
   fontSize?: number;
+  // Propriedades técnicas de fidelidade nativa da impressora
+  narrowBarDots?: number; // Largura da barra fina nativa em dots (ex: 2 em PPLB)
+  wideBarDots?: number; // Largura da barra larga nativa em dots (ex: 4 em PPLB)
+  barcodeHeightDots?: number; // Altura nativa em dots (ex: 30 em PPLB)
+  sourceBarcodeType?: string; // Simbologia nativa original da linguagem (ex: "E30", "1", "8")
 }
 
 export interface QrCodeElement extends BaseElement {

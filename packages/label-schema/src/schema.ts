@@ -59,6 +59,12 @@ export const TextElementSchema = BaseElementSchema.extend({
   color: z.string().optional(),
   autoFit: z.boolean().optional(),
   singleLine: z.boolean().optional(),
+  // Propriedades técnicas opcionais
+  printerFontId: z.union([z.string(), z.number()]).optional(),
+  horizontalMultiplier: z.number().int().positive().optional(),
+  verticalMultiplier: z.number().int().positive().optional(),
+  scaleX: z.number().positive().optional(),
+  reversePrint: z.boolean().optional(),
 });
 
 export const PriceElementSchema = BaseElementSchema.extend({
@@ -73,6 +79,12 @@ export const PriceElementSchema = BaseElementSchema.extend({
   fractionFontSize: z.number().positive().optional(),
   currencyFontSize: z.number().positive().optional(),
   color: z.string().optional(),
+  // Propriedades técnicas opcionais
+  printerFontId: z.union([z.string(), z.number()]).optional(),
+  horizontalMultiplier: z.number().int().positive().optional(),
+  verticalMultiplier: z.number().int().positive().optional(),
+  scaleX: z.number().positive().optional(),
+  reversePrint: z.boolean().optional(),
 });
 
 export const BarcodeElementSchema = BaseElementSchema.extend({
@@ -83,6 +95,11 @@ export const BarcodeElementSchema = BaseElementSchema.extend({
   showText: z.boolean().optional(),
   fontFamily: z.string().optional(),
   fontSize: z.number().optional(),
+  // Propriedades técnicas opcionais
+  narrowBarDots: z.number().int().positive().optional(),
+  wideBarDots: z.number().int().positive().optional(),
+  barcodeHeightDots: z.number().int().positive().optional(),
+  sourceBarcodeType: z.string().optional(),
 });
 
 export const QrCodeElementSchema = BaseElementSchema.extend({

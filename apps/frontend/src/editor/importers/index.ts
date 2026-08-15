@@ -1,10 +1,27 @@
 import { ImportAdapter, ImportResult } from './types';
 import { legacyAdapter } from './legacyParser';
 import { zplAdapter } from './zplParser';
+import { PPLBParser } from './pplbParser';
+import { LegacyCompiler } from './legacyCompiler';
 
 export * from './types';
+export * from './astTypes';
+export * from './legacyPreprocessor';
+export * from './pplbParser';
+export * from './legacyCompiler';
 
-const ADAPTERS: ImportAdapter[] = [legacyAdapter, zplAdapter];
+const pplbAdapter: ImportAdapter = {
+  id: 'pplb-legacy',
+  name: 'PPLB / Eltron / Legado ERP (2 Camadas + AST)',
+  detect: (content: string): boolean => {
+    return /^(I8|Q\d+|q\d+|N|A\d+,\d+|B\d+,\d+|\[\[SE\]\])/m.test(content) || /\[\[(PRECO|PROMOCAO|NOME|BARRA)/i.test(content);
+  },
+  parse: async (content: string): Promise<ImportResult> => {
+    return PPLBParser.parse(content);
+  },
+};
+
+const ADAPTERS: ImportAdapter[] = [pplbAdapter, legacyAdapter, zplAdapter];
 
 export function detectAdapter(content: string): ImportAdapter | null {
   for (const adapter of ADAPTERS) {
@@ -26,9 +43,9 @@ export async function parseImportContent(content: string, preferredAdapterId?: s
     adapter = detectAdapter(content);
   }
 
-  // Se nenhum formato específico for detectado, usa o adapter legado por padrão
+  // Se nenhum formato específico for detectado, usa o adapter PPLB por padrão
   if (!adapter) {
-    adapter = legacyAdapter;
+    adapter = pplbAdapter;
   }
 
   return adapter.parse(content);

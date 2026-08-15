@@ -26,14 +26,32 @@ export default function ImportModal({ isOpen, onClose }: ImportModalProps) {
   const [parsedResult, setParsedResult] = useState<ImportResult | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // Exemplo padrão para visualização imediata
-  const sampleLegacyContent = `[[TAMANHO: 100x30x203]]
-[[DESCRICAO]]
-[[PRECO]]
-[[EAN]]
-[[QR: https://empresa.com.br/clube]]
-[[TEXT: PRODUTO EM OFERTA - VALIDADE 15 DIAS]]
-[[LINHA]]`;
+  // Exemplo padrão realista com PPLB, Macros ERP, Condicionais e Comentários
+  const sampleLegacyContent = `// Modelo Etiqueta Gondola 100x30
+// Versao Elgin / Argox PPLB
+I8,A,001
+Q240,024
+q831
+rN
+S3
+D8
+ZT
+JF
+O
+R16,0
+f220
+N
+A80,10,0,3,1,1,N,"[[NOME,0,18]]"
+A80,35,0,2,1,1,N,"[[NOME,18,36]]"
+A80,60,0,2,1,1,N,"COD: [[CODIGO]]"
+[[SE: PROMOCAO > 0]]
+A550,15,0,2,1,1,N,"DE R$ [[PRECO]]"
+A550,45,0,4,2,2,N,"POR R$ [[PROMOCAO]]"
+[[SENAO]]
+A550,30,0,4,2,2,N,"R$ [[PRECO]]"
+[[FIMSE]]
+B80,110,0,1,2,5,60,B,"[[BARRA]]"
+P1`;
 
   useEffect(() => {
     if (isOpen && !content) {

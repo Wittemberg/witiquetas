@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useEditorStore, MOCK_PRODUCT_DATA } from './useEditorStore';
+import { LegacyCompiler } from './importers';
 import { PrinterDTO } from '@witiquetas/contracts';
 import {
   X,
@@ -144,6 +145,25 @@ export default function CompileModal({ isOpen, onClose }: CompileModalProps) {
     }
   };
 
+  // Exportar no Formato Original (Round-Trip - Item 309-320)
+  const handleExportOriginalFormat = () => {
+    const res = LegacyCompiler.compile(document);
+    const blob = new Blob([res.compiledCode], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = window.document.createElement('a');
+    a.href = url;
+    a.download = `${document.title.toLowerCase().replace(/[^a-z0-9]/g, '-')}.prn`;
+    window.document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
+
+  // Resumo de Round-Trip e Diff
+  const roundTripData = useMemo(() => {
+    return LegacyCompiler.compile(document);
+  }, [document]);
+
   // Exportar JSON do Modelo
   const handleExportJSON = () => {
     const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(document, null, 2));
@@ -155,9 +175,11 @@ export default function CompileModal({ isOpen, onClose }: CompileModalProps) {
     downloadAnchor.remove();
   };
 
+  const [showDiff, setShowDiff] = useState(false);
+
   return (
     <div className="wizard-modal-overlay">
-      <div className="wizard-modal-content" style={{ maxWidth: '680px' }}>
+      <div className="wizard-modal-content" style={{ maxWidth: '720px' }}>
         {/* Header */}
         <div className="wizard-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
@@ -166,10 +188,10 @@ export default function CompileModal({ isOpen, onClose }: CompileModalProps) {
             </div>
             <div>
               <h2 style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-primary)' }}>
-                Imprimir Etiqueta Térmica
+                Imprimir & Exportar Modelo
               </h2>
               <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                Compilação em linguagem nativa de alta velocidade ({currentPrinter?.language || 'PPLB'}).
+                Envio direto para impressora ({currentPrinter?.language || 'PPLB'}) ou download em formato original.
               </p>
             </div>
           </div>
@@ -180,6 +202,108 @@ export default function CompileModal({ isOpen, onClose }: CompileModalProps) {
 
         {/* Corpo */}
         <div className="wizard-body" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          {/* Opção Destacada de Round-Trip quando o modelo foi importado (Item 309-320) */}
+          <div style={{ background: 'var(--canvas-bg)', padding: '0.85rem', borderRadius: '8px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <Sparkles size={15} color="var(--accent-blue)" />
+                <span style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                  Round-Trip & Exportação para o ERP
+                </span>
+              </div>
+              <span className="preview-dimension-badge" style={{ fontSize: '0.65rem', padding: '0.1rem 0.4rem' }}>
+                {document.sourceFile ? `${document.sourceFile.format.toUpperCase()} (Original)` : 'PPLB Nativo'}
+              </span>
+            </div>
+
+            <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+              Preservação de 100% dos comentários, macros ERP e comandos técnicos do arquivo original.
+            </div>
+
+            {/* Resumo de Preservação (Item 329) */}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', fontSize: '0.68rem' }}>
+              <span className="badge-tag" style={{ background: 'rgba(16, 185, 129, 0.1)', color: 'var(--status-success)', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
+                ✓ {roundTripData.diffSummary.preservedCommentsCount} comentários preservados
+              </span>
+              <span className="badge-tag" style={{ background: 'rgba(59, 130, 246, 0.1)', color: 'var(--accent-blue)', border: '1px solid rgba(59, 130, 246, 0.2)' }}>
+                ✓ {roundTripData.diffSummary.preservedConfigCommandsCount} comandos de configuração
+              </span>
+              <span className="badge-tag" style={{ background: 'rgba(139, 92, 246, 0.1)', color: 'var(--accent-purple)', border: '1px solid rgba(139, 92, 246, 0.2)' }}>
+                ✓ {roundTripData.diffSummary.preservedConditionalsCount} regras condicionais
+              </span>
+              {roundTripData.diffSummary.modifiedCount > 0 && (
+                <span className="badge-tag" style={{ background: 'rgba(245, 158, 11, 0.1)', color: 'var(--status-warning)', border: '1px solid rgba(245, 158, 11, 0.2)' }}>
+                  ~ {roundTripData.diffSummary.modifiedCount} comandos modificados
+                </span>
+              )}
+            </div>
+
+            <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.2rem' }}>
+              <button
+                className="btn btn-primary"
+                style={{ fontSize: '0.75rem', padding: '0.35rem 0.75rem' }}
+                onClick={handleExportOriginalFormat}
+                title="Baixar arquivo compatível com o ERP legado (.prn / .txt)"
+              >
+                <Download size={13} />
+                <span>Baixar no Formato Original (.prn)</span>
+              </button>
+
+              <button
+                className="btn"
+                style={{ fontSize: '0.75rem', padding: '0.35rem 0.6rem' }}
+                onClick={() => setShowDiff(!showDiff)}
+                title="Comparar alterações realizadas no modelo (Diff)"
+              >
+                <FileCode size={13} />
+                <span>{showDiff ? 'Ocultar Alterações' : 'Ver Alterações (Diff)'}</span>
+              </button>
+
+              <button
+                className="btn"
+                style={{ fontSize: '0.75rem', padding: '0.35rem 0.6rem' }}
+                onClick={handleExportJSON}
+                title="Exportar JSON do modelo Witiquetas"
+              >
+                <span>Exportar JSON</span>
+              </button>
+            </div>
+
+            {/* Painel de Diff (Item 328) */}
+            {showDiff && (
+              <div style={{ marginTop: '0.5rem', borderTop: '1px solid var(--border-color)', paddingTop: '0.5rem' }}>
+                <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-muted)' }}>
+                  Comparação do Código Original vs. Exportado:
+                </span>
+                <pre className="code-block" style={{ maxHeight: '160px', overflowY: 'auto', fontSize: '0.68rem', marginTop: '0.3rem' }}>
+                  {roundTripData.diffSummary.lines.map((l, idx) => (
+                    <div
+                      key={idx}
+                      style={{
+                        color:
+                          l.type === 'modified'
+                            ? 'var(--status-warning)'
+                            : l.type === 'added'
+                            ? 'var(--status-success)'
+                            : l.type === 'deleted'
+                            ? 'var(--status-danger)'
+                            : 'var(--text-muted)',
+                      }}
+                    >
+                      {l.type === 'added'
+                        ? `+ ${l.newLine}`
+                        : l.type === 'deleted'
+                        ? `- ${l.originalLine}`
+                        : l.type === 'modified'
+                        ? `~ ${l.newLine} (antes: ${l.originalLine})`
+                        : `  ${l.originalLine}`}
+                    </div>
+                  ))}
+                </pre>
+              </div>
+            )}
+          </div>
+
           {/* Seleção de Impressora */}
           <div>
             <label className="metric-label">Selecione a Impressora de Destino</label>
@@ -243,12 +367,12 @@ export default function CompileModal({ isOpen, onClose }: CompileModalProps) {
             </div>
           )}
 
-          {/* Accordion Técnico: Código Compilado e Exportar JSON */}
+          {/* Accordion Técnico: Código Compilado para Impressão */}
           <div className="inspector-accordion" style={{ border: '1px solid var(--border-color)', borderRadius: '8px', overflow: 'hidden' }}>
             <div className="inspector-accordion-header" onClick={() => setIsAdvancedOpen(!isAdvancedOpen)}>
               <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                 <Terminal size={14} color="var(--accent-blue)" />
-                <span>Avançado: Ver Código Compilado & Exportar Modelo</span>
+                <span>Avançado: Ver Comandos RAW de Hardware</span>
               </span>
               {isAdvancedOpen ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
             </div>
@@ -257,24 +381,14 @@ export default function CompileModal({ isOpen, onClose }: CompileModalProps) {
               <div className="inspector-accordion-content" style={{ padding: '0.75rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
                   <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Payload de Comandos ({currentPrinter?.language}):</span>
-                  <div style={{ display: 'flex', gap: '0.3rem' }}>
-                    <button
-                      className="btn"
-                      style={{ padding: '0.2rem 0.5rem', fontSize: '0.7rem' }}
-                      onClick={() => navigator.clipboard.writeText(compiledCode)}
-                      title="Copiar código"
-                    >
-                      <Copy size={12} /> Copiar
-                    </button>
-                    <button
-                      className="btn"
-                      style={{ padding: '0.2rem 0.5rem', fontSize: '0.7rem' }}
-                      onClick={handleExportJSON}
-                      title="Exportar JSON do Modelo"
-                    >
-                      <Download size={12} /> Exportar JSON
-                    </button>
-                  </div>
+                  <button
+                    className="btn"
+                    style={{ padding: '0.2rem 0.5rem', fontSize: '0.7rem' }}
+                    onClick={() => navigator.clipboard.writeText(compiledCode)}
+                    title="Copiar código"
+                  >
+                    <Copy size={12} /> Copiar
+                  </button>
                 </div>
 
                 <pre className="code-block" style={{ maxHeight: '120px', fontSize: '0.7rem' }}>

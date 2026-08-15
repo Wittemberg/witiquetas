@@ -51,6 +51,7 @@ export const MOCK_PRODUCT_DATA: Record<string, string> = {
   'produto.ean': '7894900011517',
   'produto.unidade': 'UN',
   'produto.preco': '9.99',
+  'produto.promocao': '7.99',
   'produto.promocao.preco': '7.99',
   'produto.promocao.inicio': '10/08/2026',
   'produto.promocao.fim': '20/08/2026',
@@ -59,9 +60,59 @@ export const MOCK_PRODUCT_DATA: Record<string, string> = {
   'produto.fabricante': 'COCA-COLA',
   'empresa.razaoSocial': 'WR TECNOLOGIA SUPERMERCADOS LTDA',
   'empresa.nomeFantasia': 'SUPERMERCADO WR',
-  'impressao.data': '14/08/2026',
+  'empresa.nomeFilial': 'MATRIZ SÃO PAULO',
+  'job.quantidade': '1',
+  'impressao.data': '15/08/2026',
   'impressao.hora': '15:30',
 };
+
+// Avaliador Seguro de Regras de Visibilidade Condicional (Item 277-286)
+export function evaluateVisibilityRule(
+  rule?: import('@witiquetas/label-schema').VisibilityRule | null,
+  data: Record<string, string> = MOCK_PRODUCT_DATA
+): boolean {
+  if (!rule || !rule.field) return true;
+
+  const rawVal = data[rule.field] !== undefined ? String(data[rule.field]).trim() : '';
+  const targetVal = String(rule.value || '').trim();
+
+  switch (rule.operator) {
+    case '=':
+      return rawVal === targetVal;
+    case '!=':
+      return rawVal !== targetVal;
+    case '>': {
+      const numRaw = parseFloat(rawVal);
+      const numTarget = parseFloat(targetVal);
+      if (!isNaN(numRaw) && !isNaN(numTarget)) return numRaw > numTarget;
+      return rawVal > targetVal;
+    }
+    case '<': {
+      const numRaw = parseFloat(rawVal);
+      const numTarget = parseFloat(targetVal);
+      if (!isNaN(numRaw) && !isNaN(numTarget)) return numRaw < numTarget;
+      return rawVal < targetVal;
+    }
+    case '>=': {
+      const numRaw = parseFloat(rawVal);
+      const numTarget = parseFloat(targetVal);
+      if (!isNaN(numRaw) && !isNaN(numTarget)) return numRaw >= numTarget;
+      return rawVal >= targetVal;
+    }
+    case '<=': {
+      const numRaw = parseFloat(rawVal);
+      const numTarget = parseFloat(targetVal);
+      if (!isNaN(numRaw) && !isNaN(numTarget)) return numRaw <= numTarget;
+      return rawVal <= targetVal;
+    }
+    case 'empty':
+      return rawVal === '' || rawVal === '0' || rawVal === '0.00';
+    case 'not_empty':
+      return rawVal !== '' && rawVal !== '0' && rawVal !== '0.00';
+    default:
+      return true;
+  }
+}
 
 // Documento inicial padrão (100x30mm em 203 DPI)
 const initialDocument: LabelDocument = {
@@ -193,6 +244,9 @@ interface EditorState {
   showSafeArea: boolean;
   safeAreaMarginMm: number;
   showPreviewData: boolean;
+  showGhostConditionalElements: boolean; // Modo Fantasma: elementos condicionais inativos com opacidade (Item 286)
+  previewScenario: 'normal' | 'promo' | 'custom'; // Cenário de teste (Item 285)
+  mockProductData: Record<string, string>;
   isDirty: boolean;
   saveStatus: 'saved' | 'unsaved' | 'saving' | 'error';
   currentTemplateId: string | null;
@@ -232,6 +286,9 @@ interface EditorState {
   setShowRulers: (show: boolean) => void;
   setShowSafeArea: (show: boolean) => void;
   setShowPreviewData: (show: boolean) => void;
+  toggleShowGhostConditionalElements: () => void;
+  setPreviewScenario: (scenario: 'normal' | 'promo' | 'custom') => void;
+  updateMockProductData: (field: string, val: string) => void;
   toggleLeftSidebar: () => void;
   toggleRightSidebar: () => void;
 
@@ -284,6 +341,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   showSafeArea: false,
   safeAreaMarginMm: 1.5,
   showPreviewData: true,
+  showGhostConditionalElements: true, // Modo Fantasma: elementos condicionais inativos aparecem translúcidos
+  previewScenario: 'promo',
+  mockProductData: { ...MOCK_PRODUCT_DATA },
   isDirty: false,
   saveStatus: 'saved',
   currentTemplateId: null,
@@ -456,6 +516,25 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setShowRulers: (showRulers) => set({ showRulers }),
   setShowSafeArea: (showSafeArea) => set({ showSafeArea }),
   setShowPreviewData: (showPreviewData) => set({ showPreviewData }),
+  toggleShowGhostConditionalElements: () =>
+    set((state) => ({ showGhostConditionalElements: !state.showGhostConditionalElements })),
+  setPreviewScenario: (scenario) => {
+    const { mockProductData } = get();
+    const updated = { ...mockProductData };
+    if (scenario === 'promo') {
+      updated['produto.promocao'] = '7.99';
+      updated['produto.promocao.preco'] = '7.99';
+    } else if (scenario === 'normal') {
+      updated['produto.promocao'] = '0';
+      updated['produto.promocao.preco'] = '0';
+    }
+    set({ previewScenario: scenario, mockProductData: updated });
+  },
+  updateMockProductData: (field, val) =>
+    set((state) => ({
+      mockProductData: { ...state.mockProductData, [field]: val },
+      previewScenario: 'custom',
+    })),
   toggleLeftSidebar: () => set((state) => ({ isLeftSidebarCollapsed: !state.isLeftSidebarCollapsed })),
   toggleRightSidebar: () => set((state) => ({ isRightSidebarCollapsed: !state.isRightSidebarCollapsed })),
 
@@ -486,6 +565,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           color: '#0f172a',
           locked: false,
           visible: true,
+          sourceReference: { state: 'created', format: document.sourceFile?.format || 'pplb' },
         };
         break;
       case 'price':
@@ -506,6 +586,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           color: '#dc2626',
           locked: false,
           visible: true,
+          sourceReference: { state: 'created', format: document.sourceFile?.format || 'pplb' },
         };
         break;
       case 'barcode':
@@ -523,6 +604,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           showText: true,
           locked: false,
           visible: true,
+          sourceReference: { state: 'created', format: document.sourceFile?.format || 'pplb' },
         };
         break;
       case 'qrcode':
@@ -537,6 +619,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           height: Math.min(15, document.dimensions.heightMm - 10),
           locked: false,
           visible: true,
+          sourceReference: { state: 'created', format: document.sourceFile?.format || 'pplb' },
         };
         break;
       case 'rectangle':
@@ -553,6 +636,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           fillColor: 'transparent',
           locked: false,
           visible: true,
+          sourceReference: { state: 'created', format: document.sourceFile?.format || 'pplb' },
         };
         break;
       case 'line':
@@ -568,6 +652,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           color: '#000000',
           locked: false,
           visible: true,
+          sourceReference: { state: 'created', format: document.sourceFile?.format || 'pplb' },
         };
         break;
       case 'image':
@@ -582,6 +667,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           height: Math.min(20, document.dimensions.heightMm - 10),
           locked: false,
           visible: true,
+          sourceReference: { state: 'created', format: document.sourceFile?.format || 'pplb' },
         };
         break;
       default:
@@ -603,9 +689,15 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   updateElement: (id, patch) => {
     const { document, pushHistory } = get();
-    const updatedElements = document.elements.map((el) =>
-      el.id === id ? ({ ...el, ...patch } as LabelElement) : el
-    );
+    const updatedElements = document.elements.map((el) => {
+      if (el.id !== id) return el;
+      const currentRef = el.sourceReference || {};
+      const newRef = {
+        ...currentRef,
+        state: currentRef.state === 'created' ? ('created' as const) : ('modified' as const),
+      };
+      return { ...el, ...patch, sourceReference: newRef } as LabelElement;
+    });
 
     const updated: LabelDocument = {
       ...document,
@@ -620,9 +712,15 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const { document, selectedElementIds, pushHistory } = get();
     if (selectedElementIds.length === 0) return;
 
-    const updatedElements = document.elements.map((el) =>
-      selectedElementIds.includes(el.id) ? ({ ...el, ...patch } as LabelElement) : el
-    );
+    const updatedElements = document.elements.map((el) => {
+      if (!selectedElementIds.includes(el.id)) return el;
+      const currentRef = el.sourceReference || {};
+      const newRef = {
+        ...currentRef,
+        state: currentRef.state === 'created' ? ('created' as const) : ('modified' as const),
+      };
+      return { ...el, ...patch, sourceReference: newRef } as LabelElement;
+    });
 
     set({ document: { ...document, elements: updatedElements }, isDirty: true });
     pushHistory();

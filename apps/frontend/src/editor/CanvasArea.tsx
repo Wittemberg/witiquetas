@@ -6,6 +6,7 @@ import {
   mmToPx,
   pxToMm,
   MOCK_PRODUCT_DATA,
+  evaluateVisibilityRule,
 } from './useEditorStore';
 import { LabelElement, QrCodeElement, TextElement, BarcodeElement, PriceElement } from '@witiquetas/label-schema';
 import { generateQRCodeDataUrl } from './qrCodeGenerator';
@@ -315,6 +316,8 @@ export default function CanvasArea() {
     showSafeArea,
     safeAreaMarginMm,
     showPreviewData,
+    showGhostConditionalElements,
+    mockProductData,
     updateElement,
     duplicateSelectedElements,
     removeSelectedElements,
@@ -471,6 +474,10 @@ export default function CanvasArea() {
   const renderElement = (elem: LabelElement) => {
     if (elem.visible === false) return null;
 
+    const isConditionMet = evaluateVisibilityRule(elem.visibilityRule, mockProductData || MOCK_PRODUCT_DATA);
+    if (!isConditionMet && !showGhostConditionalElements) return null;
+    const isGhost = !isConditionMet;
+
     const xPx = mmToPx(elem.x, dpi);
     const yPx = mmToPx(elem.y, dpi);
     const wPx = mmToPx(elem.width, dpi);
@@ -530,55 +537,65 @@ export default function CanvasArea() {
       });
     };
 
-    switch (elem.type) {
-      case 'text': {
-        const textElem = elem as TextElement;
-        const textContent = showPreviewData && textElem.field && MOCK_PRODUCT_DATA[textElem.field]
-          ? MOCK_PRODUCT_DATA[textElem.field]
-          : textElem.text;
+    const renderInnerElement = () => {
+      switch (elem.type) {
+        case 'text': {
+          const textElem = elem as TextElement;
+          let textContent = showPreviewData && textElem.field && (mockProductData?.[textElem.field] || MOCK_PRODUCT_DATA[textElem.field])
+            ? (mockProductData?.[textElem.field] || MOCK_PRODUCT_DATA[textElem.field])
+            : textElem.text;
 
-        const isBold = textElem.fontWeight === 'bold' || textElem.fontWeight === '700' || textElem.fontWeight === '600';
-        const isItalic = textElem.fontStyle === 'italic';
-        const fontStyleStr = isBold && isItalic ? 'italic bold' : isBold ? 'bold' : isItalic ? 'italic' : 'normal';
-
-        // AutoFit Inteligente: se o texto não couber na largura/altura, reduz progressivamente a fonte respeitando 6pt
-        let calculatedFontSize = textElem.fontSize * (dpi / 72);
-        if (textElem.autoFit !== false && textElem.singleLine) {
-          const estimatedChars = textContent.length || 1;
-          const maxAllowedSize = (wPx / estimatedChars) * 1.6;
-          if (maxAllowedSize < calculatedFontSize) {
-            calculatedFontSize = Math.max(6 * (dpi / 72), maxAllowedSize);
+          // Aplicação de Transformações de Substring (Item 275-276)
+          if (textElem.transformations && textElem.transformations.length > 0) {
+            for (const trans of textElem.transformations) {
+              if (trans.type === 'substring' && textContent) {
+                textContent = textContent.substring(trans.start, trans.start + trans.length);
+              }
+            }
           }
-        }
 
-        return (
-          <Text
-            key={textElem.id}
-            id={textElem.id}
-            x={xPx}
-            y={yPx}
-            width={wPx}
-            height={hPx}
-            text={textContent}
-            fontFamily={textElem.fontFamily || 'Roboto'}
-            fontSize={calculatedFontSize}
-            fontStyle={fontStyleStr}
-            textDecoration={textElem.textDecoration || 'none'}
-            align={textElem.alignment || 'left'}
-            verticalAlign={textElem.verticalAlignment || 'top'}
-            wrap={textElem.singleLine ? 'none' : textElem.wrap || 'word'}
-            ellipsis={!!textElem.singleLine}
-            fill={textElem.color || '#000000'}
-            draggable={!textElem.locked}
-            onClick={handleClick}
-            onTap={handleClick}
-            onDblClick={() => setSelectedElementId(textElem.id)}
-            onContextMenu={handleContextMenu}
-            onDragEnd={handleDragEnd}
-            onTransformEnd={handleTransformEnd}
-          />
-        );
-      }
+          const isBold = textElem.fontWeight === 'bold' || textElem.fontWeight === '700' || textElem.fontWeight === '600';
+          const isItalic = textElem.fontStyle === 'italic';
+          const fontStyleStr = isBold && isItalic ? 'italic bold' : isBold ? 'bold' : isItalic ? 'italic' : 'normal';
+
+          // AutoFit Inteligente: se o texto não couber na largura/altura, reduz progressivamente a fonte respeitando 6pt
+          let calculatedFontSize = textElem.fontSize * (dpi / 72);
+          if (textElem.autoFit !== false && textElem.singleLine) {
+            const estimatedChars = textContent.length || 1;
+            const maxAllowedSize = (wPx / estimatedChars) * 1.6;
+            if (maxAllowedSize < calculatedFontSize) {
+              calculatedFontSize = Math.max(6 * (dpi / 72), maxAllowedSize);
+            }
+          }
+
+          return (
+            <Text
+              key={textElem.id}
+              id={textElem.id}
+              x={xPx}
+              y={yPx}
+              width={wPx}
+              height={hPx}
+              text={textContent}
+              fontFamily={textElem.fontFamily || 'Roboto'}
+              fontSize={calculatedFontSize}
+              fontStyle={fontStyleStr}
+              textDecoration={textElem.textDecoration || 'none'}
+              align={textElem.alignment || 'left'}
+              verticalAlign={textElem.verticalAlignment || 'top'}
+              wrap={textElem.singleLine ? 'none' : textElem.wrap || 'word'}
+              ellipsis={!!textElem.singleLine}
+              fill={textElem.color || '#000000'}
+              draggable={!textElem.locked}
+              onClick={handleClick}
+              onTap={handleClick}
+              onDblClick={() => setSelectedElementId(textElem.id)}
+              onContextMenu={handleContextMenu}
+              onDragEnd={handleDragEnd}
+              onTransformEnd={handleTransformEnd}
+            />
+          );
+        }
 
       case 'price': {
         const priceElem = elem as PriceElement;
@@ -811,6 +828,30 @@ export default function CanvasArea() {
     }
   };
 
+  const innerNode = renderInnerElement();
+  if (!innerNode) return null;
+
+  if (isGhost) {
+    return (
+      <Group key={`ghost-wrap-${elem.id}`} opacity={0.35}>
+        {innerNode}
+        <Rect
+          x={xPx}
+          y={yPx}
+          width={wPx}
+          height={hPx}
+          stroke="#f59e0b"
+          strokeWidth={1}
+          dash={[3, 3]}
+          listening={false}
+        />
+      </Group>
+    );
+  }
+
+  return innerNode;
+};
+
   const renderGridLines = () => {
     const lines = [];
     const step = Math.max(4, gridSizePx || 10);
@@ -852,7 +893,7 @@ export default function CanvasArea() {
     };
   }, [isMarqueeActive, marqueeStart, marqueeEnd]);
 
-  // Diagnóstico e Validação de Limites Físicos e Margem Segura (Item 257-262)
+  // Diagnóstico e Validação de Limites Físicos e Margem Segura (Item 267-268)
   interface IssueItem {
     id: string;
     name: string;
@@ -869,7 +910,9 @@ export default function CanvasArea() {
       const y = Number(el.y) || 0;
       const w = Number(el.width) || 10;
       const h = Number(el.height) || 10;
-      const isPhysical = x < 0 || y < 0 || x + w > widthMm || y + h > heightMm;
+
+      // Tolerância geométrica de 0.05 mm para prevenir falsos positivos por arredondamento
+      const isPhysical = x < -0.05 || y < -0.05 || (x + w) > (widthMm + 0.05) || (y + h) > (heightMm + 0.05);
       if (isPhysical) {
         issues.push({
           id: el.id,
@@ -878,7 +921,7 @@ export default function CanvasArea() {
           message: `"${el.name || (el.type ? el.type.toUpperCase() : 'ELEMENTO')}" está parcialmente fora da etiqueta`,
         });
       } else {
-        const isBeyondSafe = x < 1.5 || y < 1.5 || x + w > widthMm - 1.5 || y + h > heightMm - 1.5;
+        const isBeyondSafe = x < 1.49 || y < 1.49 || (x + w) > (widthMm - 1.49) || (y + h) > (heightMm - 1.49);
         if (isBeyondSafe) {
           issues.push({
             id: el.id,

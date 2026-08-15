@@ -7,6 +7,26 @@ export const LabelDimensionsSchema = z.object({
   orientation: z.enum(['portrait', 'landscape']).optional(),
 });
 
+export const VisibilityRuleSchema = z.object({
+  field: z.string(),
+  operator: z.enum(['=', '!=', '>', '<', '>=', '<=', 'empty', 'not_empty']),
+  value: z.string(),
+});
+
+export const FieldTransformationSchema = z.object({
+  type: z.literal('substring'),
+  start: z.number().nonnegative(),
+  length: z.number().positive(),
+});
+
+export const ElementSourceReferenceSchema = z.object({
+  originalCommand: z.string().optional(),
+  originalLine: z.number().int().nonnegative().optional(),
+  originalIndex: z.number().int().nonnegative().optional(),
+  format: z.string().optional(),
+  state: z.enum(['unchanged', 'modified', 'created', 'deleted']).optional(),
+});
+
 export const BaseElementSchema = z.object({
   id: z.string(),
   name: z.string().optional(),
@@ -18,6 +38,10 @@ export const BaseElementSchema = z.object({
   rotation: z.number().optional(),
   locked: z.boolean().optional(),
   visible: z.boolean().optional(),
+  groupId: z.string().optional(),
+  visibilityRule: VisibilityRuleSchema.optional(),
+  transformations: z.array(FieldTransformationSchema).optional(),
+  sourceReference: ElementSourceReferenceSchema.optional(),
 });
 
 export const TextElementSchema = BaseElementSchema.extend({
@@ -99,11 +123,23 @@ export const LabelElementSchema = z.discriminatedUnion('type', [
   ImageElementSchema,
 ]);
 
+export const SourceFileMetadataSchema = z.object({
+  rawText: z.string(),
+  format: z.string(),
+  importedAt: z.string().optional(),
+  hash: z.string().optional(),
+  configCommands: z.array(z.string()).optional(),
+  comments: z.array(z.object({ line: z.number(), text: z.string() })).optional(),
+  rawCommands: z.array(z.object({ line: z.number(), text: z.string() })).optional(),
+  printQuantity: z.string().optional(),
+});
+
 export const LabelDocumentSchema = z.object({
   schemaVersion: z.number().int().positive(),
   title: z.string(),
   dimensions: LabelDimensionsSchema,
   elements: z.array(LabelElementSchema),
+  sourceFile: SourceFileMetadataSchema.optional(),
   createdAt: z.string().optional(),
   updatedAt: z.string().optional(),
 });

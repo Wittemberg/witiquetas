@@ -1,5 +1,29 @@
 export type ElementType = 'text' | 'price' | 'barcode' | 'qrcode' | 'line' | 'rectangle' | 'image';
 
+export type VisibilityOperator = '=' | '!=' | '>' | '<' | '>=' | '<=' | 'empty' | 'not_empty';
+
+export interface VisibilityRule {
+  field: string; // Ex: "produto.promocao" ou "PROMOCAO"
+  operator: VisibilityOperator;
+  value: string; // Ex: "0" ou "1"
+}
+
+export interface FieldSubstringTransformation {
+  type: 'substring';
+  start: number;
+  length: number;
+}
+
+export type FieldTransformation = FieldSubstringTransformation;
+
+export interface ElementSourceReference {
+  originalCommand?: string;
+  originalLine?: number;
+  originalIndex?: number;
+  format?: string;
+  state?: 'unchanged' | 'modified' | 'created' | 'deleted';
+}
+
 export interface BaseElement {
   id: string;
   name?: string; // Nome amigável do elemento (ex: "Preço Promocional", "Borda Principal")
@@ -11,6 +35,10 @@ export interface BaseElement {
   rotation?: number; // Rotação em graus (0, 90, 180, 270)
   locked?: boolean; // Se bloqueado para edição no canvas
   visible?: boolean; // Se visível na tela e na impressão
+  groupId?: string; // ID de agrupamento estrutural (Item 287-288)
+  visibilityRule?: VisibilityRule; // Regra condicional de exibição (Item 277-284)
+  transformations?: FieldTransformation[]; // Transformações no valor do campo (Item 275-276)
+  sourceReference?: ElementSourceReference; // Metadados para Round-Trip de 100% de preservação (Item 313-315)
 }
 
 export interface TextElement extends BaseElement {
@@ -98,11 +126,23 @@ export interface LabelDimensions {
   orientation?: 'portrait' | 'landscape';
 }
 
+export interface SourceFileMetadata {
+  rawText: string;
+  format: string;
+  importedAt?: string;
+  hash?: string;
+  configCommands?: string[];
+  comments?: Array<{ line: number; text: string }>;
+  rawCommands?: Array<{ line: number; text: string }>;
+  printQuantity?: string;
+}
+
 export interface LabelDocument {
   schemaVersion: number;
   title: string;
   dimensions: LabelDimensions;
   elements: LabelElement[];
+  sourceFile?: SourceFileMetadata;
   createdAt?: string;
   updatedAt?: string;
 }

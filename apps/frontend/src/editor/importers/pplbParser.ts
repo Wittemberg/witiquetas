@@ -17,6 +17,7 @@ import type {
 } from './astTypes';
 import { LegacyPreprocessor, ERP_MACRO_MAP } from './legacyPreprocessor';
 import { calculatePPLBTextGeometry } from './pplbFontMetrics';
+import { calculatePPLBBarcodeGeometry } from './pplbBarcodeMetrics';
 import type { ImportDiagnosticItem, ImportResult } from './types';
 
 /**
@@ -349,37 +350,47 @@ export class PPLBParser {
         const yDots = parseInt(match[2], 10);
         const rotationVal = parseInt(match[3], 10);
         const rawType = match[4];
-        const heightDots = parseInt(match[7], 10) || 50;
+        const narrowDots = parseInt(match[5], 10) || 2;
+        const wideDots = parseInt(match[6], 10) || 4;
+        const heightDots = parseInt(match[7], 10) || 30;
         const showHuman = match[8].toUpperCase() === 'B';
         const rawData = match[9] || '';
 
         const xMm = dotsToMm(xDots, dpi);
         const yMm = dotsToMm(yDots, dpi);
-        const heightMm = Math.max(8, dotsToMm(heightDots, dpi));
         const rotation = rotationVal === 1 ? 90 : rotationVal === 2 ? 180 : rotationVal === 3 ? 270 : 0;
 
-        let format: any = 'AUTO';
-        if (rawType === 'E' || rawType === 'E30' || rawType === '3') format = 'EAN13';
-        else if (rawType === '8') format = 'EAN8';
-        else if (rawType === '1') format = 'CODE128';
-        else if (rawType === 'K') format = 'ITF14';
-
         const isMacro = /\[\[(BARRA|BARRAS|EAN|GTIN)\]\]/i.test(rawData);
+
+        // Geometria precisa derivada da simbologia e parâmetros nativos PPLB
+        const geo = calculatePPLBBarcodeGeometry(
+          rawType,
+          narrowDots,
+          wideDots,
+          heightDots,
+          rawData,
+          showHuman,
+          dpi
+        );
 
         const barcodeElement: BarcodeElement = {
           id: `elem-barcode-${lineIdx}`,
           name: 'Código de Barras',
           type: 'barcode',
-          format,
+          format: geo.canonicalFormat,
           field: isMacro ? 'produto.ean' : undefined,
           value: isMacro ? '7891234567895' : rawData,
           showText: showHuman,
           x: xMm,
           y: yMm,
-          width: Math.max(30, dotsToMm(300, dpi)),
-          height: heightMm,
+          width: geo.widthMm,
+          height: geo.heightMm,
           rotation,
           visibilityRule: inheritedRule,
+          sourceBarcodeType: rawType,
+          narrowBarDots: narrowDots,
+          wideBarDots: wideDots,
+          barcodeHeightDots: heightDots,
           sourceReference: {
             originalCommand: commandLine,
             originalLine: lineIdx,

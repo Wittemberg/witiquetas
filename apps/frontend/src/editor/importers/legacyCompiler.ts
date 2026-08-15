@@ -226,11 +226,24 @@ export class LegacyCompiler {
 
       case 'barcode': {
         const b = elem as BarcodeElement;
-        const hDots = mmToDots(b.height, dpi);
+        const hDots = b.barcodeHeightDots || mmToDots(b.height, dpi);
+        const narrow = b.narrowBarDots || 2;
+        const wide = b.wideBarDots || 4;
         const showHuman = b.showText !== false ? 'B' : 'N';
-        const typeCode = b.format === 'EAN13' ? 'E' : b.format === 'EAN8' ? '8' : '1';
-        const macroVal = b.field ? `[[${b.field.split('.').pop()?.toUpperCase()}]]` : b.value;
-        return `B${xDots},${yDots},${rotationVal},${typeCode},2,5,${hDots},${showHuman},"${macroVal}"`;
+        const typeCode = b.sourceBarcodeType || (b.format === 'EAN13' ? 'E30' : b.format === 'EAN8' ? '8' : '1');
+
+        let macroVal = b.value;
+        if (b.sourceReference?.originalCommand) {
+          const matchMacro = b.sourceReference.originalCommand.match(/"(\[\[.*?\]\])"/);
+          if (matchMacro) {
+            macroVal = matchMacro[1];
+          }
+        }
+        if (!macroVal && b.field) {
+          macroVal = b.field === 'produto.ean' ? '[[BARRA]]' : `[[${b.field.split('.').pop()?.toUpperCase()}]]`;
+        }
+
+        return `B${xDots},${yDots},${rotationVal},${typeCode},${narrow},${wide},${hDots},${showHuman},"${macroVal}"`;
       }
 
       case 'text': {

@@ -568,6 +568,48 @@ export default function CanvasArea() {
             }
           }
 
+          if (textElem.reversePrint) {
+            return (
+              <Group
+                key={textElem.id}
+                id={textElem.id}
+                x={xPx}
+                y={yPx}
+                width={wPx}
+                height={hPx}
+                draggable={!textElem.locked}
+                onClick={handleClick}
+                onTap={handleClick}
+                onDblClick={() => setSelectedElementId(textElem.id)}
+                onContextMenu={handleContextMenu}
+                onDragEnd={handleDragEnd}
+                onTransformEnd={handleTransformEnd}
+              >
+                <Rect
+                  width={wPx}
+                  height={hPx}
+                  fill={textElem.color || '#000000'}
+                  cornerRadius={1}
+                />
+                <Text
+                  width={wPx}
+                  height={hPx}
+                  text={textContent}
+                  fontFamily={textElem.fontFamily || 'Roboto'}
+                  fontSize={calculatedFontSize}
+                  fontStyle={fontStyleStr}
+                  textDecoration={textElem.textDecoration || 'none'}
+                  align={textElem.alignment || 'left'}
+                  verticalAlign={textElem.verticalAlignment || 'top'}
+                  wrap={textElem.singleLine ? 'none' : textElem.wrap || 'word'}
+                  ellipsis={!!textElem.singleLine}
+                  fill="#ffffff"
+                  scaleX={textElem.scaleX || 1}
+                />
+              </Group>
+            );
+          }
+
           return (
             <Text
               key={textElem.id}
@@ -586,6 +628,7 @@ export default function CanvasArea() {
               wrap={textElem.singleLine ? 'none' : textElem.wrap || 'word'}
               ellipsis={!!textElem.singleLine}
               fill={textElem.color || '#000000'}
+              scaleX={textElem.scaleX || 1}
               draggable={!textElem.locked}
               onClick={handleClick}
               onTap={handleClick}

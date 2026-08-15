@@ -16,6 +16,7 @@ import type {
   LabelAST,
 } from './astTypes';
 import { LegacyPreprocessor, ERP_MACRO_MAP } from './legacyPreprocessor';
+import { calculatePPLBTextGeometry } from './pplbFontMetrics';
 import type { ImportDiagnosticItem, ImportResult } from './types';
 
 /**
@@ -226,6 +227,7 @@ export class PPLBParser {
         const fontNum = parseInt(match[4], 10);
         const hMult = parseInt(match[5], 10) || 1;
         const vMult = parseInt(match[6], 10) || 1;
+        const reversePrint = match[7]?.toUpperCase() === 'R';
         const rawText = match[8] || '';
 
         const xMm = dotsToMm(xDots, dpi);
@@ -238,6 +240,9 @@ export class PPLBParser {
 
         if (isPromoPrice || isNormalPrice) {
           const hasPrefix = /R\$/i.test(rawText) || /R\s*\$/i.test(rawText);
+          const charCapacity = hasPrefix ? 10 : 7; // Capacidade padrão de preço (ex: "R$ 999,99")
+          const geo = calculatePPLBTextGeometry(fontNum, hMult, vMult, charCapacity, dpi);
+
           const priceElement: PriceElement = {
             id: `elem-price-${lineIdx}`,
             name: isPromoPrice ? 'Preço Promocional' : 'Preço Normal',
@@ -246,14 +251,19 @@ export class PPLBParser {
             prefix: hasPrefix ? 'R$' : '',
             sampleValue: isPromoPrice ? '7,99' : '9,99',
             reducedCents: true,
-            fontFamily: 'Roboto',
+            fontFamily: geo.fontMetric.fallbackFontFamily.split(',')[0].trim(),
             x: xMm,
             y: yMm,
-            width: Math.max(25, dotsToMm(200 * hMult, dpi)),
-            height: Math.max(10, dotsToMm(20 * (fontNum + 1) * vMult, dpi)),
+            width: geo.widthMm,
+            height: geo.heightMm,
             rotation,
             color: isPromoPrice ? '#ef4444' : '#1e293b',
             visibilityRule: inheritedRule,
+            printerFontId: fontNum,
+            horizontalMultiplier: hMult,
+            verticalMultiplier: vMult,
+            scaleX: hMult !== vMult ? hMult / vMult : 1.0,
+            reversePrint,
             sourceReference: {
               originalCommand: commandLine,
               originalLine: lineIdx,
@@ -269,6 +279,7 @@ export class PPLBParser {
         let fieldBinding: string | undefined = undefined;
         let transformations: any[] | undefined = undefined;
         let textContent = rawText;
+        let charCapacity = rawText.length;
 
         if (macroMatch) {
           const preprocessed = LegacyPreprocessor.parseMacro(macroMatch[0]);
@@ -276,26 +287,46 @@ export class PPLBParser {
             fieldBinding = preprocessed.field;
             transformations = preprocessed.transformations;
             textContent = rawText.replace(macroMatch[0], `{${preprocessed.field}}`);
+
+            // Se for substring com tamanho explícito (ex: [[NOME,0,18]] -> capacidade = 18 caracteres)
+            if (preprocessed.transformations && preprocessed.transformations[0]?.length) {
+              const prefixLen = rawText.indexOf(macroMatch[0]);
+              const suffixLen = rawText.length - (prefixLen + macroMatch[0].length);
+              charCapacity = prefixLen + preprocessed.transformations[0].length + suffixLen;
+            } else {
+              // Capacidade padrão para macro completa
+              const prefixLen = rawText.indexOf(macroMatch[0]);
+              const suffixLen = rawText.length - (macroMatch[0].length + prefixLen);
+              charCapacity = prefixLen + 20 + suffixLen;
+            }
           }
         }
 
-        const fontSize = Math.max(8, (fontNum + 2) * 3 * vMult);
+        const geo = calculatePPLBTextGeometry(fontNum, hMult, vMult, Math.max(1, charCapacity), dpi);
+
         const textElement: TextElement = {
           id: `elem-text-${lineIdx}`,
           name: fieldBinding ? `Texto (${fieldBinding.split('.').pop()})` : 'Texto',
           type: 'text',
           text: textContent,
           field: fieldBinding,
-          fontFamily: 'Inter',
-          fontSize,
+          fontFamily: geo.fontMetric.fallbackFontFamily.split(',')[0].trim(),
+          fontSize: geo.fontSizePt,
           fontWeight: fontNum >= 3 ? 'bold' : 'normal',
           x: xMm,
           y: yMm,
-          width: Math.max(20, dotsToMm(180 * hMult, dpi)),
-          height: Math.max(6, dotsToMm(16 * (fontNum + 1) * vMult, dpi)),
+          width: geo.widthMm,
+          height: geo.heightMm,
           rotation,
           visibilityRule: inheritedRule,
           transformations,
+          autoFit: false,
+          singleLine: true,
+          printerFontId: fontNum,
+          horizontalMultiplier: hMult,
+          verticalMultiplier: vMult,
+          scaleX: hMult !== vMult ? hMult / vMult : 1.0,
+          reversePrint,
           sourceReference: {
             originalCommand: commandLine,
             originalLine: lineIdx,

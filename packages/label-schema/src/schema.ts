@@ -5,6 +5,12 @@ export const LabelDimensionsSchema = z.object({
   heightMm: z.number().positive(),
   dpi: z.union([z.literal(203), z.literal(300), z.literal(600)]),
   orientation: z.enum(['portrait', 'landscape']).optional(),
+  gapMm: z.number().nonnegative().optional(),
+  widthDots: z.number().int().positive().optional(),
+  heightDots: z.number().int().positive().optional(),
+  gapDots: z.number().int().nonnegative().optional(),
+  rawQCommand: z.string().optional(),
+  rawqCommand: z.string().optional(),
 });
 
 export const VisibilityRuleSchema = z.object({

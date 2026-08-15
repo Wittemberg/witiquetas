@@ -88,9 +88,64 @@ export class LegacyCompiler {
         continue;
       }
 
-      // 2. Configurações de Impressora preservadas intactas
+      // 2. Configurações de Dimensões Físicas: Q (Altura/Gap) e q (Largura)
+      if (trimmed.startsWith('Q')) {
+        const qMatch = trimmed.match(/^Q(\d+)(?:,(\d+))?$/);
+        if (qMatch) {
+          const origHDots = parseInt(qMatch[1], 10);
+          const origGapStr = qMatch[2];
+          const currentHDots = document.dimensions.heightDots || mmToDots(document.dimensions.heightMm, dpi);
+          const currentGapDots = document.dimensions.gapDots !== undefined
+            ? document.dimensions.gapDots
+            : (document.dimensions.gapMm !== undefined ? mmToDots(document.dimensions.gapMm, dpi) : undefined);
+
+          const isHeightSame = origHDots === currentHDots;
+          const isGapSame = origGapStr === undefined
+            ? currentGapDots === undefined
+            : (currentGapDots !== undefined && parseInt(origGapStr, 10) === currentGapDots);
+
+          if (isHeightSame && isGapSame) {
+            compiledLines.push(origLine);
+            diffLines.push({ type: 'unchanged', originalLine: origLine, newLine: origLine });
+            preservedConfigCommandsCount++;
+          } else {
+            let gapStr = '';
+            if (currentGapDots !== undefined) {
+              const padLen = origGapStr ? Math.max(origGapStr.length, String(currentGapDots).length) : 0;
+              gapStr = `,${padLen > 0 ? String(currentGapDots).padStart(padLen, '0') : currentGapDots}`;
+            }
+            const newQLine = `Q${currentHDots}${gapStr}`;
+            compiledLines.push(newQLine);
+            diffLines.push({ type: 'modified', originalLine: origLine, newLine: newQLine });
+            modifiedCount++;
+          }
+          continue;
+        }
+      }
+
+      if (trimmed.startsWith('q')) {
+        const qMatch = trimmed.match(/^q(\d+)$/);
+        if (qMatch) {
+          const origWDots = parseInt(qMatch[1], 10);
+          const currentWDots = document.dimensions.widthDots || mmToDots(document.dimensions.widthMm, dpi);
+
+          if (origWDots === currentWDots) {
+            compiledLines.push(origLine);
+            diffLines.push({ type: 'unchanged', originalLine: origLine, newLine: origLine });
+            preservedConfigCommandsCount++;
+          } else {
+            const newqLine = `q${currentWDots}`;
+            compiledLines.push(newqLine);
+            diffLines.push({ type: 'modified', originalLine: origLine, newLine: newqLine });
+            modifiedCount++;
+          }
+          continue;
+        }
+      }
+
+      // 3. Demais Configurações de Impressora preservadas intactas
       if (
-        /^(I8|Q\d+|q\d+|r[N|Y]|S\d+|D\d+|ZT|JF|OD|R\d+,\d+|f\d+|N|\^XA|\^XZ|\^PW\d+|\^LL\d+)/i.test(trimmed) &&
+        /^(I8|r[N|Y]|S\d+|D\d+|ZT|JF|OD|R\d+,\d+|f\d+|N|\^XA|\^XZ|\^PW\d+|\^LL\d+)/i.test(trimmed) &&
         !trimmed.startsWith('A') &&
         !trimmed.startsWith('B') &&
         !trimmed.startsWith('L') &&

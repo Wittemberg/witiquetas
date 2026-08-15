@@ -21,13 +21,17 @@ import { calculatePPLBBarcodeGeometry } from './pplbBarcodeMetrics';
 import type { ImportDiagnosticItem, ImportResult } from './types';
 
 /**
- * Converte Dots da impressora para Milímetros
- * 203 DPI = ~8 dots/mm (203 / 25.4 = 7.992)
+ * Converte Dots da impressora para Milímetros (precisão em ponto flutuante)
+ * Fórmula física oficial: mm = (dots * 25.4) / dpi
  */
 export function dotsToMm(dots: number, dpi: number = 203): number {
-  return parseFloat(((dots * 25.4) / dpi).toFixed(2));
+  return (dots * 25.4) / dpi;
 }
 
+/**
+ * Converte Milímetros para Dots inteiros da impressora térmica
+ * Fórmula física oficial: dots = Math.round((mm * dpi) / 25.4)
+ */
 export function mmToDots(mm: number, dpi: number = 203): number {
   return Math.round((mm * dpi) / 25.4);
 }
@@ -47,31 +51,58 @@ export class PPLBParser {
 
     let widthMm = 100;
     let heightMm = 30;
+    let widthDots: number | undefined = undefined;
+    let heightDots: number | undefined = undefined;
+    let gapDots: number | undefined = undefined;
+    let gapMm: number | undefined = undefined;
+    let rawQCommand: string | undefined = undefined;
+    let rawqCommand: string | undefined = undefined;
     let dpi: 203 | 300 | 600 = 203;
 
-    // 1. Detectar Dimensões a partir dos comandos de configuração
+    // 1. Detectar Dimensões a partir dos comandos de configuração (Q e q estritos)
     for (const node of rawNodes) {
       if (node.type === 'config') {
         const cmd = (node as ConfigASTNode).command;
-        // Altura / Gap: Q240,024
-        const qMatch = cmd.match(/^Q(\d+)(?:,(\d+))?/i);
-        if (qMatch) {
-          const dotsH = parseInt(qMatch[1], 10);
-          if (dotsH > 0) heightMm = Math.round(dotsToMm(dotsH, dpi));
+
+        // Comando Q (Maiúsculo estrito): Altura da etiqueta e Gap entre etiquetas
+        // Sintaxe: Q[label_length_dots],[gap_dots] (Ex: Q240,024 ou Q240,24)
+        if (cmd.startsWith('Q')) {
+          const qMatch = cmd.match(/^Q(\d+)(?:,(\d+))?$/);
+          if (qMatch) {
+            const dotsH = parseInt(qMatch[1], 10);
+            if (dotsH > 0) {
+              heightDots = dotsH;
+              heightMm = dotsToMm(dotsH, dpi);
+              rawQCommand = cmd;
+            }
+            if (qMatch[2] !== undefined) {
+              const dotsG = parseInt(qMatch[2], 10);
+              gapDots = dotsG;
+              gapMm = dotsToMm(dotsG, dpi);
+            }
+          }
         }
-        // Largura: q831 ou q800
-        const qWidthMatch = cmd.match(/^q(\d+)/i);
-        if (qWidthMatch) {
-          const dotsW = parseInt(qWidthMatch[1], 10);
-          if (dotsW > 0) widthMm = Math.round(dotsToMm(dotsW, dpi));
+
+        // Comando q (Minúsculo estrito): Largura total imprimível
+        // Sintaxe: q[label_width_dots] (Ex: q831 ou q800)
+        if (cmd.startsWith('q')) {
+          const qMatch = cmd.match(/^q(\d+)$/);
+          if (qMatch) {
+            const dotsW = parseInt(qMatch[1], 10);
+            if (dotsW > 0) {
+              widthDots = dotsW;
+              widthMm = dotsToMm(dotsW, dpi);
+              rawqCommand = cmd;
+            }
+          }
         }
       }
     }
 
     diagnostics.push({
       status: 'converted',
-      originalSnippet: `Dimensões: ${widthMm}x${heightMm} mm (${dpi} DPI)`,
-      message: `Dimensões físicas detectadas: ${widthMm} mm x ${heightMm} mm (${dpi} DPI)`,
+      originalSnippet: `Dimensões: ${widthMm.toFixed(1)}x${heightMm.toFixed(1)} mm (${dpi} DPI)`,
+      message: `Dimensões físicas detectadas: ${widthMm.toFixed(2)} mm x ${heightMm.toFixed(2)} mm (${dpi} DPI)${gapDots ? `, Gap: ${gapDots} dots` : ''}`,
     });
 
     let elementIndex = 0;
@@ -88,39 +119,29 @@ export class PPLBParser {
         const processedChildren: ASTNode[] = [];
 
         for (const child of condNode.children) {
-          const parsed = this.parseSingleCommand(child.originalText, child.line, dpi, condNode.rule);
-          if (parsed.element) {
-            elements.push(parsed.element);
-            const visualNode: VisualASTNode = {
-              id: `vis-${elementIndex++}`,
-              type: 'visual',
-              line: child.line,
-              originalText: child.originalText,
-              commandType: parsed.commandType,
-              element: parsed.element,
-              visibilityRule: condNode.rule,
-              transformations: parsed.element.transformations,
-              sourceRef: {
-                originalCommand: child.originalText,
-                originalLine: child.line,
-                format: 'pplb',
-                state: 'unchanged',
-              },
-            };
-            processedChildren.push(visualNode);
-            diagnostics.push({
-              status: 'converted',
-              originalSnippet: condNode.originalText,
-              message: `Elemento "${parsed.element.name}" importado com regra condicional "${condNode.conditionExpression}"`,
-              targetElementId: parsed.element.id,
-            });
+          if (child.type === 'raw') {
+            const parsed = this.parseSingleCommand(child.originalText, child.line, dpi, condNode.rule);
+            if (parsed.element) {
+              elements.push(parsed.element);
+              processedChildren.push({
+                type: 'visual',
+                line: child.line,
+                originalText: child.originalText,
+                elementId: parsed.element.id,
+                commandType: parsed.commandType,
+              } as VisualASTNode);
+            } else {
+              processedChildren.push(child);
+            }
           } else {
             processedChildren.push(child);
           }
         }
 
-        condNode.children = processedChildren;
-        finalASTNodes.push(condNode);
+        finalASTNodes.push({
+          ...condNode,
+          children: processedChildren,
+        });
         continue;
       }
 
@@ -128,44 +149,33 @@ export class PPLBParser {
         const parsed = this.parseSingleCommand(node.originalText, node.line, dpi);
         if (parsed.element) {
           elements.push(parsed.element);
-          const visualNode: VisualASTNode = {
-            id: `vis-${elementIndex++}`,
+          finalASTNodes.push({
             type: 'visual',
             line: node.line,
             originalText: node.originalText,
+            elementId: parsed.element.id,
             commandType: parsed.commandType,
-            element: parsed.element,
-            transformations: parsed.element.transformations,
-            sourceRef: {
-              originalCommand: node.originalText,
-              originalLine: node.line,
-              format: 'pplb',
-              state: 'unchanged',
-            },
-          };
-          finalASTNodes.push(visualNode);
-          diagnostics.push({
-            status: 'converted',
-            originalSnippet: node.originalText,
-            message: `Elemento "${parsed.element.name}" importado com sucesso na posição (${parsed.element.x}, ${parsed.element.y}) mm`,
-            targetElementId: parsed.element.id,
-          });
+          } as VisualASTNode);
         } else {
           finalASTNodes.push(node);
-          diagnostics.push({
-            status: 'unrecognized',
-            originalSnippet: node.originalText,
-            message: `Comando não interpretado visualmente (preservado para round-trip): ${node.originalText}`,
-          });
         }
       }
     }
 
-    // 3. Montar LabelAST e LabelDocument
-    const ast: LabelAST = {
-      nodes: finalASTNodes,
-      detectedFormat: 'pplb',
-      dimensionsMm: { widthMm, heightMm, dpi },
+    // 3. Montar o documento de etiqueta final
+    const configCommands = finalASTNodes
+      .filter((n) => n.type === 'config')
+      .map((n: any) => n.command);
+
+    const comments = finalASTNodes
+      .filter((n) => n.type === 'comment')
+      .map((n: any) => ({ line: n.line, text: n.originalText }));
+
+    const printQuantityNode: any = finalASTNodes.find((n) => n.type === 'quantity');
+    const printQuantity = printQuantityNode ? printQuantityNode.command : undefined;
+
+    const astSummary = {
+      totalNodes: finalASTNodes.length,
       commentsCount: finalASTNodes.filter((n) => n.type === 'comment').length,
       configCommandsCount: finalASTNodes.filter((n) => n.type === 'config').length,
       conditionalsCount: finalASTNodes.filter((n) => n.type === 'conditional').length,
@@ -181,6 +191,12 @@ export class PPLBParser {
         heightMm,
         dpi,
         orientation: widthMm >= heightMm ? 'landscape' : 'portrait',
+        gapMm,
+        widthDots,
+        heightDots,
+        gapDots,
+        rawQCommand,
+        rawqCommand,
       },
       elements,
       sourceFile: {

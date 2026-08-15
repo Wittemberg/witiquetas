@@ -39,8 +39,8 @@ test('2. Human-Readable Desligado: B10,95,0,E30,2,4,30,N,"[[BARRA]]"', () => {
   const el = result.document.elements[0] as BarcodeElement;
 
   assert.equal(el.showText, false, 'Parâmetro N deve configurar showText=false');
-  assert.equal(el.width, 23.77, 'Largura das barras deve permanecer idêntica');
-  assert.equal(el.height, dotsToMm(30, 203), 'Altura sem texto deve ser exatamente 30 dots = 3.75 mm');
+  assert.equal(el.width, dotsToMm(190, 203), 'Largura das barras deve permanecer idêntica');
+  assert.equal(el.height, dotsToMm(30, 203), 'Altura sem texto deve ser exatamente 30 dots');
 });
 
 test('3. Alturas Diferentes: 30, 50 e 100 dots não afetam a largura', () => {
@@ -69,26 +69,26 @@ test('4. Narrow Bar Diferentes: narrow=1, narrow=2 e narrow=3 alteram largura de
   assert.equal(resNarrow2.narrowBarDots, 2);
   assert.equal(resNarrow3.narrowBarDots, 3);
 
-  // 95 módulos * 1 dot = 95 dots = 11.89 mm
-  // 95 módulos * 2 dots = 190 dots = 23.77 mm
-  // 95 módulos * 3 dots = 285 dots = 35.66 mm
-  assert.equal(resNarrow1.width, 11.89);
-  assert.equal(resNarrow2.width, 23.77);
-  assert.equal(resNarrow3.width, 35.66);
+  // 95 módulos * 1 dot = 95 dots
+  // 95 módulos * 2 dots = 190 dots
+  // 95 módulos * 3 dots = 285 dots
+  assert.equal(resNarrow1.width, dotsToMm(95, 203));
+  assert.equal(resNarrow2.width, dotsToMm(190, 203));
+  assert.equal(resNarrow3.width, dotsToMm(285, 203));
 });
 
 test('5. Simbologias Suportadas: EAN-8 e Code 128 calculam módulos específicos', () => {
-  // EAN-8: 67 módulos * 2 dots = 134 dots = 16.77 mm (134 * 25.4 / 203 = 16.7665)
+  // EAN-8: 67 módulos * 2 dots = 134 dots
   const resEan8 = PPLBParser.parse('B10,95,0,8,2,4,40,B,"12345670"').document.elements[0] as BarcodeElement;
   assert.equal(resEan8.format, 'EAN8');
   assert.equal(resEan8.sourceBarcodeType, '8');
-  assert.equal(resEan8.width, 16.77);
+  assert.equal(resEan8.width, dotsToMm(134, 203));
 
-  // Code 128 com 7 caracteres: (7 + 3) * 11 + 2 = 112 módulos * 2 dots = 224 dots = 28.03 mm (224 * 25.4 / 203 = 28.0275)
+  // Code 128 com 7 caracteres: (7 + 3) * 11 + 2 = 112 módulos * 2 dots = 224 dots
   const resCode128 = PPLBParser.parse('B10,95,0,1,2,4,40,B,"ABC1234"').document.elements[0] as BarcodeElement;
   assert.equal(resCode128.format, 'CODE128');
   assert.equal(resCode128.sourceBarcodeType, '1');
-  assert.equal(resCode128.width, 28.03);
+  assert.equal(resCode128.width, dotsToMm(224, 203));
 });
 
 test('6. Round-Trip Editável: Modificação localizada de altura preserva todos os outros parâmetros', () => {

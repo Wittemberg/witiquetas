@@ -141,6 +141,12 @@ export interface LabelDimensions {
   heightMm: number;
   dpi: 203 | 300 | 600;
   orientation?: 'portrait' | 'landscape';
+  gapMm?: number; // Espaço físico / gap entre etiquetas em mm
+  widthDots?: number; // Largura nativa original em dots (ex: 831 do comando q831)
+  heightDots?: number; // Altura nativa original em dots (ex: 240 do comando Q240,024)
+  gapDots?: number; // Gap nativo original em dots (ex: 24 do comando Q240,024)
+  rawQCommand?: string; // Comando Q original bruto (ex: "Q240,024")
+  rawqCommand?: string; // Comando q original bruto (ex: "q831")
 }
 
 export interface SourceFileMetadata {

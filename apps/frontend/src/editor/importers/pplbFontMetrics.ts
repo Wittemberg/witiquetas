@@ -106,8 +106,8 @@ export function calculatePPLBTextGeometry(
   const totalHeightDots = charHeightDots;
 
   // Conversão exata de dots para mm: (dots * 25.4) / dpi
-  const widthMm = parseFloat(((totalWidthDots * 25.4) / dpi).toFixed(2));
-  const heightMm = parseFloat(((totalHeightDots * 25.4) / dpi).toFixed(2));
+  const widthMm = (totalWidthDots * 25.4) / dpi;
+  const heightMm = (totalHeightDots * 25.4) / dpi;
 
   // Tamanho tipográfico em pt: (dots * 72) / dpi
   const fontSizePt = Math.max(6, Math.round((charHeightDots * 72) / dpi));

@@ -144,8 +144,8 @@ export function calculatePPLBBarcodeGeometry(
   // Se showText for true, adiciona 12 dots para a legenda legível humana da impressora
   const totalHeightDots = safeHeight + (showText ? 12 : 0);
 
-  const widthMm = parseFloat(((symbolWidthDots * 25.4) / dpi).toFixed(2));
-  const heightMm = parseFloat(((totalHeightDots * 25.4) / dpi).toFixed(2));
+  const widthMm = (symbolWidthDots * 25.4) / dpi;
+  const heightMm = (totalHeightDots * 25.4) / dpi;
 
   return {
     widthMm,

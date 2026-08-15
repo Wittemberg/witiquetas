@@ -1,4 +1,4 @@
-import {
+import type {
   LabelDocument,
   LabelElement,
   TextElement,
@@ -8,7 +8,7 @@ import {
   RectangleElement,
   VisibilityRule,
 } from '@witiquetas/label-schema';
-import {
+import type {
   ASTNode,
   VisualASTNode,
   ConditionalASTNode,
@@ -16,7 +16,7 @@ import {
   LabelAST,
 } from './astTypes';
 import { LegacyPreprocessor, ERP_MACRO_MAP } from './legacyPreprocessor';
-import { ImportDiagnosticItem, ImportResult } from './types';
+import type { ImportDiagnosticItem, ImportResult } from './types';
 
 /**
  * Converte Dots da impressora para Milímetros

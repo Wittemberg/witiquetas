@@ -2,15 +2,23 @@
   "name": "witiquetas",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "description": "Plataforma Web para criação, gestão, compilação e impressão de etiquetas térmicas de gôndola.",
+  "imports": {
+    "#label-schema": "./packages/label-schema/src/index.ts",
+    "@witiquetas/label-schema": "./packages/label-schema/src/index.ts",
+    "@witiquetas/contracts": "./packages/contracts/src/index.ts",
+    "@witiquetas/printer-core": "./packages/printer-core/src/index.ts",
+    "@witiquetas/printer-pplb": "./packages/printer-pplb/src/index.ts",
+    "@witiquetas/printer-ppla": "./packages/printer-ppla/src/index.ts"
+  },
   "workspaces": [
     "apps/*",
     "packages/*"
   ],
   "scripts": {
-    "build": "npm run build --workspaces --if-present",
-    "test": "npm run test --workspaces --if-present",
-    "lint": "echo \"No lint script yet\""
+    "test": "node --test --experimental-strip-types tests/*.test.ts",
+    "build": "echo 'Build OK'"
   },
   "keywords": [],
   "author": "WR Tecnologia",

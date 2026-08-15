@@ -1,5 +1,5 @@
-import { VisibilityRule, FieldTransformation } from '@witiquetas/label-schema';
-import {
+import type { VisibilityRule, FieldTransformation } from '@witiquetas/label-schema';
+import type {
   ASTNode,
   CommentASTNode,
   ConfigASTNode,

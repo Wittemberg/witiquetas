@@ -467,55 +467,59 @@ export default function EditorLayout({
       </header>
 
       {/* =========================================================================
-         CORPO PRINCIPAL (CANVAS PROTAGONISTA + SIDEBARS FLUTUANTES/RECOLHÍVEIS)
+         WORKSPACE PRINCIPAL (3 COLUNAS: ESQUERDA 250px | CANVAS FLEX:1 | DIREITA 290px)
          ========================================================================= */}
-      <div className="editor-main-viewport">
-        {/* Painel Esquerdo: Ferramentas de Criação e Camadas */}
+      <div className="editor-workspace-row">
+        {/* Painel Esquerdo: Biblioteca de Criação & Camadas */}
         <aside className={`editor-sidebar-left ${isLeftSidebarCollapsed ? 'collapsed' : ''}`}>
-          <div className="sidebar-header-toggle">
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-              <Layers size={14} color="var(--accent-blue)" />
-              <span style={{ fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', color: 'var(--text-secondary)' }}>
-                Elementos & Camadas
-              </span>
-            </div>
-            <button
-              className="btn-icon-subtle"
-              onClick={toggleLeftSidebar}
-              title={isLeftSidebarCollapsed ? 'Expandir painel esquerdo' : 'Recolher painel esquerdo'}
-            >
-              {isLeftSidebarCollapsed ? <PanelLeftOpen size={14} /> : <PanelLeftClose size={14} />}
+          {/* Header do Painel Esquerdo */}
+          <div style={{ padding: '0.75rem 0.85rem', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+              Elementos
+            </span>
+            <button className="btn" style={{ padding: '0.2rem', border: 'none' }} onClick={toggleLeftSidebar} title="Recolher Painel">
+              <ChevronLeft size={14} />
             </button>
           </div>
 
-          <div className="sidebar-content-scrollable">
-            {/* Bloco de Ações de Criação Rápidas */}
-            <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
-                <label className="metric-label">Adicionar Elemento</label>
-                <button
-                  className="btn-subtle"
-                  style={{ fontSize: '0.7rem', padding: '0.15rem 0.4rem' }}
-                  onClick={() => setIsImportModalOpen(true)}
-                  title="Importar modelo existente (PPLB, ZPL, Legado)"
-                >
-                  <FileUp size={11} />
-                  <span>Importar</span>
-                </button>
-              </div>
+          <div style={{ padding: '0.85rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            {/* Botões de Ação do Topo da Barra Lateral */}
+            <div style={{ display: 'flex', gap: '0.4rem' }}>
+              <button
+                className="btn btn-primary"
+                style={{ flex: 1, justifyContent: 'center', fontSize: '0.78rem', padding: '0.45rem' }}
+                onClick={() => setIsWizardOpen(true)}
+              >
+                <Plus size={14} />
+                <span>Novo Formato</span>
+              </button>
 
-              <div className="creation-tools-grid">
+              <button
+                className="btn"
+                style={{ justifyContent: 'center', fontSize: '0.78rem', padding: '0.45rem 0.6rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
+                onClick={() => setIsImportModalOpen(true)}
+                title="Importar modelo existente (PPLB, ZPL, Legado)"
+              >
+                <FileUp size={14} color="var(--accent-blue)" />
+                <span>Importar</span>
+              </button>
+            </div>
+
+            {/* Paleta de Criação de Elementos (Grid 2 Colunas Aprovado) */}
+            <div>
+              <label className="metric-label" style={{ marginBottom: '0.4rem' }}>Adicionar à Etiqueta</label>
+              <div className="creation-palette-grid">
                 <button className="creation-tool-btn" onClick={() => addElement('text')}>
                   <Type size={16} color="var(--accent-blue)" />
                   <span>Texto</span>
                 </button>
                 <button className="creation-tool-btn" onClick={() => addElement('price')}>
                   <DollarSign size={16} color="#dc2626" />
-                  <span>Preço R$</span>
+                  <span>Preço</span>
                 </button>
                 <button className="creation-tool-btn" onClick={() => addElement('barcode')}>
-                  <Barcode size={16} color="var(--text-primary)" />
-                  <span>Código</span>
+                  <Barcode size={16} color="var(--accent-cyan)" />
+                  <span>Código Barras</span>
                 </button>
                 <button className="creation-tool-btn" onClick={() => addElement('qrcode')}>
                   <QrCode size={16} color="var(--accent-teal)" />

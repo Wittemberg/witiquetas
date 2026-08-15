@@ -482,4 +482,14 @@ A primeira versão deverá permitir:
 
 ---
 
+## 13. POLÍTICA DE NÃO REGRESSÃO
+
+> **Princípio de Estabilidade de Layout:**
+> Componentes e fluxos visualmente aprovados são considerados baseline intocável.
+> Solicitações pontuais devem modificar apenas o escopo diretamente relacionado.
+> Alterações estruturais de UX/UI em áreas já aprovadas exigem solicitação explícita ou justificativa técnica apresentada antes da implementação.
+
+---
+
 Documento inicial: 13/08/2026.
+Atualização: 15/08/2026.

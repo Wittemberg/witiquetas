@@ -522,7 +522,7 @@ export default function EditorLayout({
                   <span>Código Barras</span>
                 </button>
                 <button className="creation-tool-btn" onClick={() => addElement('qrcode')}>
-                  <QrCode size={16} color="var(--accent-teal)" />
+                  <QrCode size={16} color="var(--status-success)" />
                   <span>QR Code</span>
                 </button>
                 <button className="creation-tool-btn" onClick={() => addElement('rectangle')}>

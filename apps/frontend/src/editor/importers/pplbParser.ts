@@ -15,7 +15,7 @@ import type {
   ConfigASTNode,
   LabelAST,
 } from './astTypes';
-import { LegacyPreprocessor, ERP_MACRO_MAP } from './legacyPreprocessor';
+import { LegacyPreprocessor, ERP_MACRO_MAP, invertVisibilityRule } from './legacyPreprocessor';
 import { calculatePPLBTextGeometry } from './pplbFontMetrics';
 import { calculatePPLBBarcodeGeometry } from './pplbBarcodeMetrics';
 import type { ImportDiagnosticItem, ImportResult } from './types';
@@ -40,6 +40,58 @@ export function mmToDots(mm: number, dpi: number = 203): number {
  * ETAPA B: Parser de Comandos PPLB / Eltron / Legado
  */
 export class PPLBParser {
+  /**
+   * Processa nós condicionais recursivamente, suportando blocos then/else e aninhamentos
+   */
+  private static processConditionalNode(
+    condNode: ConditionalASTNode,
+    dpi: number,
+    elements: LabelElement[],
+    inheritedRule?: VisibilityRule
+  ): ConditionalASTNode {
+    const effectiveThenRule = inheritedRule || condNode.rule;
+    const effectiveElseRule = invertVisibilityRule(effectiveThenRule);
+
+    const processBranch = (branchNodes: ASTNode[], ruleToApply: VisibilityRule): ASTNode[] => {
+      const processed: ASTNode[] = [];
+      for (const child of branchNodes) {
+        if (child.type === 'conditional') {
+          const nested = this.processConditionalNode(child as ConditionalASTNode, dpi, elements, ruleToApply);
+          processed.push(nested);
+        } else if (child.type === 'raw') {
+          const parsed = this.parseSingleCommand(child.originalText, child.line, dpi, ruleToApply);
+          if (parsed.element) {
+            elements.push(parsed.element);
+            processed.push({
+              type: 'visual',
+              line: child.line,
+              originalText: child.originalText,
+              elementId: parsed.element.id,
+              commandType: parsed.commandType,
+            } as VisualASTNode);
+          } else {
+            processed.push(child);
+          }
+        } else {
+          processed.push(child);
+        }
+      }
+      return processed;
+    };
+
+    const processedThen = processBranch(condNode.thenNodes || condNode.children || [], effectiveThenRule);
+    const processedElse = condNode.elseNodes && condNode.elseNodes.length > 0
+      ? processBranch(condNode.elseNodes, effectiveElseRule)
+      : undefined;
+
+    return {
+      ...condNode,
+      thenNodes: processedThen,
+      elseNodes: processedElse,
+      children: [...processedThen, ...(processedElse || [])],
+    };
+  }
+
   /**
    * Converte nós pré-processados da AST em elementos nativos e preenche a AST
    */
@@ -116,32 +168,8 @@ export class PPLBParser {
 
       if (node.type === 'conditional') {
         const condNode = node as ConditionalASTNode;
-        const processedChildren: ASTNode[] = [];
-
-        for (const child of condNode.children) {
-          if (child.type === 'raw') {
-            const parsed = this.parseSingleCommand(child.originalText, child.line, dpi, condNode.rule);
-            if (parsed.element) {
-              elements.push(parsed.element);
-              processedChildren.push({
-                type: 'visual',
-                line: child.line,
-                originalText: child.originalText,
-                elementId: parsed.element.id,
-                commandType: parsed.commandType,
-              } as VisualASTNode);
-            } else {
-              processedChildren.push(child);
-            }
-          } else {
-            processedChildren.push(child);
-          }
-        }
-
-        finalASTNodes.push({
-          ...condNode,
-          children: processedChildren,
-        });
+        const processed = this.processConditionalNode(condNode, dpi, elements);
+        finalASTNodes.push(processed);
         continue;
       }
 

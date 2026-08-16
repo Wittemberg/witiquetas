@@ -164,11 +164,11 @@ export class LegacyCompiler {
         continue;
       }
 
-      // 4. Blocos Condicionais [[SE]]{{condição}}{{comando}}
-      const condMatch = trimmed.match(/^\[\[SE\]\]\{\{([^}]+)\}\}\{\{(.+)\}\}$/i);
-      if (condMatch) {
-        const condExpr = condMatch[1];
-        const innerCmd = condMatch[2];
+      // 4. Blocos Condicionais Inline: [[SE]]{{condição}}{{comando}}
+      const inlineCondMatch = trimmed.match(/^\[\[SE\]\]\{\{([^}]+)\}\}\{\{(.+)\}\}$/i);
+      if (inlineCondMatch) {
+        const condExpr = inlineCondMatch[1];
+        const innerCmd = inlineCondMatch[2];
 
         // Buscar elemento correspondente
         const element = elementsMapByCommand.get(innerCmd.trim()) || elementsMapByLine.get(i + 1);
@@ -196,6 +196,22 @@ export class LegacyCompiler {
           modifiedCount++;
           preservedConditionalsCount++;
         }
+        continue;
+      }
+
+      // 4.1 Cabeçalho de Condicional Multilinha: [[SE]]{{condição}}
+      const multilineCondMatch = trimmed.match(/^\[\[SE\]\]\s*\{\{([^}]+)\}\}$/i);
+      if (multilineCondMatch) {
+        compiledLines.push(origLine);
+        diffLines.push({ type: 'unchanged', originalLine: origLine, newLine: origLine });
+        preservedConditionalsCount++;
+        continue;
+      }
+
+      // 4.2 Divisor [[SENAO]] e Fechamento [[FIMSE]]
+      if (/^\[\[(SENAO|ELSE|FIMSE|FIM_SE|ENDIF)\]\]$/i.test(trimmed)) {
+        compiledLines.push(origLine);
+        diffLines.push({ type: 'unchanged', originalLine: origLine, newLine: origLine });
         continue;
       }
 
@@ -276,7 +292,11 @@ export class LegacyCompiler {
         const p = elem as PriceElement;
         const prefix = p.prefix ? `${p.prefix} ` : '';
         const macroName = p.field.includes('promocao') ? 'PROMOCAO' : 'PRECO';
-        return `A${xDots},${yDots},${rotationVal},4,2,2,N,"${prefix}[[${macroName}]]"`;
+        const fontNum = p.printerFontId || 4;
+        const hMult = p.horizontalMultiplier || 2;
+        const vMult = p.verticalMultiplier || 2;
+        const reverse = p.reversePrint ? 'R' : 'N';
+        return `A${xDots},${yDots},${rotationVal},${fontNum},${hMult},${vMult},${reverse},"${prefix}[[${macroName}]]"`;
       }
 
       case 'barcode': {
@@ -303,7 +323,10 @@ export class LegacyCompiler {
 
       case 'text': {
         const t = elem as TextElement;
-        const fontNum = t.fontWeight === 'bold' ? 4 : 3;
+        const fontNum = t.printerFontId || (t.fontWeight === 'bold' ? 4 : 2);
+        const hMult = t.horizontalMultiplier || 1;
+        const vMult = t.verticalMultiplier || 1;
+        const reverse = t.reversePrint ? 'R' : 'N';
         let textVal = t.text;
 
         // Se tiver recorte de substring registrado
@@ -317,7 +340,7 @@ export class LegacyCompiler {
           textVal = `[[${t.field.split('.').pop()?.toUpperCase()}]]`;
         }
 
-        return `A${xDots},${yDots},${rotationVal},${fontNum},1,1,N,"${textVal}"`;
+        return `A${xDots},${yDots},${rotationVal},${fontNum},${hMult},${vMult},${reverse},"${textVal}"`;
       }
 
       case 'line': {

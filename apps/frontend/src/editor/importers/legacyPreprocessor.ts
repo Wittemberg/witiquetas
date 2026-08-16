@@ -41,6 +41,32 @@ export interface PreprocessedMacro {
 }
 
 /**
+ * Inverte uma regra de visibilidade para geração da regra do ramo ELSE ([[SENAO]])
+ */
+export function invertVisibilityRule(rule: VisibilityRule): VisibilityRule {
+  const opMap: Record<string, any> = {
+    '=': '!=',
+    '!=': '=',
+    '>': '<=',
+    '<=': '>',
+    '<': '>=',
+    '>=': '<',
+    'empty': 'not_empty',
+    'not_empty': 'empty',
+  };
+  return {
+    field: rule.field,
+    operator: opMap[rule.operator] || '!=',
+    value: rule.value,
+  };
+}
+
+interface ConditionalStackFrame {
+  node: ConditionalASTNode;
+  currentBranch: 'then' | 'else';
+}
+
+/**
  * ETAPA A: Pré-processamento de Macros, Condicionais e Comentários do ERP
  */
 export class LegacyPreprocessor {
@@ -74,7 +100,7 @@ export class LegacyPreprocessor {
   }
 
   /**
-   * Interpreta condição de blocos [[SE]]{{condição}}{{corpo}}
+   * Interpreta condição de blocos [[SE]]{{condição}}{{corpo}} ou [[SE]]{{condição}}
    * Ex: "[[PROMOCAO]]>0" ➔ { field: 'produto.promocao.preco', operator: '>', value: '0' }
    */
   static parseCondition(conditionExpr: string): VisibilityRule {
@@ -109,11 +135,27 @@ export class LegacyPreprocessor {
   }
 
   /**
-   * Pré-processa as linhas do arquivo em Nós da AST
+   * Pré-processa as linhas do arquivo em Nós da AST com suporte completo a condicionais inline e multilinha
    */
   static preprocessLines(content: string): ASTNode[] {
     const lines = content.split(/\r?\n/);
     const nodes: ASTNode[] = [];
+    const stack: ConditionalStackFrame[] = [];
+    const MAX_DEPTH = 32; // Limite defensivo de aninhamento
+
+    const appendNode = (node: ASTNode) => {
+      if (stack.length > 0) {
+        const top = stack[stack.length - 1];
+        if (top.currentBranch === 'then') {
+          top.node.thenNodes.push(node);
+        } else {
+          top.node.elseNodes = top.node.elseNodes || [];
+          top.node.elseNodes.push(node);
+        }
+      } else {
+        nodes.push(node);
+      }
+    };
 
     for (let i = 0; i < lines.length; i++) {
       const rawLine = lines[i];
@@ -132,11 +174,125 @@ export class LegacyPreprocessor {
           originalText: rawLine,
           commentText: trimmed.replace(/^(\/\/|#)\s*/, ''),
         };
-        nodes.push(node);
+        appendNode(node);
         continue;
       }
 
-      // 2. Quantidade de Impressão (ex: P[[QUANTIDADE]] ou P1)
+      // 2. Condicional Inline: [[SE]]{{condição}}{{comando}}
+      const inlineCondMatch = trimmed.match(/^\[\[SE\]\]\{\{([^}]+)\}\}\{\{(.+)\}\}$/i);
+      if (inlineCondMatch) {
+        const condExpr = inlineCondMatch[1];
+        const innerCmd = inlineCondMatch[2];
+        const rule = this.parseCondition(condExpr);
+
+        const innerNode: RawASTNode = {
+          id: `inner-${i}`,
+          type: 'raw',
+          line: i + 1,
+          originalText: innerCmd,
+          recognized: false,
+        };
+
+        const node: ConditionalASTNode = {
+          id: `cond-${i}`,
+          type: 'conditional',
+          line: i + 1,
+          originalText: rawLine,
+          conditionExpression: condExpr,
+          rule,
+          thenNodes: [innerNode],
+          elseNodes: [],
+          children: [innerNode],
+          isMultiline: false,
+          rawOpenCommand: rawLine,
+          startLine: i + 1,
+          endLine: i + 1,
+        };
+        appendNode(node);
+        continue;
+      }
+
+      // 3. Início de Condicional Multilinha: [[SE]]{{condição}}
+      const multilineOpenMatch = trimmed.match(/^\[\[SE\]\]\s*\{\{([^}]+)\}\}$/i);
+      if (multilineOpenMatch) {
+        if (stack.length >= MAX_DEPTH) {
+          appendNode({
+            id: `raw-${i}`,
+            type: 'raw',
+            line: i + 1,
+            originalText: rawLine,
+            recognized: false,
+            notes: `Limite máximo de aninhamento (${MAX_DEPTH}) excedido`,
+          });
+          continue;
+        }
+
+        const condExpr = multilineOpenMatch[1];
+        const rule = this.parseCondition(condExpr);
+
+        const condNode: ConditionalASTNode = {
+          id: `cond-${i}`,
+          type: 'conditional',
+          line: i + 1,
+          originalText: rawLine,
+          conditionExpression: condExpr,
+          rule,
+          thenNodes: [],
+          elseNodes: [],
+          children: [],
+          isMultiline: true,
+          rawOpenCommand: rawLine,
+          startLine: i + 1,
+          endLine: i + 1,
+        };
+
+        stack.push({ node: condNode, currentBranch: 'then' });
+        continue;
+      }
+
+      // 4. Ramo Alternativo: [[SENAO]] ou [[ELSE]]
+      if (/^\[\[(SENAO|ELSE)\]\]$/i.test(trimmed)) {
+        if (stack.length > 0) {
+          const top = stack[stack.length - 1];
+          top.currentBranch = 'else';
+          top.node.rawElseCommand = rawLine;
+        } else {
+          // SENAO órfão (sem SE anterior)
+          appendNode({
+            id: `raw-${i}`,
+            type: 'raw',
+            line: i + 1,
+            originalText: rawLine,
+            recognized: false,
+            notes: 'Orphaned [[SENAO]] without matching [[SE]]',
+          });
+        }
+        continue;
+      }
+
+      // 5. Fechamento de Condicional Multilinha: [[FIMSE]], [[ENDIF]], [[FIM_SE]]
+      if (/^\[\[(FIMSE|FIM_SE|ENDIF)\]\]$/i.test(trimmed)) {
+        if (stack.length > 0) {
+          const popped = stack.pop()!;
+          popped.node.rawCloseCommand = rawLine;
+          popped.node.endLine = i + 1;
+          popped.node.children = [...popped.node.thenNodes, ...(popped.node.elseNodes || [])];
+          appendNode(popped.node);
+        } else {
+          // FIMSE órfão (sem SE anterior)
+          appendNode({
+            id: `raw-${i}`,
+            type: 'raw',
+            line: i + 1,
+            originalText: rawLine,
+            recognized: false,
+            notes: 'Orphaned [[FIMSE]] without matching [[SE]]',
+          });
+        }
+        continue;
+      }
+
+      // 6. Quantidade de Impressão (ex: P[[QUANTIDADE]] ou P1)
       if (/^P(\[\[[A-Z0-9_]+\]\]|\d+)$/i.test(trimmed)) {
         const qMatch = trimmed.match(/^P(.+)$/i);
         const node: QuantityASTNode = {
@@ -146,43 +302,18 @@ export class LegacyPreprocessor {
           originalText: rawLine,
           quantityExpression: qMatch ? qMatch[1] : '1',
         };
-        nodes.push(node);
+        appendNode(node);
         continue;
       }
 
-      // 3. Blocos Condicionais [[SE]]{{condição}}{{comando}}
-      const condMatch = trimmed.match(/^\[\[SE\]\]\{\{([^}]+)\}\}\{\{(.+)\}\}$/i);
-      if (condMatch) {
-        const condExpr = condMatch[1];
-        const innerCmd = condMatch[2];
-        const rule = this.parseCondition(condExpr);
-
-        const node: ConditionalASTNode = {
-          id: `cond-${i}`,
-          type: 'conditional',
-          line: i + 1,
-          originalText: rawLine,
-          conditionExpression: condExpr,
-          rule,
-          children: [],
-        };
-
-        // Cria nó interno temporário para o comando
-        const innerNode: RawASTNode = {
-          id: `inner-${i}`,
-          type: 'raw',
-          line: i + 1,
-          originalText: innerCmd,
-          recognized: false,
-        };
-        node.children.push(innerNode);
-        nodes.push(node);
-        continue;
-      }
-
-      // 4. Comandos de Configuração de Impressora (PPLB / Eltron / ZPL)
-      // Ex: I8,A,001 | Q240,024 | q831 | rN | S4 | D7 | ZT | JF | OD | R0,0 | f100 | N | ^XA | ^XZ
-      if (/^(I8|Q\d+|q\d+|r[N|Y]|S\d+|D\d+|ZT|JF|OD|R\d+,\d+|f\d+|N|\^XA|\^XZ|\^PW\d+|\^LL\d+)/i.test(trimmed) && !trimmed.startsWith('A') && !trimmed.startsWith('B') && !trimmed.startsWith('L') && !trimmed.startsWith('X')) {
+      // 7. Comandos de Configuração de Impressora (PPLB / Eltron / ZPL)
+      if (
+        /^(I8|Q\d+|q\d+|r[N|Y]|S\d+|D\d+|ZT|JF|OD|R\d+,\d+|f\d+|N|\^XA|\^XZ|\^PW\d+|\^LL\d+)/i.test(trimmed) &&
+        !trimmed.startsWith('A') &&
+        !trimmed.startsWith('B') &&
+        !trimmed.startsWith('L') &&
+        !trimmed.startsWith('X')
+      ) {
         let category: any = 'generic';
         if (trimmed.startsWith('Q') || trimmed.startsWith('q') || trimmed.startsWith('^PW') || trimmed.startsWith('^LL')) category = 'dimensions';
         else if (trimmed.startsWith('I8')) category = 'density';
@@ -197,18 +328,26 @@ export class LegacyPreprocessor {
           command: trimmed,
           category,
         };
-        nodes.push(node);
+        appendNode(node);
         continue;
       }
 
-      // 5. Nó genérico/raw (será processado na Etapa B pelo Parser de Linguagem de Impressora)
-      nodes.push({
+      // 8. Nó genérico / comando visual
+      appendNode({
         id: `raw-${i}`,
         type: 'raw',
         line: i + 1,
         originalText: rawLine,
         recognized: false,
       });
+    }
+
+    // Fechamento defensivo de blocos não fechados no final do arquivo
+    while (stack.length > 0) {
+      const unclosed = stack.pop()!;
+      unclosed.node.endLine = lines.length;
+      unclosed.node.children = [...unclosed.node.thenNodes, ...(unclosed.node.elseNodes || [])];
+      appendNode(unclosed.node);
     }
 
     return nodes;

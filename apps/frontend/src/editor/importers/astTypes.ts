@@ -43,9 +43,17 @@ export interface VisualASTNode extends BaseASTNode {
 
 export interface ConditionalASTNode extends BaseASTNode {
   type: 'conditional';
-  conditionExpression: string; // Ex: "[[PROMOCAO]]>0"
+  conditionExpression: string; // Ex: "[[PROMOCAO]]>0" ou "PROMOCAO > 0"
   rule: VisibilityRule;
-  children: ASTNode[];
+  thenNodes: ASTNode[]; // Comandos executados quando a condição é verdadeira
+  elseNodes?: ASTNode[]; // Comandos opcionais sob [[SENAO]]
+  children: ASTNode[]; // Retrocompatibilidade (alias para todos os nós filhos)
+  isMultiline?: boolean; // Se foi declarado como bloco multilinha ([[SE]] ... [[FIMSE]]) ou inline
+  rawOpenCommand?: string; // Ex: "[[SE]]{{[[PROMOCAO]]>0}}" ou "[[SE]]{{...}}{{...}}"
+  rawElseCommand?: string; // Ex: "[[SENAO]]"
+  rawCloseCommand?: string; // Ex: "[[FIMSE]]"
+  startLine: number;
+  endLine: number;
 }
 
 export interface QuantityASTNode extends BaseASTNode {

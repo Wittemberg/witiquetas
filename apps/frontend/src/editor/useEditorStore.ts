@@ -6,6 +6,7 @@ import {
   calculateOrientation,
 } from '@witiquetas/label-schema';
 import { QRCodeLibraryItemDTO, PrinterDTO } from '@witiquetas/contracts';
+import { constrainElementToLabel, constrainGroupMovement, validateDocumentBounds } from './bounds';
 
 // Converter Milímetros ➔ Pixels com base no DPI (ex: 203 DPI = ~8 dots/mm)
 export function mmToPx(mm: number, dpi: number = 203): number {
@@ -674,6 +675,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         return;
     }
 
+    newElem = constrainElementToLabel(newElem, document.dimensions);
+
     const updated: LabelDocument = {
       ...document,
       elements: [...document.elements, newElem],
@@ -696,7 +699,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         ...currentRef,
         state: currentRef.state === 'created' ? ('created' as const) : ('modified' as const),
       };
-      return { ...el, ...patch, sourceReference: newRef } as LabelElement;
+      const merged = { ...el, ...patch, sourceReference: newRef } as LabelElement;
+      return constrainElementToLabel(merged, document.dimensions);
     });
 
     const updated: LabelDocument = {
@@ -719,7 +723,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         ...currentRef,
         state: currentRef.state === 'created' ? ('created' as const) : ('modified' as const),
       };
-      return { ...el, ...patch, sourceReference: newRef } as LabelElement;
+      const merged = { ...el, ...patch, sourceReference: newRef } as LabelElement;
+      return constrainElementToLabel(merged, document.dimensions);
     });
 
     set({ document: { ...document, elements: updatedElements }, isDirty: true });
@@ -761,20 +766,21 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     document.elements.forEach((el) => {
       if (selectedElementIds.includes(el.id)) {
         const newId = `elem-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`;
-        const clone: LabelElement = {
+        let clone: LabelElement = {
           ...JSON.parse(JSON.stringify(el)),
           id: newId,
           name: el.name ? `${el.name} (Cópia)` : undefined,
-          x: Math.min(el.x + 2, document.dimensions.widthMm - el.width),
-          y: Math.min(el.y + 2, document.dimensions.heightMm - el.height),
+          x: el.x + 2,
+          y: el.y + 2,
         };
+        clone = constrainElementToLabel(clone, document.dimensions);
         newClones.push(clone);
         newSelectedIds.push(newId);
       }
     });
 
     set({
-      document: { ...document, elements: [...document.elements, newClones] },
+      document: { ...document, elements: [...document.elements, ...newClones] },
       selectedElementIds: newSelectedIds,
       isDirty: true,
     });
@@ -869,12 +875,13 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
     clipboard.forEach((el) => {
       const newId = `elem-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`;
-      const clone: LabelElement = {
+      let clone: LabelElement = {
         ...JSON.parse(JSON.stringify(el)),
         id: newId,
-        x: Math.min(el.x + 2, document.dimensions.widthMm - el.width),
-        y: Math.min(el.y + 2, document.dimensions.heightMm - el.height),
+        x: el.x + 2,
+        y: el.y + 2,
       };
+      clone = constrainElementToLabel(clone, document.dimensions);
       newClones.push(clone);
       newSelectedIds.push(newId);
     });
@@ -914,13 +921,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
     const updatedElements = document.elements.map((el) => {
       if (!selectedElementIds.includes(el.id)) return el;
-      if (direction === 'left') return { ...el, x: refVal };
-      if (direction === 'right') return { ...el, x: refVal - el.width };
-      if (direction === 'top') return { ...el, y: refVal };
-      if (direction === 'bottom') return { ...el, y: refVal - el.height };
-      if (direction === 'center') return { ...el, x: refVal - el.width / 2 };
-      if (direction === 'middle') return { ...el, y: refVal - el.height / 2 };
-      return el;
+      let aligned = { ...el };
+      if (direction === 'left') aligned.x = refVal;
+      if (direction === 'right') aligned.x = refVal - el.width;
+      if (direction === 'top') aligned.y = refVal;
+      if (direction === 'bottom') aligned.y = refVal - el.height;
+      if (direction === 'center') aligned.x = refVal - el.width / 2;
+      if (direction === 'middle') aligned.y = refVal - el.height / 2;
+      return constrainElementToLabel(aligned, document.dimensions);
     });
 
     set({ document: { ...document, elements: updatedElements }, isDirty: true });
@@ -949,9 +957,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         currentX += el.width + gap;
       });
 
-      const updated = document.elements.map((el) =>
-        updatedMap.has(el.id) ? { ...el, x: updatedMap.get(el.id)! } : el
-      );
+      const updated = document.elements.map((el) => {
+        if (updatedMap.has(el.id)) {
+          return constrainElementToLabel({ ...el, x: updatedMap.get(el.id)! }, document.dimensions);
+        }
+        return el;
+      });
       set({ document: { ...document, elements: updated }, isDirty: true });
     } else {
       const minY = targets[0].y;
@@ -967,9 +978,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         currentY += el.height + gap;
       });
 
-      const updated = document.elements.map((el) =>
-        updatedMap.has(el.id) ? { ...el, y: updatedMap.get(el.id)! } : el
-      );
+      const updated = document.elements.map((el) => {
+        if (updatedMap.has(el.id)) {
+          return constrainElementToLabel({ ...el, y: updatedMap.get(el.id)! }, document.dimensions);
+        }
+        return el;
+      });
       set({ document: { ...document, elements: updated }, isDirty: true });
     }
 
@@ -980,12 +994,27 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const { document, selectedElementIds, pushHistory } = get();
     if (selectedElementIds.length === 0) return;
 
+    const selectedElements = document.elements.filter(
+      (el) => selectedElementIds.includes(el.id) && !el.locked
+    );
+    if (selectedElements.length === 0) return;
+
+    // Move o grupo preservando a distância relativa exata entre os elementos
+    const { dxMm: allowedDx, dyMm: allowedDy } = constrainGroupMovement(
+      selectedElements,
+      dxMm,
+      dyMm,
+      document.dimensions
+    );
+
+    if (allowedDx === 0 && allowedDy === 0) return;
+
     const updatedElements = document.elements.map((el) => {
       if (!selectedElementIds.includes(el.id) || el.locked) return el;
       return {
         ...el,
-        x: Math.max(0, parseFloat((el.x + dxMm).toFixed(2))),
-        y: Math.max(0, parseFloat((el.y + dyMm).toFixed(2))),
+        x: parseFloat((el.x + allowedDx).toFixed(2)),
+        y: parseFloat((el.y + allowedDy).toFixed(2)),
       };
     });
 

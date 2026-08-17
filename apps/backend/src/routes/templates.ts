@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
-import { LabelDocument, LabelDocumentSchema } from '@witiquetas/label-schema';
-import { TemplateDTO, CreateTemplateDTO } from '@witiquetas/contracts';
+import { type LabelDocument, LabelDocumentSchema } from '@witiquetas/label-schema';
+import type { TemplateDTO, CreateTemplateDTO } from '@witiquetas/contracts';
 
 const router = Router();
 

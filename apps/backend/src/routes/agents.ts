@@ -1,17 +1,23 @@
+import crypto from 'node:crypto';
 import { Router, Request, Response } from 'express';
-import {
+import type {
   AgentDTO,
   PairAgentRequestDTO,
   PairAgentResponseDTO,
   AgentHeartbeatRequestDTO,
   AgentHeartbeatResponseDTO,
 } from '@witiquetas/contracts';
+import { printJobsStore } from './printJobs.js';
 
 const router = Router();
 
 // Storage em memória inicial (com fallback/mock para persistência antes de migrations do banco)
-interface AgentRecord extends AgentDTO {
+export interface AgentRecord extends AgentDTO {
   tokenHash: string;
+}
+
+export function hashToken(token: string): string {
+  return crypto.createHash('sha256').update(token, 'utf8').digest('hex');
 }
 
 const pairingCodes = new Map<string, { companyId: string; companyName: string; expiresAt: number }>([
@@ -21,15 +27,16 @@ const pairingCodes = new Map<string, { companyId: string; companyName: string; e
 
 const agentsStore = new Map<string, AgentRecord>();
 
-// Helper: Middleware básico de autenticação de agente
+// Helper: Middleware básico de autenticação de agente com SHA-256
 export function authenticateAgent(req: Request, res: Response, next: Function) {
   const authHeader = req.headers.authorization || (req.headers['x-agent-token'] as string);
   if (!authHeader) {
     return res.status(401).json({ error: 'Token de agente não fornecido.' });
   }
 
-  const token = authHeader.replace(/^Bearer\s+/i, '');
-  const agent = Array.from(agentsStore.values()).find((a) => a.tokenHash === token);
+  const rawToken = authHeader.replace(/^Bearer\s+/i, '').trim();
+  const incomingHash = hashToken(rawToken);
+  const agent = Array.from(agentsStore.values()).find((a) => a.tokenHash === incomingHash);
 
   if (!agent) {
     return res.status(403).json({ error: 'Credencial do agente inválida ou revogada.' });
@@ -78,7 +85,8 @@ router.post('/pair', (req: Request, res: Response) => {
 
   const installationId = `inst-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
   const agentId = `agent-${Date.now()}`;
-  const token = `agt_live_${Math.random().toString(36).substring(2)}${Math.random().toString(36).substring(2)}`;
+  const rawToken = `agt_live_${crypto.randomBytes(24).toString('hex')}`;
+  const tokenHash = hashToken(rawToken);
   const now = new Date().toISOString();
 
   const newAgent: AgentRecord = {
@@ -92,7 +100,7 @@ router.post('/pair', (req: Request, res: Response) => {
     status: 'ONLINE',
     lastSeenAt: now,
     createdAt: now,
-    tokenHash: token,
+    tokenHash,
   };
 
   agentsStore.set(agentId, newAgent);
@@ -103,7 +111,7 @@ router.post('/pair', (req: Request, res: Response) => {
     success: true,
     agentId,
     installationId,
-    token,
+    token: rawToken,
     companyId: pairing.companyId,
     companyName: pairing.companyName,
     serverTime: now,
@@ -116,12 +124,13 @@ router.post('/pair', (req: Request, res: Response) => {
 router.post('/heartbeat', (req: Request, res: Response) => {
   const body = req.body as AgentHeartbeatRequestDTO;
   const tokenHeader = req.headers.authorization || (req.headers['x-agent-token'] as string);
-  const token = tokenHeader ? tokenHeader.replace(/^Bearer\s+/i, '') : null;
+  const rawToken = tokenHeader ? tokenHeader.replace(/^Bearer\s+/i, '').trim() : null;
 
-  // Localizar agente pelo installationId, agentId ou token
+  // Localizar agente pelo token hash, agentId ou installationId
   let agent: AgentRecord | undefined;
-  if (token) {
-    agent = Array.from(agentsStore.values()).find((a) => a.tokenHash === token);
+  if (rawToken) {
+    const incomingHash = hashToken(rawToken);
+    agent = Array.from(agentsStore.values()).find((a) => a.tokenHash === incomingHash);
   } else if (body.agentId) {
     agent = agentsStore.get(body.agentId);
   } else if (body.installationId) {
@@ -134,15 +143,21 @@ router.post('/heartbeat', (req: Request, res: Response) => {
     if (body.agentVersion) agent.agentVersion = body.agentVersion;
   }
 
+  // Calcular contagem de jobs pendentes dinamicamente para o tenant do agente
+  const pendingJobsCount = Array.from(printJobsStore.values()).filter(
+    (j) => j.status === 'PENDING' && (!agent || j.companyId === agent.companyId)
+  ).length;
+
   const response: AgentHeartbeatResponseDTO = {
     acknowledged: true,
     serverTime: new Date().toISOString(),
-    pendingJobsCount: 0, // Atualizado dinamicamente pelo printJobsRouter
+    pendingJobsCount,
     pollIntervalSeconds: DEFAULT_AGENT_POLL_INTERVAL_SECONDS,
   };
 
   res.json(response);
 });
+
 
 
 // 4. Listar Agentes da Empresa

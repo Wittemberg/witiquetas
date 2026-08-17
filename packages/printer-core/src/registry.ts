@@ -1,4 +1,4 @@
-import { PrinterCompiler, PrinterLanguage } from './types.js';
+import type { PrinterCompiler, PrinterLanguage } from './types.js';
 
 class CompilerRegistry {
   private compilers = new Map<PrinterLanguage, PrinterCompiler>();

@@ -4,6 +4,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const ZOD_SHIM_URL = pathToFileURL(path.join(__dirname, 'zod-shim.js')).href;
+const EXPRESS_SHIM_URL = pathToFileURL(path.join(__dirname, 'express-shim.js')).href;
 
 export async function resolve(specifier, context, nextResolve) {
   if (specifier === 'zod') {
@@ -13,6 +14,21 @@ export async function resolve(specifier, context, nextResolve) {
       url: ZOD_SHIM_URL,
     };
   }
+
+  if (specifier === 'express') {
+    return {
+      format: 'module',
+      shortCircuit: true,
+      url: EXPRESS_SHIM_URL,
+    };
+  }
+
+  if (specifier.startsWith('@witiquetas/')) {
+    const pkgName = specifier.replace('@witiquetas/', '');
+    const pkgPath = path.join(__dirname, '..', 'packages', pkgName, 'src', 'index.ts');
+    return await nextResolve(pathToFileURL(pkgPath).href, context);
+  }
+
 
   try {
     return await nextResolve(specifier, context);

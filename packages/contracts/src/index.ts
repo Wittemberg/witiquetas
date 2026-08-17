@@ -406,3 +406,9 @@ export interface CreateImageLibraryItemDTO {
   hashSha256: string;
 }
 
+// ==========================================
+// UTILITÁRIOS DE CODIFICAÇÃO TÉRMICA (WINDOWS-1252 / UTF-8 / ASCII)
+// ==========================================
+export * from './encoding.js';
+
+

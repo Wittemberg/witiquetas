@@ -1,5 +1,5 @@
-import { LabelDocument, LabelElement } from '@witiquetas/label-schema';
-import { PrinterCompiler, PrinterLanguage, CompiledLabel, ValidationResult, compilerRegistry } from '@witiquetas/printer-core';
+import type { LabelDocument, LabelElement } from '@witiquetas/label-schema';
+import { type PrinterCompiler, type PrinterLanguage, type CompiledLabel, type ValidationResult, compilerRegistry } from '@witiquetas/printer-core';
 
 export class PPLBCompiler implements PrinterCompiler {
   language: PrinterLanguage = 'PPLB';

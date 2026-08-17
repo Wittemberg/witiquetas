@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { QRCodeLibraryItemDTO, CreateQRCodeDTO, UpdateQRCodeDTO } from '@witiquetas/contracts';
+import type { QRCodeLibraryItemDTO, CreateQRCodeDTO, UpdateQRCodeDTO } from '@witiquetas/contracts';
 
 const router = Router();
 

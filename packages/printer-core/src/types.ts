@@ -1,4 +1,4 @@
-import { LabelDocument } from '@witiquetas/label-schema';
+import type { LabelDocument } from '@witiquetas/label-schema';
 
 export type PrinterLanguage = 'PPLA' | 'PPLB' | 'ZPL' | 'EPL';
 

@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { PrinterDTO, CreatePrinterDTO, PrinterProfileDTO } from '@witiquetas/contracts';
+import type { PrinterDTO, CreatePrinterDTO, PrinterProfileDTO } from '@witiquetas/contracts';
 
 const router = Router();
 

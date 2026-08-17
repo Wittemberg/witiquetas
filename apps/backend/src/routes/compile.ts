@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { LabelDocument, LabelDocumentSchema } from '@witiquetas/label-schema';
+import { type LabelDocument, LabelDocumentSchema } from '@witiquetas/label-schema';
 import { compilerRegistry, PrinterLanguage } from '@witiquetas/printer-core';
 
 // Garantir que os compiladores PPLA e PPLB sejam registrados no registry

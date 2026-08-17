@@ -37,30 +37,55 @@ test('1. Detecção por Score: Identifica PPLA com alta confiança sem confusão
 });
 
 test('2. Parser PPLA: Extrai corretamente cabeçalhos, comandos de controle e elementos visuais', async () => {
-  const result = await parseImportContent(REAL_PPLA_FIXTURE);
+  const result = await parseImportContent(REAL_PPLA_FIXTURE, undefined, {
+    originalFileName: 'MODELO_PPLA_PRODUCAO.txt',
+    originalExtension: '.txt',
+  });
   assert.ok(result.document, 'Documento deve ser gerado');
   assert.equal(result.document.sourceFile?.format, 'ppla');
+  assert.equal(result.document.sourceFile?.originalFileName, 'MODELO_PPLA_PRODUCAO.txt');
+  assert.equal(result.document.sourceFile?.originalExtension, '.txt');
 
-  // Não deve criar elementos visuais para comandos de controle (CHAR02, O0220, M3500, LC0000, H, D11, Q, E)
+  // NENHUM elemento de controle (CHAR02, CHAR10, CHAR13, O0220, M3500, LC0000, D11, etc.) pode virar elemento visual
+  const charElements = result.document.elements.filter(
+    (el) =>
+      el.name?.toLowerCase().includes('char') ||
+      (el as any).text?.toLowerCase().includes('char') ||
+      (el as any).field?.toLowerCase().includes('char')
+  );
+  assert.equal(charElements.length, 0, 'ZERO elementos chamados Campo CHAR ou contendo tokens de controle');
+
   const nonVisuals = result.document.elements.filter((el) =>
-    ['O0220', 'M3500', 'LC0000', 'D11', 'CHAR02'].some((kw) => el.name?.includes(kw) || (el as any).text?.includes(kw))
+    ['O0220', 'M3500', 'LC0000', 'D11', 'CHAR02', 'CHAR13'].some(
+      (kw) => el.name?.includes(kw) || (el as any).text?.includes(kw)
+    )
   );
   assert.equal(nonVisuals.length, 0, 'Comandos de controle de impressora não devem virar elementos visuais no canvas');
 
+  // Quantidade exata esperada de elementos visuais reais (4 recortes de nome + 1 linha + 1 barcode + 5 condicionais + 1 preco normal = 12)
+  assert.equal(result.document.elements.length, 12, 'Exatamente 12 elementos visuais reais devem ser criados');
+
   // Deve encontrar elementos de texto do nome com substring
-  const nomeElements = result.document.elements.filter((el) => el.type === 'text' && (el as TextElement).field === 'produto.descricao');
+  const nomeElements = result.document.elements.filter(
+    (el) => el.type === 'text' && (el as TextElement).field === 'produto.descricao'
+  );
   assert.equal(nomeElements.length, 4, 'Devem existir 4 linhas de recorte de nome do produto');
   assert.deepEqual((nomeElements[0] as TextElement).transformations, [{ type: 'substring', start: 0, length: 18 }]);
   assert.deepEqual((nomeElements[1] as TextElement).transformations, [{ type: 'substring', start: 18, length: 18 }]);
+  assert.equal((nomeElements[0] as TextElement).printerFontId, '2', 'Deve preservar printerFontId nativo');
 
   // Deve encontrar a linha divisória gráfica 1X...
   const lineElement = result.document.elements.find((el) => el.type === 'line') as LineElement;
   assert.ok(lineElement, 'Linha gráfica 1X deve ser reconhecida como LineElement');
+  assert.equal(lineElement.x, 1.25, 'Coordenada X da linha calculada em mm (10 dots a 203 DPI)');
+  assert.equal(lineElement.y, 6.26, 'Coordenada Y da linha calculada em mm (50 dots a 203 DPI)');
 
   // Deve encontrar o código de barras 1F...
   const barcodeElement = result.document.elements.find((el) => el.type === 'barcode') as BarcodeElement;
   assert.ok(barcodeElement, 'Código de barras 1F deve ser reconhecido como BarcodeElement');
   assert.equal(barcodeElement.field, 'produto.ean');
+  assert.notEqual(barcodeElement.width, 35, 'Largura do código de barras NÃO pode ser 35mm hardcoded');
+  assert.ok(barcodeElement.width > 10 && barcodeElement.width < 30, 'Largura calculada a partir dos parâmetros do comando PPLA');
 
   // Deve encontrar o preço normal 12110...R$ [[PRECO]]
   const priceElement = result.document.elements.find(
@@ -68,10 +93,15 @@ test('2. Parser PPLA: Extrai corretamente cabeçalhos, comandos de controle e el
   ) as PriceElement;
   assert.ok(priceElement, 'Preço R$ [[PRECO]] deve ser reconhecido como PriceElement com produto.preco');
   assert.equal(priceElement.field, 'produto.preco');
+  assert.equal(priceElement.reducedCents, false, 'Preço importado não deve forçar centavos reduzidos');
+
+  // Dimensões com confiança parcial
+  assert.equal(result.document.dimensions.dimensionsConfidence, 'partial');
+  assert.ok(result.document.dimensions.dimensionsConfidenceMessage?.includes('Detectamos o layout'));
 
   // Elementos com condicionais encadeadas [[SE]]{{frente}}[[SE]]{{prateleira}}...
   const condElements = result.document.elements.filter((el) => el.visibilityRule !== undefined);
-  assert.ok(condElements.length >= 5, 'Elementos condicionais devem manter suas regras');
+  assert.equal(condElements.length, 5, 'Exatamente 5 elementos condicionais');
 });
 
 test('3. Golden Zero-Change PPLA: Importação e exportação direta geram Diff Zero exato', async () => {

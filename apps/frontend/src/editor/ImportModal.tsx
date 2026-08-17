@@ -53,6 +53,9 @@ A550,30,0,4,2,2,N,"R$ [[PRECO]]"
 B80,110,0,1,2,5,60,B,"[[BARRA]]"
 P1`;
 
+  const [uploadedFileName, setUploadedFileName] = useState<string | undefined>(undefined);
+  const [uploadedFileExt, setUploadedFileExt] = useState<string | undefined>(undefined);
+
   useEffect(() => {
     if (isOpen && !content) {
       setContent(sampleLegacyContent);
@@ -68,7 +71,10 @@ P1`;
     const timer = setTimeout(async () => {
       setIsProcessing(true);
       try {
-        const result = await parseImportContent(content);
+        const result = await parseImportContent(content, undefined, {
+          originalFileName: uploadedFileName,
+          originalExtension: uploadedFileExt || '.txt',
+        });
         setParsedResult(result);
       } catch (err) {
         console.error('Erro ao interpretar modelo:', err);
@@ -78,13 +84,18 @@ P1`;
     }, 250);
 
     return () => clearTimeout(timer);
-  }, [content]);
+  }, [content, uploadedFileName, uploadedFileExt]);
 
   if (!isOpen) return null;
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    const fileName = file.name;
+    const fileExt = fileName.includes('.') ? '.' + fileName.split('.').pop() : '.txt';
+    setUploadedFileName(fileName);
+    setUploadedFileExt(fileExt);
 
     const reader = new FileReader();
     reader.onload = (ev) => {
@@ -199,6 +210,13 @@ P1`;
                     {formatDimensionBR(parsedResult.document.dimensions.widthMm)} × {formatDimensionBR(parsedResult.document.dimensions.heightMm)} ({parsedResult.document.dimensions.dpi} DPI)
                   </span>
                 </div>
+
+                {parsedResult.document.dimensions.dimensionsConfidence === 'partial' && (
+                  <div style={{ padding: '0.4rem 0.6rem', borderRadius: '4px', background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.25)', fontSize: '0.68rem', color: 'var(--status-warning)', display: 'flex', gap: '0.4rem', alignItems: 'flex-start' }}>
+                    <AlertTriangle size={13} style={{ flexShrink: 0, marginTop: '2px' }} />
+                    <span>{parsedResult.document.dimensions.dimensionsConfidenceMessage || 'Detectamos o layout, mas não foi possível determinar com segurança o tamanho da mídia. Selecione o tamanho físico da etiqueta.'}</span>
+                  </div>
+                )}
 
                 {/* Resumo de Elementos */}
                 <div style={{ display: 'flex', gap: '0.75rem', fontSize: '0.75rem' }}>

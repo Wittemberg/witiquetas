@@ -34,6 +34,20 @@ export const ERP_MACRO_MAP: Record<string, string> = {
   CODIGO_INTERNO: 'produto.codigoInterno',
 };
 
+/**
+ * Tokens de controle de impressora e escape que NUNCA devem ser interpretados como macros de dados ERP
+ */
+export const CONTROL_TOKENS = new Set([
+  'CHAR02', 'CHAR10', 'CHAR13', 'CHAR27', 'STX', 'ETX', 'CR', 'LF', 'ESC', 'NUL', 'SOH', 'EOT', 'ENQ', 'ACK', 'NAK'
+]);
+
+export function isControlToken(token: string): boolean {
+  const clean = token.replace(/^\[\[/, '').replace(/\]\]$/, '').trim().toUpperCase();
+  if (CONTROL_TOKENS.has(clean)) return true;
+  if (/^CHAR\d+$/i.test(clean)) return true;
+  return false;
+}
+
 export interface PreprocessedMacro {
   field: string;
   rawMacro: string;
@@ -73,11 +87,17 @@ export class LegacyPreprocessor {
   /**
    * Extrai e mapeia macros em um trecho de texto
    * Ex: "[[NOME,0,18]]" ➔ field: 'produto.descricao', substring: [0, 18]
+   * Retorna null se for token de controle ([[CHAR02]], [[CHAR13]], etc.)
    */
   static parseMacro(macroStr: string): PreprocessedMacro | null {
     const clean = macroStr.replace(/^\[\[/, '').replace(/\]\]$/, '').trim();
     const parts = clean.split(',').map((p) => p.trim());
     const macroName = parts[0].toUpperCase();
+
+    // Rejeita estritamente tokens de controle de impressora
+    if (isControlToken(macroName)) {
+      return null;
+    }
 
     const mappedField = ERP_MACRO_MAP[macroName] || `custom.${macroName.toLowerCase()}`;
 

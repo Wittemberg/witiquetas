@@ -19,9 +19,14 @@ export interface ImportResult {
   warningsCount: number;
 }
 
+export interface FileMetadataInput {
+  originalFileName?: string;
+  originalExtension?: string;
+}
+
 export interface ImportAdapter {
   id: string;
   name: string;
   detect: (content: string) => boolean;
-  parse: (content: string) => Promise<ImportResult>;
+  parse: (content: string, fileMetadata?: FileMetadataInput) => Promise<ImportResult>;
 }

@@ -21,8 +21,8 @@ export const pplaAdapter: ImportAdapter = {
     const detection = detectLabelFormat(content);
     return detection.language === 'ppla';
   },
-  parse: async (content: string): Promise<ImportResult> => {
-    return PPLAParser.parse(content);
+  parse: async (content: string, fileMetadata?: { originalFileName?: string; originalExtension?: string }): Promise<ImportResult> => {
+    return PPLAParser.parse(content, fileMetadata);
   },
 };
 
@@ -33,8 +33,8 @@ export const pplbAdapter: ImportAdapter = {
     const detection = detectLabelFormat(content);
     return detection.language === 'pplb';
   },
-  parse: async (content: string): Promise<ImportResult> => {
-    return PPLBParser.parse(content);
+  parse: async (content: string, fileMetadata?: { originalFileName?: string; originalExtension?: string }): Promise<ImportResult> => {
+    return PPLBParser.parse(content, fileMetadata);
   },
 };
 
@@ -54,7 +54,11 @@ export function detectAdapter(content: string): ImportAdapter | null {
   return null;
 }
 
-export async function parseImportContent(content: string, preferredAdapterId?: string): Promise<ImportResult> {
+export async function parseImportContent(
+  content: string,
+  preferredAdapterId?: string,
+  fileMetadata?: { originalFileName?: string; originalExtension?: string }
+): Promise<ImportResult> {
   let adapter: ImportAdapter | null = null;
 
   if (preferredAdapterId) {
@@ -70,6 +74,6 @@ export async function parseImportContent(content: string, preferredAdapterId?: s
     adapter = pplbAdapter;
   }
 
-  return adapter.parse(content);
+  return adapter.parse(content, fileMetadata);
 }
 

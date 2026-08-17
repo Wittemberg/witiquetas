@@ -152,14 +152,25 @@ export default function CompileModal({ isOpen, onClose }: CompileModalProps) {
     }
   };
 
-  // Exportar no Formato Original (Round-Trip - Item 309-320)
-  const handleExportOriginalFormat = () => {
+  // Exportar Modelo no Formato Original / TXT / PRN (Round-Trip Fiel)
+  const handleExportModel = (formatType: 'TXT' | 'PRN' | 'ORIGINAL' = 'ORIGINAL') => {
     const res = LegacyCompiler.compile(document);
     const blob = new Blob([res.compiledCode], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = window.document.createElement('a');
     a.href = url;
-    a.download = `${document.title.toLowerCase().replace(/[^a-z0-9]/g, '-')}.prn`;
+
+    let baseName = document.sourceFile?.originalFileName || `${document.title.toLowerCase().replace(/[^a-z0-9]/g, '-')}.txt`;
+    const cleanBaseName = baseName.replace(/\.[^/.]+$/, '');
+
+    let finalFileName = `${cleanBaseName}.txt`;
+    if (formatType === 'PRN') {
+      finalFileName = `${cleanBaseName}.prn`;
+    } else if (formatType === 'ORIGINAL' && document.sourceFile?.originalExtension) {
+      finalFileName = `${cleanBaseName}${document.sourceFile.originalExtension}`;
+    }
+
+    a.download = finalFileName;
     window.document.body.appendChild(a);
     a.click();
     a.remove();
@@ -238,15 +249,33 @@ export default function CompileModal({ isOpen, onClose }: CompileModalProps) {
               )}
             </div>
 
-            <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.2rem' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.2rem' }}>
               <button
                 className="btn btn-primary"
                 style={{ fontSize: '0.75rem', padding: '0.35rem 0.75rem' }}
-                onClick={handleExportOriginalFormat}
-                title="Baixar arquivo compatível com o ERP legado (.prn / .txt)"
+                onClick={() => handleExportModel('ORIGINAL')}
+                title="Baixar modelo no formato original com preservação exata"
               >
                 <Download size={13} />
-                <span>Baixar no Formato Original (.prn)</span>
+                <span>Baixar Modelo</span>
+              </button>
+
+              <button
+                className="btn"
+                style={{ fontSize: '0.75rem', padding: '0.35rem 0.6rem' }}
+                onClick={() => handleExportModel('TXT')}
+                title="Baixar como arquivo de texto (.txt - recomendado)"
+              >
+                <span>TXT (Padrão)</span>
+              </button>
+
+              <button
+                className="btn"
+                style={{ fontSize: '0.75rem', padding: '0.35rem 0.6rem' }}
+                onClick={() => handleExportModel('PRN')}
+                title="Baixar como RAW de impressão (.prn)"
+              >
+                <span>PRN (RAW)</span>
               </button>
 
               <button
@@ -263,9 +292,9 @@ export default function CompileModal({ isOpen, onClose }: CompileModalProps) {
                 className="btn"
                 style={{ fontSize: '0.75rem', padding: '0.35rem 0.6rem' }}
                 onClick={handleExportJSON}
-                title="Exportar JSON do modelo Witiquetas"
+                title="Exportar JSON do modelo Witiquetas (Avançado)"
               >
-                <span>Exportar JSON</span>
+                <span>JSON</span>
               </button>
             </div>
 

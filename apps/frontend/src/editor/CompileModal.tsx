@@ -37,6 +37,12 @@ export default function CompileModal({ isOpen, onClose }: CompileModalProps) {
 
   // Accordion avançado para visualização técnica de código
   const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
+  const [showDiff, setShowDiff] = useState(false);
+
+  // Resumo de Round-Trip e Diff
+  const roundTripData = useMemo(() => {
+    return LegacyCompiler.compile(document);
+  }, [document]);
 
   // Carregar impressoras disponíveis no backend
   useEffect(() => {
@@ -105,6 +111,7 @@ export default function CompileModal({ isOpen, onClose }: CompileModalProps) {
       });
   }, [isOpen, selectedPrinterId, document, printers]);
 
+  // Se o modal estiver fechado, não renderiza o DOM, mas os hooks acima já foram avaliados de forma estável
   if (!isOpen) return null;
 
   const currentPrinter = printers.find((p) => p.id === selectedPrinterId);
@@ -159,11 +166,6 @@ export default function CompileModal({ isOpen, onClose }: CompileModalProps) {
     URL.revokeObjectURL(url);
   };
 
-  // Resumo de Round-Trip e Diff
-  const roundTripData = useMemo(() => {
-    return LegacyCompiler.compile(document);
-  }, [document]);
-
   // Exportar JSON do Modelo
   const handleExportJSON = () => {
     const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(document, null, 2));
@@ -174,8 +176,6 @@ export default function CompileModal({ isOpen, onClose }: CompileModalProps) {
     downloadAnchor.click();
     downloadAnchor.remove();
   };
-
-  const [showDiff, setShowDiff] = useState(false);
 
   return (
     <div className="wizard-modal-overlay">

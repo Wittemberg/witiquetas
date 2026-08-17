@@ -98,5 +98,40 @@ mod tests {
         transport.clear();
         assert_eq!(transport.get_history().len(), 0);
     }
+
+    #[test]
+    fn test_memory_transport_copy_strategy_embedded() {
+        let transport = MemoryTransport::new();
+        let payload = b"I8,A,001\nQ240,024\nP5\n"; // 5 cópias já embutidas no payload
+
+        // Estratégia EMBEDDED_IN_PAYLOAD -> 1 envio físico
+        let result = transport.send("Zebra ZD220", payload);
+        assert!(result.is_ok());
+
+        let history = transport.get_history();
+        assert_eq!(history.len(), 1, "EMBEDDED_IN_PAYLOAD deve enviar exatamente 1 vez");
+        assert_eq!(history[0].payload, payload);
+    }
+
+    #[test]
+    fn test_memory_transport_copy_strategy_transport_repeat() {
+        let transport = MemoryTransport::new();
+        let payload = b"I8,A,001\nQ240,024\nP1\n";
+        let copies = 3;
+
+        // Estratégia TRANSPORT_REPEAT -> N envios físicos
+        for _ in 0..copies {
+            let res = transport.send("Argox OS-214", payload);
+            assert!(res.is_ok());
+        }
+
+        let history = transport.get_history();
+        assert_eq!(history.len(), 3, "TRANSPORT_REPEAT com 3 cópias deve enviar 3 vezes");
+        for event in history {
+            assert_eq!(event.payload, payload, "Cada repetição deve conter os bytes exatos");
+            assert_eq!(event.printer_name, "Argox OS-214");
+        }
+    }
 }
+
 

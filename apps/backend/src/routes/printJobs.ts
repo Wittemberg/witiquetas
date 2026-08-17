@@ -12,7 +12,14 @@ import {
 import { type LabelDocument, LabelDocumentSchema } from '@witiquetas/label-schema';
 import { compilerRegistry, type PrinterLanguage } from '@witiquetas/printer-core';
 import { printersStore } from './printers.js';
-import { agentsStore, hashToken, authenticateAgent, type AgentRecord } from './agents.js';
+import {
+  agentsStore,
+  hashToken,
+  authenticateAgent,
+  authenticateWebOrAgent,
+  type AgentRecord,
+  type AuthWebUser,
+} from './agents.js';
 
 // Compiladores PPLA e PPLB
 import '@witiquetas/printer-ppla';
@@ -73,8 +80,12 @@ export function detectCopyStrategy(payload: string, language: string): CopyStrat
 
 const printJobsStore = new Map<string, PrintJobDTO>();
 
-// 1. Criar novo Job de Impressão
-router.post('/', (req: Request, res: Response) => {
+// 1. Criar novo Job de Impressão (Painel Web / ERP / Integrações Autenticadas)
+router.post('/', authenticateWebOrAgent, (req: Request, res: Response) => {
+  const user = (req as any).user as AuthWebUser | undefined;
+  const agent = (req as any).agent as AgentRecord | undefined;
+  const authCompanyId = user ? user.companyId : (agent ? agent.companyId : null);
+
   const body = req.body as CreatePrintJobDTO;
 
   if (!body.printerId) {
@@ -84,6 +95,13 @@ router.post('/', (req: Request, res: Response) => {
   const printer = printersStore.get(body.printerId);
   if (!printer) {
     return res.status(404).json({ error: `Impressora '${body.printerId}' não encontrada.` });
+  }
+
+  // Validação de isolamento de tenant
+  if (authCompanyId && authCompanyId !== '*' && printer.companyId !== authCompanyId) {
+    return res.status(403).json({
+      error: `Não autorizado a enviar jobs para impressora da empresa '${printer.companyId}'. Seu escopo autorizado é '${authCompanyId}'.`,
+    });
   }
 
   let finalPayload = body.compiledCommand || '';
@@ -359,11 +377,19 @@ router.patch('/:id/status', authenticateAgent, (req: Request, res: Response) => 
   });
 });
 
-// 4. Listar Histórico de Jobs
-router.get('/', (_req: Request, res: Response) => {
-  const jobs = Array.from(printJobsStore.values()).sort(
+// 4. Listar Histórico de Jobs (Obrigatoriamente Autenticado e Filtrado por Tenant)
+router.get('/', authenticateWebOrAgent, (req: Request, res: Response) => {
+  const user = (req as any).user as AuthWebUser | undefined;
+  const agent = (req as any).agent as AgentRecord | undefined;
+  const authCompanyId = user ? user.companyId : (agent ? agent.companyId : null);
+
+  let jobs = Array.from(printJobsStore.values()).sort(
     (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
   );
+
+  if (authCompanyId && authCompanyId !== '*') {
+    jobs = jobs.filter((j) => j.companyId === authCompanyId);
+  }
 
   res.json({
     total: jobs.length,
@@ -373,6 +399,7 @@ router.get('/', (_req: Request, res: Response) => {
 
 export { printJobsStore };
 export default router;
+
 
 
 

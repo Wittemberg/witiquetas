@@ -16,6 +16,50 @@ export interface AgentRecord extends AgentDTO {
   tokenHash: string;
 }
 
+export interface AuthWebUser {
+  id: string;
+  companyId: string;
+  role: 'ADMIN' | 'OPERATOR' | 'SUPER_ADMIN';
+}
+
+// Map de credenciais administrativas/web válidas (para transição segura pré-Fase 4)
+const validWebTokens = new Map<string, AuthWebUser>([
+  ['adm_secret_matriz_token_123', { id: 'usr-admin-matriz', companyId: 'comp-matriz-01', role: 'ADMIN' }],
+  ['adm_secret_filial_token_456', { id: 'usr-admin-filial', companyId: 'comp-filial-02', role: 'ADMIN' }],
+  ['adm_secret_superadmin_789', { id: 'usr-superadmin', companyId: '*', role: 'SUPER_ADMIN' }],
+]);
+
+export function verifyWebUserToken(token: string): AuthWebUser | null {
+  if (!token) return null;
+
+  for (const [validToken, user] of validWebTokens.entries()) {
+    try {
+      const bufA = Buffer.from(token, 'utf8');
+      const bufB = Buffer.from(validToken, 'utf8');
+      if (bufA.length === bufB.length && crypto.timingSafeEqual(bufA, bufB)) {
+        return user;
+      }
+    } catch {}
+  }
+
+  const configuredAdminKey = process.env.ADMIN_API_KEY;
+  if (configuredAdminKey) {
+    try {
+      const bufA = Buffer.from(token, 'utf8');
+      const bufB = Buffer.from(configuredAdminKey, 'utf8');
+      if (bufA.length === bufB.length && crypto.timingSafeEqual(bufA, bufB)) {
+        return {
+          id: 'usr-env-admin',
+          companyId: process.env.DEFAULT_COMPANY_ID || 'comp-matriz-01',
+          role: 'ADMIN',
+        };
+      }
+    } catch {}
+  }
+
+  return null;
+}
+
 export function hashToken(token: string): string {
   return crypto.createHash('sha256').update(token, 'utf8').digest('hex');
 }
@@ -43,7 +87,7 @@ if (process.env.NODE_ENV !== 'production') {
 
 const agentsStore = new Map<string, AgentRecord>();
 
-// Helper: Middleware de autenticação de agente com SHA-256 e timingSafeEqual
+// Helper: Middleware de autenticação exclusiva de agente daemon (SHA-256 + timingSafeEqual)
 export function authenticateAgent(req: Request, res: Response, next: Function) {
   const authHeader = req.headers.authorization || (req.headers['x-agent-token'] as string);
   if (!authHeader) {
@@ -73,19 +117,76 @@ export function authenticateAgent(req: Request, res: Response, next: Function) {
   next();
 }
 
-export const DEFAULT_AGENT_POLL_INTERVAL_SECONDS = 45;
-
-// 1. Gerar Código de Pareamento Temporário (Painel Web / Administrativo)
-router.post('/generate-pairing-code', (req: Request, res: Response) => {
-  // Proteção: em produção, exigir autenticação administrativa
-  if (process.env.NODE_ENV === 'production' && !req.headers.authorization) {
-    return res.status(401).json({ error: 'Autorização administrativa necessária para gerar códigos de pareamento em produção.' });
+// Helper: Middleware de autenticação administrativa / web
+export function authenticateWebUser(req: Request, res: Response, next: Function) {
+  const authHeader = req.headers.authorization;
+  if (!authHeader) {
+    return res.status(401).json({ error: 'Token de autorização administrativo/web não fornecido.' });
   }
 
-  const { companyId = 'comp-matriz-01', companyName = 'Supermercado WR' } = req.body;
+  const token = authHeader.replace(/^Bearer\s+/i, '').trim();
+  if (!token) {
+    return res.status(401).json({ error: 'Token de autorização administrativo vazio.' });
+  }
+
+  const user = verifyWebUserToken(token);
+  if (!user) {
+    return res.status(403).json({ error: 'Credencial administrativa inválida ou sem permissão.' });
+  }
+
+  (req as any).user = user;
+  next();
+}
+
+// Helper: Middleware de autenticação híbrida (Web User / Admin OU Agent)
+export function authenticateWebOrAgent(req: Request, res: Response, next: Function) {
+  const authHeader = req.headers.authorization || (req.headers['x-agent-token'] as string);
+  if (!authHeader) {
+    return res.status(401).json({ error: 'Token de autenticação não fornecido.' });
+  }
+
+  const rawToken = authHeader.replace(/^Bearer\s+/i, '').trim();
+  if (!rawToken) {
+    return res.status(401).json({ error: 'Token de autenticação vazio.' });
+  }
+
+  // 1. Tentar autenticar como Web User / Admin
+  const webUser = verifyWebUserToken(rawToken);
+  if (webUser) {
+    (req as any).user = webUser;
+    return next();
+  }
+
+  // 2. Tentar autenticar como Agent
+  const agent = Array.from(agentsStore.values()).find((a) => verifyTokenHash(rawToken, a.tokenHash));
+  if (agent) {
+    (req as any).agent = agent;
+    return next();
+  }
+
+  return res.status(403).json({ error: 'Credencial inválida ou revogada.' });
+}
+
+export const DEFAULT_AGENT_POLL_INTERVAL_SECONDS = 45;
+
+// 1. Gerar Código de Pareamento Temporário (Protegido por Autenticação Administrativa / Web)
+router.post('/generate-pairing-code', authenticateWebUser, (req: Request, res: Response) => {
+  const user = (req as any).user as AuthWebUser;
+  const requestedCompanyId = req.body.companyId;
+
+  // Proteção de tenant: Se o usuário não for SUPER_ADMIN, não pode gerar código para outra empresa
+  if (requestedCompanyId && user.role !== 'SUPER_ADMIN' && user.companyId !== '*' && requestedCompanyId !== user.companyId) {
+    return res.status(403).json({
+      error: `Não autorizado a gerar código de pareamento para a empresa '${requestedCompanyId}'. Seu escopo autorizado é '${user.companyId}'.`,
+    });
+  }
+
+  const targetCompanyId = user.companyId !== '*' ? user.companyId : (requestedCompanyId || 'comp-matriz-01');
+  const companyName = req.body.companyName || (targetCompanyId === 'comp-matriz-01' ? 'Matriz Supermercado WR' : 'Filial Supermercado WR');
+
   const code = `WIT-${Math.floor(1000 + Math.random() * 9000)}`;
   pairingCodes.set(code, {
-    companyId,
+    companyId: targetCompanyId,
     companyName,
     expiresAt: Date.now() + 15 * 60 * 1000, // 15 minutos de validade
   });
@@ -94,6 +195,7 @@ router.post('/generate-pairing-code', (req: Request, res: Response) => {
     pairingCode: code,
     expiresInSeconds: 900,
     companyName,
+    companyId: targetCompanyId,
   });
 });
 
@@ -152,7 +254,7 @@ router.post('/pair', (req: Request, res: Response) => {
   res.status(201).json(response);
 });
 
-// 3. Heartbeat do Agente (Obrigatoriamente autenticado via token)
+// 3. Heartbeat do Agente (Obrigatoriamente autenticado via token de daemon)
 router.post('/heartbeat', authenticateAgent, (req: Request, res: Response) => {
   const agent = (req as any).agent as AgentRecord;
   const body = req.body as AgentHeartbeatRequestDTO;
@@ -183,32 +285,32 @@ router.post('/heartbeat', authenticateAgent, (req: Request, res: Response) => {
   res.json(response);
 });
 
-// 4. Listar Agentes da Empresa (Filtrado pelo tenant)
-router.get('/', (req: Request, res: Response) => {
-  const authHeader = req.headers.authorization || (req.headers['x-agent-token'] as string);
-  const rawToken = authHeader ? authHeader.replace(/^Bearer\s+/i, '').trim() : null;
-  const callerAgent = rawToken ? Array.from(agentsStore.values()).find((a) => verifyTokenHash(rawToken, a.tokenHash)) : null;
+// 4. Listar Agentes da Empresa (Obrigatoriamente Autenticado e Filtrado por Tenant)
+router.get('/', authenticateWebOrAgent, (req: Request, res: Response) => {
+  const user = (req as any).user as AuthWebUser | undefined;
+  const agent = (req as any).agent as AgentRecord | undefined;
+  const allowedCompanyId = user ? user.companyId : (agent ? agent.companyId : null);
 
   const now = Date.now();
   let agents = Array.from(agentsStore.values());
 
-  if (callerAgent) {
-    agents = agents.filter((a) => a.companyId === callerAgent.companyId);
+  if (allowedCompanyId && allowedCompanyId !== '*') {
+    agents = agents.filter((a) => a.companyId === allowedCompanyId);
   }
 
-  const agentsDTO: AgentDTO[] = agents.map((agent) => {
-    const isOnline = agent.lastSeenAt && now - new Date(agent.lastSeenAt).getTime() < 120000;
+  const agentsDTO: AgentDTO[] = agents.map((a) => {
+    const isOnline = a.lastSeenAt && now - new Date(a.lastSeenAt).getTime() < 120000;
     return {
-      id: agent.id,
-      companyId: agent.companyId,
-      installationId: agent.installationId,
-      machineName: agent.machineName,
-      os: agent.os,
-      architecture: agent.architecture,
-      agentVersion: agent.agentVersion,
-      status: isOnline ? agent.status : 'OFFLINE',
-      lastSeenAt: agent.lastSeenAt,
-      createdAt: agent.createdAt,
+      id: a.id,
+      companyId: a.companyId,
+      installationId: a.installationId,
+      machineName: a.machineName,
+      os: a.os,
+      architecture: a.architecture,
+      agentVersion: a.agentVersion,
+      status: isOnline ? a.status : 'OFFLINE',
+      lastSeenAt: a.lastSeenAt,
+      createdAt: a.createdAt,
     };
   });
 
@@ -220,3 +322,4 @@ router.get('/', (req: Request, res: Response) => {
 
 export { agentsStore, pairingCodes };
 export default router;
+

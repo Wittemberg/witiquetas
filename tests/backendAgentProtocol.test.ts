@@ -27,11 +27,13 @@ import agentsRouter, {
   agentsStore,
   hashToken,
   verifyTokenHash,
+  verifyWebUserToken,
   type AgentRecord,
+  type AuthWebUser,
 } from '../apps/backend/src/routes/agents.js';
 import { printersStore } from '../apps/backend/src/routes/printers.js';
 
-// Helper: Executa a cadeia de handlers de rota (incluindo middleware authenticateAgent)
+// Helper: Executa a cadeia de handlers de rota (incluindo middlewares de autenticação)
 function executeRouteChain(handlers: Function[], req: any, res: any) {
   let idx = 0;
   function next() {
@@ -40,7 +42,7 @@ function executeRouteChain(handlers: Function[], req: any, res: any) {
       handlers[idx](req, res, next);
     }
   }
-  if (handlers.length > 0) {
+  if (handlers && handlers.length > 0) {
     handlers[0](req, res, next);
   }
 }
@@ -53,6 +55,7 @@ function createMockReqRes(options: {
   query?: any;
   headers?: any;
   agent?: any;
+  user?: any;
 }) {
   let statusCode = 200;
   let responseData: any = null;
@@ -64,6 +67,7 @@ function createMockReqRes(options: {
     query: options.query || {},
     headers: options.headers || {},
     agent: options.agent,
+    user: options.user,
   };
 
   const res: any = {
@@ -99,12 +103,20 @@ const patchJobStatusHandlers = (printJobsRouter as any).routes.find(
   (r: any) => r.method === 'PATCH' && r.path === '/:id/status'
 ).handlers;
 
+const getPrintJobsHistoryHandlers = (printJobsRouter as any).routes.find(
+  (r: any) => r.method === 'GET' && r.path === '/'
+).handlers;
+
 const heartbeatHandlers = (agentsRouter as any).routes.find(
   (r: any) => r.method === 'POST' && r.path === '/heartbeat'
 ).handlers;
 
 const generatePairingCodeHandlers = (agentsRouter as any).routes.find(
   (r: any) => r.method === 'POST' && r.path === '/generate-pairing-code'
+).handlers;
+
+const getAgentsHandlers = (agentsRouter as any).routes.find(
+  (r: any) => r.method === 'GET' && r.path === '/'
 ).handlers;
 
 // ============================================================================
@@ -164,13 +176,20 @@ test('6. CopyStrategy: Comando sem quantidade nativa define TRANSPORT_REPEAT', (
 // BLOCO 3: SEGURANÇA DE AUTENTICAÇÃO E TIMING SAFE EQUAL
 // ============================================================================
 
-test('7. Segurança de Token: verifyTokenHash com timingSafeEqual valida hashes com segurança', () => {
+test('7. Segurança de Token: verifyTokenHash e verifyWebUserToken com timingSafeEqual', () => {
   const rawToken = 'agt_live_test_secret_12345';
   const tokenHash = hashToken(rawToken);
 
   assert.equal(verifyTokenHash(rawToken, tokenHash), true);
   assert.equal(verifyTokenHash('agt_live_wrong_token', tokenHash), false);
   assert.equal(verifyTokenHash('', tokenHash), false);
+
+  const adminMatriz = verifyWebUserToken('adm_secret_matriz_token_123');
+  assert.ok(adminMatriz);
+  assert.equal(adminMatriz.companyId, 'comp-matriz-01');
+
+  const invalidAdmin = verifyWebUserToken('qualquer_coisa_invalida');
+  assert.equal(invalidAdmin, null);
 });
 
 // ============================================================================
@@ -340,7 +359,6 @@ test('15. Status update sem leaseId em job claimed retorna HTTP 400', () => {
     body: {
       status: 'DELIVERING',
       attemptId: job.attemptId,
-      // leaseId omitido propositalmente
     },
   });
   executeRouteChain(patchJobStatusHandlers, req, res);
@@ -357,7 +375,6 @@ test('16. Status update sem attemptId para tentativa física retorna HTTP 400', 
     body: {
       status: 'DELIVERING',
       leaseId: job.leaseId,
-      // attemptId omitido propositalmente
     },
   });
   executeRouteChain(patchJobStatusHandlers, req, res);
@@ -399,7 +416,6 @@ test('18. Status update com attemptId incorreto retorna HTTP 409', () => {
 
 test('19. Agent B tentando atualizar job do Agent A retorna HTTP 403', () => {
   const job = printJobsStore.get('job-matriz-test-01')!;
-  // Agent Filial 02 tentando atualizar job claimed pelo Agent Matriz 01
   const { req, res } = createMockReqRes({
     method: 'PATCH',
     params: { id: job.id },
@@ -416,7 +432,6 @@ test('19. Agent B tentando atualizar job do Agent A retorna HTTP 403', () => {
 
 test('20. Status update com lease expirado retorna HTTP 409', () => {
   const job = printJobsStore.get('job-matriz-test-01')!;
-  // Simular expiração do lease
   job.leaseExpiresAt = new Date(Date.now() - 5000).toISOString();
 
   const { req, res } = createMockReqRes({
@@ -449,7 +464,7 @@ test('21. attempts >= maxAttempts impede novo claim e transiciona para FAILED', 
     payloadBase64: 'VEVTVEU=',
     payloadBytesLength: 5,
     checksumSha256: 'abc',
-    attempts: 3, // Já atingiu maxAttempts = 3
+    attempts: 3,
     maxAttempts: 3,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
@@ -465,14 +480,147 @@ test('21. attempts >= maxAttempts impede novo claim e transiciona para FAILED', 
   assert.ok(updatedStoredJob.error?.includes('Limite máximo de tentativas'));
 });
 
-test('22. Geração de pairing code em produção exige autenticação administrativa', () => {
-  const originalEnv = process.env.NODE_ENV;
-  try {
-    process.env.NODE_ENV = 'production';
-    const { req, res } = createMockReqRes({ method: 'POST', headers: {}, body: {} });
-    executeRouteChain(generatePairingCodeHandlers, req, res);
+// ============================================================================
+// BLOCO 5: PROTEÇÃO DOS ENDPOINTS ADMINISTRATIVOS (/generate-pairing-code, /agents, /print-jobs)
+// ============================================================================
+
+test('22. POST /generate-pairing-code sem autenticação retorna HTTP 401', () => {
+  const { req, res } = createMockReqRes({ method: 'POST', headers: {}, body: {} });
+  executeRouteChain(generatePairingCodeHandlers, req, res);
+  assert.equal(res.getStatusCode(), 401);
+});
+
+test('23. POST /generate-pairing-code com header arbitrário inválido retorna HTTP 403', () => {
+  const { req, res } = createMockReqRes({
+    method: 'POST',
+    headers: { authorization: 'Bearer token_arbitrario_qualquer_coisa' },
+    body: {},
+  });
+  executeRouteChain(generatePairingCodeHandlers, req, res);
+  assert.equal(res.getStatusCode(), 403);
+});
+
+test('24. POST /generate-pairing-code com credencial administrativa válida gera código com sucesso', () => {
+  const { req, res } = createMockReqRes({
+    method: 'POST',
+    headers: { authorization: 'Bearer adm_secret_matriz_token_123' },
+    body: { companyName: 'Supermercado WR Matriz' },
+  });
+  executeRouteChain(generatePairingCodeHandlers, req, res);
+  assert.equal(res.getStatusCode(), 200);
+  const data = res.getData();
+  assert.ok(data.pairingCode.startsWith('WIT-'));
+  assert.equal(data.companyId, 'comp-matriz-01');
+});
+
+test('25. POST /generate-pairing-code tentativa de geração para tenant não autorizado retorna HTTP 403', () => {
+  // Usuário autenticado na Matriz tentando gerar código para a Filial 02
+  const { req, res } = createMockReqRes({
+    method: 'POST',
+    headers: { authorization: 'Bearer adm_secret_matriz_token_123' },
+    body: { companyId: 'comp-filial-02' },
+  });
+  executeRouteChain(generatePairingCodeHandlers, req, res);
+  assert.equal(res.getStatusCode(), 403);
+  assert.ok(res.getData().error.includes('Não autorizado'));
+});
+
+test('26. GET /agents: anônimo retorna 401, credencial inválida retorna 403 e credencial válida filtra por tenant', () => {
+  // A. Anônimo -> 401
+  {
+    const { req, res } = createMockReqRes({ method: 'GET', headers: {} });
+    executeRouteChain(getAgentsHandlers, req, res);
     assert.equal(res.getStatusCode(), 401);
-  } finally {
-    process.env.NODE_ENV = originalEnv;
+  }
+
+  // B. Credencial inválida -> 403
+  {
+    const { req, res } = createMockReqRes({
+      method: 'GET',
+      headers: { authorization: 'Bearer token_invalido' },
+    });
+    executeRouteChain(getAgentsHandlers, req, res);
+    assert.equal(res.getStatusCode(), 403);
+  }
+
+  // C. Credencial válida Matriz -> Somente agentes da Matriz
+  {
+    const { req, res } = createMockReqRes({
+      method: 'GET',
+      headers: { authorization: 'Bearer adm_secret_matriz_token_123' },
+    });
+    executeRouteChain(getAgentsHandlers, req, res);
+    assert.equal(res.getStatusCode(), 200);
+    const data = res.getData();
+    assert.ok(data.agents.length > 0);
+    assert.ok(data.agents.every((a: any) => a.companyId === 'comp-matriz-01'));
+  }
+});
+
+test('27. GET /print-jobs: anônimo retorna 401 e credencial válida filtra histórico por tenant', () => {
+  // A. Anônimo -> 401
+  {
+    const { req, res } = createMockReqRes({ method: 'GET', headers: {} });
+    executeRouteChain(getPrintJobsHistoryHandlers, req, res);
+    assert.equal(res.getStatusCode(), 401);
+  }
+
+  // B. Credencial Matriz -> Retorna apenas jobs da Matriz
+  {
+    const { req, res } = createMockReqRes({
+      method: 'GET',
+      headers: { authorization: 'Bearer adm_secret_matriz_token_123' },
+    });
+    executeRouteChain(getPrintJobsHistoryHandlers, req, res);
+    assert.equal(res.getStatusCode(), 200);
+    const data = res.getData();
+    assert.ok(data.jobs.length > 0);
+    assert.ok(data.jobs.every((j: any) => j.companyId === 'comp-matriz-01'));
+  }
+});
+
+test('28. POST /print-jobs: anônimo retorna 401, envio para impressora de outro tenant retorna 403 e envio válido retorna 201', () => {
+  // A. Anônimo -> 401
+  {
+    const { req, res } = createMockReqRes({
+      method: 'POST',
+      headers: {},
+      body: { printerId: 'prn-matriz-l42', compiledCommand: 'TESTE' },
+    });
+    executeRouteChain(postJobHandlers, req, res);
+    assert.equal(res.getStatusCode(), 401);
+  }
+
+  // B. Admin Matriz tentando enviar para impressora da Filial 02 -> 403
+  printersStore.set('prn-filial-isolated', {
+    id: 'prn-filial-isolated',
+    companyId: 'comp-filial-02',
+    name: 'Impressora Filial 02',
+    protocol: 'RAW_TCP',
+    language: 'PPLB',
+    active: true,
+  } as any);
+
+  {
+    const { req, res } = createMockReqRes({
+      method: 'POST',
+      headers: { authorization: 'Bearer adm_secret_matriz_token_123' },
+      body: { printerId: 'prn-filial-isolated', compiledCommand: 'TESTE' },
+    });
+    executeRouteChain(postJobHandlers, req, res);
+    assert.equal(res.getStatusCode(), 403);
+    assert.ok(res.getData().error.includes('Não autorizado'));
+  }
+
+  // C. Envio válido para impressora da Matriz -> 201
+  {
+    const { req, res } = createMockReqRes({
+      method: 'POST',
+      headers: { authorization: 'Bearer adm_secret_matriz_token_123' },
+      body: { printerId: 'prn-matriz-l42', compiledCommand: 'I8,A,001\nP1\n', encoding: 'windows-1252' },
+    });
+    executeRouteChain(postJobHandlers, req, res);
+    assert.equal(res.getStatusCode(), 201);
+    assert.equal(res.getData().success, true);
   }
 });

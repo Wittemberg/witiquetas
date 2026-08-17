@@ -22,26 +22,15 @@ export interface AuthWebUser {
   role: 'ADMIN' | 'OPERATOR' | 'SUPER_ADMIN';
 }
 
-// Map de credenciais administrativas/web válidas (para transição segura pré-Fase 4)
-const validWebTokens = new Map<string, AuthWebUser>([
-  ['adm_secret_matriz_token_123', { id: 'usr-admin-matriz', companyId: 'comp-matriz-01', role: 'ADMIN' }],
-  ['adm_secret_filial_token_456', { id: 'usr-admin-filial', companyId: 'comp-filial-02', role: 'ADMIN' }],
-  ['adm_secret_superadmin_789', { id: 'usr-superadmin', companyId: '*', role: 'SUPER_ADMIN' }],
-]);
-
+/**
+ * TEMPORARY PRE-RBAC AUTH:
+ * Validação de tokens administrativos e web através de variáveis de ambiente.
+ * Nenhum token estático reside no código-fonte.
+ */
 export function verifyWebUserToken(token: string): AuthWebUser | null {
   if (!token) return null;
 
-  for (const [validToken, user] of validWebTokens.entries()) {
-    try {
-      const bufA = Buffer.from(token, 'utf8');
-      const bufB = Buffer.from(validToken, 'utf8');
-      if (bufA.length === bufB.length && crypto.timingSafeEqual(bufA, bufB)) {
-        return user;
-      }
-    } catch {}
-  }
-
+  // 1. Verificar ADMIN_API_KEY do ambiente (Fail-closed se não configurada)
   const configuredAdminKey = process.env.ADMIN_API_KEY;
   if (configuredAdminKey) {
     try {
@@ -49,9 +38,25 @@ export function verifyWebUserToken(token: string): AuthWebUser | null {
       const bufB = Buffer.from(configuredAdminKey, 'utf8');
       if (bufA.length === bufB.length && crypto.timingSafeEqual(bufA, bufB)) {
         return {
-          id: 'usr-env-admin',
-          companyId: process.env.DEFAULT_COMPANY_ID || 'comp-matriz-01',
+          id: 'usr-admin',
+          companyId: process.env.ADMIN_COMPANY_ID || 'comp-matriz-01',
           role: 'ADMIN',
+        };
+      }
+    } catch {}
+  }
+
+  // 2. Verificar SUPER_ADMIN_API_KEY do ambiente
+  const configuredSuperAdminKey = process.env.SUPER_ADMIN_API_KEY;
+  if (configuredSuperAdminKey) {
+    try {
+      const bufA = Buffer.from(token, 'utf8');
+      const bufB = Buffer.from(configuredSuperAdminKey, 'utf8');
+      if (bufA.length === bufB.length && crypto.timingSafeEqual(bufA, bufB)) {
+        return {
+          id: 'usr-superadmin',
+          companyId: '*',
+          role: 'SUPER_ADMIN',
         };
       }
     } catch {}
@@ -117,8 +122,15 @@ export function authenticateAgent(req: Request, res: Response, next: Function) {
   next();
 }
 
-// Helper: Middleware de autenticação administrativa / web
+// Helper: Middleware de autenticação administrativa / web (Fail-closed)
 export function authenticateWebUser(req: Request, res: Response, next: Function) {
+  // Fail-closed: Se nenhuma chave administrativa estiver configurada no ambiente
+  if (!process.env.ADMIN_API_KEY && !process.env.SUPER_ADMIN_API_KEY) {
+    return res.status(503).json({
+      error: 'Autenticação administrativa indisponível. Nenhuma chave administrativa (ADMIN_API_KEY / SUPER_ADMIN_API_KEY) foi configurada no ambiente.',
+    });
+  }
+
   const authHeader = req.headers.authorization;
   if (!authHeader) {
     return res.status(401).json({ error: 'Token de autorização administrativo/web não fornecido.' });
@@ -138,38 +150,9 @@ export function authenticateWebUser(req: Request, res: Response, next: Function)
   next();
 }
 
-// Helper: Middleware de autenticação híbrida (Web User / Admin OU Agent)
-export function authenticateWebOrAgent(req: Request, res: Response, next: Function) {
-  const authHeader = req.headers.authorization || (req.headers['x-agent-token'] as string);
-  if (!authHeader) {
-    return res.status(401).json({ error: 'Token de autenticação não fornecido.' });
-  }
-
-  const rawToken = authHeader.replace(/^Bearer\s+/i, '').trim();
-  if (!rawToken) {
-    return res.status(401).json({ error: 'Token de autenticação vazio.' });
-  }
-
-  // 1. Tentar autenticar como Web User / Admin
-  const webUser = verifyWebUserToken(rawToken);
-  if (webUser) {
-    (req as any).user = webUser;
-    return next();
-  }
-
-  // 2. Tentar autenticar como Agent
-  const agent = Array.from(agentsStore.values()).find((a) => verifyTokenHash(rawToken, a.tokenHash));
-  if (agent) {
-    (req as any).agent = agent;
-    return next();
-  }
-
-  return res.status(403).json({ error: 'Credencial inválida ou revogada.' });
-}
-
 export const DEFAULT_AGENT_POLL_INTERVAL_SECONDS = 45;
 
-// 1. Gerar Código de Pareamento Temporário (Protegido por Autenticação Administrativa / Web)
+// 1. Gerar Código de Pareamento Temporário (Exclusivo Web/Admin com Proteção de Tenant)
 router.post('/generate-pairing-code', authenticateWebUser, (req: Request, res: Response) => {
   const user = (req as any).user as AuthWebUser;
   const requestedCompanyId = req.body.companyId;
@@ -285,11 +268,10 @@ router.post('/heartbeat', authenticateAgent, (req: Request, res: Response) => {
   res.json(response);
 });
 
-// 4. Listar Agentes da Empresa (Obrigatoriamente Autenticado e Filtrado por Tenant)
-router.get('/', authenticateWebOrAgent, (req: Request, res: Response) => {
-  const user = (req as any).user as AuthWebUser | undefined;
-  const agent = (req as any).agent as AgentRecord | undefined;
-  const allowedCompanyId = user ? user.companyId : (agent ? agent.companyId : null);
+// 4. Listar Agentes da Empresa (Exclusivo Web/Admin e Filtrado por Tenant)
+router.get('/', authenticateWebUser, (req: Request, res: Response) => {
+  const user = (req as any).user as AuthWebUser;
+  const allowedCompanyId = user.companyId;
 
   const now = Date.now();
   let agents = Array.from(agentsStore.values());

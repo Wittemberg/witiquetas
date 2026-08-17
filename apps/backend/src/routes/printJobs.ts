@@ -16,7 +16,7 @@ import {
   agentsStore,
   hashToken,
   authenticateAgent,
-  authenticateWebOrAgent,
+  authenticateWebUser,
   type AgentRecord,
   type AuthWebUser,
 } from './agents.js';
@@ -80,11 +80,10 @@ export function detectCopyStrategy(payload: string, language: string): CopyStrat
 
 const printJobsStore = new Map<string, PrintJobDTO>();
 
-// 1. Criar novo Job de Impressão (Painel Web / ERP / Integrações Autenticadas)
-router.post('/', authenticateWebOrAgent, (req: Request, res: Response) => {
-  const user = (req as any).user as AuthWebUser | undefined;
-  const agent = (req as any).agent as AgentRecord | undefined;
-  const authCompanyId = user ? user.companyId : (agent ? agent.companyId : null);
+// 1. Criar novo Job de Impressão (Exclusivo Web/Admin / ERP Autenticado — Agents NÃO podem criar jobs)
+router.post('/', authenticateWebUser, (req: Request, res: Response) => {
+  const user = (req as any).user as AuthWebUser;
+  const authCompanyId = user.companyId;
 
   const body = req.body as CreatePrintJobDTO;
 
@@ -377,11 +376,10 @@ router.patch('/:id/status', authenticateAgent, (req: Request, res: Response) => 
   });
 });
 
-// 4. Listar Histórico de Jobs (Obrigatoriamente Autenticado e Filtrado por Tenant)
-router.get('/', authenticateWebOrAgent, (req: Request, res: Response) => {
-  const user = (req as any).user as AuthWebUser | undefined;
-  const agent = (req as any).agent as AgentRecord | undefined;
-  const authCompanyId = user ? user.companyId : (agent ? agent.companyId : null);
+// 4. Listar Histórico de Jobs (Exclusivo Web/Admin e Filtrado por Tenant)
+router.get('/', authenticateWebUser, (req: Request, res: Response) => {
+  const user = (req as any).user as AuthWebUser;
+  const authCompanyId = user.companyId;
 
   let jobs = Array.from(printJobsStore.values()).sort(
     (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
@@ -399,6 +397,7 @@ router.get('/', authenticateWebOrAgent, (req: Request, res: Response) => {
 
 export { printJobsStore };
 export default router;
+
 
 
 

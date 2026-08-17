@@ -213,3 +213,58 @@ export interface UpdatePrintJobStatusDTO {
   error?: string;
   executionTimeMs?: number;
 }
+
+// ==========================================
+// PAYLOADS COMPILADOS FINAIS (FASE 3 AGENT LOCAL)
+// ==========================================
+export interface CompiledPrintPayload {
+  language: 'PPLB' | 'PPLA' | 'ZPL' | 'EPL';
+  encoding: 'windows-1252' | 'utf-8' | 'ascii' | 'binary';
+  payloadBase64: string; // Representação segura em Base64 dos bytes finais compilados
+  payloadBytesLength: number; // Quantidade exata de bytes binários
+  checksumSha256: string; // Hash SHA-256 dos bytes finais para integridade e idempotência
+  copies: number;
+  dpi: 203 | 300 | 600;
+  metadata: {
+    templateTitle?: string;
+    hasBinaryGraphics?: boolean;
+    dimensionsMm: {
+      width: number;
+      height: number;
+      gap?: number;
+    };
+  };
+}
+
+// ==========================================
+// BIBLIOTECA DE IMAGENS & RECURSOS GRÁFICOS MULTINICHO
+// ==========================================
+export type ImageAssetCategory = 'LOGO' | 'SEAL' | 'PICTOGRAM' | 'CERTIFICATION' | 'ICON' | 'OTHER';
+
+export interface ImageLibraryItemDTO {
+  id: string;
+  companyId: string;
+  name: string; // Nome obrigatório (ex: "Logo Hospital", "Selo Orgânico")
+  category: ImageAssetCategory;
+  url: string;
+  originalFilename?: string;
+  mimeType: string;
+  fileSizeBytes: number;
+  widthPx: number;
+  heightPx: number;
+  hashSha256: string; // Deduplicação por hash
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateImageLibraryItemDTO {
+  name: string;
+  category?: ImageAssetCategory;
+  url: string;
+  originalFilename?: string;
+  mimeType: string;
+  fileSizeBytes: number;
+  widthPx: number;
+  heightPx: number;
+  hashSha256: string;
+}

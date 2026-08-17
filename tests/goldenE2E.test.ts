@@ -238,15 +238,16 @@ test('10. Auditoria de Fechamento Defensivo: Arquivo malformado sem FIMSE não i
 // ============================================================================
 
 export interface CompiledPrintPayload {
-  language: 'PPLB' | 'PPLA' | 'ZPL' | 'ESC_POS';
-  encoding: 'utf-8' | 'windows-1252' | 'ascii';
-  payload: string;
+  language: 'PPLB' | 'PPLA' | 'ZPL' | 'EPL';
+  encoding: 'windows-1252' | 'utf-8' | 'ascii' | 'binary';
+  payloadBase64: string;
+  payloadBytesLength: number;
   checksumSha256: string;
   copies: number;
   dpi: 203 | 300 | 600;
   metadata: {
     templateTitle: string;
-    totalBytes: number;
+    hasBinaryGraphics?: boolean;
     dimensionsMm: {
       width: number;
       height: number;
@@ -255,23 +256,25 @@ export interface CompiledPrintPayload {
   };
 }
 
-test('11. Contrato Preparatório Fase 3: Geração de CompiledPrintPayload com Checksum SHA-256', () => {
+test('11. Contrato Preparatório Fase 3: Geração de CompiledPrintPayload em Bytes/Base64 com Checksum SHA-256', () => {
   const importResult = PPLBParser.parse(fixtureRealContent);
   const compileResult = LegacyCompiler.compile(importResult.document);
 
   const payloadString = compileResult.compiledCode;
-  const hash = crypto.createHash('sha256').update(payloadString, 'utf8').digest('hex');
+  const payloadBuffer = Buffer.from(payloadString, 'latin1'); // Simula CP1252 / Windows-1252
+  const hash = crypto.createHash('sha256').update(payloadBuffer).digest('hex');
 
   const printPayload: CompiledPrintPayload = {
     language: 'PPLB',
     encoding: 'windows-1252',
-    payload: payloadString,
+    payloadBase64: payloadBuffer.toString('base64'),
+    payloadBytesLength: payloadBuffer.length,
     checksumSha256: hash,
     copies: 1,
     dpi: importResult.document.dimensions.dpi,
     metadata: {
       templateTitle: importResult.document.title,
-      totalBytes: Buffer.byteLength(payloadString, 'utf8'),
+      hasBinaryGraphics: false,
       dimensionsMm: {
         width: importResult.document.dimensions.widthMm,
         height: importResult.document.dimensions.heightMm,
@@ -283,6 +286,11 @@ test('11. Contrato Preparatório Fase 3: Geração de CompiledPrintPayload com C
   assert.equal(printPayload.language, 'PPLB');
   assert.equal(printPayload.dpi, 203);
   assert.equal(printPayload.checksumSha256.length, 64);
-  assert.ok(printPayload.payload.startsWith('// Modelo Etiqueta Gondola 100x30'));
-  assert.ok(printPayload.metadata.totalBytes > 0);
+  assert.equal(printPayload.payloadBytesLength, payloadBuffer.length);
+  assert.ok(printPayload.payloadBase64.length > 0);
+
+  // Decodificação pelo Agent Local em bytes opacos
+  const decodedBytes = Buffer.from(printPayload.payloadBase64, 'base64');
+  assert.equal(decodedBytes.length, printPayload.payloadBytesLength);
+  assert.equal(crypto.createHash('sha256').update(decodedBytes).digest('hex'), printPayload.checksumSha256);
 });

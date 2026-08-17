@@ -85,33 +85,39 @@ Um layout criado no navegador pode ser salvo, recarregado e reproduzido sem perd
 
 ---
 
-## Fase 2 — PPLA/PPLB e TXT
+## Fase 2 — Compiladores PPLA/PPLB e Importador Legado (Fase 2.1)
 
 ### Objetivo
 
-Comprovar a primeira impressão real.
+Comprovar a primeira impressão real, importação lossless de modelos legados e fidelidade de round-trip.
 
-### Entregas
+### Entregas da Fase 2.1 (Concluída Tecnico-Documentalmente)
 
-- interface de compiladores;
-- PPLA/PPLB inicial;
-- validação de comandos;
-- encoding;
-- preview textual;
-- copiar comando;
-- baixar TXT;
-- dados simulados;
-- primeiros modelos oficiais;
-- testes unitários dos compiladores.
+- [x] Pré-processador hierárquico com preservação de comentários e comandos de configuração;
+- [x] Parsing de macros ERP e transformações (`[[NOME,0,18]]`, `[[BARRA]]`, `[[PROMOCAO]]`, `[[PRECO]]`);
+- [x] Catálogo centralizado de fontes PPLB 1–5 com métricas físicas exatas;
+- [x] Catálogo e cálculo dimensional de códigos de barras (EAN-13, EAN-8, Code 128) por contagem de módulos;
+- [x] Precisão física centralizada `dotsToMm` e `mmToDots` sem arredondamento prematuro;
+- [x] Distinção estrita entre `Q` (altura + gap) e `q` (largura imprimível);
+- [x] Suporte completo a condicionais inline e multilinha com `[[SE]]`, `[[SENAO]]`, `[[FIMSE]]` e aninhamentos (profundidade defensiva de 32 níveis);
+- [x] Suíte de 61 testes automatizados (Golden Tests, Round-trip Diff Zero e modificações cirúrgicas localizadas);
+- [x] Contrato preparatório `CompiledPrintPayload` para o Agente Local da Fase 3.
 
-### Critério de saída
+### Status da Fase 2.1
 
 ```text
-Editor
-→ compile
-→ TXT
-→ envio manual
-→ etiqueta física correta
+Fase 2.1 — Concluída tecnicamente (61/61 testes aprovados)
+Homologação física de hardware pendente para validação em conjunto com a Fase 3.
+```
+
+### Critério de saída para Fase 3
+
+```text
+Modelo real importado
+→ Zero-change round-trip Diff Zero
+→ Alterações localizadas cirúrgicas
+→ Payload RAW compilado com SHA-256
+→ Pronto para envio via Agente Local (Fase 3)
 ```
 
 ---

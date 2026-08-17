@@ -235,12 +235,12 @@ export class LegacyCompiler {
       }
 
       // 6. Comandos RAW não associados a nenhum elemento existente
-      // Se era um comando gráfico e o elemento não existe mais, foi deletado
-      if (/^[ABLOX]/.test(trimmed)) {
+      // Se era um comando gráfico (A, B, LO, X, W) com parâmetros numéricos e o elemento não existe mais, foi deletado
+      if (/^(A\d+|B\d+|LO\d+|X\d+|W\d+)/.test(trimmed)) {
         deletedCount++;
         diffLines.push({ type: 'deleted', originalLine: origLine });
       } else {
-        // Se era outro comando genérico, preserva
+        // Se era outro comando genérico ou de configuração (como 'O'), preserva
         compiledLines.push(origLine);
         diffLines.push({ type: 'unchanged', originalLine: origLine, newLine: origLine });
       }
@@ -329,15 +329,32 @@ export class LegacyCompiler {
         const reverse = t.reversePrint ? 'R' : 'N';
         let textVal = t.text;
 
+        // Recuperar nome exato da macro original caso existente
+        let origMacroName: string | undefined = undefined;
+        if (t.sourceReference?.originalCommand) {
+          const m = t.sourceReference.originalCommand.match(/\[\[([A-Z0-9_]+)/i);
+          if (m) origMacroName = m[1].toUpperCase();
+        }
+
+        const fallbackMacroName =
+          t.field === 'produto.descricao'
+            ? 'NOME'
+            : t.field === 'produto.ean'
+            ? 'BARRA'
+            : t.field === 'produto.codigoInterno'
+            ? 'CODIGO'
+            : t.field?.split('.').pop()?.toUpperCase() || 'NOME';
+
+        const macroName = origMacroName || fallbackMacroName;
+
         // Se tiver recorte de substring registrado
         if (t.transformations && t.transformations.length > 0) {
           const sub = t.transformations[0];
           if (sub.type === 'substring') {
-            const macroName = t.field ? t.field.split('.').pop()?.toUpperCase() : 'NOME';
             textVal = `[[${macroName},${sub.start},${sub.length}]]`;
           }
         } else if (t.field) {
-          textVal = `[[${t.field.split('.').pop()?.toUpperCase()}]]`;
+          textVal = `[[${macroName}]]`;
         }
 
         return `A${xDots},${yDots},${rotationVal},${fontNum},${hMult},${vMult},${reverse},"${textVal}"`;

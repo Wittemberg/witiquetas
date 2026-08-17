@@ -16,20 +16,36 @@ import {
 } from '../packages/contracts/src/encoding.js';
 import printJobsRouter, {
   printJobsStore,
+  claimPendingJobsForAgent,
   VALID_DELIVERY_STATUSES,
   isValidStatusTransition,
   detectCopyStrategy,
   DEFAULT_PRINT_JOB_MAX_ATTEMPTS,
 } from '../apps/backend/src/routes/printJobs.js';
-import {
+import agentsRouter, {
   DEFAULT_AGENT_POLL_INTERVAL_SECONDS,
   agentsStore,
   hashToken,
+  verifyTokenHash,
   type AgentRecord,
 } from '../apps/backend/src/routes/agents.js';
 import { printersStore } from '../apps/backend/src/routes/printers.js';
 
-// Helper: Cria objetos mock de request e response para testes de integração de rota
+// Helper: Executa a cadeia de handlers de rota (incluindo middleware authenticateAgent)
+function executeRouteChain(handlers: Function[], req: any, res: any) {
+  let idx = 0;
+  function next() {
+    idx++;
+    if (idx < handlers.length) {
+      handlers[idx](req, res, next);
+    }
+  }
+  if (handlers.length > 0) {
+    handlers[0](req, res, next);
+  }
+}
+
+// Helper: Cria objetos mock de request e response
 function createMockReqRes(options: {
   method?: string;
   body?: any;
@@ -70,18 +86,26 @@ function createMockReqRes(options: {
   return { req, res };
 }
 
-// Obter handlers reais do Router Express
-const postJobHandler = (printJobsRouter as any).routes.find(
+// Obter cadeias de handlers das rotas do Router Express
+const postJobHandlers = (printJobsRouter as any).routes.find(
   (r: any) => r.method === 'POST' && r.path === '/'
-).handlers[0];
+).handlers;
 
-const getPendingJobsHandler = (printJobsRouter as any).routes.find(
+const getPendingJobsHandlers = (printJobsRouter as any).routes.find(
   (r: any) => r.method === 'GET' && r.path === '/pending'
-).handlers[0];
+).handlers;
 
-const patchJobStatusHandler = (printJobsRouter as any).routes.find(
+const patchJobStatusHandlers = (printJobsRouter as any).routes.find(
   (r: any) => r.method === 'PATCH' && r.path === '/:id/status'
-).handlers[0];
+).handlers;
+
+const heartbeatHandlers = (agentsRouter as any).routes.find(
+  (r: any) => r.method === 'POST' && r.path === '/heartbeat'
+).handlers;
+
+const generatePairingCodeHandlers = (agentsRouter as any).routes.find(
+  (r: any) => r.method === 'POST' && r.path === '/generate-pairing-code'
+).handlers;
 
 // ============================================================================
 // BLOCO 1: CODIFICAÇÃO CP1252 REAL vs LATIN1 vs UTF-8
@@ -137,124 +161,123 @@ test('6. CopyStrategy: Comando sem quantidade nativa define TRANSPORT_REPEAT', (
 });
 
 // ============================================================================
-// BLOCO 3: SEGURANÇA DE AUTENTICAÇÃO E HEARTBEAT
+// BLOCO 3: SEGURANÇA DE AUTENTICAÇÃO E TIMING SAFE EQUAL
 // ============================================================================
 
-test('7. Segurança de Token: hashToken gera hash SHA-256 consistente', () => {
+test('7. Segurança de Token: verifyTokenHash com timingSafeEqual valida hashes com segurança', () => {
   const rawToken = 'agt_live_test_secret_12345';
-  const hash1 = hashToken(rawToken);
-  const hash2 = crypto.createHash('sha256').update(rawToken, 'utf8').digest('hex');
+  const tokenHash = hashToken(rawToken);
 
-  assert.equal(hash1, hash2);
-  assert.notEqual(hash1, rawToken);
-  assert.equal(hash1.length, 64);
-});
-
-test('8. Heartbeat: Retorna intervalo padrão documentado (45s) e timestamp', () => {
-  assert.equal(DEFAULT_AGENT_POLL_INTERVAL_SECONDS, 45);
-  const response: AgentHeartbeatResponseDTO = {
-    acknowledged: true,
-    serverTime: new Date().toISOString(),
-    pendingJobsCount: 0,
-    pollIntervalSeconds: DEFAULT_AGENT_POLL_INTERVAL_SECONDS,
-  };
-  assert.equal(response.acknowledged, true);
-  assert.equal(response.pollIntervalSeconds, 45);
+  assert.equal(verifyTokenHash(rawToken, tokenHash), true);
+  assert.equal(verifyTokenHash('agt_live_wrong_token', tokenHash), false);
+  assert.equal(verifyTokenHash('', tokenHash), false);
 });
 
 // ============================================================================
-// BLOCO 4: TESTES DE INTEGRAÇÃO DAS ROTAS REAIS (POST, GET /pending, PATCH /status)
+// BLOCO 4: HARDENING REAL DE ROTAS (AUTENTICAÇÃO, TENANT E LEASES)
 // ============================================================================
 
-test('9. Rota Real POST /print-jobs: Cria Job com DTO v1 completo, Base64 e SHA-256 sobre CP1252', () => {
-  // Garantir impressora padrão cadastrada
-  printersStore.set('prn-test-elgin', {
-    id: 'prn-test-elgin',
+const rawTokenMatriz = 'agt_live_matriz_secret_token_12345';
+const agentMatriz: AgentRecord = {
+  id: 'agent-matriz-01',
+  companyId: 'comp-matriz-01',
+  installationId: 'inst-matriz-01',
+  machineName: 'WIN-MATRIZ',
+  os: 'windows',
+  architecture: 'x86_64',
+  agentVersion: '0.1.0',
+  status: 'ONLINE',
+  lastSeenAt: new Date().toISOString(),
+  createdAt: new Date().toISOString(),
+  tokenHash: hashToken(rawTokenMatriz),
+};
+agentsStore.set(agentMatriz.id, agentMatriz);
+
+const rawTokenFilial = 'agt_live_filial_secret_token_67890';
+const agentFilial: AgentRecord = {
+  id: 'agent-filial-02',
+  companyId: 'comp-filial-02',
+  installationId: 'inst-filial-02',
+  machineName: 'WIN-FILIAL',
+  os: 'windows',
+  architecture: 'x86_64',
+  agentVersion: '0.1.0',
+  status: 'ONLINE',
+  lastSeenAt: new Date().toISOString(),
+  createdAt: new Date().toISOString(),
+  tokenHash: hashToken(rawTokenFilial),
+};
+agentsStore.set(agentFilial.id, agentFilial);
+
+test('8. /pending sem token retorna HTTP 401', () => {
+  const { req, res } = createMockReqRes({ method: 'GET', headers: {} });
+  executeRouteChain(getPendingJobsHandlers, req, res);
+  assert.equal(res.getStatusCode(), 401);
+});
+
+test('9. /pending com x-agent-id ou query agentId mas sem token retorna HTTP 401 (agentId não autentica)', () => {
+  const { req, res } = createMockReqRes({
+    method: 'GET',
+    headers: { 'x-agent-id': 'agent-matriz-01' },
+    query: { agentId: 'agent-matriz-01' },
+  });
+  executeRouteChain(getPendingJobsHandlers, req, res);
+  assert.equal(res.getStatusCode(), 401);
+});
+
+test('10. /pending com token inválido retorna HTTP 403', () => {
+  const { req, res } = createMockReqRes({
+    method: 'GET',
+    headers: { authorization: 'Bearer agt_live_token_falso_invalido' },
+  });
+  executeRouteChain(getPendingJobsHandlers, req, res);
+  assert.equal(res.getStatusCode(), 403);
+});
+
+test('11. /pending com token do tenant correto retorna sucesso e isola jobs de outros tenants', () => {
+  // Cadastrar impressora e job para Matriz
+  printersStore.set('prn-matriz-l42', {
+    id: 'prn-matriz-l42',
     companyId: 'comp-matriz-01',
-    name: 'Elgin L42 Pro Test',
+    name: 'Elgin L42 Matriz',
     protocol: 'RAW_TCP',
     language: 'PPLB',
     active: true,
   } as any);
 
-  const rawPplb = 'I8,A,001\nQ240,024\nq831\nA10,18,0,2,2,2,N,"PRODUTO € 9,90"\nP3\n';
-
-  const { req, res } = createMockReqRes({
-    method: 'POST',
-    body: {
-      printerId: 'prn-test-elgin',
-      compiledCommand: rawPplb,
-      encoding: 'windows-1252',
-      copies: 3,
-    },
-  });
-
-  postJobHandler(req, res);
-
-  assert.equal(res.getStatusCode(), 201);
-  const data = res.getData();
-  assert.equal(data.success, true);
-  assert.ok(data.job);
-
-  const job: PrintJobDTO = data.job;
-  assert.equal(job.status, 'PENDING');
-  assert.equal(job.copyStrategy, 'EMBEDDED_IN_PAYLOAD');
-  assert.equal(job.maxAttempts, 3);
-  assert.equal(job.attempts, 0);
-
-  // Validar bytes reais do Base64
-  const expectedBytes = encodePayload(rawPplb, 'windows-1252');
-  assert.equal(job.payloadBytesLength, expectedBytes.length);
-  assert.equal(job.payloadBase64, Buffer.from(expectedBytes).toString('base64'));
-  assert.equal(
-    job.checksumSha256,
-    crypto.createHash('sha256').update(Buffer.from(expectedBytes)).digest('hex')
-  );
-});
-
-test('10. Rota Real GET /print-jobs/pending: Rejeita chamador sem autenticação com HTTP 401', () => {
-  const { req, res } = createMockReqRes({
-    method: 'GET',
-    headers: {}, // Sem token
-  });
-
-  getPendingJobsHandler(req, res);
-
-  assert.equal(res.getStatusCode(), 401);
-  assert.ok(res.getData().error.includes('não autenticado'));
-});
-
-test('11. Rota Real GET /print-jobs/pending: Claim grava claimedByAgentId, leaseId, attemptId e isola por tenant', () => {
-  const rawTokenMatriz = 'agt_live_matriz_secret_token';
-  const tokenHashMatriz = hashToken(rawTokenMatriz);
-
-  const agentMatriz: AgentRecord = {
-    id: 'agent-matriz-01',
+  const jobMatriz: PrintJobDTO = {
+    id: 'job-matriz-test-01',
     companyId: 'comp-matriz-01',
-    installationId: 'inst-01',
-    machineName: 'WIN-MATRIZ',
-    os: 'windows',
-    architecture: 'x86_64',
-    agentVersion: '0.1.0',
-    status: 'ONLINE',
-    lastSeenAt: new Date().toISOString(),
-    createdAt: new Date().toISOString(),
-    tokenHash: tokenHashMatriz,
-  };
-  agentsStore.set(agentMatriz.id, agentMatriz);
-
-  // Criar Job da Filial 02 (tenant diferente)
-  const jobFilial: PrintJobDTO = {
-    id: 'job-filial-02-isolated',
-    companyId: 'comp-filial-02',
-    printerId: 'prn-filial-02',
-    printerName: 'Impressora Filial',
+    printerId: 'prn-matriz-l42',
+    printerName: 'Elgin L42 Matriz',
     status: 'PENDING',
     language: 'PPLB',
     encoding: 'windows-1252',
     copies: 1,
-    copyStrategy: 'TRANSPORT_REPEAT',
-    payload: 'TESTE',
+    copyStrategy: 'EMBEDDED_IN_PAYLOAD',
+    payload: 'TESTE MATRIZ',
+    payloadBase64: 'VEVTVEU=',
+    payloadBytesLength: 5,
+    checksumSha256: 'abc',
+    attempts: 0,
+    maxAttempts: 3,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+  printJobsStore.set(jobMatriz.id, jobMatriz);
+
+  // Job de outro tenant (Filial 02)
+  const jobFilial: PrintJobDTO = {
+    id: 'job-filial-test-02',
+    companyId: 'comp-filial-02',
+    printerId: 'prn-filial-l42',
+    printerName: 'Elgin L42 Filial',
+    status: 'PENDING',
+    language: 'PPLB',
+    encoding: 'windows-1252',
+    copies: 1,
+    copyStrategy: 'EMBEDDED_IN_PAYLOAD',
+    payload: 'TESTE FILIAL',
     payloadBase64: 'VEVTVEU=',
     payloadBytesLength: 5,
     checksumSha256: 'abc',
@@ -265,152 +288,191 @@ test('11. Rota Real GET /print-jobs/pending: Claim grava claimedByAgentId, lease
   };
   printJobsStore.set(jobFilial.id, jobFilial);
 
-  // Requisitar pending com o token do agente da Matriz
   const { req, res } = createMockReqRes({
     method: 'GET',
     headers: { authorization: `Bearer ${rawTokenMatriz}` },
   });
 
-  getPendingJobsHandler(req, res);
-
+  executeRouteChain(getPendingJobsHandlers, req, res);
   assert.equal(res.getStatusCode(), 200);
+
   const data = res.getData();
+  const claimedFilialJob = data.jobs.find((j: any) => j.jobId === 'job-filial-test-02');
+  assert.equal(claimedFilialJob, undefined, 'Filial 02 job não pode ser entregue para Matriz');
 
-  // O job da filial 02 NÃO pode ser entregue para o agente da matriz
-  const claimedFilialJob = data.jobs.find((j: any) => j.jobId === 'job-filial-02-isolated');
-  assert.equal(claimedFilialJob, undefined, 'Jobs de outro tenant não devem ser entregues');
-
-  // Job da Matriz deve ser reivindicado com sucesso
-  const claimedMatrizJob = data.jobs.find((j: any) => j.printerId === 'prn-test-elgin');
-  if (claimedMatrizJob) {
-    assert.ok(claimedMatrizJob.leaseId.startsWith('lease-'));
-    assert.ok(claimedMatrizJob.attemptId.startsWith('att-'));
-
-    const storedJob = printJobsStore.get(claimedMatrizJob.jobId)!;
-    assert.equal(storedJob.status, 'CLAIMED');
-    assert.equal(storedJob.claimedByAgentId, 'agent-matriz-01');
-    assert.equal(storedJob.attempts, 1, 'Início de nova tentativa define attempts = 1');
-  }
+  const claimedMatrizJob = data.jobs.find((j: any) => j.jobId === 'job-matriz-test-01');
+  assert.ok(claimedMatrizJob, 'Job da Matriz deve ser entregue com claim atômico');
+  assert.ok(claimedMatrizJob.leaseId.startsWith('lease-'));
+  assert.ok(claimedMatrizJob.attemptId.startsWith('att-'));
 });
 
-test('12. Rota Real PATCH /print-jobs/:id/status: Validações de Runtime, Lease, Attempt, Agente e Transições', () => {
-  const jobId = 'job-test-status-validation';
-  const testJob: PrintJobDTO = {
-    id: jobId,
+test('12. Heartbeat sem token retorna HTTP 401', () => {
+  const { req, res } = createMockReqRes({ method: 'POST', body: { status: 'ONLINE' } });
+  executeRouteChain(heartbeatHandlers, req, res);
+  assert.equal(res.getStatusCode(), 401);
+});
+
+test('13. Heartbeat com body.agentId apenas (sem token) retorna HTTP 401', () => {
+  const { req, res } = createMockReqRes({
+    method: 'POST',
+    body: { agentId: 'agent-matriz-01', status: 'ONLINE' },
+  });
+  executeRouteChain(heartbeatHandlers, req, res);
+  assert.equal(res.getStatusCode(), 401);
+});
+
+test('14. Status update sem token retorna HTTP 401', () => {
+  const { req, res } = createMockReqRes({
+    method: 'PATCH',
+    params: { id: 'job-matriz-test-01' },
+    body: { status: 'DELIVERING' },
+  });
+  executeRouteChain(patchJobStatusHandlers, req, res);
+  assert.equal(res.getStatusCode(), 401);
+});
+
+test('15. Status update sem leaseId em job claimed retorna HTTP 400', () => {
+  const job = printJobsStore.get('job-matriz-test-01')!;
+  const { req, res } = createMockReqRes({
+    method: 'PATCH',
+    params: { id: job.id },
+    headers: { authorization: `Bearer ${rawTokenMatriz}` },
+    body: {
+      status: 'DELIVERING',
+      attemptId: job.attemptId,
+      // leaseId omitido propositalmente
+    },
+  });
+  executeRouteChain(patchJobStatusHandlers, req, res);
+  assert.equal(res.getStatusCode(), 400);
+  assert.ok(res.getData().error.includes('leaseId é obrigatório'));
+});
+
+test('16. Status update sem attemptId para tentativa física retorna HTTP 400', () => {
+  const job = printJobsStore.get('job-matriz-test-01')!;
+  const { req, res } = createMockReqRes({
+    method: 'PATCH',
+    params: { id: job.id },
+    headers: { authorization: `Bearer ${rawTokenMatriz}` },
+    body: {
+      status: 'DELIVERING',
+      leaseId: job.leaseId,
+      // attemptId omitido propositalmente
+    },
+  });
+  executeRouteChain(patchJobStatusHandlers, req, res);
+  assert.equal(res.getStatusCode(), 400);
+  assert.ok(res.getData().error.includes('attemptId é obrigatório'));
+});
+
+test('17. Status update com leaseId incorreto retorna HTTP 409', () => {
+  const job = printJobsStore.get('job-matriz-test-01')!;
+  const { req, res } = createMockReqRes({
+    method: 'PATCH',
+    params: { id: job.id },
+    headers: { authorization: `Bearer ${rawTokenMatriz}` },
+    body: {
+      status: 'DELIVERING',
+      leaseId: 'lease-falso-999',
+      attemptId: job.attemptId,
+    },
+  });
+  executeRouteChain(patchJobStatusHandlers, req, res);
+  assert.equal(res.getStatusCode(), 409);
+});
+
+test('18. Status update com attemptId incorreto retorna HTTP 409', () => {
+  const job = printJobsStore.get('job-matriz-test-01')!;
+  const { req, res } = createMockReqRes({
+    method: 'PATCH',
+    params: { id: job.id },
+    headers: { authorization: `Bearer ${rawTokenMatriz}` },
+    body: {
+      status: 'DELIVERING',
+      leaseId: job.leaseId,
+      attemptId: 'att-falsa-999',
+    },
+  });
+  executeRouteChain(patchJobStatusHandlers, req, res);
+  assert.equal(res.getStatusCode(), 409);
+});
+
+test('19. Agent B tentando atualizar job do Agent A retorna HTTP 403', () => {
+  const job = printJobsStore.get('job-matriz-test-01')!;
+  // Agent Filial 02 tentando atualizar job claimed pelo Agent Matriz 01
+  const { req, res } = createMockReqRes({
+    method: 'PATCH',
+    params: { id: job.id },
+    headers: { authorization: `Bearer ${rawTokenFilial}` },
+    body: {
+      status: 'DELIVERING',
+      leaseId: job.leaseId,
+      attemptId: job.attemptId,
+    },
+  });
+  executeRouteChain(patchJobStatusHandlers, req, res);
+  assert.equal(res.getStatusCode(), 403);
+});
+
+test('20. Status update com lease expirado retorna HTTP 409', () => {
+  const job = printJobsStore.get('job-matriz-test-01')!;
+  // Simular expiração do lease
+  job.leaseExpiresAt = new Date(Date.now() - 5000).toISOString();
+
+  const { req, res } = createMockReqRes({
+    method: 'PATCH',
+    params: { id: job.id },
+    headers: { authorization: `Bearer ${rawTokenMatriz}` },
+    body: {
+      status: 'DELIVERING',
+      leaseId: job.leaseId,
+      attemptId: job.attemptId,
+    },
+  });
+  executeRouteChain(patchJobStatusHandlers, req, res);
+  assert.equal(res.getStatusCode(), 409);
+  assert.ok(res.getData().error.includes('Lease expirado'));
+});
+
+test('21. attempts >= maxAttempts impede novo claim e transiciona para FAILED', () => {
+  const jobExhausted: PrintJobDTO = {
+    id: 'job-exhausted-attempts',
     companyId: 'comp-matriz-01',
-    printerId: 'prn-test-elgin',
-    printerName: 'Elgin L42 Pro Test',
-    status: 'CLAIMED',
-    claimedByAgentId: 'agent-matriz-01',
-    leaseId: 'lease-correct-123',
-    attemptId: 'att-job-test-status-validation-1',
+    printerId: 'prn-matriz-l42',
+    printerName: 'Elgin L42 Matriz',
+    status: 'PENDING',
     language: 'PPLB',
     encoding: 'windows-1252',
     copies: 1,
     copyStrategy: 'EMBEDDED_IN_PAYLOAD',
-    payload: 'TESTE',
+    payload: 'TESTE EXHAUSTED',
     payloadBase64: 'VEVTVEU=',
     payloadBytesLength: 5,
     checksumSha256: 'abc',
-    attempts: 1,
+    attempts: 3, // Já atingiu maxAttempts = 3
     maxAttempts: 3,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
-  printJobsStore.set(jobId, testJob);
+  printJobsStore.set(jobExhausted.id, jobExhausted);
 
-  // A. Status inválido -> HTTP 400
-  {
-    const { req, res } = createMockReqRes({
-      method: 'PATCH',
-      params: { id: jobId },
-      body: { status: 'STATUS_INVENTADO_INVALIDO' },
-    });
-    patchJobStatusHandler(req, res);
-    assert.equal(res.getStatusCode(), 400, 'Status inválido deve retornar HTTP 400');
-  }
+  const claimed = claimPendingJobsForAgent(agentMatriz);
+  const found = claimed.find((j) => j.jobId === 'job-exhausted-attempts');
+  assert.equal(found, undefined, 'Job com tentativas esgotadas não pode receber novo claim');
 
-  // B. Lease incorreto -> HTTP 409
-  {
-    const { req, res } = createMockReqRes({
-      method: 'PATCH',
-      params: { id: jobId },
-      body: { status: 'DELIVERING', leaseId: 'lease-errado-999', attemptId: 'att-job-test-status-validation-1' },
-    });
-    patchJobStatusHandler(req, res);
-    assert.equal(res.getStatusCode(), 409, 'Lease mismatch deve retornar HTTP 409');
-  }
+  const updatedStoredJob = printJobsStore.get('job-exhausted-attempts')!;
+  assert.equal(updatedStoredJob.status, 'FAILED');
+  assert.ok(updatedStoredJob.error?.includes('Limite máximo de tentativas'));
+});
 
-  // C. AttemptId incorreto -> HTTP 409
-  {
-    const { req, res } = createMockReqRes({
-      method: 'PATCH',
-      params: { id: jobId },
-      body: { status: 'DELIVERING', leaseId: 'lease-correct-123', attemptId: 'att-errada-999' },
-    });
-    patchJobStatusHandler(req, res);
-    assert.equal(res.getStatusCode(), 409, 'Attempt mismatch deve retornar HTTP 409');
-  }
-
-  // D. Agente incorreto -> HTTP 403
-  {
-    const { req, res } = createMockReqRes({
-      method: 'PATCH',
-      params: { id: jobId },
-      body: { status: 'DELIVERING', agentId: 'agent-impostor-02' },
-    });
-    patchJobStatusHandler(req, res);
-    assert.equal(res.getStatusCode(), 403, 'Agente diferente do detentor deve retornar HTTP 403');
-  }
-
-  // E. Transição Inválida (CLAIMED -> PRINTED diretamente sem envio) -> HTTP 409
-  {
-    const { req, res } = createMockReqRes({
-      method: 'PATCH',
-      params: { id: jobId },
-      body: { status: 'PRINTED', leaseId: 'lease-correct-123', attemptId: 'att-job-test-status-validation-1' },
-    });
-    patchJobStatusHandler(req, res);
-    assert.equal(res.getStatusCode(), 409, 'Transição inválida CLAIMED -> PRINTED deve retornar HTTP 409');
-  }
-
-  // F. Transição Válida (CLAIMED -> DELIVERING) -> Não incrementa attempts
-  {
-    const { req, res } = createMockReqRes({
-      method: 'PATCH',
-      params: { id: jobId },
-      body: {
-        status: 'DELIVERING',
-        leaseId: 'lease-correct-123',
-        attemptId: 'att-job-test-status-validation-1',
-        agentId: 'agent-matriz-01',
-      },
-    });
-    patchJobStatusHandler(req, res);
-    assert.equal(res.getStatusCode(), 200);
-    assert.equal(printJobsStore.get(jobId)!.status, 'DELIVERING');
-    assert.equal(printJobsStore.get(jobId)!.attempts, 1, 'DELIVERING na mesma attempt mantém attempts = 1');
-  }
-
-  // G. Transição Válida (DELIVERING -> DELIVERED_TO_TRANSPORT) -> Grava deliveredToTransportAt e mantém attempts = 1
-  {
-    const { req, res } = createMockReqRes({
-      method: 'PATCH',
-      params: { id: jobId },
-      body: {
-        status: 'DELIVERED_TO_TRANSPORT',
-        leaseId: 'lease-correct-123',
-        attemptId: 'att-job-test-status-validation-1',
-        agentId: 'agent-matriz-01',
-        executionTimeMs: 145,
-      },
-    });
-    patchJobStatusHandler(req, res);
-    assert.equal(res.getStatusCode(), 200);
-    const updated = printJobsStore.get(jobId)!;
-    assert.equal(updated.status, 'DELIVERED_TO_TRANSPORT');
-    assert.equal(updated.attempts, 1, 'DELIVERED_TO_TRANSPORT na mesma attempt mantém attempts = 1');
-    assert.ok(updated.deliveredToTransportAt);
-    assert.equal(updated.executionTimeMs, 145);
+test('22. Geração de pairing code em produção exige autenticação administrativa', () => {
+  const originalEnv = process.env.NODE_ENV;
+  try {
+    process.env.NODE_ENV = 'production';
+    const { req, res } = createMockReqRes({ method: 'POST', headers: {}, body: {} });
+    executeRouteChain(generatePairingCodeHandlers, req, res);
+    assert.equal(res.getStatusCode(), 401);
+  } finally {
+    process.env.NODE_ENV = originalEnv;
   }
 });

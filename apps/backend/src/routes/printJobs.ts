@@ -12,7 +12,7 @@ import {
 import { type LabelDocument, LabelDocumentSchema } from '@witiquetas/label-schema';
 import { compilerRegistry, type PrinterLanguage } from '@witiquetas/printer-core';
 import { printersStore } from './printers.js';
-import { agentsStore, hashToken } from './agents.js';
+import { agentsStore, hashToken, authenticateAgent, type AgentRecord } from './agents.js';
 
 // Compiladores PPLA e PPLB
 import '@witiquetas/printer-ppla';
@@ -166,32 +166,31 @@ router.post('/', (req: Request, res: Response) => {
   });
 });
 
-// 2. Buscar Jobs Pendentes (Consumido pelo Agente Local Autenticado)
-router.get('/pending', (req: Request, res: Response) => {
-  const authHeader = req.headers.authorization || (req.headers['x-agent-token'] as string);
-  const agentIdHeader = (req.headers['x-agent-id'] as string) || (req.query.agentId as string);
-
-  let agent = (req as any).agent;
-  if (!agent && authHeader) {
-    const rawToken = authHeader.replace(/^Bearer\s+/i, '').trim();
-    const tokenHash = hashToken(rawToken);
-    agent = Array.from(agentsStore.values()).find((a) => a.tokenHash === tokenHash);
-  } else if (!agent && agentIdHeader) {
-    agent = agentsStore.get(agentIdHeader);
-  }
-
-  if (!agent) {
-    return res.status(401).json({ error: 'Agente não autenticado ou token inválido para reivindicar jobs.' });
-  }
-
+// 2. Função Centralizada de Claim de Jobs Pendentes para o Agente Autenticado
+/**
+ * NOTA TÉCNICA DO PROTOCOLO V1:
+ * O claim de jobs pendentes é realizado durante a requisição GET /pending para manter retrocompatibilidade
+ * do ciclo de vida de transição atômica (PENDING -> CLAIMED). A evolução para POST /claim explícito
+ * está documentada no roadmap para versões futuras.
+ */
+export function claimPendingJobsForAgent(agent: AgentRecord): PrintJobItemDTO[] {
   const pendingJobs: PrintJobItemDTO[] = [];
   const now = new Date().toISOString();
 
   printJobsStore.forEach((job) => {
-    // Escopo multi-tenant: apenas jobs da mesma empresa/filial
+    // A. Filtro estrito de tenant (empresa / filial)
     if (job.status === 'PENDING' && job.companyId === agent.companyId) {
+      // B. Proteção contra loops infinitos: não permitir claim se excedeu maxAttempts
+      const maxAttempts = job.maxAttempts || DEFAULT_PRINT_JOB_MAX_ATTEMPTS;
+      if (job.attempts >= maxAttempts) {
+        job.status = 'FAILED';
+        job.error = `Limite máximo de tentativas (${maxAttempts}) atingido sem sucesso.`;
+        job.updatedAt = now;
+        return;
+      }
+
+      // C. Validar se a impressora pertence à empresa e se está atribuída a este agente
       const printer = printersStore.get(job.printerId);
-      // Validar se a impressora pertence à empresa e, se vinculado a um agente específico, ao agente chamador
       if (printer && (!printer.agentId || printer.agentId === agent.id)) {
         const leaseId = `lease-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
         const attemptNumber = job.attempts + 1;
@@ -202,9 +201,9 @@ router.get('/pending', (req: Request, res: Response) => {
         job.claimedByAgentId = agent.id;
         job.leaseId = leaseId;
         job.attemptId = attemptId;
-        job.attempts = attemptNumber; // Incrementa attempts uma única vez no início da tentativa!
+        job.attempts = attemptNumber; // Incrementa attempts uma única vez no início da nova tentativa!
         job.claimedAt = now;
-        job.leaseExpiresAt = new Date(Date.now() + 60000).toISOString();
+        job.leaseExpiresAt = new Date(Date.now() + 60000).toISOString(); // Validade do lease: 60 segundos
         job.updatedAt = now;
 
         pendingJobs.push({
@@ -232,14 +231,27 @@ router.get('/pending', (req: Request, res: Response) => {
     }
   });
 
+  return pendingJobs;
+}
+
+// 2. Buscar Jobs Pendentes (Consumido pelo Agente Local Obrigatoriamente Autenticado)
+router.get('/pending', authenticateAgent, (req: Request, res: Response) => {
+  const agent = (req as any).agent as AgentRecord;
+  if (!agent) {
+    return res.status(401).json({ error: 'Agente não autenticado.' });
+  }
+
+  const jobs = claimPendingJobsForAgent(agent);
+
   res.json({
-    total: pendingJobs.length,
-    jobs: pendingJobs,
+    total: jobs.length,
+    jobs,
   });
 });
 
-// 3. Atualizar Status do Job (Reportado pelo Agente Local)
-router.patch('/:id/status', (req: Request, res: Response) => {
+// 3. Atualizar Status do Job (Reportado pelo Agente Local Obrigatoriamente Autenticado)
+router.patch('/:id/status', authenticateAgent, (req: Request, res: Response) => {
+  const agent = (req as any).agent as AgentRecord;
   const job = printJobsStore.get(req.params.id);
   if (!job) {
     return res.status(404).json({ error: `Job de impressão '${req.params.id}' não encontrado.` });
@@ -250,7 +262,7 @@ router.patch('/:id/status', (req: Request, res: Response) => {
     return res.status(400).json({ error: 'Campo status é obrigatório.' });
   }
 
-  // Validação em runtime de status válido
+  // 1. Validação em runtime de status válido
   if (!VALID_DELIVERY_STATUSES.includes(body.status)) {
     return res.status(400).json({
       error: `Status de entrega '${body.status}' inválido.`,
@@ -258,28 +270,67 @@ router.patch('/:id/status', (req: Request, res: Response) => {
     });
   }
 
-  // Validação de leaseId
-  if (body.leaseId && job.leaseId && body.leaseId !== job.leaseId) {
-    return res.status(409).json({
-      error: `Lease ID mismatch: o lease '${body.leaseId}' não corresponde ao lease ativo '${job.leaseId}'.`,
-    });
-  }
-
-  // Validação de attemptId
-  if (body.attemptId && job.attemptId && body.attemptId !== job.attemptId) {
-    return res.status(409).json({
-      error: `Attempt ID mismatch: a tentativa '${body.attemptId}' não corresponde à tentativa ativa '${job.attemptId}'.`,
-    });
-  }
-
-  // Validação de agente detentor do claim
-  if (body.agentId && job.claimedByAgentId && body.agentId !== job.claimedByAgentId) {
+  // 2. Validação do agente detentor do claim
+  if (job.claimedByAgentId && job.claimedByAgentId !== agent.id) {
     return res.status(403).json({
-      error: `Agente '${body.agentId}' não é o detentor do claim do job (detentor: '${job.claimedByAgentId}').`,
+      error: `Agente autenticado ('${agent.id}') não é o detentor do claim do job (detentor: '${job.claimedByAgentId}').`,
     });
   }
 
-  // Validação de transição de estado
+  // Consistência se body.agentId foi fornecido
+  if (body.agentId && body.agentId !== agent.id) {
+    return res.status(403).json({
+      error: `Inconsistência no body: agentId ('${body.agentId}') difere do agente autenticado ('${agent.id}').`,
+    });
+  }
+
+  // 3. Validação de leaseId OBRIGATÓRIO após o claim
+  if (job.status !== 'PENDING' && job.status !== 'CANCELLED') {
+    if (!body.leaseId) {
+      return res.status(400).json({
+        error: 'Campo leaseId é obrigatório para atualização de status de jobs reivindicados.',
+      });
+    }
+
+    if (job.leaseId && body.leaseId !== job.leaseId) {
+      return res.status(409).json({
+        error: `Lease ID mismatch: o lease '${body.leaseId}' não corresponde ao lease ativo '${job.leaseId}'.`,
+      });
+    }
+
+    // 4. Verificação de expiração do lease
+    if (job.leaseExpiresAt && new Date(job.leaseExpiresAt).getTime() < Date.now()) {
+      return res.status(409).json({
+        error: `Lease expirado em ${job.leaseExpiresAt}. O job não pode mais ser atualizado sob este lease.`,
+      });
+    }
+  }
+
+  // 5. Validação de attemptId OBRIGATÓRIO para transições da tentativa física
+  const physicalAttemptStatuses: PrintJobDeliveryStatus[] = [
+    'DOWNLOADED',
+    'DELIVERING',
+    'DELIVERED_TO_TRANSPORT',
+    'PRINTED',
+    'FAILED',
+    'UNKNOWN_RESULT',
+  ];
+
+  if (physicalAttemptStatuses.includes(body.status)) {
+    if (!body.attemptId) {
+      return res.status(400).json({
+        error: `Campo attemptId é obrigatório para o status '${body.status}'.`,
+      });
+    }
+
+    if (job.attemptId && body.attemptId !== job.attemptId) {
+      return res.status(409).json({
+        error: `Attempt ID mismatch: a tentativa '${body.attemptId}' não corresponde à tentativa ativa '${job.attemptId}'.`,
+      });
+    }
+  }
+
+  // 6. Validação da máquina de estados
   if (!isValidStatusTransition(job.status, body.status)) {
     return res.status(409).json({
       error: `Transição de estado inválida: não é permitido transicionar de '${job.status}' para '${body.status}'.`,
@@ -322,5 +373,6 @@ router.get('/', (_req: Request, res: Response) => {
 
 export { printJobsStore };
 export default router;
+
 
 

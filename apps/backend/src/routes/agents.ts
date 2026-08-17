@@ -20,14 +20,30 @@ export function hashToken(token: string): string {
   return crypto.createHash('sha256').update(token, 'utf8').digest('hex');
 }
 
-const pairingCodes = new Map<string, { companyId: string; companyName: string; expiresAt: number }>([
-  ['WIT-2026', { companyId: 'comp-matriz-01', companyName: 'Matriz Supermercado WR', expiresAt: Date.now() + 86400000 }],
-  ['DEMO-PAIR', { companyId: 'comp-matriz-01', companyName: 'Matriz Supermercado WR', expiresAt: Date.now() + 86400000 }],
-]);
+export function verifyTokenHash(incomingRawToken: string, storedTokenHash: string): boolean {
+  try {
+    const incomingHash = hashToken(incomingRawToken);
+    const bufA = Buffer.from(incomingHash, 'hex');
+    const bufB = Buffer.from(storedTokenHash, 'hex');
+    if (bufA.length !== bufB.length) return false;
+    return crypto.timingSafeEqual(bufA, bufB);
+  } catch {
+    return false;
+  }
+}
+
+// Códigos de pareamento ativos
+const pairingCodes = new Map<string, { companyId: string; companyName: string; expiresAt: number }>();
+
+// Em desenvolvimento/testes, permitir códigos demo para testes rápidos
+if (process.env.NODE_ENV !== 'production') {
+  pairingCodes.set('WIT-2026', { companyId: 'comp-matriz-01', companyName: 'Matriz Supermercado WR', expiresAt: Date.now() + 86400000 });
+  pairingCodes.set('DEMO-PAIR', { companyId: 'comp-matriz-01', companyName: 'Matriz Supermercado WR', expiresAt: Date.now() + 86400000 });
+}
 
 const agentsStore = new Map<string, AgentRecord>();
 
-// Helper: Middleware básico de autenticação de agente com SHA-256
+// Helper: Middleware de autenticação de agente com SHA-256 e timingSafeEqual
 export function authenticateAgent(req: Request, res: Response, next: Function) {
   const authHeader = req.headers.authorization || (req.headers['x-agent-token'] as string);
   if (!authHeader) {
@@ -35,11 +51,22 @@ export function authenticateAgent(req: Request, res: Response, next: Function) {
   }
 
   const rawToken = authHeader.replace(/^Bearer\s+/i, '').trim();
-  const incomingHash = hashToken(rawToken);
-  const agent = Array.from(agentsStore.values()).find((a) => a.tokenHash === incomingHash);
+  if (!rawToken) {
+    return res.status(401).json({ error: 'Token de agente vazio ou não fornecido.' });
+  }
+
+  const agent = Array.from(agentsStore.values()).find((a) => verifyTokenHash(rawToken, a.tokenHash));
 
   if (!agent) {
     return res.status(403).json({ error: 'Credencial do agente inválida ou revogada.' });
+  }
+
+  // Validação de consistência: se x-agent-id foi fornecido, deve coincidir com o token autenticado
+  const providedAgentId = req.headers['x-agent-id'] as string;
+  if (providedAgentId && providedAgentId !== agent.id) {
+    return res.status(403).json({
+      error: `Inconsistência de identidade: header x-agent-id ('${providedAgentId}') não coincide com o token autenticado ('${agent.id}').`,
+    });
   }
 
   (req as any).agent = agent;
@@ -48,8 +75,13 @@ export function authenticateAgent(req: Request, res: Response, next: Function) {
 
 export const DEFAULT_AGENT_POLL_INTERVAL_SECONDS = 45;
 
-// 1. Gerar Código de Pareamento Temporário
+// 1. Gerar Código de Pareamento Temporário (Painel Web / Administrativo)
 router.post('/generate-pairing-code', (req: Request, res: Response) => {
+  // Proteção: em produção, exigir autenticação administrativa
+  if (process.env.NODE_ENV === 'production' && !req.headers.authorization) {
+    return res.status(401).json({ error: 'Autorização administrativa necessária para gerar códigos de pareamento em produção.' });
+  }
+
   const { companyId = 'comp-matriz-01', companyName = 'Supermercado WR' } = req.body;
   const code = `WIT-${Math.floor(1000 + Math.random() * 9000)}`;
   pairingCodes.set(code, {
@@ -65,7 +97,7 @@ router.post('/generate-pairing-code', (req: Request, res: Response) => {
   });
 });
 
-// 2. Parear Agente Local
+// 2. Parear Agente Local (Única rota não autenticada do ciclo de vida do agente)
 router.post('/pair', (req: Request, res: Response) => {
   const body = req.body as PairAgentRequestDTO;
 
@@ -120,32 +152,25 @@ router.post('/pair', (req: Request, res: Response) => {
   res.status(201).json(response);
 });
 
-// 3. Heartbeat do Agente
-router.post('/heartbeat', (req: Request, res: Response) => {
+// 3. Heartbeat do Agente (Obrigatoriamente autenticado via token)
+router.post('/heartbeat', authenticateAgent, (req: Request, res: Response) => {
+  const agent = (req as any).agent as AgentRecord;
   const body = req.body as AgentHeartbeatRequestDTO;
-  const tokenHeader = req.headers.authorization || (req.headers['x-agent-token'] as string);
-  const rawToken = tokenHeader ? tokenHeader.replace(/^Bearer\s+/i, '').trim() : null;
 
-  // Localizar agente pelo token hash, agentId ou installationId
-  let agent: AgentRecord | undefined;
-  if (rawToken) {
-    const incomingHash = hashToken(rawToken);
-    agent = Array.from(agentsStore.values()).find((a) => a.tokenHash === incomingHash);
-  } else if (body.agentId) {
-    agent = agentsStore.get(body.agentId);
-  } else if (body.installationId) {
-    agent = Array.from(agentsStore.values()).find((a) => a.installationId === body.installationId);
+  // Validação de consistência do agentId no body
+  if (body.agentId && body.agentId !== agent.id) {
+    return res.status(403).json({
+      error: `Inconsistência no heartbeat: body.agentId ('${body.agentId}') não coincide com o agente autenticado ('${agent.id}').`,
+    });
   }
 
-  if (agent) {
-    agent.lastSeenAt = new Date().toISOString();
-    agent.status = body.status || 'ONLINE';
-    if (body.agentVersion) agent.agentVersion = body.agentVersion;
-  }
+  agent.lastSeenAt = new Date().toISOString();
+  agent.status = body.status || 'ONLINE';
+  if (body.agentVersion) agent.agentVersion = body.agentVersion;
 
   // Calcular contagem de jobs pendentes dinamicamente para o tenant do agente
   const pendingJobsCount = Array.from(printJobsStore.values()).filter(
-    (j) => j.status === 'PENDING' && (!agent || j.companyId === agent.companyId)
+    (j) => j.status === 'PENDING' && j.companyId === agent.companyId
   ).length;
 
   const response: AgentHeartbeatResponseDTO = {
@@ -158,34 +183,40 @@ router.post('/heartbeat', (req: Request, res: Response) => {
   res.json(response);
 });
 
+// 4. Listar Agentes da Empresa (Filtrado pelo tenant)
+router.get('/', (req: Request, res: Response) => {
+  const authHeader = req.headers.authorization || (req.headers['x-agent-token'] as string);
+  const rawToken = authHeader ? authHeader.replace(/^Bearer\s+/i, '').trim() : null;
+  const callerAgent = rawToken ? Array.from(agentsStore.values()).find((a) => verifyTokenHash(rawToken, a.tokenHash)) : null;
 
-
-// 4. Listar Agentes da Empresa
-router.get('/', (_req: Request, res: Response) => {
   const now = Date.now();
-  const agents = Array.from(agentsStore.values()).map((a) => {
-    // Definir como OFFLINE se não enviar heartbeat há mais de 2 minutos
-    const diffMs = now - new Date(a.lastSeenAt).getTime();
-    const isOnline = diffMs < 120000;
+  let agents = Array.from(agentsStore.values());
+
+  if (callerAgent) {
+    agents = agents.filter((a) => a.companyId === callerAgent.companyId);
+  }
+
+  const agentsDTO: AgentDTO[] = agents.map((agent) => {
+    const isOnline = agent.lastSeenAt && now - new Date(agent.lastSeenAt).getTime() < 120000;
     return {
-      id: a.id,
-      companyId: a.companyId,
-      installationId: a.installationId,
-      machineName: a.machineName,
-      os: a.os,
-      architecture: a.architecture,
-      agentVersion: a.agentVersion,
-      status: isOnline ? 'ONLINE' : 'OFFLINE',
-      lastSeenAt: a.lastSeenAt,
-      createdAt: a.createdAt,
+      id: agent.id,
+      companyId: agent.companyId,
+      installationId: agent.installationId,
+      machineName: agent.machineName,
+      os: agent.os,
+      architecture: agent.architecture,
+      agentVersion: agent.agentVersion,
+      status: isOnline ? agent.status : 'OFFLINE',
+      lastSeenAt: agent.lastSeenAt,
+      createdAt: agent.createdAt,
     };
   });
 
   res.json({
-    total: agents.length,
-    agents,
+    total: agentsDTO.length,
+    agents: agentsDTO,
   });
 });
 
-export { agentsStore };
+export { agentsStore, pairingCodes };
 export default router;

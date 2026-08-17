@@ -145,11 +145,12 @@ export class LegacyCompiler {
 
       // 3. Demais Configurações de Impressora preservadas intactas
       if (
-        /^(I8|r[N|Y]|S\d+|D\d+|ZT|JF|OD|R\d+,\d+|f\d+|N|\^XA|\^XZ|\^PW\d+|\^LL\d+)/i.test(trimmed) &&
+        /^(I8|r[N|Y]|S\d+|D\d+|ZT|JF|OD|R\d+,\d+|f\d+|N|\^XA|\^XZ|\^PW\d+|\^LL\d+|LC\d+|H|O\d+|M\d+|\[\[CHAR02\]\]|E$)/i.test(trimmed) &&
         !trimmed.startsWith('A') &&
         !trimmed.startsWith('B') &&
         !trimmed.startsWith('L') &&
-        !trimmed.startsWith('X')
+        !trimmed.startsWith('X') &&
+        !/^[1-4][0-9A-Z][0-9]{2}[0-9]{3}[0-9]{4}[0-9]{4}/.test(trimmed)
       ) {
         compiledLines.push(origLine);
         diffLines.push({ type: 'unchanged', originalLine: origLine, newLine: origLine });
@@ -157,18 +158,22 @@ export class LegacyCompiler {
         continue;
       }
 
-      // 3. Quantidade de Impressão (ex: P[[QUANTIDADE]] ou P1)
-      if (/^P(\[\[[A-Z0-9_]+\]\]|\d+)$/i.test(trimmed)) {
+      // 3. Quantidade de Impressão (ex: P[[QUANTIDADE]], Q[[QUANTIDADE]], P1)
+      if (/^[PQ](\[\[[A-Z0-9_]+\]\]|\d+)$/i.test(trimmed)) {
         compiledLines.push(origLine);
         diffLines.push({ type: 'unchanged', originalLine: origLine, newLine: origLine });
         continue;
       }
 
-      // 4. Blocos Condicionais Inline: [[SE]]{{condição}}{{comando}}
-      const inlineCondMatch = trimmed.match(/^\[\[SE\]\]\{\{([^}]+)\}\}\{\{(.+)\}\}$/i);
+      // 4. Blocos Condicionais Inline e Encadeados: [[SE]]{{cond1}}[[SE]]{{cond2}}{{comando}}
+      const inlineCondMatch = trimmed.match(/^((?:\[\[SE\]\]\{\{[^}]+\}\})+)(.+)$/i);
       if (inlineCondMatch) {
-        const condExpr = inlineCondMatch[1];
-        const innerCmd = inlineCondMatch[2];
+        const condPart = inlineCondMatch[1];
+        let innerCmd = inlineCondMatch[2];
+        const isBracketEnclosed = innerCmd.startsWith('{{') && innerCmd.endsWith('}}');
+        if (isBracketEnclosed) {
+          innerCmd = innerCmd.slice(2, -2);
+        }
 
         // Buscar elemento correspondente
         const element = elementsMapByCommand.get(innerCmd.trim()) || elementsMapByLine.get(i + 1);
@@ -183,14 +188,15 @@ export class LegacyCompiler {
         processedElementIds.add(element.id);
         const state = element.sourceReference?.state || 'unchanged';
 
-        if (state === 'unchanged') {
+        if (state === 'unchanged' || state === 'imported') {
           compiledLines.push(origLine);
           diffLines.push({ type: 'unchanged', originalLine: origLine, newLine: origLine });
           preservedConditionalsCount++;
         } else {
           // Elemento foi alterado: recompilar o comando interno
-          const newInnerCmd = this.serializeSingleElement(element, dpi);
-          const newCondLine = `[[SE]]{{${condExpr}}}{{${newInnerCmd}}}`;
+          const isPpla = document.sourceFile?.format === 'ppla';
+          const newInnerCmd = isPpla ? this.serializePPLAElement(element, dpi) : this.serializeSingleElement(element, dpi);
+          const newCondLine = isBracketEnclosed ? `${condPart}{{${newInnerCmd}}}` : `${condPart}${newInnerCmd}`;
           compiledLines.push(newCondLine);
           diffLines.push({ type: 'modified', originalLine: origLine, newLine: newCondLine });
           modifiedCount++;
@@ -215,18 +221,19 @@ export class LegacyCompiler {
         continue;
       }
 
-      // 5. Comandos Visuais Diretos (A, B, L, X)
+      // 5. Comandos Visuais Diretos (A, B, L, X, ou Comandos Posicionais PPLA 12110...)
       const element = elementsMapByCommand.get(trimmed) || elementsMapByLine.get(i + 1);
 
       if (element) {
         processedElementIds.add(element.id);
         const state = element.sourceReference?.state || 'unchanged';
 
-        if (state === 'unchanged') {
+        if (state === 'unchanged' || state === 'imported') {
           compiledLines.push(origLine);
           diffLines.push({ type: 'unchanged', originalLine: origLine, newLine: origLine });
         } else {
-          const newLine = this.serializeSingleElement(element, dpi);
+          const isPpla = document.sourceFile?.format === 'ppla';
+          const newLine = isPpla ? this.serializePPLAElement(element, dpi) : this.serializeSingleElement(element, dpi);
           compiledLines.push(newLine);
           diffLines.push({ type: 'modified', originalLine: origLine, newLine });
           modifiedCount++;
@@ -235,12 +242,11 @@ export class LegacyCompiler {
       }
 
       // 6. Comandos RAW não associados a nenhum elemento existente
-      // Se era um comando gráfico (A, B, LO, X, W) com parâmetros numéricos e o elemento não existe mais, foi deletado
-      if (/^(A\d+|B\d+|LO\d+|X\d+|W\d+)/.test(trimmed)) {
+      if (/^(A\d+|B\d+|LO\d+|X\d+|W\d+|[1-4][0-9A-Z][0-9]{2}[0-9]{3}[0-9]{4}[0-9]{4})/.test(trimmed)) {
         deletedCount++;
         diffLines.push({ type: 'deleted', originalLine: origLine });
       } else {
-        // Se era outro comando genérico ou de configuração (como 'O'), preserva
+        // Se era outro comando genérico ou de configuração, preserva
         compiledLines.push(origLine);
         diffLines.push({ type: 'unchanged', originalLine: origLine, newLine: origLine });
       }
@@ -249,13 +255,13 @@ export class LegacyCompiler {
     // 7. Adicionar novos elementos criados pelo usuário que não estavam no arquivo original
     const newElements = document.elements.filter((el) => !processedElementIds.has(el.id));
     if (newElements.length > 0) {
-      // Inserir antes da linha final de quantidade P... se existir
-      const lastPIndex = compiledLines.findLastIndex((l) => /^P(\[\[|\d+)/i.test(l.trim()));
+      const isPpla = document.sourceFile?.format === 'ppla';
+      const lastPIndex = compiledLines.findLastIndex((l) => /^[PQ](\[\[|\d+)/i.test(l.trim()) || /^E\s*$/i.test(l.trim()));
       const insertAt = lastPIndex !== -1 ? lastPIndex : compiledLines.length;
 
       newElements.forEach((newEl) => {
         createdCount++;
-        const newCmd = this.serializeSingleElement(newEl, dpi);
+        const newCmd = isPpla ? this.serializePPLAElement(newEl, dpi) : this.serializeSingleElement(newEl, dpi);
         const lineContent = newEl.visibilityRule
           ? `[[SE]]{{[[${newEl.visibilityRule.field.split('.').pop()?.toUpperCase()}]]${newEl.visibilityRule.operator}${newEl.visibilityRule.value}}}{{${newCmd}}}`
           : newCmd;
@@ -377,6 +383,69 @@ export class LegacyCompiler {
 
       default:
         return `// Elemento não suportado nativamente em PPLB: ${elem.type}`;
+    }
+  }
+
+  /**
+   * Serializa um elemento individual do Witiquetas para comando PPLA
+   */
+  private static serializePPLAElement(elem: LabelElement, dpi: number): string {
+    const xDots = mmToDots(elem.x, dpi);
+    const yDots = mmToDots(elem.y, dpi);
+    const xStr = String(xDots).padStart(4, '0');
+    const yStr = String(yDots).padStart(4, '0');
+    const orientation = elem.rotation === 90 ? '2' : elem.rotation === 180 ? '3' : elem.rotation === 270 ? '4' : '1';
+
+    switch (elem.type) {
+      case 'price': {
+        const p = elem as PriceElement;
+        const fontNum = '2';
+        const hMult = '1';
+        const vMult = '1';
+        const subType = '000';
+        const macroName = p.field.includes('promocao') ? 'PROMOCAO' : 'PRECO';
+        const prefix = p.prefix ? `${p.prefix} ` : '';
+        return `${orientation}${fontNum}${hMult}${vMult}${subType}${yStr}${xStr}${prefix}[[${macroName}]]`;
+      }
+
+      case 'barcode': {
+        const b = elem as BarcodeElement;
+        const hDots = String(b.barcodeHeightDots || mmToDots(b.height, dpi)).padStart(3, '0');
+        let macroVal = b.value;
+        if (b.field === 'produto.ean') {
+          macroVal = '[[BARRA]]';
+        } else if (b.field) {
+          macroVal = `[[${b.field.split('.').pop()?.toUpperCase()}]]`;
+        }
+        return `${orientation}F11${hDots}${yStr}${xStr}${macroVal || '[[BARRA]]'}`;
+      }
+
+      case 'line': {
+        const l = elem as LineElement;
+        const lenDots = String(mmToDots(l.width, dpi)).padStart(4, '0');
+        const thickDots = String(l.strokeWidth || 1).padStart(4, '0');
+        return `${orientation}X11000${yStr}${xStr}L${lenDots}${thickDots}`;
+      }
+
+      case 'text':
+      default: {
+        const t = elem as TextElement;
+        const fontNum = t.fontWeight === 'bold' ? '3' : '2';
+        const hMult = '1';
+        const vMult = '1';
+        const subType = '000';
+        let data = t.text;
+        if (t.field) {
+          const fallbackMacro = t.field === 'produto.descricao' ? 'NOME' : t.field.split('.').pop()?.toUpperCase() || 'NOME';
+          if (t.transformations && t.transformations.length > 0 && t.transformations[0].type === 'substring') {
+            const trans = t.transformations[0];
+            data = `[[${fallbackMacro},${trans.start},${trans.length}]]`;
+          } else {
+            data = `[[${fallbackMacro}]]`;
+          }
+        }
+        return `${orientation}${fontNum}${hMult}${vMult}${subType}${yStr}${xStr}${data}`;
+      }
     }
   }
 

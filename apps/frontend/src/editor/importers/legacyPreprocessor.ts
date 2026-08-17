@@ -127,6 +127,18 @@ export class LegacyPreprocessor {
       return { field: ERP_MACRO_MAP[rawField] || `custom.${rawField.toLowerCase()}`, operator: 'not_empty', value: '' };
     }
 
+    // Variável única (ex: {{frente}} ou {{precoAtacadista}} ou {{cd_regraPrecos}})
+    const singleVarMatch = clean.match(/^(?:\[\[([A-Z0-9_]+)\]\]|([A-Z0-9_]+))$/i);
+    if (singleVarMatch) {
+      const rawField = (singleVarMatch[1] || singleVarMatch[2]).toUpperCase();
+      const field = ERP_MACRO_MAP[rawField] || `custom.${rawField.toLowerCase()}`;
+      return {
+        field,
+        operator: 'not_empty',
+        value: '',
+      };
+    }
+
     return {
       field: 'produto.promocao.preco',
       operator: '>',
@@ -141,12 +153,13 @@ export class LegacyPreprocessor {
     const lines = content.split(/\r?\n/);
     const nodes: ASTNode[] = [];
     const stack: ConditionalStackFrame[] = [];
-    const MAX_DEPTH = 32; // Limite defensivo de aninhamento
+    const MAX_DEPTH = 5; // Limite defensivo de aninhamento
 
     const appendNode = (node: ASTNode) => {
       if (stack.length > 0) {
         const top = stack[stack.length - 1];
         if (top.currentBranch === 'then') {
+          top.node.thenNodes = top.node.thenNodes || [];
           top.node.thenNodes.push(node);
         } else {
           top.node.elseNodes = top.node.elseNodes || [];
@@ -178,12 +191,17 @@ export class LegacyPreprocessor {
         continue;
       }
 
-      // 2. Condicional Inline: [[SE]]{{condição}}{{comando}}
-      const inlineCondMatch = trimmed.match(/^\[\[SE\]\]\{\{([^}]+)\}\}\{\{(.+)\}\}$/i);
+      // 2. Condicionais Inline e Encadeadas: [[SE]]{{cond1}}[[SE]]{{cond2}}{{cmd}} ou [[SE]]{{cond}}12110...
+      const inlineCondMatch = trimmed.match(/^((?:\[\[SE\]\]\{\{[^}]+\}\})+)(.+)$/i);
       if (inlineCondMatch) {
-        const condExpr = inlineCondMatch[1];
-        const innerCmd = inlineCondMatch[2];
-        const rule = this.parseCondition(condExpr);
+        const condPart = inlineCondMatch[1];
+        let innerCmd = inlineCondMatch[2].trim();
+        if (innerCmd.startsWith('{{') && innerCmd.endsWith('}}')) {
+          innerCmd = innerCmd.slice(2, -2).trim();
+        }
+
+        const condMatches = Array.from(condPart.matchAll(/\[\[SE\]\]\{\{([^}]+)\}\}/gi));
+        const rules = condMatches.map((m) => this.parseCondition(m[1]));
 
         const innerNode: RawASTNode = {
           id: `inner-${i}`,
@@ -193,22 +211,30 @@ export class LegacyPreprocessor {
           recognized: false,
         };
 
-        const node: ConditionalASTNode = {
-          id: `cond-${i}`,
-          type: 'conditional',
-          line: i + 1,
-          originalText: rawLine,
-          conditionExpression: condExpr,
-          rule,
-          thenNodes: [innerNode],
-          elseNodes: [],
-          children: [innerNode],
-          isMultiline: false,
-          rawOpenCommand: rawLine,
-          startLine: i + 1,
-          endLine: i + 1,
-        };
-        appendNode(node);
+        // Construir nós condicionais aninhados se houver encadeamento
+        let currentInnermost: ASTNode = innerNode;
+        for (let rIdx = rules.length - 1; rIdx >= 0; rIdx--) {
+          const rule = rules[rIdx];
+          const condExpr = condMatches[rIdx][1];
+          const condNode: ConditionalASTNode = {
+            id: `cond-${i}-${rIdx}`,
+            type: 'conditional',
+            line: i + 1,
+            originalText: rIdx === 0 ? rawLine : currentInnermost.originalText,
+            conditionExpression: condExpr,
+            rule,
+            thenNodes: [currentInnermost],
+            elseNodes: [],
+            children: [currentInnermost],
+            isMultiline: false,
+            rawOpenCommand: rawLine,
+            startLine: i + 1,
+            endLine: i + 1,
+          };
+          currentInnermost = condNode;
+        }
+
+        appendNode(currentInnermost);
         continue;
       }
 

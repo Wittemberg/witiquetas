@@ -1,6 +1,4 @@
-import { LabelDocument, LabelElement } from '@witiquetas/label-schema';
-import { ImportAdapter, ImportResult, ImportDiagnosticItem } from './types';
-import { pxToMm } from '../useEditorStore';
+import type { ImportAdapter, ImportResult, ImportDiagnosticItem } from './types';
 
 /**
  * Adaptador de Importação para Zebra Programming Language (ZPL)

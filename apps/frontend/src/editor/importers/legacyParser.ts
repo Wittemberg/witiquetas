@@ -1,5 +1,4 @@
-import { LabelDocument, LabelElement } from '@witiquetas/label-schema';
-import { ImportAdapter, ImportResult, ImportDiagnosticItem } from './types';
+import type { ImportAdapter, ImportResult, ImportDiagnosticItem } from './types';
 
 /**
  * Adaptador de Importação para Modelos Legados Witiquetas / ERP

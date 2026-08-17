@@ -1,29 +1,51 @@
-import { ImportAdapter, ImportResult } from './types';
+import type { ImportAdapter, ImportResult } from './types';
 import { legacyAdapter } from './legacyParser';
 import { zplAdapter } from './zplParser';
 import { PPLBParser } from './pplbParser';
+import { PPLAParser } from './pplaParser';
 import { LegacyCompiler } from './legacyCompiler';
+import { detectLabelFormat } from './formatDetector';
 
 export * from './types';
 export * from './astTypes';
 export * from './legacyPreprocessor';
 export * from './pplbParser';
+export * from './pplaParser';
+export * from './formatDetector';
 export * from './legacyCompiler';
 
-const pplbAdapter: ImportAdapter = {
+export const pplaAdapter: ImportAdapter = {
+  id: 'ppla-legacy',
+  name: 'PPLA / Argox / Datamax DPL (2 Camadas + AST)',
+  detect: (content: string): boolean => {
+    const detection = detectLabelFormat(content);
+    return detection.language === 'ppla';
+  },
+  parse: async (content: string): Promise<ImportResult> => {
+    return PPLAParser.parse(content);
+  },
+};
+
+export const pplbAdapter: ImportAdapter = {
   id: 'pplb-legacy',
   name: 'PPLB / Eltron / Legado ERP (2 Camadas + AST)',
   detect: (content: string): boolean => {
-    return /^(I8|Q\d+|q\d+|N|A\d+,\d+|B\d+,\d+|\[\[SE\]\])/m.test(content) || /\[\[(PRECO|PROMOCAO|NOME|BARRA)/i.test(content);
+    const detection = detectLabelFormat(content);
+    return detection.language === 'pplb';
   },
   parse: async (content: string): Promise<ImportResult> => {
     return PPLBParser.parse(content);
   },
 };
 
-const ADAPTERS: ImportAdapter[] = [pplbAdapter, legacyAdapter, zplAdapter];
+const ADAPTERS: ImportAdapter[] = [pplaAdapter, pplbAdapter, zplAdapter, legacyAdapter];
 
 export function detectAdapter(content: string): ImportAdapter | null {
+  const detection = detectLabelFormat(content);
+  if (detection.language === 'ppla') return pplaAdapter;
+  if (detection.language === 'pplb') return pplbAdapter;
+  if (detection.language === 'zpl') return zplAdapter;
+
   for (const adapter of ADAPTERS) {
     if (adapter.detect(content)) {
       return adapter;
@@ -43,10 +65,11 @@ export async function parseImportContent(content: string, preferredAdapterId?: s
     adapter = detectAdapter(content);
   }
 
-  // Se nenhum formato específico for detectado, usa o adapter PPLB por padrão
+  // Se nenhum formato específico for detectado, tenta PPLA se tiver O/M ou comandos numéricos, senão PPLB
   if (!adapter) {
     adapter = pplbAdapter;
   }
 
   return adapter.parse(content);
 }
+

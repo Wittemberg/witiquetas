@@ -1,29 +1,10 @@
-use thiserror::Error;
+use super::{PrinterTarget, PrinterTransport, TransportError, TransportResult};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
-#[derive(Error, Debug)]
-pub enum TransportError {
-    #[error("Erro de conexão com impressora: {0}")]
-    ConnectionError(String),
-    #[error("Erro de transmissão de bytes: {0}")]
-    TransmissionError(String),
-    #[error("Tempo limite excedido na impressora: {0}")]
-    TimeoutError(String),
-}
-
-#[derive(Debug, Clone)]
-pub struct TransportResult {
-    pub bytes_written: usize,
-    pub execution_time_ms: u64,
-}
-
-pub trait PrinterTransport: Send + Sync {
-    fn send(&self, printer_name: &str, payload: &[u8]) -> Result<TransportResult, TransportError>;
-}
-
 #[derive(Debug, Clone)]
 pub struct MemoryPrintEvent {
+    pub printer_id: String,
     pub printer_name: String,
     pub payload: Vec<u8>,
     pub timestamp: std::time::SystemTime,
@@ -53,11 +34,12 @@ impl MemoryTransport {
 }
 
 impl PrinterTransport for MemoryTransport {
-    fn send(&self, printer_name: &str, payload: &[u8]) -> Result<TransportResult, TransportError> {
+    async fn send(&self, target: &PrinterTarget, payload: &[u8]) -> Result<TransportResult, TransportError> {
         let start = Instant::now();
 
         let event = MemoryPrintEvent {
-            printer_name: printer_name.to_string(),
+            printer_id: target.printer_id.clone(),
+            printer_name: target.name.clone(),
             payload: payload.to_vec(),
             timestamp: std::time::SystemTime::now(),
         };
@@ -80,12 +62,13 @@ impl PrinterTransport for MemoryTransport {
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_memory_transport_send_and_history() {
+    #[tokio::test]
+    async fn test_memory_transport_send_and_history() {
         let transport = MemoryTransport::new();
         let payload = b"I8,A,001\nQ240,024\nP1\n";
+        let target = PrinterTarget::memory("Impressora Elgin L42");
 
-        let result = transport.send("Impressora Elgin L42", payload);
+        let result = transport.send(&target, payload).await;
         assert!(result.is_ok());
         let res = result.unwrap();
         assert_eq!(res.bytes_written, payload.len());
@@ -99,13 +82,14 @@ mod tests {
         assert_eq!(transport.get_history().len(), 0);
     }
 
-    #[test]
-    fn test_memory_transport_copy_strategy_embedded() {
+    #[tokio::test]
+    async fn test_memory_transport_copy_strategy_embedded() {
         let transport = MemoryTransport::new();
         let payload = b"I8,A,001\nQ240,024\nP5\n"; // 5 cópias já embutidas no payload
+        let target = PrinterTarget::memory("Zebra ZD220");
 
         // Estratégia EMBEDDED_IN_PAYLOAD -> 1 envio físico
-        let result = transport.send("Zebra ZD220", payload);
+        let result = transport.send(&target, payload).await;
         assert!(result.is_ok());
 
         let history = transport.get_history();
@@ -113,15 +97,16 @@ mod tests {
         assert_eq!(history[0].payload, payload);
     }
 
-    #[test]
-    fn test_memory_transport_copy_strategy_transport_repeat() {
+    #[tokio::test]
+    async fn test_memory_transport_copy_strategy_transport_repeat() {
         let transport = MemoryTransport::new();
         let payload = b"I8,A,001\nQ240,024\nP1\n";
+        let target = PrinterTarget::memory("Argox OS-214");
         let copies = 3;
 
         // Estratégia TRANSPORT_REPEAT -> N envios físicos
         for _ in 0..copies {
-            let res = transport.send("Argox OS-214", payload);
+            let res = transport.send(&target, payload).await;
             assert!(res.is_ok());
         }
 
@@ -133,5 +118,3 @@ mod tests {
         }
     }
 }
-
-

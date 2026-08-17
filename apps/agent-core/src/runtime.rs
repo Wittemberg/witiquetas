@@ -3,7 +3,7 @@ use crate::identity::AgentIdentity;
 use crate::payload::PayloadValidator;
 use crate::protocol::client::{AgentClient, ClientError};
 use crate::protocol::dto::{PrintJobItemDTO, UpdatePrintJobStatusRequestDTO};
-use crate::transport::PrinterTransport;
+use crate::transport::{PrinterTarget, PrinterTransport};
 use std::collections::HashSet;
 use std::time::Duration;
 use tokio::time::sleep;
@@ -189,17 +189,27 @@ impl<T: PrinterTransport> AgentRuntime<T> {
             1
         };
 
+        let target = PrinterTarget {
+            printer_id: job.printer_id.clone(),
+            name: job.printer_name.clone(),
+            protocol: job.protocol.clone(),
+            host: job.host.clone(),
+            port: job.port,
+        };
+
         let mut total_execution_time_ms = 0u64;
         let mut transport_success = true;
+        let mut is_ambiguous = false;
         let mut last_error_msg = String::new();
 
         for i in 1..=send_repetitions {
-            match self.transport.send(&job.printer_name, &payload_bytes) {
+            match self.transport.send(&target, &payload_bytes).await {
                 Ok(res) => {
                     total_execution_time_ms += res.execution_time_ms;
                 }
                 Err(err) => {
                     transport_success = false;
+                    is_ambiguous = err.is_ambiguous_partial_write();
                     last_error_msg = format!("Falha no envio de transporte (repetição {}/{}): {}", i, send_repetitions, err);
                     eprintln!("[Agent] Erro de transporte no job '{}': {}", job.job_id, last_error_msg);
                     break;
@@ -208,12 +218,18 @@ impl<T: PrinterTransport> AgentRuntime<T> {
         }
 
         if !transport_success {
+            let status_report = if is_ambiguous {
+                "UNKNOWN_RESULT"
+            } else {
+                "FAILED"
+            };
+
             let _ = self
                 .client
                 .update_job_status(
                     &job.job_id,
                     &UpdatePrintJobStatusRequestDTO {
-                        status: "FAILED".to_string(),
+                        status: status_report.to_string(),
                         lease_id: Some(job.lease_id.clone()),
                         attempt_id: Some(job.attempt_id.clone()),
                         agent_id: Some(self.identity.agent_id.clone()),

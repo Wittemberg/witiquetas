@@ -8,7 +8,7 @@ pub mod transport;
 use config::AgentConfig;
 use runtime::AgentRuntime;
 use std::env;
-use transport::MemoryTransport;
+use transport::DynamicRouterTransport;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -51,8 +51,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     };
 
-    let memory_transport = MemoryTransport::new();
-    let mut runtime = match AgentRuntime::new(config, memory_transport) {
+    let router_transport = DynamicRouterTransport::new();
+    let mut runtime = match AgentRuntime::new(config, router_transport) {
         Ok(rt) => rt,
         Err(err) => {
             eprintln!("[Agent Runtime Error] Falha ao inicializar runtime: {}", err);

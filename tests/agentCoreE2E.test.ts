@@ -1,14 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
+import net from 'node:net';
 import { spawn } from 'node:child_process';
 import crypto from 'node:crypto';
 import path from 'node:path';
 
-const AGENT_EXE_PATH = path.resolve(
-  process.env.LOCALAPPDATA || '',
-  'witiquetas-cargo-target/debug/witiquetas-agent-core.exe'
-);
+import fs from 'node:fs';
+
+const localTarget = path.resolve(process.cwd(), 'apps/agent-core/target/debug/witiquetas-agent-core.exe');
+const appDataTarget = path.resolve(process.env.LOCALAPPDATA || '', 'witiquetas-cargo-target/debug/witiquetas-agent-core.exe');
+const AGENT_EXE_PATH = fs.existsSync(localTarget) ? localTarget : appDataTarget;
 
 test('End-to-End: 1. Ciclo de sucesso termina em DELIVERED_TO_TRANSPORT e NUNCA em PRINTED', async () => {
   const rawToken = `agt_live_e2e_${crypto.randomBytes(16).toString('hex')}`;
@@ -592,4 +594,159 @@ test('End-to-End: 6. Ciclo limpo quando não há jobs pendentes', async () => {
 
   assert.equal(exitCode, 0);
   assert.ok(heartbeatsReceived >= 1);
+});
+
+test('End-to-End: 7. Envio físico RAW TCP ponta a ponta para servidor TCP fake com preservação binária integral', async () => {
+  const rawToken = `agt_live_e2e_${crypto.randomBytes(16).toString('hex')}`;
+  const agentId = 'agent-e2e-tcp';
+  const companyId = 'comp-matriz-01';
+
+  // 1. Iniciar servidor de impressora TCP RAW fake
+  let capturedTcpBytes = Buffer.alloc(0);
+  const fakePrinterServer = net.createServer((socket) => {
+    socket.on('data', (chunk) => {
+      capturedTcpBytes = Buffer.concat([capturedTcpBytes, chunk]);
+    });
+  });
+
+  await new Promise<void>((resolve) => fakePrinterServer.listen(0, '127.0.0.1', () => resolve()));
+  const tcpAddr = fakePrinterServer.address() as net.AddressInfo;
+  const tcpPort = tcpAddr.port;
+
+  // 2. Preparar payload de teste com bytes reais
+  const payloadStr = 'I8,A,001\nQ240,024\nq831\nA10,10,0,1,1,1,N,"RAW TCP PHYSICAL TEST"\nP1\n';
+  const payloadBytes = Buffer.from(payloadStr, 'utf8');
+  const payloadBase64 = payloadBytes.toString('base64');
+  const checksumSha256 = crypto.createHash('sha256').update(payloadBytes).digest('hex');
+  const jobId = `job-e2e-tcp-${Date.now()}`;
+
+  const state = {
+    heartbeatsReceived: 0,
+    jobStatusHistory: [] as string[],
+    job: {
+      id: jobId,
+      companyId,
+      printerId: 'prn-tcp-01',
+      printerName: 'Zebra ZD220 TCP',
+      status: 'PENDING',
+      language: 'PPLB',
+      encoding: 'windows-1252',
+      copies: 1,
+      copyStrategy: 'EMBEDDED_IN_PAYLOAD',
+      payloadBase64,
+      payloadBytesLength: payloadBytes.length,
+      checksumSha256,
+      attempts: 0,
+      maxAttempts: 3,
+      claimedByAgentId: null as string | null,
+    },
+  };
+
+  // 3. Iniciar servidor Backend mock
+  const server = http.createServer(async (req, res) => {
+    const authHeader = req.headers.authorization;
+    if (authHeader !== `Bearer ${rawToken}`) {
+      res.writeHead(401, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify({ error: 'Não autorizado' }));
+    }
+
+    let body = '';
+    for await (const chunk of req) {
+      body += chunk;
+    }
+    const jsonBody = body ? JSON.parse(body) : {};
+    const url = req.url || '';
+
+    if (req.method === 'POST' && url.startsWith('/agents/heartbeat')) {
+      state.heartbeatsReceived += 1;
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(
+        JSON.stringify({
+          acknowledged: true,
+          serverTime: new Date().toISOString(),
+          pendingJobsCount: state.job.status === 'PENDING' ? 1 : 0,
+          pollIntervalSeconds: 10,
+        })
+      );
+    }
+
+    if (req.method === 'GET' && url.startsWith('/print-jobs/pending')) {
+      if (state.job.status === 'PENDING') {
+        state.job.attempts += 1;
+        state.job.claimedByAgentId = agentId;
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        return res.end(
+          JSON.stringify({
+            total: 1,
+            jobs: [
+              {
+                jobId: state.job.id,
+                leaseId: 'lease-e2e-tcp-01',
+                attemptId: 'attempt-e2e-tcp-01',
+                printerId: state.job.printerId,
+                printerName: state.job.printerName,
+                protocol: 'RAW_TCP',
+                host: '127.0.0.1',
+                port: tcpPort,
+                language: state.job.language,
+                encoding: state.job.encoding,
+                copies: state.job.copies,
+                copyStrategy: state.job.copyStrategy,
+                payloadBase64: state.job.payloadBase64,
+                payloadBytesLength: state.job.payloadBytesLength,
+                checksumSha256: state.job.checksumSha256,
+              },
+            ],
+          })
+        );
+      }
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify({ total: 0, jobs: [] }));
+    }
+
+    if (req.method === 'PATCH' && url.includes('/status')) {
+      const newStatus = jsonBody.status;
+      state.jobStatusHistory.push(newStatus);
+      state.job.status = newStatus;
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify({ success: true, jobId: state.job.id, status: newStatus }));
+    }
+
+    res.writeHead(404, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Rota não encontrada' }));
+  });
+
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', () => resolve()));
+  const address = server.address() as any;
+  const backendUrl = `http://127.0.0.1:${address.port}`;
+
+  const env = {
+    ...process.env,
+    WITIQUETAS_BACKEND_URL: backendUrl,
+    WITIQUETAS_AGENT_ID: agentId,
+    WITIQUETAS_AGENT_TOKEN: rawToken,
+    WITIQUETAS_INSTALLATION_ID: 'inst-e2e-tcp',
+    WITIQUETAS_SINGLE_RUN: '1',
+  };
+
+  const agentProcess = spawn(AGENT_EXE_PATH, ['--single-run'], { env });
+  const exitCode = await new Promise<number>((resolve) => {
+    agentProcess.on('close', (code) => resolve(code ?? 0));
+  });
+
+  server.close();
+  fakePrinterServer.close();
+
+  assert.equal(exitCode, 0, 'Agent Core deve finalizar com código 0');
+  assert.ok(state.heartbeatsReceived >= 1);
+  assert.deepEqual(
+    state.jobStatusHistory,
+    ['DOWNLOADED', 'DELIVERING', 'DELIVERED_TO_TRANSPORT'],
+    'Ciclo completo de gates com RAW TCP real'
+  );
+  assert.equal(
+    capturedTcpBytes.toString('utf8'),
+    payloadStr,
+    'Servidor de impressora TCP capturou exatamente os bytes enviados pelo Agent Core'
+  );
 });

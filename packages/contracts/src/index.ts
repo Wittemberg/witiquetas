@@ -113,6 +113,7 @@ export interface PairAgentRequestDTO {
   architecture: AgentArchitecture;
   agentVersion: string;
   protocolVersion: 1;
+  installationId?: string;
 }
 
 export interface PairAgentResponseDTO {

@@ -391,3 +391,69 @@ test('9. Token emitido no pareamento autentica com sucesso no heartbeat do Agent
   assert.equal(resHb.data.acknowledged, true);
 });
 
+test('10. Pairing com installationId informado preserva exatamente o mesmo valor', () => {
+  const session = createWebSession({
+    id: 'usr-matriz-01',
+    companyId: 'comp-matriz-01',
+    role: 'ADMIN',
+  });
+
+  const { req: reqGen, res: resGen } = createMockReqRes({
+    method: 'POST',
+    url: '/generate-pairing-code',
+    headers: { cookie: `witiquetas_session=${session.sessionId}` },
+  });
+  executeRouteChain(postGenerateCodeHandlers, reqGen, resGen);
+
+  const customInstallationId = 'inst-custom-hardware-guid-999';
+
+  const { req: reqPair, res: resPair } = createMockReqRes({
+    method: 'POST',
+    url: '/pair',
+    body: {
+      pairingCode: resGen.data.pairingCode,
+      machineName: 'CAIXA-PRESERVADO',
+      installationId: customInstallationId,
+    },
+  });
+  executeRouteChain(postPairHandlers, reqPair, resPair);
+
+  assert.equal(resPair.statusCode, 201);
+  assert.equal(resPair.data.installationId, customInstallationId, 'Deve preservar exatamente o installationId enviado');
+
+  const saved = agentsStore.get(resPair.data.agentId)!;
+  assert.equal(saved.installationId, customInstallationId);
+});
+
+test('11. Pairing sem installationId gera automaticamente novo identificador persistente', () => {
+  const session = createWebSession({
+    id: 'usr-matriz-01',
+    companyId: 'comp-matriz-01',
+    role: 'ADMIN',
+  });
+
+  const { req: reqGen, res: resGen } = createMockReqRes({
+    method: 'POST',
+    url: '/generate-pairing-code',
+    headers: { cookie: `witiquetas_session=${session.sessionId}` },
+  });
+  executeRouteChain(postGenerateCodeHandlers, reqGen, resGen);
+
+  const { req: reqPair, res: resPair } = createMockReqRes({
+    method: 'POST',
+    url: '/pair',
+    body: {
+      pairingCode: resGen.data.pairingCode,
+      machineName: 'CAIXA-AUTO-INST',
+    },
+  });
+  executeRouteChain(postPairHandlers, reqPair, resPair);
+
+  assert.equal(resPair.statusCode, 201);
+  assert.ok(resPair.data.installationId.startsWith('inst-'));
+
+  const saved = agentsStore.get(resPair.data.agentId)!;
+  assert.equal(saved.installationId, resPair.data.installationId);
+});
+
+

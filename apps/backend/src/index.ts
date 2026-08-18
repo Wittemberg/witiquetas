@@ -168,6 +168,8 @@ import authRouter from './routes/auth';
 app.use('/auth', authRouter);
 app.use('/api/auth', authRouter);
 
+import agentsRouter, { logAgentDistributionStatus } from './routes/agents.js';
+
 app.use('/templates', templatesRouter);
 app.use('/api/templates', templatesRouter);
 
@@ -204,4 +206,5 @@ app.get('/', (_req, res) => {
 
 app.listen(PORT, () => {
   console.log(`[Witiquetas Backend] Rodando na porta ${PORT} (ENV: ${process.env.NODE_ENV || 'development'})`);
+  logAgentDistributionStatus();
 });

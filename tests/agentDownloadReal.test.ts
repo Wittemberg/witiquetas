@@ -120,3 +120,24 @@ test('3. Fail-Closed: Quando a plataforma for desconhecida ou não disponível, 
   assert.equal(res.statusCode, 404);
   assert.equal(res.data.status, 'COMING_SOON');
 });
+
+test('4. Endpoint de Diagnóstico /download-status: Reporta disponibilidade, tamanho e SHA-256', () => {
+  const getStatusHandler = (agentsRouter as any).routes.find(
+    (r: any) => r.method === 'GET' && r.path === '/download-status'
+  ).handlers[0];
+
+  const { req, res } = createMockReqRes({
+    method: 'GET',
+    url: '/download-status',
+  });
+
+  getStatusHandler(req, res);
+
+  assert.equal(res.statusCode, 200);
+  assert.ok(res.data['windows-x64']);
+  assert.equal(res.data['windows-x64'].available, true);
+  assert.ok(res.data['windows-x64'].sizeBytes > 1000000);
+  assert.equal(res.data['windows-x64'].version, '0.1.0');
+  assert.ok(res.data['windows-x64'].sha256.length === 64);
+});
+

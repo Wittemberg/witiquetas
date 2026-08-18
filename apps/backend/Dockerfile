@@ -33,6 +33,10 @@ RUN npm run build
 WORKDIR /app/apps/backend
 RUN npm run build
 
+# Validação do binário do Agent no estágio builder
+RUN test -f /app/apps/backend/bin/agents/witiquetas-agent-windows-x64.exe
+RUN test $(stat -c%s /app/apps/backend/bin/agents/witiquetas-agent-windows-x64.exe) -gt 1000000
+
 # Estágio 2: Runner de produção
 FROM node:22-alpine AS runner
 
@@ -43,6 +47,10 @@ ENV PORT=3000
 
 # Copia a estrutura completa compilada com as node_modules hoisted do monorepo
 COPY --from=builder /app ./
+
+# Validação do binário do Agent no estágio runner final
+RUN test -f /app/apps/backend/bin/agents/witiquetas-agent-windows-x64.exe
+RUN test $(stat -c%s /app/apps/backend/bin/agents/witiquetas-agent-windows-x64.exe) -gt 1000000
 
 WORKDIR /app/apps/backend
 

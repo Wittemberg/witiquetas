@@ -112,6 +112,18 @@ jobs:
           push: true
           tags: ghcr.io/wittemberg/witiquetas-backend:latest
 
+      - name: Validate Backend Container Download Endpoint
+        run: |
+          echo "Testando endpoint de download em container temporário..."
+          docker run -d --name test-backend -p 3000:3000 -e ADMIN_API_KEY=ci_test_key ghcr.io/wittemberg/witiquetas-backend:latest
+          sleep 4
+          curl -f http://localhost:3000/api/agents/download/windows-x64 -o downloaded-agent.exe
+          ls -la downloaded-agent.exe
+          test $(stat -c%s downloaded-agent.exe) -gt 1000000
+          head -c 2 downloaded-agent.exe | grep -q "MZ"
+          echo "Download endpoint retornou executavel PE Windows valido (> 1MB, header MZ)."
+          docker stop test-backend && docker rm test-backend
+
       - name: Build & Push Frontend Image
         uses: docker/build-push-action@v6
         with:

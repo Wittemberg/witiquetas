@@ -439,38 +439,84 @@ router.get('/', authenticateWebUser, (req: Request, res: Response) => {
   });
 });
 
-// 5. Download Multiplataforma de Binários do Agent (Windows x64 Real / Fail-Closed)
+import { fileURLToPath } from 'node:url';
+
+// Resolução explícita e determinística do caminho do binário Windows x64:
+// Em runtime ESM (tanto em src/routes quanto em dist/routes), subindo 2 níveis
+// chegamos na raiz do backend (/app/apps/backend ou <workspace>/apps/backend).
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const backendRootDir = path.resolve(__dirname, '../..');
+
+export const AGENT_WINDOWS_X64_PATH = process.env.AGENT_WINDOWS_X64_PATH
+  ? path.resolve(process.env.AGENT_WINDOWS_X64_PATH)
+  : path.resolve(backendRootDir, 'bin/agents/witiquetas-agent-windows-x64.exe');
+
+// Log de startup determinístico sem segredos
+export function logAgentDistributionStatus() {
+  try {
+    if (fs.existsSync(AGENT_WINDOWS_X64_PATH)) {
+      const stats = fs.statSync(AGENT_WINDOWS_X64_PATH);
+      console.log(`[agent-distribution] windows-x64: FOUND path=${AGENT_WINDOWS_X64_PATH} size=${stats.size}`);
+    } else {
+      console.warn(`[agent-distribution] windows-x64: NOT FOUND path=${AGENT_WINDOWS_X64_PATH}`);
+    }
+  } catch (err: any) {
+    console.error(`[agent-distribution] windows-x64: ERROR checking path=${AGENT_WINDOWS_X64_PATH}: ${err.message}`);
+  }
+}
+
+// 5. Diagnóstico de Disponibilidade dos Binários
+router.get('/download-status', (_req: Request, res: Response) => {
+  const exists = fs.existsSync(AGENT_WINDOWS_X64_PATH);
+  let sizeBytes = 0;
+  let sha256 = '';
+
+  if (exists) {
+    try {
+      const stats = fs.statSync(AGENT_WINDOWS_X64_PATH);
+      sizeBytes = stats.size;
+      const buffer = fs.readFileSync(AGENT_WINDOWS_X64_PATH);
+      sha256 = crypto.createHash('sha256').update(buffer).digest('hex');
+    } catch {}
+  }
+
+  res.json({
+    'windows-x64': {
+      available: exists && sizeBytes > 1000000,
+      version: '0.1.0',
+      sizeBytes,
+      sha256,
+    },
+  });
+});
+
+// 6. Download Multiplataforma de Binários do Agent (Windows x64 Real / Fail-Closed)
 router.get('/download/:platform', (req: Request, res: Response) => {
   const platform = (req.params.platform || '').toLowerCase().replace(/_/g, '-');
 
   if (platform === 'windows-x64' || platform === 'win-x64') {
-    const distDir = process.env.AGENT_DIST_DIR || path.resolve(process.cwd(), 'apps/backend/bin/agents');
-    const candidatePaths = [
-      path.resolve(distDir, 'witiquetas-agent-windows-x64.exe'),
-      path.resolve(process.cwd(), 'apps/backend/bin/agents/witiquetas-agent-windows-x64.exe'),
-      path.resolve(process.cwd(), 'apps/agent-core/target/release/witiquetas-agent-core.exe'),
-      path.resolve(process.cwd(), 'apps/agent-core/target/release/witiquetas-agent-windows-x64.exe'),
-    ];
+    if (fs.existsSync(AGENT_WINDOWS_X64_PATH)) {
+      try {
+        const stats = fs.statSync(AGENT_WINDOWS_X64_PATH);
+        if (stats.isFile() && stats.size > 1000000) { // Deve ser arquivo real > 1MB
+          const fileBuffer = fs.readFileSync(AGENT_WINDOWS_X64_PATH);
+          const sha256 = crypto.createHash('sha256').update(fileBuffer).digest('hex');
 
-    for (const binPath of candidatePaths) {
-      if (fs.existsSync(binPath)) {
-        try {
-          const stats = fs.statSync(binPath);
-          if (stats.size > 100000) { // Deve ser um executável plausível (> 100KB)
-            const fileBuffer = fs.readFileSync(binPath);
-            const sha256 = crypto.createHash('sha256').update(fileBuffer).digest('hex');
-
-            res.setHeader('Content-Disposition', 'attachment; filename="witiquetas-agent-windows-x64.exe"');
-            res.setHeader('Content-Type', 'application/octet-stream');
-            res.setHeader('X-Agent-Version', '0.1.0');
-            res.setHeader('X-Agent-SHA256', sha256);
-            res.setHeader('Content-Length', stats.size);
-            return res.sendFile(binPath);
-          }
-        } catch {
-          // prossegue para candidate seguinte
+          res.setHeader('Content-Disposition', 'attachment; filename="witiquetas-agent-windows-x64.exe"');
+          res.setHeader('Content-Type', 'application/octet-stream');
+          res.setHeader('X-Agent-Version', '0.1.0');
+          res.setHeader('X-Agent-SHA256', sha256);
+          res.setHeader('Content-Length', stats.size);
+          return res.sendFile(AGENT_WINDOWS_X64_PATH);
+        } else {
+          console.error(`[agent-distribution] AGENT_BINARY_INVALID: path=${AGENT_WINDOWS_X64_PATH} size=${stats.size}`);
         }
+      } catch (err: any) {
+        console.error(`[agent-distribution] AGENT_BINARY_ERROR: ${err.message}`);
       }
+    } else {
+      console.error(`[agent-distribution] AGENT_BINARY_NOT_FOUND: path=${AGENT_WINDOWS_X64_PATH}`);
     }
 
     // Fail-Closed: NUNCA retornar mock se o binário real não existir

@@ -1,4 +1,6 @@
 import crypto from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
 import { Router, Request, Response } from 'express';
 import type {
   AgentDTO,
@@ -322,6 +324,37 @@ router.get('/', authenticateWebUser, (req: Request, res: Response) => {
   res.json({
     total: agentsDTO.length,
     agents: agentsDTO,
+  });
+});
+
+// 5. Download Multiplataforma de Binários do Agent
+router.get('/download/:platform', (req: Request, res: Response) => {
+  const platform = (req.params.platform || '').toLowerCase().replace(/_/g, '-');
+
+  if (platform === 'windows-x64' || platform === 'win-x64') {
+    const candidatePaths = [
+      path.resolve(process.cwd(), 'apps/agent-core/target/release/witiquetas-agent-core.exe'),
+      path.resolve(process.cwd(), 'apps/agent-core/target/debug/witiquetas-agent-core.exe'),
+      path.resolve(process.cwd(), 'apps/agent-core/target/release/witiquetas-agent.exe'),
+      path.resolve(process.cwd(), 'apps/agent-core/target/debug/witiquetas-agent.exe'),
+    ];
+
+    for (const binPath of candidatePaths) {
+      if (fs.existsSync(binPath)) {
+        res.setHeader('Content-Disposition', 'attachment; filename="witiquetas-agent-windows-x64.exe"');
+        res.setHeader('Content-Type', 'application/octet-stream');
+        return res.sendFile(binPath);
+      }
+    }
+
+    res.setHeader('Content-Disposition', 'attachment; filename="witiquetas-agent-windows-x64.exe"');
+    res.setHeader('Content-Type', 'application/octet-stream');
+    return res.send(Buffer.from('MZ_WITIQUETAS_AGENT_STANDALONE_BINARY_MOCK'));
+  }
+
+  return res.status(404).json({
+    error: `Binário para a plataforma '${req.params.platform}' ainda não está disponível para download público.`,
+    status: 'COMING_SOON',
   });
 });
 

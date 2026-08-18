@@ -17,10 +17,12 @@ import {
   Moon,
   Plus,
   Sparkles,
-  Maximize2
+  Maximize2,
+  Download
 } from 'lucide-react';
 import EditorLayout from './editor/EditorLayout';
 import NewTemplateWizard from './editor/NewTemplateWizard';
+import DownloadAgentModal from './agent/DownloadAgentModal';
 
 interface ServiceStatus {
   status: string;
@@ -59,6 +61,7 @@ export default function App() {
   const [lastUpdated, setLastUpdated] = useState<string>('');
   const [autoRefresh, setAutoRefresh] = useState<boolean>(true);
   const [isWizardOpen, setIsWizardOpen] = useState<boolean>(false);
+  const [isDownloadModalOpen, setIsDownloadModalOpen] = useState<boolean>(false);
 
   // Tema Claro / Escuro
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
@@ -149,6 +152,16 @@ export default function App() {
           >
             <Plus size={16} />
             <span>Nova Etiqueta (Por Nicho)</span>
+          </button>
+
+          {/* Botão Baixar Agent Multiplataforma (Fase 3) */}
+          <button 
+            className="btn"
+            onClick={() => setIsDownloadModalOpen(true)}
+            style={{ borderColor: 'var(--accent-blue)', color: 'var(--text-primary)' }}
+          >
+            <Download size={16} color="var(--accent-blue)" />
+            <span>Baixar Agent</span>
           </button>
 
           {/* Abrir Editor Direto */}
@@ -372,6 +385,56 @@ export default function App() {
             {minioStatus?.message || 'Aguardando validação de conexão...'}
           </div>
         </div>
+
+        {/* Card Agent de Impressão (Fase 3) */}
+        <div className="card">
+          <div className="card-header">
+            <div>
+              <div className="card-title">
+                <Cpu size={20} color="var(--accent-blue)" />
+                Agent de Impressão
+              </div>
+              <div className="card-subtitle">Daemon Headless de Hardware (Rust)</div>
+            </div>
+            <span className="badge badge-success">
+              <CheckCircle2 size={12} />
+              Multiplataforma
+            </span>
+          </div>
+
+          <div className="metrics">
+            <div className="metric-item">
+              <span className="metric-label">Protocolo</span>
+              <span className="metric-value">Agent Protocol v1</span>
+            </div>
+            <div className="metric-item">
+              <span className="metric-label">Transportes</span>
+              <span className="metric-value">RAW TCP • Spooler</span>
+            </div>
+            <div className="metric-item">
+              <span className="metric-label">Status</span>
+              <span className="metric-value">Pronto para Instalação</span>
+            </div>
+            <div className="metric-item">
+              <span className="metric-label">Versão</span>
+              <span className="metric-value">v0.1.0</span>
+            </div>
+          </div>
+
+          <div style={{ marginTop: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: 0 }}>
+              Conecte este computador às impressoras locais.
+            </p>
+            <button
+              className="btn btn-primary"
+              onClick={() => setIsDownloadModalOpen(true)}
+              style={{ padding: '0.45rem 0.9rem', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+            >
+              <Download size={14} />
+              <span>Baixar Agent</span>
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* Fluxo de CI/CD e Infraestrutura */}
@@ -437,6 +500,12 @@ export default function App() {
         isOpen={isWizardOpen}
         onClose={() => setIsWizardOpen(false)}
         onSuccess={() => setCurrentView('editor')}
+      />
+
+      {/* Modal de Download Multiplataforma do Agent (Fase 3) */}
+      <DownloadAgentModal
+        isOpen={isDownloadModalOpen}
+        onClose={() => setIsDownloadModalOpen(false)}
       />
     </div>
   );

@@ -439,29 +439,45 @@ router.get('/', authenticateWebUser, (req: Request, res: Response) => {
   });
 });
 
-// 5. Download Multiplataforma de Binários do Agent
+// 5. Download Multiplataforma de Binários do Agent (Windows x64 Real / Fail-Closed)
 router.get('/download/:platform', (req: Request, res: Response) => {
   const platform = (req.params.platform || '').toLowerCase().replace(/_/g, '-');
 
   if (platform === 'windows-x64' || platform === 'win-x64') {
+    const distDir = process.env.AGENT_DIST_DIR || path.resolve(process.cwd(), 'apps/backend/bin/agents');
     const candidatePaths = [
+      path.resolve(distDir, 'witiquetas-agent-windows-x64.exe'),
+      path.resolve(process.cwd(), 'apps/backend/bin/agents/witiquetas-agent-windows-x64.exe'),
       path.resolve(process.cwd(), 'apps/agent-core/target/release/witiquetas-agent-core.exe'),
-      path.resolve(process.cwd(), 'apps/agent-core/target/debug/witiquetas-agent-core.exe'),
-      path.resolve(process.cwd(), 'apps/agent-core/target/release/witiquetas-agent.exe'),
-      path.resolve(process.cwd(), 'apps/agent-core/target/debug/witiquetas-agent.exe'),
+      path.resolve(process.cwd(), 'apps/agent-core/target/release/witiquetas-agent-windows-x64.exe'),
     ];
 
     for (const binPath of candidatePaths) {
       if (fs.existsSync(binPath)) {
-        res.setHeader('Content-Disposition', 'attachment; filename="witiquetas-agent-windows-x64.exe"');
-        res.setHeader('Content-Type', 'application/octet-stream');
-        return res.sendFile(binPath);
+        try {
+          const stats = fs.statSync(binPath);
+          if (stats.size > 100000) { // Deve ser um executável plausível (> 100KB)
+            const fileBuffer = fs.readFileSync(binPath);
+            const sha256 = crypto.createHash('sha256').update(fileBuffer).digest('hex');
+
+            res.setHeader('Content-Disposition', 'attachment; filename="witiquetas-agent-windows-x64.exe"');
+            res.setHeader('Content-Type', 'application/octet-stream');
+            res.setHeader('X-Agent-Version', '0.1.0');
+            res.setHeader('X-Agent-SHA256', sha256);
+            res.setHeader('Content-Length', stats.size);
+            return res.sendFile(binPath);
+          }
+        } catch {
+          // prossegue para candidate seguinte
+        }
       }
     }
 
-    res.setHeader('Content-Disposition', 'attachment; filename="witiquetas-agent-windows-x64.exe"');
-    res.setHeader('Content-Type', 'application/octet-stream');
-    return res.send(Buffer.from('MZ_WITIQUETAS_AGENT_STANDALONE_BINARY_MOCK'));
+    // Fail-Closed: NUNCA retornar mock se o binário real não existir
+    return res.status(503).json({
+      error: 'Agent Windows x64 temporariamente indisponível.',
+      platform: 'WINDOWS_X64',
+    });
   }
 
   return res.status(404).json({

@@ -34,5 +34,11 @@ coverage/
 *.log
 logs/
 
-# Tauri / Rust (para quando o agente local for iniciado)
+# Tauri / Rust
 apps/agent-local/src-tauri/target/
+apps/agent-core/target/
+target/
+apps/backend/bin/agents/*.exe
+apps/backend/bin/agents/*.tar.gz
+apps/backend/bin/agents/*.zip
+

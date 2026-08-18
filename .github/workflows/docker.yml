@@ -10,13 +10,89 @@ permissions:
   packages: write
 
 jobs:
+  build-agent-windows:
+    name: Build Real Windows Agent (x64 PE)
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Test Agent Core
+        run: cargo test --manifest-path apps/agent-core/Cargo.toml
+
+      - name: Build Agent Core Release
+        run: cargo build --release --manifest-path apps/agent-core/Cargo.toml
+
+      - name: Validate Windows PE Executable
+        shell: pwsh
+        run: |
+          $exePath = "apps/agent-core/target/release/witiquetas-agent-core.exe"
+          if (-not (Test-Path $exePath)) {
+            Write-Error "Executavel $exePath nao foi encontrado!"
+            exit 1
+          }
+          $item = Get-Item $exePath
+          Write-Host "Tamanho do EXE: $($item.Length) bytes"
+          if ($item.Length -lt 1000000) {
+            Write-Error "Tamanho do executavel muito pequeno ($($item.Length) bytes)!"
+            exit 1
+          }
+          
+          # Teste de execucao real no runner Windows
+          Write-Host "Executando --version..."
+          & $exePath --version
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "Falha ao executar --version! ExitCode: $LASTEXITCODE"
+            exit 1
+          }
+
+          Write-Host "Executando --help..."
+          & $exePath --help
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "Falha ao executar --help! ExitCode: $LASTEXITCODE"
+            exit 1
+          }
+
+          # Calcular e exibir SHA-256
+          $hash = (Get-FileHash $exePath -Algorithm SHA256).Hash
+          Write-Host "SHA-256 do Binario Windows: $hash"
+
+          # Copiar para nome padronizado de distribuicao
+          New-Item -ItemType Directory -Force -Path "bin/agents"
+          Copy-Item $exePath "bin/agents/witiquetas-agent-windows-x64.exe" -Force
+
+      - name: Upload Windows Agent Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-windows-x64
+          path: bin/agents/witiquetas-agent-windows-x64.exe
+          if-no-files-found: error
+
   build-and-deploy:
     name: Build & Push Docker Images
+    needs: build-agent-windows
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Download Windows Agent Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: agent-windows-x64
+          path: apps/backend/bin/agents/
+
+      - name: Verify Downloaded Windows Agent
+        run: |
+          mkdir -p apps/backend/bin/agents
+          ls -la apps/backend/bin/agents/
+          test -f apps/backend/bin/agents/witiquetas-agent-windows-x64.exe
+          echo "Windows Agent pronto para inclusão na imagem Docker do Backend."
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3

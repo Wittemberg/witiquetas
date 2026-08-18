@@ -158,7 +158,7 @@ const handleVersion = (_req: Request, res: Response) => {
 
 import templatesRouter from './routes/templates';
 import compileRouter from './routes/compile';
-import agentsRouter from './routes/agents';
+import agentsRouter, { logAgentDistributionStatus } from './routes/agents';
 import printersRouter from './routes/printers';
 import printJobsRouter from './routes/printJobs';
 import qrcodesRouter from './routes/qrcodes';
@@ -167,8 +167,6 @@ import authRouter from './routes/auth';
 // Suporta tanto rotas diretas quanto rotas com prefixo /api (conforme Traefik/Nginx)
 app.use('/auth', authRouter);
 app.use('/api/auth', authRouter);
-
-import agentsRouter, { logAgentDistributionStatus } from './routes/agents.js';
 
 app.use('/templates', templatesRouter);
 app.use('/api/templates', templatesRouter);

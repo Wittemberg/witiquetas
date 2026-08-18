@@ -439,44 +439,60 @@ router.get('/', authenticateWebUser, (req: Request, res: Response) => {
   });
 });
 
-import { fileURLToPath } from 'node:url';
+// Resolução determinística do caminho do binário do Agent Windows x64:
+// Compatível com CommonJS, ESM, container Docker (WORKDIR /app/apps/backend) e ambiente de desenvolvimento.
+export function getAgentWindowsX64Path(): string {
+  if (process.env.AGENT_WINDOWS_X64_PATH) {
+    return path.resolve(process.env.AGENT_WINDOWS_X64_PATH);
+  }
 
-// Resolução explícita e determinística do caminho do binário Windows x64:
-// Em runtime ESM (tanto em src/routes quanto em dist/routes), subindo 2 níveis
-// chegamos na raiz do backend (/app/apps/backend ou <workspace>/apps/backend).
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const backendRootDir = path.resolve(__dirname, '../..');
+  // 1. Caminho relativo ao módulo compilado (dist/routes -> ../../bin/agents/...)
+  if (typeof __dirname !== 'undefined') {
+    const fromDirname = path.resolve(__dirname, '../../bin/agents/witiquetas-agent-windows-x64.exe');
+    if (fs.existsSync(fromDirname)) return fromDirname;
+  }
 
-export const AGENT_WINDOWS_X64_PATH = process.env.AGENT_WINDOWS_X64_PATH
-  ? path.resolve(process.env.AGENT_WINDOWS_X64_PATH)
-  : path.resolve(backendRootDir, 'bin/agents/witiquetas-agent-windows-x64.exe');
+  // 2. Caminho dentro do container Docker (onde WORKDIR é /app/apps/backend)
+  const fromContainerCwd = path.resolve(process.cwd(), 'bin/agents/witiquetas-agent-windows-x64.exe');
+  if (fs.existsSync(fromContainerCwd)) return fromContainerCwd;
+
+  // 3. Caminho a partir da raiz do monorepo em desenvolvimento
+  const fromMonorepoCwd = path.resolve(process.cwd(), 'apps/backend/bin/agents/witiquetas-agent-windows-x64.exe');
+  if (fs.existsSync(fromMonorepoCwd)) return fromMonorepoCwd;
+
+  // Fallback padrão para o container
+  return fromContainerCwd;
+}
+
+export const AGENT_WINDOWS_X64_PATH = getAgentWindowsX64Path();
 
 // Log de startup determinístico sem segredos
 export function logAgentDistributionStatus() {
+  const binaryPath = getAgentWindowsX64Path();
   try {
-    if (fs.existsSync(AGENT_WINDOWS_X64_PATH)) {
-      const stats = fs.statSync(AGENT_WINDOWS_X64_PATH);
-      console.log(`[agent-distribution] windows-x64: FOUND path=${AGENT_WINDOWS_X64_PATH} size=${stats.size}`);
+    if (fs.existsSync(binaryPath)) {
+      const stats = fs.statSync(binaryPath);
+      console.log(`[agent-distribution] windows-x64: FOUND path=${binaryPath} size=${stats.size}`);
     } else {
-      console.warn(`[agent-distribution] windows-x64: NOT FOUND path=${AGENT_WINDOWS_X64_PATH}`);
+      console.warn(`[agent-distribution] windows-x64: NOT FOUND path=${binaryPath}`);
     }
   } catch (err: any) {
-    console.error(`[agent-distribution] windows-x64: ERROR checking path=${AGENT_WINDOWS_X64_PATH}: ${err.message}`);
+    console.error(`[agent-distribution] windows-x64: ERROR checking path=${binaryPath}: ${err.message}`);
   }
 }
 
 // 5. Diagnóstico de Disponibilidade dos Binários
 router.get('/download-status', (_req: Request, res: Response) => {
-  const exists = fs.existsSync(AGENT_WINDOWS_X64_PATH);
+  const binaryPath = getAgentWindowsX64Path();
+  const exists = fs.existsSync(binaryPath);
   let sizeBytes = 0;
   let sha256 = '';
 
   if (exists) {
     try {
-      const stats = fs.statSync(AGENT_WINDOWS_X64_PATH);
+      const stats = fs.statSync(binaryPath);
       sizeBytes = stats.size;
-      const buffer = fs.readFileSync(AGENT_WINDOWS_X64_PATH);
+      const buffer = fs.readFileSync(binaryPath);
       sha256 = crypto.createHash('sha256').update(buffer).digest('hex');
     } catch {}
   }
@@ -496,11 +512,12 @@ router.get('/download/:platform', (req: Request, res: Response) => {
   const platform = (req.params.platform || '').toLowerCase().replace(/_/g, '-');
 
   if (platform === 'windows-x64' || platform === 'win-x64') {
-    if (fs.existsSync(AGENT_WINDOWS_X64_PATH)) {
+    const binaryPath = getAgentWindowsX64Path();
+    if (fs.existsSync(binaryPath)) {
       try {
-        const stats = fs.statSync(AGENT_WINDOWS_X64_PATH);
+        const stats = fs.statSync(binaryPath);
         if (stats.isFile() && stats.size > 1000000) { // Deve ser arquivo real > 1MB
-          const fileBuffer = fs.readFileSync(AGENT_WINDOWS_X64_PATH);
+          const fileBuffer = fs.readFileSync(binaryPath);
           const sha256 = crypto.createHash('sha256').update(fileBuffer).digest('hex');
 
           res.setHeader('Content-Disposition', 'attachment; filename="witiquetas-agent-windows-x64.exe"');
@@ -508,15 +525,15 @@ router.get('/download/:platform', (req: Request, res: Response) => {
           res.setHeader('X-Agent-Version', '0.1.0');
           res.setHeader('X-Agent-SHA256', sha256);
           res.setHeader('Content-Length', stats.size);
-          return res.sendFile(AGENT_WINDOWS_X64_PATH);
+          return res.sendFile(binaryPath);
         } else {
-          console.error(`[agent-distribution] AGENT_BINARY_INVALID: path=${AGENT_WINDOWS_X64_PATH} size=${stats.size}`);
+          console.error(`[agent-distribution] AGENT_BINARY_INVALID: path=${binaryPath} size=${stats.size}`);
         }
       } catch (err: any) {
         console.error(`[agent-distribution] AGENT_BINARY_ERROR: ${err.message}`);
       }
     } else {
-      console.error(`[agent-distribution] AGENT_BINARY_NOT_FOUND: path=${AGENT_WINDOWS_X64_PATH}`);
+      console.error(`[agent-distribution] AGENT_BINARY_NOT_FOUND: path=${binaryPath}`);
     }
 
     // Fail-Closed: NUNCA retornar mock se o binário real não existir

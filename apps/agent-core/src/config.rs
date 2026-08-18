@@ -57,17 +57,31 @@ fn default_timeout_secs() -> u64 {
 }
 
 impl AgentConfig {
-    /// Carrega configuração combinando arquivo local (se existir) e variáveis de ambiente (prioridade)
+    /// Carrega configuração combinando identidade salva, arquivo local e variáveis de ambiente
     pub fn load_auto() -> Result<Self, ConfigError> {
-        // 1. Tentar ler de arquivo se a variável WITIQUETAS_CONFIG_PATH estiver definida ou config.json existir
-        let config_path = env::var("WITIQUETAS_CONFIG_PATH").unwrap_or_else(|_| "agent_config.json".to_string());
-        let mut config = if Path::new(&config_path).exists() {
-            Self::from_file(&config_path)?
-        } else {
-            Self::default_empty()
-        };
+        let mut config = Self::default_empty();
 
-        // 2. Sobrescrever com variáveis de ambiente explícitas
+        // 1. Tentar ler identidade previamente pareada
+        if let Ok(Some(identity)) = crate::pairing::load_identity() {
+            config.backend_url = identity.backend_url;
+            config.agent_id = identity.agent_id;
+            config.installation_id = identity.installation_id;
+            config.token = identity.token;
+            if !identity.machine_name.is_empty() {
+                config.machine_name = identity.machine_name;
+            }
+        }
+
+        // 2. Tentar ler de arquivo customizado se WITIQUETAS_CONFIG_PATH estiver definida
+        if let Ok(config_path) = env::var("WITIQUETAS_CONFIG_PATH") {
+            if Path::new(&config_path).exists() {
+                if let Ok(file_cfg) = Self::from_file(&config_path) {
+                    config = file_cfg;
+                }
+            }
+        }
+
+        // 3. Sobrescrever com variáveis de ambiente explícitas (maior precedência)
         if let Ok(val) = env::var("WITIQUETAS_BACKEND_URL") {
             config.backend_url = val;
         }

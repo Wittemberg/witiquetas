@@ -83,15 +83,6 @@ export function verifyTokenHash(incomingRawToken: string, storedTokenHash: strin
   }
 }
 
-// Códigos de pareamento ativos
-const pairingCodes = new Map<string, { companyId: string; companyName: string; expiresAt: number }>();
-
-// Em desenvolvimento/testes, permitir códigos demo para testes rápidos
-if (process.env.NODE_ENV !== 'production') {
-  pairingCodes.set('WIT-2026', { companyId: 'comp-matriz-01', companyName: 'Matriz Supermercado WR', expiresAt: Date.now() + 86400000 });
-  pairingCodes.set('DEMO-PAIR', { companyId: 'comp-matriz-01', companyName: 'Matriz Supermercado WR', expiresAt: Date.now() + 86400000 });
-}
-
 const agentsStore = new Map<string, AgentRecord>();
 
 // Helper: Middleware de autenticação exclusiva de agente daemon (SHA-256 + timingSafeEqual)
@@ -175,6 +166,39 @@ export function authenticateWebUser(req: Request, res: Response, next: Function)
   return res.status(401).json({ error: 'Não autenticado. Forneça uma sessão web válida ou token administrativo.' });
 }
 
+export interface PairingCodeRecord {
+  pairingCode: string;
+  companyId: string;
+  companyName: string;
+  createdBy: string;
+  createdAt: number;
+  expiresAt: number;
+  status: 'PENDING' | 'USED' | 'EXPIRED';
+  usedAt?: string;
+  agentId?: string;
+  agentDetails?: {
+    id: string;
+    machineName: string;
+    os: string;
+    architecture: string;
+    agentVersion: string;
+  };
+}
+
+const pairingCodes = new Map<string, PairingCodeRecord>();
+const pairingFailedAttempts = new Map<string, { count: number; resetAt: number }>();
+
+function generateUnambiguousPairingCode(): string {
+  const chars = '23456789ABCDEFGHJKMNPQRSTUVWXYZ';
+  let p1 = '';
+  let p2 = '';
+  for (let i = 0; i < 4; i++) {
+    p1 += chars.charAt(Math.floor(Math.random() * chars.length));
+    p2 += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return `WIT-${p1}-${p2}`;
+}
+
 export const DEFAULT_AGENT_POLL_INTERVAL_SECONDS = 45;
 
 // 1. Gerar Código de Pareamento Temporário (Exclusivo Web/Admin com Proteção de Tenant)
@@ -192,11 +216,18 @@ router.post('/generate-pairing-code', authenticateWebUser, (req: Request, res: R
   const targetCompanyId = user.companyId !== '*' ? user.companyId : (requestedCompanyId || 'comp-matriz-01');
   const companyName = req.body.companyName || (targetCompanyId === 'comp-matriz-01' ? 'Matriz Supermercado WR' : 'Filial Supermercado WR');
 
-  const code = `WIT-${Math.floor(1000 + Math.random() * 9000)}`;
+  const code = generateUnambiguousPairingCode();
+  const now = Date.now();
+  const expiresAt = now + 15 * 60 * 1000; // 15 minutos de validade
+
   pairingCodes.set(code, {
+    pairingCode: code,
     companyId: targetCompanyId,
     companyName,
-    expiresAt: Date.now() + 15 * 60 * 1000, // 15 minutos de validade
+    createdBy: user.id,
+    createdAt: now,
+    expiresAt,
+    status: 'PENDING',
   });
 
   res.json({
@@ -207,25 +238,100 @@ router.post('/generate-pairing-code', authenticateWebUser, (req: Request, res: R
   });
 });
 
+// 1.1 Consultar Status de Pareamento (Exclusivo Web/Admin para polling amigável no modal)
+router.get('/pairing-status/:code', authenticateWebUser, (req: Request, res: Response) => {
+  const user = (req as any).user as AuthWebUser;
+  const code = (req.params.code || '').toUpperCase().trim();
+  const pairing = pairingCodes.get(code);
+
+  if (!pairing) {
+    return res.status(404).json({ error: 'Código de pareamento não encontrado.', status: 'EXPIRED' });
+  }
+
+  if (user.companyId !== '*' && pairing.companyId !== user.companyId) {
+    return res.status(403).json({ error: 'Não autorizado a consultar pareamento de outro tenant.' });
+  }
+
+  if (pairing.status === 'PENDING' && Date.now() > pairing.expiresAt) {
+    pairing.status = 'EXPIRED';
+  }
+
+  let agentRecord: AgentDTO | null = null;
+  if (pairing.agentId && agentsStore.has(pairing.agentId)) {
+    const rawAgent = agentsStore.get(pairing.agentId)!;
+    agentRecord = {
+      id: rawAgent.id,
+      companyId: rawAgent.companyId,
+      installationId: rawAgent.installationId,
+      machineName: rawAgent.machineName,
+      os: rawAgent.os,
+      architecture: rawAgent.architecture,
+      agentVersion: rawAgent.agentVersion,
+      status: rawAgent.status,
+      lastSeenAt: rawAgent.lastSeenAt,
+      createdAt: rawAgent.createdAt,
+    };
+  }
+
+  res.json({
+    pairingCode: pairing.pairingCode,
+    companyId: pairing.companyId,
+    status: pairing.status,
+    expiresAt: pairing.expiresAt,
+    agent: agentRecord || pairing.agentDetails || null,
+  });
+});
+
 // 2. Parear Agente Local (Única rota não autenticada do ciclo de vida do agente)
 router.post('/pair', (req: Request, res: Response) => {
-  const body = req.body as PairAgentRequestDTO;
+  const ip = req.ip || req.socket.remoteAddress || 'unknown';
+  const nowMs = Date.now();
 
-  if (!body.pairingCode) {
+  // Rate limit de tentativas de pareamento
+  const attempts = pairingFailedAttempts.get(ip) || { count: 0, resetAt: nowMs + 300000 };
+  if (nowMs > attempts.resetAt) {
+    attempts.count = 0;
+    attempts.resetAt = nowMs + 300000;
+  }
+
+  if (attempts.count >= 20) {
+    return res.status(429).json({ error: 'Muitas tentativas inválidas de pareamento. Aguarde alguns minutos.' });
+  }
+
+  const body = req.body as PairAgentRequestDTO;
+  const rawCode = (body.pairingCode || '').toUpperCase().trim();
+
+  if (!rawCode) {
+    attempts.count++;
+    pairingFailedAttempts.set(ip, attempts);
     return res.status(400).json({ error: 'Código de pareamento obrigatório.' });
   }
 
-  const pairing = pairingCodes.get(body.pairingCode.toUpperCase());
+  const pairing = pairingCodes.get(rawCode);
   if (!pairing) {
+    attempts.count++;
+    pairingFailedAttempts.set(ip, attempts);
     return res.status(400).json({ error: 'Código de pareamento inválido ou não encontrado.' });
   }
 
-  if (Date.now() > pairing.expiresAt) {
-    pairingCodes.delete(body.pairingCode.toUpperCase());
+  if (pairing.status === 'USED') {
+    attempts.count++;
+    pairingFailedAttempts.set(ip, attempts);
+    return res.status(409).json({ error: 'Este código de pareamento já foi utilizado por outro Agent.' });
+  }
+
+  if (nowMs > pairing.expiresAt || pairing.status === 'EXPIRED') {
+    pairing.status = 'EXPIRED';
+    attempts.count++;
+    pairingFailedAttempts.set(ip, attempts);
     return res.status(400).json({ error: 'Código de pareamento expirado. Gere um novo no painel Web.' });
   }
 
-  const installationId = `inst-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+  // Transição atômica para USED (Uso Único)
+  pairing.status = 'USED';
+  pairing.usedAt = new Date().toISOString();
+
+  const installationId = body.installationId || `inst-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
   const agentId = `agent-${Date.now()}`;
   const rawToken = `agt_live_${crypto.randomBytes(24).toString('hex')}`;
   const tokenHash = hashToken(rawToken);
@@ -246,8 +352,14 @@ router.post('/pair', (req: Request, res: Response) => {
   };
 
   agentsStore.set(agentId, newAgent);
-  // Consumir o código de uso único
-  pairingCodes.delete(body.pairingCode.toUpperCase());
+  pairing.agentId = agentId;
+  pairing.agentDetails = {
+    id: agentId,
+    machineName: newAgent.machineName,
+    os: newAgent.os,
+    architecture: newAgent.architecture,
+    agentVersion: newAgent.agentVersion,
+  };
 
   const response: PairAgentResponseDTO = {
     success: true,

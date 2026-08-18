@@ -18,11 +18,13 @@ import {
   Plus,
   Sparkles,
   Maximize2,
-  Download
+  Download,
+  KeyRound
 } from 'lucide-react';
 import EditorLayout from './editor/EditorLayout';
 import NewTemplateWizard from './editor/NewTemplateWizard';
 import DownloadAgentModal from './agent/DownloadAgentModal';
+import PairAgentModal from './agent/PairAgentModal';
 
 interface ServiceStatus {
   status: string;
@@ -62,6 +64,8 @@ export default function App() {
   const [autoRefresh, setAutoRefresh] = useState<boolean>(true);
   const [isWizardOpen, setIsWizardOpen] = useState<boolean>(false);
   const [isDownloadModalOpen, setIsDownloadModalOpen] = useState<boolean>(false);
+  const [isPairModalOpen, setIsPairModalOpen] = useState<boolean>(false);
+  const [agents, setAgents] = useState<any[]>([]);
 
   // Tema Claro / Escuro
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
@@ -82,13 +86,15 @@ export default function App() {
     setLoading(true);
     setError(null);
     try {
-      const [healthRes, versionRes] = await Promise.all([
+      const [healthRes, versionRes, agentsRes] = await Promise.all([
         fetch('/api/health').then((r) => r.json()),
         fetch('/api/version').then((r) => r.json()),
+        fetch('/api/agents', { credentials: 'include' }).then((r) => r.json()).catch(() => ({ agents: [] })),
       ]);
 
       setHealth(healthRes);
       setVersion(versionRes);
+      setAgents(agentsRes.agents || []);
       setLastUpdated(new Date().toLocaleTimeString('pt-BR'));
     } catch (err: any) {
       setError(err.message || 'Erro ao comunicar com a API Backend.');
@@ -152,6 +158,16 @@ export default function App() {
           >
             <Plus size={16} />
             <span>Nova Etiqueta (Por Nicho)</span>
+          </button>
+
+          {/* Botão Conectar Agent por Código (Fase 3) */}
+          <button 
+            className="btn"
+            onClick={() => setIsPairModalOpen(true)}
+            style={{ borderColor: '#10b981', color: 'var(--text-primary)' }}
+          >
+            <KeyRound size={16} color="#10b981" />
+            <span>Conectar Agent</span>
           </button>
 
           {/* Botão Baixar Agent Multiplataforma (Fase 3) */}
@@ -396,43 +412,59 @@ export default function App() {
               </div>
               <div className="card-subtitle">Daemon Headless de Hardware (Rust)</div>
             </div>
-            <span className="badge badge-success">
-              <CheckCircle2 size={12} />
-              Multiplataforma
-            </span>
+            {agents.length > 0 ? (
+              <span className={`badge ${agents[0].status === 'ONLINE' ? 'badge-success' : 'badge-danger'}`}>
+                {agents[0].status === 'ONLINE' ? <CheckCircle2 size={12} /> : <XCircle size={12} />}
+                {agents[0].status === 'ONLINE' ? 'Online' : 'Offline'}
+              </span>
+            ) : (
+              <span className="badge badge-warning">
+                Sem Agent
+              </span>
+            )}
           </div>
 
           <div className="metrics">
+            <div className="metric-item">
+              <span className="metric-label">Computador</span>
+              <span className="metric-value">{agents[0]?.machineName || 'Nenhum'}</span>
+            </div>
+            <div className="metric-item">
+              <span className="metric-label">Sistema / SO</span>
+              <span className="metric-value">{agents[0] ? `${agents[0].os} (${agents[0].architecture})` : 'Multiplataforma'}</span>
+            </div>
             <div className="metric-item">
               <span className="metric-label">Protocolo</span>
               <span className="metric-value">Agent Protocol v1</span>
             </div>
             <div className="metric-item">
-              <span className="metric-label">Transportes</span>
-              <span className="metric-value">RAW TCP • Spooler</span>
-            </div>
-            <div className="metric-item">
-              <span className="metric-label">Status</span>
-              <span className="metric-value">Pronto para Instalação</span>
-            </div>
-            <div className="metric-item">
               <span className="metric-label">Versão</span>
-              <span className="metric-value">v0.1.0</span>
+              <span className="metric-value">{agents[0]?.agentVersion ? `v${agents[0].agentVersion}` : 'v0.1.0'}</span>
             </div>
           </div>
 
           <div style={{ marginTop: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
             <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: 0 }}>
-              Conecte este computador às impressoras locais.
+              {agents.length > 0 ? 'Agent conectado e operando no terminal.' : 'Conecte este computador às impressoras locais.'}
             </p>
-            <button
-              className="btn btn-primary"
-              onClick={() => setIsDownloadModalOpen(true)}
-              style={{ padding: '0.45rem 0.9rem', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
-            >
-              <Download size={14} />
-              <span>Baixar Agent</span>
-            </button>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <button
+                className="btn btn-primary"
+                onClick={() => setIsPairModalOpen(true)}
+                style={{ padding: '0.45rem 0.9rem', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.4rem', background: 'linear-gradient(135deg, #10b981, #3b82f6)' }}
+              >
+                <KeyRound size={14} />
+                <span>{agents.length > 0 ? 'Conectar Outro' : 'Conectar Agent'}</span>
+              </button>
+              <button
+                className="btn"
+                onClick={() => setIsDownloadModalOpen(true)}
+                style={{ padding: '0.45rem 0.9rem', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+              >
+                <Download size={14} />
+                <span>Baixar</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -506,6 +538,13 @@ export default function App() {
       <DownloadAgentModal
         isOpen={isDownloadModalOpen}
         onClose={() => setIsDownloadModalOpen(false)}
+      />
+
+      {/* Modal de Pareamento Seguro do Agent por Código (Fase 3) */}
+      <PairAgentModal
+        isOpen={isPairModalOpen}
+        onClose={() => setIsPairModalOpen(false)}
+        onSuccess={fetchData}
       />
     </div>
   );

@@ -103,6 +103,19 @@ router.post('/', authenticateWebUser, (req: Request, res: Response) => {
     });
   }
 
+  // Validação estrita de transporte de hardware para RAW_TCP
+  if (printer.protocol === 'RAW_TCP' || printer.protocol === 'TCP' || printer.protocol === 'NETWORK') {
+    const host = printer.host?.trim();
+    if (!host) {
+      return res.status(400).json({
+        error: `Impressora '${printer.name}' (${printer.id}) não possui Host/IP configurado para o protocolo RAW TCP.`,
+      });
+    }
+    if (!printer.port) {
+      printer.port = 9100;
+    }
+  }
+
   let finalPayload = body.compiledCommand || '';
   let encoding = body.encoding || 'windows-1252';
   const targetLanguage = (body.language || printer.language || 'PPLB') as PrinterLanguage;

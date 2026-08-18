@@ -361,6 +361,8 @@ test('18. /pending com token do tenant correto retorna sucesso e isola jobs de o
     companyId: 'comp-matriz-01',
     name: 'Elgin L42 Matriz',
     protocol: 'RAW_TCP',
+    host: '192.168.1.100',
+    port: 9100,
     language: 'PPLB',
     active: true,
   } as any);

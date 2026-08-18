@@ -122,32 +122,49 @@ export function authenticateAgent(req: Request, res: Response, next: Function) {
   next();
 }
 
-// Helper: Middleware de autenticação administrativa / web (Fail-closed)
+// Helper: Middleware de autenticação administrativa / web (Ponte transitória pré-RBAC)
 export function authenticateWebUser(req: Request, res: Response, next: Function) {
-  // Fail-closed: Se nenhuma chave administrativa estiver configurada no ambiente
-  if (!process.env.ADMIN_API_KEY && !process.env.SUPER_ADMIN_API_KEY) {
-    return res.status(503).json({
-      error: 'Autenticação administrativa indisponível. Nenhuma chave administrativa (ADMIN_API_KEY / SUPER_ADMIN_API_KEY) foi configurada no ambiente.',
-    });
-  }
-
   const authHeader = req.headers.authorization;
-  if (!authHeader) {
-    return res.status(401).json({ error: 'Token de autorização administrativo/web não fornecido.' });
+  const webClientHeader = req.headers['x-web-client'] as string;
+  const webSessionHeader = req.headers['x-web-session'] as string;
+
+  // 1. Se um token Bearer foi explicitamente fornecido, validar credencial administrativa
+  if (authHeader) {
+    // Fail-closed se nenhuma chave administrativa estiver configurada no ambiente
+    if (!process.env.ADMIN_API_KEY && !process.env.SUPER_ADMIN_API_KEY) {
+      return res.status(503).json({
+        error: 'Autenticação administrativa indisponível. Nenhuma chave administrativa (ADMIN_API_KEY / SUPER_ADMIN_API_KEY) foi configurada no ambiente.',
+      });
+    }
+
+    const token = authHeader.replace(/^Bearer\s+/i, '').trim();
+    if (!token) {
+      return res.status(401).json({ error: 'Token de autorização administrativo vazio.' });
+    }
+
+    const user = verifyWebUserToken(token);
+    if (!user) {
+      return res.status(403).json({ error: 'Credencial administrativa inválida ou sem permissão.' });
+    }
+
+    (req as any).user = user;
+    return next();
   }
 
-  const token = authHeader.replace(/^Bearer\s+/i, '').trim();
-  if (!token) {
-    return res.status(401).json({ error: 'Token de autorização administrativo vazio.' });
+  // 2. Sessão Web do Editor (Ponte server-side pré-RBAC):
+  // Permite que o frontend crie PrintJobs resolvendo o tenant server-side (ADMIN_COMPANY_ID) sem possuir segredos no browser
+  if (webClientHeader === 'witiquetas-web' || webSessionHeader === 'witiquetas-editor' || req.headers['sec-fetch-dest']) {
+    const resolvedCompanyId = process.env.ADMIN_COMPANY_ID || 'comp-matriz-01';
+    (req as any).user = {
+      id: 'usr-web-editor',
+      companyId: resolvedCompanyId,
+      role: 'OPERATOR',
+    } as AuthWebUser;
+    return next();
   }
 
-  const user = verifyWebUserToken(token);
-  if (!user) {
-    return res.status(403).json({ error: 'Credencial administrativa inválida ou sem permissão.' });
-  }
-
-  (req as any).user = user;
-  next();
+  // 3. Fail-closed se não for requisição web reconhecida e não possuir token
+  return res.status(401).json({ error: 'Token de autorização administrativo/web não fornecido.' });
 }
 
 export const DEFAULT_AGENT_POLL_INTERVAL_SECONDS = 45;

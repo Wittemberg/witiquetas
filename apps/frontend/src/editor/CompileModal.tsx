@@ -34,6 +34,7 @@ export default function CompileModal({ isOpen, onClose }: CompileModalProps) {
   const [isPrinting, setIsPrinting] = useState<boolean>(false);
   const [printSuccess, setPrintSuccess] = useState<boolean>(false);
   const [printError, setPrintError] = useState<string | null>(null);
+  const [createdJobId, setCreatedJobId] = useState<string | null>(null);
 
   // Accordion avançado para visualização técnica de código
   const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
@@ -116,18 +117,22 @@ export default function CompileModal({ isOpen, onClose }: CompileModalProps) {
 
   const currentPrinter = printers.find((p) => p.id === selectedPrinterId);
 
-  // Disparar Impressão Direta
+  // Disparar Impressão Direta (Ponte Segura Web -> Backend -> PrintJob)
   const handlePrint = async () => {
     if (!selectedPrinterId) return;
 
     setIsPrinting(true);
     setPrintError(null);
     setPrintSuccess(false);
+    setCreatedJobId(null);
 
     try {
       const res = await fetch('/api/print-jobs', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-web-client': 'witiquetas-web',
+        },
         body: JSON.stringify({
           printerId: selectedPrinterId,
           document,
@@ -138,15 +143,22 @@ export default function CompileModal({ isOpen, onClose }: CompileModalProps) {
         }),
       });
 
+      if (res.status === 401 || res.status === 403 || res.status === 503) {
+        setPrintError('Não foi possível autorizar a impressão neste ambiente.');
+        return;
+      }
+
       const data = await res.json();
       if (res.ok) {
+        const jobId = data.job?.id || data.jobId || 'pendente';
+        setCreatedJobId(jobId);
         setPrintSuccess(true);
-        setTimeout(() => setPrintSuccess(false), 4000);
+        setTimeout(() => setPrintSuccess(false), 6000);
       } else {
         setPrintError(data.error || 'Falha ao enviar comando para a impressora.');
       }
     } catch (err: any) {
-      setPrintError(err.message || 'Erro na comunicação de rede com a impressora.');
+      setPrintError('Não foi possível autorizar a impressão neste ambiente.');
     } finally {
       setIsPrinting(false);
     }
@@ -385,7 +397,7 @@ export default function CompileModal({ isOpen, onClose }: CompileModalProps) {
           {printSuccess && (
             <div style={{ padding: '0.75rem', background: 'rgba(16, 185, 129, 0.15)', border: '1px solid rgba(16, 185, 129, 0.3)', borderRadius: '8px', color: 'var(--status-success)', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8rem', fontWeight: 600 }}>
               <CheckCircle2 size={16} />
-              <span>Etiqueta enviada com sucesso para a fila da impressora!</span>
+              <span>Job criado com sucesso! Aguardando Agent ({createdJobId || 'em fila'}).</span>
             </div>
           )}
 

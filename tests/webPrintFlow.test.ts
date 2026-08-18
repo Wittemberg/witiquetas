@@ -417,3 +417,124 @@ test('P0.13: Job criado para impressora RAW_TCP é consumido pelo Agent com host
   assert.ok(job.payloadBase64.length > 0);
   assert.equal(job.copies, 1);
 });
+
+test('P0.14: WINDOWS_SPOOLER não entra na validação de host TCP e cria job sem exigir host', () => {
+  printersStore.set('prn-spooler-01', {
+    id: 'prn-spooler-01',
+    companyId: 'comp-matriz-01',
+    name: 'Zebra Windows Spooler',
+    model: 'ZD220',
+    protocol: 'WINDOWS_SPOOLER',
+    spoolerName: 'ZDesigner ZD220',
+    language: 'ZPL',
+    dpi: 203,
+    active: true,
+    isDefault: false,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  });
+
+  const session = createWebSession({
+    id: 'usr-spooler-op',
+    companyId: 'comp-matriz-01',
+    role: 'OPERATOR',
+  });
+
+  const { req, res } = createMockReqRes({
+    method: 'POST',
+    url: '/',
+    headers: {
+      cookie: `witiquetas_session=${session.sessionId}`,
+    },
+    body: {
+      printerId: 'prn-spooler-01',
+      compiledCommand: '^XA^FO10,10^FDTeste^FS^XZ',
+      language: 'ZPL',
+    },
+  });
+
+  executeRouteChain(postJobHandlers, req, res);
+  assert.equal(res.statusCode, 201, 'WINDOWS_SPOOLER deve criar job sem exigir host TCP');
+  assert.equal(res.data.job.printerId, 'prn-spooler-01');
+});
+
+test('P0.15: CUPS não entra na validação de host TCP e cria job sem exigir host', () => {
+  printersStore.set('prn-cups-01', {
+    id: 'prn-cups-01',
+    companyId: 'comp-matriz-01',
+    name: 'Zebra CUPS Linux',
+    model: 'ZD220',
+    protocol: 'CUPS',
+    spoolerName: 'zebra_cups',
+    language: 'ZPL',
+    dpi: 203,
+    active: true,
+    isDefault: false,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  });
+
+  const session = createWebSession({
+    id: 'usr-cups-op',
+    companyId: 'comp-matriz-01',
+    role: 'OPERATOR',
+  });
+
+  const { req, res } = createMockReqRes({
+    method: 'POST',
+    url: '/',
+    headers: {
+      cookie: `witiquetas_session=${session.sessionId}`,
+    },
+    body: {
+      printerId: 'prn-cups-01',
+      compiledCommand: '^XA^FO10,10^FDTeste^FS^XZ',
+      language: 'ZPL',
+    },
+  });
+
+  executeRouteChain(postJobHandlers, req, res);
+  assert.equal(res.statusCode, 201, 'CUPS deve criar job sem exigir host TCP');
+  assert.equal(res.data.job.printerId, 'prn-cups-01');
+});
+
+test('P0.16: RAW_TCP com host ausente/vazio é rejeitado com 400 Bad Request', () => {
+  printersStore.set('prn-tcp-nohost', {
+    id: 'prn-tcp-nohost',
+    companyId: 'comp-matriz-01',
+    name: 'Elgin Sem Host',
+    model: 'L42',
+    protocol: 'RAW_TCP',
+    host: '   ', // HOST VAZIO
+    language: 'PPLB',
+    dpi: 203,
+    active: true,
+    isDefault: false,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  });
+
+  const session = createWebSession({
+    id: 'usr-nohost-op',
+    companyId: 'comp-matriz-01',
+    role: 'OPERATOR',
+  });
+
+  const { req, res } = createMockReqRes({
+    method: 'POST',
+    url: '/',
+    headers: {
+      cookie: `witiquetas_session=${session.sessionId}`,
+    },
+    body: {
+      printerId: 'prn-tcp-nohost',
+      compiledCommand: 'P1\n',
+      language: 'PPLB',
+    },
+  });
+
+  executeRouteChain(postJobHandlers, req, res);
+  assert.equal(res.statusCode, 400, 'RAW_TCP com host vazio deve retornar 400');
+  assert.ok(res.data.error.includes('não possui Host/IP configurado'));
+});
+

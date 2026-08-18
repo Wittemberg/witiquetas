@@ -104,7 +104,7 @@ router.post('/', authenticateWebUser, (req: Request, res: Response) => {
   }
 
   // Validação estrita de transporte de hardware para RAW_TCP
-  if (printer.protocol === 'RAW_TCP' || printer.protocol === 'TCP' || printer.protocol === 'NETWORK') {
+  if (printer.protocol === 'RAW_TCP') {
     const host = printer.host?.trim();
     if (!host) {
       return res.status(400).json({

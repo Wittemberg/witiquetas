@@ -86,6 +86,7 @@ pub use memory::{MemoryPrintEvent, MemoryTransport};
 pub use raw_tcp::RawTcpTransport;
 
 /// Roteador dinâmico de transporte selecionando RAW_TCP vs MEMORY com base no protocolo do PrintJob
+/// O roteamento é estritamente Fail-Closed: nunca usa fallback silencioso de memória para destinos físicos inválidos.
 #[derive(Debug, Clone, Default)]
 pub struct DynamicRouterTransport {
     pub memory: MemoryTransport,
@@ -112,20 +113,139 @@ impl PrinterTransport for DynamicRouterTransport {
     async fn send(&self, target: &PrinterTarget, payload: &[u8]) -> Result<TransportResult, TransportError> {
         match target.protocol.to_uppercase().as_str() {
             "RAW_TCP" | "TCP" | "NETWORK" => {
-                if target.host.is_some() {
-                    self.raw_tcp.send(target, payload).await
+                let host = target.host.as_deref().unwrap_or("").trim();
+                if host.is_empty() {
+                    Err(TransportError::InvalidTarget(
+                        "Host/IP da impressora não informado para transporte RAW TCP".to_string(),
+                    ))
                 } else {
-                    self.memory.send(target, payload).await
+                    self.raw_tcp.send(target, payload).await
                 }
             }
             "MEMORY" => self.memory.send(target, payload).await,
-            _ => {
-                if target.host.is_some() {
-                    self.raw_tcp.send(target, payload).await
-                } else {
-                    self.memory.send(target, payload).await
-                }
-            }
+            other => Err(TransportError::InvalidTarget(format!(
+                "Protocolo de transporte '{}' não suportado",
+                other
+            ))),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tokio::io::AsyncReadExt;
+    use tokio::net::TcpListener;
+
+    #[tokio::test]
+    async fn test_router_raw_tcp_with_valid_host() {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let payload = b"I8,A,001\nQ240,024\nP1\n";
+
+        let server_task = tokio::spawn(async move {
+            let (mut socket, _) = listener.accept().await.unwrap();
+            let mut buf = Vec::new();
+            socket.read_to_end(&mut buf).await.unwrap();
+            buf
+        });
+
+        let router = DynamicRouterTransport::new();
+        let target = PrinterTarget {
+            printer_id: "prn-01".to_string(),
+            name: "Zebra Rede".to_string(),
+            protocol: "RAW_TCP".to_string(),
+            host: Some("127.0.0.1".to_string()),
+            port: Some(port),
+        };
+
+        let result = router.send(&target, payload).await;
+        assert!(result.is_ok(), "RAW_TCP com host válido deve enviar com sucesso");
+        let res = result.unwrap();
+        assert_eq!(res.bytes_written, payload.len());
+
+        let received = server_task.await.unwrap();
+        assert_eq!(received, payload);
+    }
+
+    #[tokio::test]
+    async fn test_router_raw_tcp_missing_host_fails_closed() {
+        let router = DynamicRouterTransport::new();
+
+        // Host None
+        let target_none = PrinterTarget {
+            printer_id: "prn-02".to_string(),
+            name: "Zebra Sem Host".to_string(),
+            protocol: "RAW_TCP".to_string(),
+            host: None,
+            port: Some(9100),
+        };
+        let res_none = router.send(&target_none, b"test").await;
+        assert!(
+            matches!(res_none, Err(TransportError::InvalidTarget(_))),
+            "RAW_TCP sem host deve retornar InvalidTarget (NUNCA MemoryTransport)"
+        );
+
+        // Host vazio / whitespace
+        let target_empty = PrinterTarget {
+            printer_id: "prn-03".to_string(),
+            name: "Zebra Host Vazio".to_string(),
+            protocol: "RAW_TCP".to_string(),
+            host: Some("   ".to_string()),
+            port: Some(9100),
+        };
+        let res_empty = router.send(&target_empty, b"test").await;
+        assert!(
+            matches!(res_empty, Err(TransportError::InvalidTarget(_))),
+            "RAW_TCP com host em branco deve retornar InvalidTarget"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_router_memory_protocol() {
+        let router = DynamicRouterTransport::new();
+        let target = PrinterTarget::memory("Impressora Virtual");
+
+        let result = router.send(&target, b"MEMORY TEST").await;
+        assert!(result.is_ok(), "protocol MEMORY deve usar MemoryTransport");
+        let history = router.memory.get_history();
+        assert_eq!(history.len(), 1);
+        assert_eq!(history[0].payload, b"MEMORY TEST");
+    }
+
+    #[tokio::test]
+    async fn test_router_unknown_protocol_with_host_fails_closed() {
+        let router = DynamicRouterTransport::new();
+        let target = PrinterTarget {
+            printer_id: "prn-04".to_string(),
+            name: "Impressora Bluetooth".to_string(),
+            protocol: "BLUETOOTH".to_string(),
+            host: Some("192.168.1.50".to_string()),
+            port: Some(9100),
+        };
+
+        let result = router.send(&target, b"test").await;
+        assert!(
+            matches!(result, Err(TransportError::InvalidTarget(msg)) if msg.contains("não suportado")),
+            "Protocolo desconhecido mesmo com host deve retornar InvalidTarget"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_router_unknown_protocol_without_host_fails_closed() {
+        let router = DynamicRouterTransport::new();
+        let target = PrinterTarget {
+            printer_id: "prn-05".to_string(),
+            name: "Impressora Serial".to_string(),
+            protocol: "SERIAL_RS232".to_string(),
+            host: None,
+            port: None,
+        };
+
+        let result = router.send(&target, b"test").await;
+        assert!(
+            matches!(result, Err(TransportError::InvalidTarget(msg)) if msg.contains("não suportado")),
+            "Protocolo desconhecido sem host deve retornar InvalidTarget"
+        );
     }
 }

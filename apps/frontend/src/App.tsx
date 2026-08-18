@@ -413,28 +413,26 @@ export default function App() {
             </div>
           </div>
 
-          <div style={{ marginTop: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
-            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: 0 }}>
-              {agents.length > 0 ? 'Agent conectado e operando no terminal.' : 'Conecte este computador às impressoras locais.'}
-            </p>
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
-              <button
-                className="btn btn-primary"
-                onClick={() => setIsPairModalOpen(true)}
-                style={{ padding: '0.45rem 0.9rem', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.4rem', background: 'linear-gradient(135deg, #10b981, #3b82f6)' }}
-              >
-                <KeyRound size={14} />
-                <span>Conectar Agent</span>
-              </button>
-              <button
-                className="btn"
-                onClick={() => setIsDownloadModalOpen(true)}
-                style={{ padding: '0.45rem 0.9rem', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
-              >
-                <Download size={14} />
-                <span>Baixar Agent</span>
-              </button>
-            </div>
+          <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '0.75rem 0 0 0' }}>
+            {agents.length > 0 ? 'Agent conectado e operando no terminal.' : 'Conecte este computador às impressoras locais.'}
+          </p>
+
+          <div className="card-actions">
+            <button
+              className="btn btn-primary"
+              onClick={() => setIsPairModalOpen(true)}
+              style={{ background: 'linear-gradient(135deg, #10b981, #3b82f6)' }}
+            >
+              <KeyRound size={15} />
+              <span>Conectar Agent</span>
+            </button>
+            <button
+              className="btn"
+              onClick={() => setIsDownloadModalOpen(true)}
+            >
+              <Download size={15} />
+              <span>Baixar Agent</span>
+            </button>
           </div>
         </div>
       </div>

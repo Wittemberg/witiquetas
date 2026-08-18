@@ -122,11 +122,11 @@ export function authenticateAgent(req: Request, res: Response, next: Function) {
   next();
 }
 
-// Helper: Middleware de autenticação administrativa / web (Ponte transitória pré-RBAC)
+import { parseCookies, getWebSession, SESSION_COOKIE_NAME } from './auth.js';
+
+// Helper: Middleware de autenticação administrativa / web (Sessão Web Server-Side Pré-RBAC + Bearer Admin)
 export function authenticateWebUser(req: Request, res: Response, next: Function) {
   const authHeader = req.headers.authorization;
-  const webClientHeader = req.headers['x-web-client'] as string;
-  const webSessionHeader = req.headers['x-web-session'] as string;
 
   // 1. Se um token Bearer foi explicitamente fornecido, validar credencial administrativa
   if (authHeader) {
@@ -151,20 +151,26 @@ export function authenticateWebUser(req: Request, res: Response, next: Function)
     return next();
   }
 
-  // 2. Sessão Web do Editor (Ponte server-side pré-RBAC):
-  // Permite que o frontend crie PrintJobs resolvendo o tenant server-side (ADMIN_COMPANY_ID) sem possuir segredos no browser
-  if (webClientHeader === 'witiquetas-web' || webSessionHeader === 'witiquetas-editor' || req.headers['sec-fetch-dest']) {
-    const resolvedCompanyId = process.env.ADMIN_COMPANY_ID || 'comp-matriz-01';
-    (req as any).user = {
-      id: 'usr-web-editor',
-      companyId: resolvedCompanyId,
-      role: 'OPERATOR',
-    } as AuthWebUser;
-    return next();
+  // 2. Cookie de Sessão Web Server-Side (Pré-RBAC):
+  // Valida o cookie HttpOnly 'witiquetas_session' contra o store de sessões em memória
+  const cookies = parseCookies(req.headers.cookie);
+  const sessionId = cookies[SESSION_COOKIE_NAME];
+
+  if (sessionId) {
+    const session = getWebSession(sessionId);
+    if (session) {
+      (req as any).user = {
+        id: session.userId,
+        companyId: session.companyId,
+        role: session.role,
+      } as AuthWebUser;
+      return next();
+    }
+    return res.status(401).json({ error: 'Sessão web expirada ou inválida.' });
   }
 
-  // 3. Fail-closed se não for requisição web reconhecida e não possuir token
-  return res.status(401).json({ error: 'Token de autorização administrativo/web não fornecido.' });
+  // 3. Fail-closed se não possuir sessão válida nem token administrativo
+  return res.status(401).json({ error: 'Não autenticado. Forneça uma sessão web válida ou token administrativo.' });
 }
 
 export const DEFAULT_AGENT_POLL_INTERVAL_SECONDS = 45;

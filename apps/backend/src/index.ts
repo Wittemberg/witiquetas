@@ -162,8 +162,12 @@ import agentsRouter from './routes/agents';
 import printersRouter from './routes/printers';
 import printJobsRouter from './routes/printJobs';
 import qrcodesRouter from './routes/qrcodes';
+import authRouter from './routes/auth';
 
 // Suporta tanto rotas diretas quanto rotas com prefixo /api (conforme Traefik/Nginx)
+app.use('/auth', authRouter);
+app.use('/api/auth', authRouter);
+
 app.use('/templates', templatesRouter);
 app.use('/api/templates', templatesRouter);
 

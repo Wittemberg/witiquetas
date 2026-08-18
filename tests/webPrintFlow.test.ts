@@ -16,6 +16,12 @@ import agentsRouter, {
   authenticateWebUser,
   type AuthWebUser,
 } from '../apps/backend/src/routes/agents.js';
+import authRouter, {
+  webSessionsStore,
+  createWebSession,
+  getWebSession,
+  SESSION_COOKIE_NAME,
+} from '../apps/backend/src/routes/auth.js';
 import { printersStore } from '../apps/backend/src/routes/printers.js';
 
 // Setup de chaves administrativas dinâmicas injetadas via ENV para os testes (sem hardcode)
@@ -50,6 +56,7 @@ function createMockReqRes(options: {
 }) {
   let statusCode = 200;
   let responseData: any = null;
+  const headersSet: Record<string, string> = {};
 
   const req: any = {
     method: options.method,
@@ -72,6 +79,13 @@ function createMockReqRes(options: {
       responseData = data;
       return res;
     },
+    setHeader(name: string, value: string) {
+      headersSet[name.toLowerCase()] = value;
+      return res;
+    },
+    getHeader(name: string) {
+      return headersSet[name.toLowerCase()];
+    },
     get statusCode() {
       return statusCode;
     },
@@ -83,12 +97,247 @@ function createMockReqRes(options: {
   return { req, res };
 }
 
-// Obter handlers da rota POST / em printJobsRouter
+// Handlers das rotas
 const postJobHandlers = (printJobsRouter as any).routes.find(
   (r: any) => r.method === 'POST' && r.path === '/'
 ).handlers;
 
-test('Segurança Web: 1. Frontend source não contém ADMIN_API_KEY hardcoded nem em variáveis', () => {
+const postAuthSessionHandlers = (authRouter as any).routes.find(
+  (r: any) => r.method === 'POST' && r.path === '/pre-rbac-session'
+).handlers;
+
+const postLogoutHandlers = (authRouter as any).routes.find(
+  (r: any) => r.method === 'POST' && r.path === '/logout'
+).handlers;
+
+const getSessionHandlers = (authRouter as any).routes.find(
+  (r: any) => r.method === 'GET' && r.path === '/session'
+).handlers;
+
+// ============================================================================
+// SUÍTE P0: AUTENTICAÇÃO WEB REAL PRÉ-RBAC
+// ============================================================================
+
+test('P0.1: Header declaratório x-web-client sozinho NÃO autentica -> retorna 401', () => {
+  const { req, res } = createMockReqRes({
+    method: 'POST',
+    url: '/',
+    headers: { 'x-web-client': 'witiquetas-web' },
+    body: { printerId: 'prn-gondola-elgin-tcp', compiledCommand: 'P1\n', language: 'PPLB' },
+  });
+  executeRouteChain(postJobHandlers, req, res);
+  assert.equal(res.statusCode, 401, 'x-web-client sozinho deve retornar 401');
+});
+
+test('P0.2: Header declaratório x-web-session sozinho NÃO autentica -> retorna 401', () => {
+  const { req, res } = createMockReqRes({
+    method: 'POST',
+    url: '/',
+    headers: { 'x-web-session': 'witiquetas-editor' },
+    body: { printerId: 'prn-gondola-elgin-tcp', compiledCommand: 'P1\n', language: 'PPLB' },
+  });
+  executeRouteChain(postJobHandlers, req, res);
+  assert.equal(res.statusCode, 401, 'x-web-session sozinho deve retornar 401');
+});
+
+test('P0.3: Header declaratório sec-fetch-dest sozinho NÃO autentica -> retorna 401', () => {
+  const { req, res } = createMockReqRes({
+    method: 'POST',
+    url: '/',
+    headers: { 'sec-fetch-dest': 'empty' },
+    body: { printerId: 'prn-gondola-elgin-tcp', compiledCommand: 'P1\n', language: 'PPLB' },
+  });
+  executeRouteChain(postJobHandlers, req, res);
+  assert.equal(res.statusCode, 401, 'sec-fetch-dest sozinho deve retornar 401');
+});
+
+test('P0.4: Todos os headers declaratórios combinados sem cookie -> retorna 401', () => {
+  const { req, res } = createMockReqRes({
+    method: 'POST',
+    url: '/',
+    headers: {
+      'x-web-client': 'witiquetas-web',
+      'x-web-session': 'witiquetas-editor',
+      'sec-fetch-dest': 'empty',
+      origin: 'https://witiquetas.wrtec.com.br',
+      referer: 'https://witiquetas.wrtec.com.br/',
+    },
+    body: { printerId: 'prn-gondola-elgin-tcp', compiledCommand: 'P1\n', language: 'PPLB' },
+  });
+  executeRouteChain(postJobHandlers, req, res);
+  assert.equal(res.statusCode, 401, 'Headers combinados sem cookie/token devem retornar 401');
+});
+
+test('P0.5: API key inválida no bootstrap de sessão -> retorna 403', () => {
+  const { req, res } = createMockReqRes({
+    method: 'POST',
+    url: '/pre-rbac-session',
+    body: { apiKey: 'chave_totalmente_invalida' },
+  });
+  executeRouteChain(postAuthSessionHandlers, req, res);
+  assert.equal(res.statusCode, 403, 'Chave inválida no bootstrap deve retornar 403');
+  assert.equal(res.getHeader('set-cookie'), undefined, 'Nenhum cookie de sessão pode ser emitido');
+});
+
+test('P0.6: API key válida no bootstrap -> cria sessão server-side e emite cookie HttpOnly', () => {
+  const { req, res } = createMockReqRes({
+    method: 'POST',
+    url: '/pre-rbac-session',
+    body: { apiKey: testAdminKeyMatriz },
+  });
+  executeRouteChain(postAuthSessionHandlers, req, res);
+  assert.equal(res.statusCode, 200, 'Bootstrap com chave válida deve retornar 200');
+  assert.ok(res.data.success);
+  assert.equal(res.data.user.companyId, 'comp-matriz-01');
+
+  const setCookie = res.getHeader('set-cookie');
+  assert.ok(setCookie, 'Header Set-Cookie deve ser emitido');
+  assert.ok(setCookie.includes('witiquetas_session='), 'Cookie deve se chamar witiquetas_session');
+  assert.ok(setCookie.includes('HttpOnly'), 'Cookie DEVE ser HttpOnly');
+  assert.ok(setCookie.includes('Path=/'), 'Cookie DEVE ter Path=/');
+});
+
+test('P0.7: Cookie de sessão válido em POST /print-jobs -> cria PrintJob autorizado com tenant server-side', () => {
+  // Cria sessão legítima no store
+  const session = createWebSession({
+    id: 'usr-matriz-op',
+    companyId: 'comp-matriz-01',
+    role: 'OPERATOR',
+  });
+
+  const { req, res } = createMockReqRes({
+    method: 'POST',
+    url: '/',
+    headers: {
+      cookie: `witiquetas_session=${session.sessionId}`,
+    },
+    body: {
+      printerId: 'prn-gondola-elgin-tcp',
+      compiledCommand: 'N\nq800\nQ240,24\nB40,40,0,1,2,6,50,B,"7894900011517"\nA40,120,0,4,1,1,N,"WITIQUETAS TESTE"\nP1\n',
+      language: 'PPLB',
+      copies: 1,
+    },
+  });
+
+  executeRouteChain(postJobHandlers, req, res);
+
+  assert.equal(res.statusCode, 201, `Job deve ser criado com 201. Erro: ${JSON.stringify(res.data)}`);
+  assert.ok(res.data.success);
+  assert.ok(res.data.job.id.startsWith('job-'));
+  assert.equal(res.data.job.companyId, 'comp-matriz-01', 'Tenant deve vir exclusivamente da sessão do backend');
+  assert.equal(res.data.job.status, 'PENDING');
+  assert.equal(res.data.job.printerId, 'prn-gondola-elgin-tcp');
+});
+
+test('P0.8: Sessão expirada -> retorna 401', () => {
+  const expiredSessionId = 'sess_expirada_' + crypto.randomBytes(16).toString('hex');
+  webSessionsStore.set(expiredSessionId, {
+    sessionId: expiredSessionId,
+    userId: 'usr-exp',
+    companyId: 'comp-matriz-01',
+    role: 'OPERATOR',
+    createdAt: Date.now() - 100000,
+    expiresAt: Date.now() - 1000, // EXPIRADA
+  });
+
+  const { req, res } = createMockReqRes({
+    method: 'POST',
+    url: '/',
+    headers: {
+      cookie: `witiquetas_session=${expiredSessionId}`,
+    },
+    body: {
+      printerId: 'prn-gondola-elgin-tcp',
+      compiledCommand: 'P1\n',
+      language: 'PPLB',
+    },
+  });
+
+  executeRouteChain(postJobHandlers, req, res);
+  assert.equal(res.statusCode, 401, 'Sessão expirada deve retornar 401');
+});
+
+test('P0.9: Sessão de tenant A NÃO cria job em impressora do tenant B -> retorna 403 Forbidden', () => {
+  // Impressora da Filial
+  printersStore.set('prn-filial-01', {
+    id: 'prn-filial-01',
+    companyId: 'comp-filial-999',
+    name: 'Zebra Filial',
+    model: 'ZD220',
+    protocol: 'RAW_TCP',
+    host: '192.168.1.250',
+    port: 9100,
+    language: 'ZPL',
+    dpi: 203,
+    active: true,
+    isDefault: false,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  });
+
+  // Sessão do operador da Matriz
+  const sessionMatriz = createWebSession({
+    id: 'usr-matriz-op',
+    companyId: 'comp-matriz-01',
+    role: 'OPERATOR',
+  });
+
+  const { req, res } = createMockReqRes({
+    method: 'POST',
+    url: '/',
+    headers: {
+      cookie: `witiquetas_session=${sessionMatriz.sessionId}`,
+    },
+    body: {
+      printerId: 'prn-filial-01',
+      compiledCommand: '^XA^FO50,50^FDTeste^FS^XZ',
+      language: 'ZPL',
+    },
+  });
+
+  executeRouteChain(postJobHandlers, req, res);
+  assert.equal(res.statusCode, 403, 'Operador da Matriz não pode enviar job para impressora da Filial');
+  assert.ok(res.data.error.includes('Não autorizado a enviar jobs para impressora da empresa'));
+});
+
+test('P0.10: Logout invalida sessão e limpa cookie -> chamadas subsequentes retornam 401', () => {
+  const session = createWebSession({
+    id: 'usr-logout-op',
+    companyId: 'comp-matriz-01',
+    role: 'OPERATOR',
+  });
+
+  // 1. Executar logout
+  const { req: reqLogout, res: resLogout } = createMockReqRes({
+    method: 'POST',
+    url: '/logout',
+    headers: {
+      cookie: `witiquetas_session=${session.sessionId}`,
+    },
+  });
+  executeRouteChain(postLogoutHandlers, reqLogout, resLogout);
+  assert.equal(resLogout.statusCode, 200);
+  assert.equal(getWebSession(session.sessionId), null, 'Sessão deve ser removida do store');
+  assert.ok(resLogout.getHeader('set-cookie').includes('Max-Age=0'), 'Cookie deve ser zerado no logout');
+
+  // 2. Tentar criar job com a sessão deslogada
+  const { req: reqJob, res: resJob } = createMockReqRes({
+    method: 'POST',
+    url: '/',
+    headers: {
+      cookie: `witiquetas_session=${session.sessionId}`,
+    },
+    body: {
+      printerId: 'prn-gondola-elgin-tcp',
+      compiledCommand: 'P1\n',
+      language: 'PPLB',
+    },
+  });
+  executeRouteChain(postJobHandlers, reqJob, resJob);
+  assert.equal(resJob.statusCode, 401, 'Sessão invalidada deve retornar 401');
+});
+
+test('P0.11: Frontend source NÃO contém ADMIN_API_KEY nem SUPER_ADMIN_API_KEY', () => {
   const frontendSrcDir = path.resolve(process.cwd(), 'apps/frontend/src');
   const files: string[] = [];
 
@@ -122,36 +371,13 @@ test('Segurança Web: 1. Frontend source não contém ADMIN_API_KEY hardcoded ne
   }
 });
 
-test('Segurança Web: 2. Print job via sessão Web autoriza sem expor tokens e resolve tenant server-side', () => {
+test('P0.12: Token de Agente NÃO funciona como credencial/sessão Web em POST /print-jobs', () => {
   const { req, res } = createMockReqRes({
     method: 'POST',
     url: '/',
     headers: {
-      'x-web-client': 'witiquetas-web',
+      authorization: 'Bearer agt_live_token_do_daemon_123',
     },
-    body: {
-      printerId: 'prn-gondola-elgin-tcp',
-      compiledCommand: 'N\nq800\nQ240,24\nB40,40,0,1,2,6,50,B,"7894900011517"\nA40,120,0,4,1,1,N,"WITIQUETAS TESTE"\nP1\n',
-      language: 'PPLB',
-      copies: 1,
-    },
-  });
-
-  executeRouteChain(postJobHandlers, req, res);
-
-  assert.equal(res.statusCode, 201, `Job deve ser criado com 201. Erro: ${JSON.stringify(res.data)}`);
-  assert.ok(res.data.success);
-  assert.ok(res.data.job.id.startsWith('job-'));
-  assert.equal(res.data.job.companyId, 'comp-matriz-01', 'Tenant deve ser resolvido server-side como comp-matriz-01');
-  assert.equal(res.data.job.status, 'PENDING');
-  assert.equal(res.data.job.printerId, 'prn-gondola-elgin-tcp');
-});
-
-test('Segurança Web: 3. Requisição anônima sem header web e sem token é rejeitada com 401 fail-closed', () => {
-  const { req, res } = createMockReqRes({
-    method: 'POST',
-    url: '/',
-    headers: {}, // SEM TOKEN E SEM X-WEB-CLIENT
     body: {
       printerId: 'prn-gondola-elgin-tcp',
       compiledCommand: 'P1\n',
@@ -160,85 +386,10 @@ test('Segurança Web: 3. Requisição anônima sem header web e sem token é rej
   });
 
   executeRouteChain(postJobHandlers, req, res);
-
-  assert.equal(res.statusCode, 401, 'Requisição anônima deve ser rejeitada com 401');
-  assert.ok(!res.data?.job);
+  assert.equal(res.statusCode, 403, 'Token de agente não é chave administrativa e deve retornar 403');
 });
 
-test('Segurança Web: 4. Tenant incorreto é rejeitado com 403 Forbidden', () => {
-  // Cria impressora de outra empresa no store
-  printersStore.set('prn-filial-01', {
-    id: 'prn-filial-01',
-    companyId: 'comp-filial-999', // Empresa diferente de comp-matriz-01
-    name: 'Zebra Filial',
-    model: 'ZD220',
-    protocol: 'RAW_TCP',
-    host: '192.168.1.250',
-    port: 9100,
-    language: 'ZPL',
-    dpi: 203,
-    active: true,
-    isDefault: false,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  });
-
-  const { req, res } = createMockReqRes({
-    method: 'POST',
-    url: '/',
-    headers: {
-      'x-web-client': 'witiquetas-web', // Web user com tenant resolvido comp-matriz-01
-    },
-    body: {
-      printerId: 'prn-filial-01',
-      compiledCommand: '^XA^FO50,50^FDTeste^FS^XZ',
-      language: 'ZPL',
-    },
-  });
-
-  executeRouteChain(postJobHandlers, req, res);
-
-  assert.equal(res.statusCode, 403, 'Acesso a impressora de outro tenant deve retornar 403');
-  assert.ok(res.data.error.includes('Não autorizado a enviar jobs para impressora da empresa'));
-});
-
-test('Segurança Web: 5. RAW_TCP sem host na impressora é rejeitado com 400 Bad Request', () => {
-  printersStore.set('prn-sem-ip', {
-    id: 'prn-sem-ip',
-    companyId: 'comp-matriz-01',
-    name: 'Zebra Sem IP',
-    model: 'ZD220',
-    protocol: 'RAW_TCP',
-    host: undefined, // SEM HOST
-    port: 9100,
-    language: 'PPLB',
-    dpi: 203,
-    active: true,
-    isDefault: false,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  });
-
-  const { req, res } = createMockReqRes({
-    method: 'POST',
-    url: '/',
-    headers: {
-      'x-web-client': 'witiquetas-web',
-    },
-    body: {
-      printerId: 'prn-sem-ip',
-      compiledCommand: 'P1\n',
-      language: 'PPLB',
-    },
-  });
-
-  executeRouteChain(postJobHandlers, req, res);
-
-  assert.equal(res.statusCode, 400, 'RAW_TCP sem host configurado deve retornar 400');
-  assert.ok(res.data.error.includes('não possui Host/IP configurado'));
-});
-
-test('Segurança Web: 6. Job criado para impressora RAW_TCP é consumido pelo Agent com host e port corretos', () => {
+test('P0.13: Job criado para impressora RAW_TCP é consumido pelo Agent com host e port corretos', () => {
   const printer = printersStore.get('prn-gondola-elgin-tcp')!;
   assert.ok(printer, 'Impressora padrão deve existir');
   assert.equal(printer.protocol, 'RAW_TCP');

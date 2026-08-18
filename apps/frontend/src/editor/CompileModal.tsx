@@ -129,9 +129,9 @@ export default function CompileModal({ isOpen, onClose }: CompileModalProps) {
     try {
       const res = await fetch('/api/print-jobs', {
         method: 'POST',
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
-          'x-web-client': 'witiquetas-web',
         },
         body: JSON.stringify({
           printerId: selectedPrinterId,

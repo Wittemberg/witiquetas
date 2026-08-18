@@ -150,36 +150,6 @@ export default function App() {
             {theme === 'dark' ? <Sun size={18} color="#f59e0b" /> : <Moon size={18} color="#3b82f6" />}
           </button>
 
-          {/* Botão Nova Etiqueta (com seleção de nicho) */}
-          <button 
-            className="btn btn-primary"
-            onClick={() => setIsWizardOpen(true)}
-            style={{ background: 'linear-gradient(135deg, #10b981, #06b6d4)', boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)' }}
-          >
-            <Plus size={16} />
-            <span>Nova Etiqueta (Por Nicho)</span>
-          </button>
-
-          {/* Botão Conectar Agent por Código (Fase 3) */}
-          <button 
-            className="btn"
-            onClick={() => setIsPairModalOpen(true)}
-            style={{ borderColor: '#10b981', color: 'var(--text-primary)' }}
-          >
-            <KeyRound size={16} color="#10b981" />
-            <span>Conectar Agent</span>
-          </button>
-
-          {/* Botão Baixar Agent Multiplataforma (Fase 3) */}
-          <button 
-            className="btn"
-            onClick={() => setIsDownloadModalOpen(true)}
-            style={{ borderColor: 'var(--accent-blue)', color: 'var(--text-primary)' }}
-          >
-            <Download size={16} color="var(--accent-blue)" />
-            <span>Baixar Agent</span>
-          </button>
-
           {/* Abrir Editor Direto */}
           <button 
             className="btn"
@@ -454,7 +424,7 @@ export default function App() {
                 style={{ padding: '0.45rem 0.9rem', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.4rem', background: 'linear-gradient(135deg, #10b981, #3b82f6)' }}
               >
                 <KeyRound size={14} />
-                <span>{agents.length > 0 ? 'Conectar Outro' : 'Conectar Agent'}</span>
+                <span>Conectar Agent</span>
               </button>
               <button
                 className="btn"
@@ -462,7 +432,7 @@ export default function App() {
                 style={{ padding: '0.45rem 0.9rem', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
               >
                 <Download size={14} />
-                <span>Baixar</span>
+                <span>Baixar Agent</span>
               </button>
             </div>
           </div>

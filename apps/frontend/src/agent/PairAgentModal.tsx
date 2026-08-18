@@ -156,9 +156,9 @@ export default function PairAgentModal({ isOpen, onClose, onSuccess }: PairAgent
   };
 
   return (
-    <div className="modal-backdrop" onClick={onClose} style={{ zIndex: 10000 }}>
+    <div className="wizard-modal-overlay" onClick={onClose}>
       <div
-        className="modal-content"
+        className="wizard-modal-content"
         onClick={(e) => e.stopPropagation()}
         style={{
           maxWidth: '560px',
@@ -170,7 +170,7 @@ export default function PairAgentModal({ isOpen, onClose, onSuccess }: PairAgent
           overflow: 'hidden',
           borderRadius: '16px',
           border: '1px solid var(--border-color)',
-          background: 'var(--bg-modal)',
+          background: 'var(--modal-bg)',
           boxShadow: '0 20px 50px rgba(0, 0, 0, 0.4)',
         }}
       >

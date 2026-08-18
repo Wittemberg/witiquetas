@@ -416,22 +416,34 @@ body {
 }
 
 /* ==========================================================================
-   WIZARD DE NICHO & FORMATOS (SEM OVERFLOW, SEM CORTE DE BADGES)
+   WIZARD DE NICHO & FORMATOS / MODAIS DO SISTEMA
    ========================================================================== */
 
-.wizard-modal-overlay {
+:root {
+  --modal-bg: #1e293b;
+  --bg-modal: #1e293b;
+}
+
+[data-theme="light"] {
+  --modal-bg: #ffffff;
+  --bg-modal: #ffffff;
+}
+
+.wizard-modal-overlay,
+.modal-backdrop {
   position: fixed;
   inset: 0;
   background-color: rgba(0, 0, 0, 0.75);
   backdrop-filter: blur(8px);
-  z-index: 100;
+  z-index: 10000;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 1.5rem;
 }
 
-.wizard-modal-content {
+.wizard-modal-content,
+.modal-content {
   width: min(94vw, 1080px);
   max-height: 90vh;
   background-color: var(--modal-bg);

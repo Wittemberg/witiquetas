@@ -116,9 +116,9 @@ export default function DownloadAgentModal({ isOpen, onClose }: DownloadAgentMod
   };
 
   return (
-    <div className="modal-backdrop" onClick={onClose} style={{ zIndex: 10000 }}>
+    <div className="wizard-modal-overlay" onClick={onClose}>
       <div
-        className="modal-content"
+        className="wizard-modal-content"
         onClick={(e) => e.stopPropagation()}
         style={{
           maxWidth: '720px',
@@ -130,7 +130,7 @@ export default function DownloadAgentModal({ isOpen, onClose }: DownloadAgentMod
           overflow: 'hidden',
           borderRadius: '16px',
           border: '1px solid var(--border-color)',
-          background: 'var(--bg-modal)',
+          background: 'var(--modal-bg)',
           boxShadow: '0 20px 50px rgba(0, 0, 0, 0.4)',
         }}
       >

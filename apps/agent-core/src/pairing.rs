@@ -58,31 +58,21 @@ pub fn get_identity_path() -> PathBuf {
 
     #[cfg(target_os = "windows")]
     {
-        if let Ok(program_data) = env::var("ProgramData") {
-            let dir = PathBuf::from(program_data).join("Witiquetas").join("Agent");
-            if fs::create_dir_all(&dir).is_ok() {
-                return dir.join("identity.json");
-            }
-        }
-        if let Ok(appdata) = env::var("APPDATA") {
-            let dir = PathBuf::from(appdata).join("Witiquetas").join("Agent");
-            if fs::create_dir_all(&dir).is_ok() {
-                return dir.join("identity.json");
-            }
-        }
+        let program_data = env::var("ProgramData").unwrap_or_else(|_| "C:\\ProgramData".to_string());
+        let dir = PathBuf::from(program_data).join("Witiquetas").join("Agent");
+        let _ = fs::create_dir_all(&dir);
+        return dir.join("identity.json");
     }
 
     #[cfg(not(target_os = "windows"))]
     {
         if let Ok(home) = env::var("HOME") {
             let dir = PathBuf::from(home).join(".config").join("witiquetas").join("agent");
-            if fs::create_dir_all(&dir).is_ok() {
-                return dir.join("identity.json");
-            }
+            let _ = fs::create_dir_all(&dir);
+            return dir.join("identity.json");
         }
+        PathBuf::from("witiquetas-agent-identity.json")
     }
-
-    PathBuf::from("witiquetas-agent-identity.json")
 }
 
 /// Carrega a identidade do Agent se o arquivo existir

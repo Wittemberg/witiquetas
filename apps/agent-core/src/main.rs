@@ -1,46 +1,48 @@
-pub mod config;
-pub mod identity;
-pub mod pairing;
-pub mod payload;
-pub mod protocol;
-pub mod runtime;
-pub mod transport;
-
-use config::AgentConfig;
-use runtime::AgentRuntime;
 use std::env;
-use transport::DynamicRouterTransport;
+use witiquetas_agent_core::config::{self, AgentConfig};
+use witiquetas_agent_core::logging::init_logging;
+use witiquetas_agent_core::pairing;
+use witiquetas_agent_core::runtime::AgentRuntime;
+use witiquetas_agent_core::service;
+use witiquetas_agent_core::transport::DynamicRouterTransport;
+
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = env::args().collect();
 
+    // 1. Despacho de Serviço Windows Control Manager (SCM)
+    if args.iter().any(|arg| arg == "--run-service") {
+        return service::run_service();
+    }
+
+    // 2. Comandos Administrativos de Gerenciamento do Windows Service
+    if args.iter().any(|arg| arg == "--install-service") {
+        return service::install_service();
+    }
+
+    if args.iter().any(|arg| arg == "--uninstall-service") {
+        return service::uninstall_service();
+    }
+
+    if args.iter().any(|arg| arg == "--service-status") {
+        return service::service_status();
+    }
+
+    // 3. Informações de Versão
     if args.iter().any(|arg| arg == "--version" || arg == "-v") {
         println!("Witiquetas Agent Core v{}", config::CURRENT_AGENT_VERSION);
         return Ok(());
     }
 
+    // 4. Manual de Ajuda
     if args.iter().any(|arg| arg == "--help" || arg == "-h") {
-        println!("Witiquetas Print Runtime & Agent Core Headless");
-        println!();
-        println!("USO:");
-        println!("  witiquetas-agent-core [OPÇÕES]");
-        println!();
-        println!("OPÇÕES:");
-        println!("  --pair, --repair   Executa o assistente interativo para conectar à sua empresa.");
-        println!("  --code <CÓDIGO>    Informa o código de pareamento diretamente via linha de comando.");
-        println!("  --backend-url <URL> URL do servidor Witiquetas (padrão: https://witiquetas.wrtec.com.br).");
-        println!("  --single-run       Executa um único ciclo de polling e encerra.");
-        println!("  -v, --version      Exibe a versão do Agent Core.");
-        println!("  -h, --help         Exibe esta mensagem de ajuda.");
-        println!();
-        println!("VARIÁVEIS DE AMBIENTE:");
-        println!("  WITIQUETAS_BACKEND_URL       URL base da API backend");
-        println!("  WITIQUETAS_AGENT_ID          ID único do agente local");
-        println!("  WITIQUETAS_AGENT_TOKEN       Token de autenticação do agente");
-        println!("  WITIQUETAS_CONFIG_PATH       Caminho personalizado para o arquivo de identidade local");
+        print_help();
         return Ok(());
     }
+
+    // Inicializar subsistema de logging no modo interativo
+    let _log_guard = init_logging(false);
 
     let is_force_pair = args.iter().any(|arg| arg == "--pair" || arg == "--repair" || arg == "-p");
     let is_single_run = args.iter().any(|arg| arg == "--single-run") || env::var("WITIQUETAS_SINGLE_RUN").unwrap_or_default() == "1";
@@ -111,6 +113,33 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     start_agent_runtime(config, is_single_run).await
+}
+
+fn print_help() {
+    println!("================================================================");
+    println!(" Witiquetas Print Runtime & Windows Service (v{})", config::CURRENT_AGENT_VERSION);
+    println!("================================================================");
+    println!();
+    println!("USO:");
+    println!("  witiquetas-agent-windows-x64.exe [OPÇÕES]");
+    println!();
+    println!("GERENCIAMENTO DO SERVIÇO WINDOWS (Requer Administrador):");
+    println!("  --install-service     Instala e inicia como Windows Service automático permanente.");
+    println!("  --uninstall-service   Para e remove o Windows Service do sistema.");
+    println!("  --service-status      Consulta o status atual do serviço no Windows Service Manager.");
+    println!();
+    println!("PAREAMENTO E OPERAÇÃO:");
+    println!("  --pair, --repair      Inicia o assistente para conectar ou reconectar o computador.");
+    println!("  --code <CÓDIGO>       Informa o código de pareamento diretamente (ex: WIT-7K4P-92MX).");
+    println!("  --backend-url <URL>   Sobrescreve a URL do servidor Witiquetas.");
+    println!("  --single-run          Executa um único ciclo de polling e encerra com diagnóstico.");
+    println!("  -v, --version         Exibe a versão do Agent.");
+    println!("  -h, --help            Exibe esta mensagem de ajuda.");
+    println!();
+    println!("LOCAIS DE ARMAZENAMENTO PADRÃO:");
+    println!("  Identidade:           %ProgramData%\\Witiquetas\\Agent\\identity.json");
+    println!("  Logs Rotativos:       %ProgramData%\\Witiquetas\\Agent\\logs\\witiquetas-agent.log");
+    println!("================================================================");
 }
 
 async fn start_agent_runtime(config: AgentConfig, is_single_run: bool) -> Result<(), Box<dyn std::error::Error>> {

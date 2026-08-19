@@ -443,7 +443,7 @@ impl<T: PrinterTransport + Clone + 'static> AgentRuntime<T> {
 
     async fn run_single_tick(&mut self, backoff: &mut BackoffManager) {
         if self.state == AgentOperationalState::AuthRequired {
-            warn!("[Agent] Estado AUTH_REQUIRED: Credenciais revogadas ou não autorizadas no servidor. Aguardando novo pareamento (--pair)...");
+            warn!("[Agent] Estado AUTH_REQUIRED: Credenciais revogadas ou não autorizadas no servidor. Para reconectar, execute: witiquetas-agent-windows-x64.exe --pair");
             sleep(Duration::from_secs(60)).await;
             return;
         }
@@ -453,21 +453,47 @@ impl<T: PrinterTransport + Clone + 'static> AgentRuntime<T> {
                 backoff.reset();
                 sleep(Duration::from_secs(self.config.poll_interval_secs)).await;
             }
-            Err(ClientError::ApiError { status, message }) if status == 401 || status == 403 => {
-                error!(
+            Err(ref e) if e.is_auth_error() => {
+                let status = match e {
+                    ClientError::ApiError { status, .. } => *status,
+                    _ => 401,
+                };
+                warn!(
                     status = status,
-                    message = %message,
-                    "[Segurança] Token ou Agent revogado/não autorizado pelo servidor. Entrando em estado AUTH_REQUIRED."
+                    "[Segurança] Credencial do Agent revogada ou inválida (HTTP {}). Entrando em estado AUTH_REQUIRED. Execute com --pair para novo pareamento.",
+                    status
                 );
                 self.state = AgentOperationalState::AuthRequired;
                 sleep(Duration::from_secs(60)).await;
             }
-            Err(e) => {
+            Err(ref e) if e.is_protocol_or_config_error() => {
+                let status = match e {
+                    ClientError::ApiError { status, .. } => *status,
+                    _ => 405,
+                };
+                error!(
+                    status = status,
+                    "[Configuração/Protocolo] Endpoint recusado pelo servidor (HTTP {}). Verifique a URL do backend configurada: {}",
+                    status, self.config.backend_url
+                );
+                self.state = AgentOperationalState::Degraded(format!("Erro de rota/protocolo HTTP {}", status));
+                sleep(Duration::from_secs(60)).await;
+            }
+            Err(ref e) if e.is_transient_network_error() => {
                 let wait_dur = backoff.next();
                 debug!(
                     error = %e,
                     retry_in_secs = wait_dur.as_secs(),
-                    "[Agent] Backend temporariamente indisponível. Aplicando backoff progressivo..."
+                    "[Agent] Backend temporariamente indisponível (falha transitória). Aplicando backoff progressivo..."
+                );
+                sleep(wait_dur).await;
+            }
+            Err(e) => {
+                let wait_dur = backoff.next();
+                warn!(
+                    error = %e,
+                    retry_in_secs = wait_dur.as_secs(),
+                    "[Agent] Erro de comunicação com o backend. Aguardando próximo intervalo..."
                 );
                 sleep(wait_dur).await;
             }

@@ -10,6 +10,7 @@ use tokio::sync::Mutex;
 use witiquetas_agent_core::config::AgentConfig;
 use witiquetas_agent_core::logging::sanitize_for_log;
 use witiquetas_agent_core::pairing::{load_identity, save_identity, AgentIdentityData};
+use witiquetas_agent_core::protocol::client::{build_api_url, ClientError};
 use witiquetas_agent_core::runtime::{
     format_user_facing_error, AgentOperationalState, AgentRuntime, BackoffManager,
     USER_FRIENDLY_PRINTER_UNREACHABLE_MSG,
@@ -19,9 +20,12 @@ use witiquetas_agent_core::transport::{
     TransportResult,
 };
 
+static ENV_MUTEX: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
 /// 1. Teste: Identidade persiste em disco e sobrevive a restart
 #[test]
 fn test_identity_survives_restart() {
+    let _lock = ENV_MUTEX.lock().unwrap();
     let temp_dir = env::temp_dir().join(format!("witiquetas_test_ident_{}", rand_id()));
     let _ = fs::create_dir_all(&temp_dir);
     let config_path = temp_dir.join("identity.json");
@@ -53,6 +57,7 @@ fn test_identity_survives_restart() {
     assert_eq!(loaded.company_id.as_deref(), Some("comp-filial-02"));
 
     // Cleanup
+    env::remove_var("WITIQUETAS_CONFIG_PATH");
     let _ = fs::remove_dir_all(&temp_dir);
 }
 
@@ -195,12 +200,11 @@ fn test_log_sanitization_never_logs_tokens() {
 /// 8. Teste: Backend offline -> Agent continua vivo e reconecta automaticamente quando o servidor responde
 #[tokio::test]
 async fn test_backend_offline_and_reconnection() {
-    // Inicializar mini mock server HTTP
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let port = listener.local_addr().unwrap().port();
     let backend_url = format!("http://127.0.0.1:{}", port);
 
-    // Responder HTTP 200 Heartbeat
+    // Responder HTTP 200 Heartbeat na rota canônica /api/agents/heartbeat
     tokio::spawn(async move {
         while let Ok((mut socket, _)) = listener.accept().await {
             let mut buf = [0u8; 1024];
@@ -238,6 +242,7 @@ async fn test_backend_offline_and_reconnection() {
 /// 9. Teste: HTTP 401/403 coloca Agent em estado AUTH_REQUIRED sem destruir a identidade local
 #[tokio::test]
 async fn test_auth_revocation_enters_auth_required_state() {
+    let _lock = ENV_MUTEX.lock().unwrap();
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let port = listener.local_addr().unwrap().port();
     let backend_url = format!("http://127.0.0.1:{}", port);
@@ -296,7 +301,119 @@ async fn test_auth_revocation_enters_auth_required_state() {
     // Identidade local continua preservada no disco (NÃO deve ser apagada)
     assert!(config_path.exists(), "Identidade local deve ser preservada em 401/403");
 
+    env::remove_var("WITIQUETAS_CONFIG_PATH");
     let _ = fs::remove_dir_all(&temp_dir);
+}
+
+/// 10. Teste: Resolução estrita de URLs canônicas da API pública
+#[test]
+fn test_canonical_api_urls_resolution() {
+    // 1. Sem /api
+    assert_eq!(
+        build_api_url("https://witiquetas.wrtec.com.br", "/agents/heartbeat"),
+        "https://witiquetas.wrtec.com.br/api/agents/heartbeat"
+    );
+
+    // 2. Com trailing slash
+    assert_eq!(
+        build_api_url("https://witiquetas.wrtec.com.br/", "/agents/heartbeat"),
+        "https://witiquetas.wrtec.com.br/api/agents/heartbeat"
+    );
+
+    // 3. Já contendo /api
+    assert_eq!(
+        build_api_url("https://witiquetas.wrtec.com.br/api", "/agents/heartbeat"),
+        "https://witiquetas.wrtec.com.br/api/agents/heartbeat"
+    );
+
+    // 4. Já contendo /api/
+    assert_eq!(
+        build_api_url("https://witiquetas.wrtec.com.br/api/", "/agents/heartbeat"),
+        "https://witiquetas.wrtec.com.br/api/agents/heartbeat"
+    );
+
+    // 5. Print jobs pending
+    assert_eq!(
+        build_api_url("https://witiquetas.wrtec.com.br", "/print-jobs/pending"),
+        "https://witiquetas.wrtec.com.br/api/print-jobs/pending"
+    );
+
+    // 6. Print jobs status
+    assert_eq!(
+        build_api_url("https://witiquetas.wrtec.com.br", "/print-jobs/job-xyz/status"),
+        "https://witiquetas.wrtec.com.br/api/print-jobs/job-xyz/status"
+    );
+
+    // 7. Pairing endpoint
+    assert_eq!(
+        build_api_url("https://witiquetas.wrtec.com.br", "/agents/pair"),
+        "https://witiquetas.wrtec.com.br/api/agents/pair"
+    );
+}
+
+/// 11. Teste: Falha no novo pareamento (--repair) preserva intacta a identidade anterior
+#[tokio::test]
+async fn test_failed_repair_preserves_old_identity() {
+    let _lock = ENV_MUTEX.lock().unwrap();
+    let temp_dir = env::temp_dir().join(format!("witiquetas_repair_preserve_{}", rand_id()));
+    let _ = fs::create_dir_all(&temp_dir);
+    let config_path = temp_dir.join("identity.json");
+    env::set_var("WITIQUETAS_CONFIG_PATH", &config_path);
+
+    let old_identity = AgentIdentityData {
+        config_version: 1,
+        agent_id: "agent-antigo-01".to_string(),
+        installation_id: "inst-antigo-123".to_string(),
+        token: "agt_live_old_valid_token".to_string(),
+        backend_url: "https://witiquetas.wrtec.com.br".to_string(),
+        company_id: Some("comp-matriz".to_string()),
+        machine_name: "PDV-01".to_string(),
+        paired_at: "2026-08-18T10:00:00Z".to_string(),
+    };
+    save_identity(&old_identity).expect("Falha ao salvar identidade inicial");
+
+    // Tentativa de pareamento com servidor que responde 404 (falha forçada)
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let port = listener.local_addr().unwrap().port();
+    let server_url = format!("http://127.0.0.1:{}", port);
+
+    tokio::spawn(async move {
+        if let Ok((mut socket, _)) = listener.accept().await {
+            let mut buf = [0u8; 1024];
+            let _ = socket.read(&mut buf).await;
+            let response = "HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
+            let _ = socket.write_all(response.as_bytes()).await;
+        }
+    });
+
+    let repair_result = witiquetas_agent_core::pairing::run_interactive_pairing(
+        Some(server_url),
+        Some("WIT-FAIL-9999".to_string()),
+    )
+    .await;
+
+    assert!(repair_result.is_err(), "Pareamento com erro deve falhar");
+
+    // Verificar se a identidade original permanece intacta
+    let current_identity = load_identity().expect("Leitura da identidade falhou").expect("Identidade deve existir");
+    assert_eq!(current_identity.agent_id, "agent-antigo-01");
+    assert_eq!(current_identity.token, "agt_live_old_valid_token");
+    assert_eq!(current_identity.machine_name, "PDV-01");
+
+    env::remove_var("WITIQUETAS_CONFIG_PATH");
+    let _ = fs::remove_dir_all(&temp_dir);
+}
+
+/// 12. Teste: HTTP 405 não é classificado como transitório de rede
+#[test]
+fn test_error_405_is_protocol_not_transient() {
+    let err_405 = ClientError::ApiError {
+        status: 405,
+        message: "Method Not Allowed".to_string(),
+    };
+    assert!(err_405.is_protocol_or_config_error());
+    assert!(!err_405.is_transient_network_error());
+    assert!(!err_405.is_auth_error());
 }
 
 /// Helper para simular transporte com falha controlável

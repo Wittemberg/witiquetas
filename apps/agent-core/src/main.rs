@@ -144,11 +144,14 @@ fn print_help() {
 
 async fn start_agent_runtime(config: AgentConfig, is_single_run: bool) -> Result<(), Box<dyn std::error::Error>> {
     println!("--------------------------------------------------");
-    println!(" Witiquetas Agent v{}", config.agent_version);
-    println!(" Computador: {}", config.machine_name);
-    println!(" Status: Conectado");
-    println!(" Backend: {}", config.backend_url);
-    println!(" Aguardando trabalhos de impressão...");
+    println!(" Witiquetas Agent de Impressão (v{})", config.agent_version);
+    println!(" Identidade existente encontrada.");
+    println!(" Agent ID:    {}", config.agent_id);
+    println!(" Computador:  {}", config.machine_name);
+    println!(" Backend:     {}", config.backend_url);
+    println!(" Status:      Conectando...");
+    println!();
+    println!(" Para realizar novo pareamento, execute com --pair.");
     println!("--------------------------------------------------");
 
     let router_transport = DynamicRouterTransport::new();

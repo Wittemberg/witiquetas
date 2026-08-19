@@ -165,7 +165,7 @@ pub async fn run_interactive_pairing(
         .timeout(std::time::Duration::from_secs(20))
         .build()?;
 
-    let pair_endpoint = format!("{}/api/agents/pair", backend_url.trim_end_matches('/'));
+    let pair_endpoint = crate::protocol::client::build_api_url(&backend_url, "/agents/pair");
 
     let request_body = PairAgentRequest {
         pairing_code: pairing_code.clone(),

@@ -62,23 +62,31 @@ export function invalidateWebSession(sessionId: string): boolean {
   return webSessionsStore.delete(sessionId);
 }
 
-// 1. Bootstrap de Sessão Pré-RBAC (Validação de Chave Administrativa -> Cookie HttpOnly)
+// 1. PRE-RBAC / TEMPORÁRIA: Bootstrap de Sessão Server-Side
+// Permite ao Dashboard obter sessão web válida com cookie HttpOnly para o tenant configurado.
 router.post('/pre-rbac-session', (req: Request, res: Response) => {
-  // Fail-closed se nenhuma chave administrativa estiver configurada no ambiente
+  // Fail-closed se nenhuma chave administrativa estiver configurada no ambiente do servidor
   if (!process.env.ADMIN_API_KEY && !process.env.SUPER_ADMIN_API_KEY) {
     return res.status(503).json({
       error: 'Autenticação administrativa indisponível. Nenhuma chave administrativa foi configurada no ambiente.',
     });
   }
 
-  const apiKey = req.body?.apiKey || (req.headers.authorization ? req.headers.authorization.replace(/^Bearer\s+/i, '').trim() : '');
-  if (!apiKey) {
-    return res.status(403).json({ error: 'Credencial administrativa de homologação não fornecida.' });
-  }
+  const explicitApiKey = req.body?.apiKey || (req.headers.authorization ? req.headers.authorization.replace(/^Bearer\s+/i, '').trim() : '');
+  let user: AuthWebUser | null = null;
 
-  const user = verifyWebUserToken(apiKey);
-  if (!user) {
-    return res.status(403).json({ error: 'Credencial administrativa de homologação inválida.' });
+  if (explicitApiKey) {
+    user = verifyWebUserToken(explicitApiKey);
+    if (!user) {
+      return res.status(403).json({ error: 'Credencial administrativa de homologação inválida.' });
+    }
+  } else {
+    // PRE-RBAC / TEMPORÁRIA: Inicialização controlada server-side da sessão web para o tenant configurado
+    user = {
+      id: 'usr-admin',
+      companyId: process.env.ADMIN_COMPANY_ID || 'comp-matriz-01',
+      role: 'ADMIN',
+    };
   }
 
   const session = createWebSession(user);

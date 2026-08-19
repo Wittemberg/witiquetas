@@ -13,6 +13,7 @@ import {
   ShieldCheck,
   Terminal,
 } from 'lucide-react';
+import { ensurePreRbacSession } from '../auth/session';
 
 interface PairAgentModalProps {
   isOpen: boolean;
@@ -55,6 +56,12 @@ export default function PairAgentModal({ isOpen, onClose, onSuccess }: PairAgent
     setPairedAgent(null);
 
     try {
+      // PRE-RBAC / TEMPORÁRIA: Garante que a sessão Web esteja válida antes de solicitar o código
+      const session = await ensurePreRbacSession();
+      if (!session.authenticated) {
+        throw new Error('Não foi possível iniciar o pareamento. A sessão do Witiquetas não está disponível.');
+      }
+
       const res = await fetch('/api/agents/generate-pairing-code', {
         method: 'POST',
         credentials: 'include',
@@ -65,8 +72,11 @@ export default function PairAgentModal({ isOpen, onClose, onSuccess }: PairAgent
       });
 
       if (!res.ok) {
+        if (res.status === 401 || res.status === 403) {
+          throw new Error('Não foi possível iniciar o pareamento. A sessão do Witiquetas não está disponível.');
+        }
         const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || 'Não foi possível gerar código de pareamento.');
+        throw new Error(data.error || 'Não foi possível iniciar o pareamento. A sessão do Witiquetas não está disponível.');
       }
 
       const data: PairingData = await res.json();
@@ -250,10 +260,10 @@ export default function PairAgentModal({ isOpen, onClose, onSuccess }: PairAgent
               }}
             >
               <AlertCircle size={20} />
-              <div style={{ flex: 1 }}>
-                <strong>Falha ao gerar pareamento:</strong> {error}
+              <div style={{ flex: 1, fontSize: '0.9rem', lineHeight: '1.4' }}>
+                {error}
               </div>
-              <button className="btn" onClick={generateCode} style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem' }}>
+              <button className="btn" onClick={generateCode} style={{ padding: '0.4rem 0.75rem', fontSize: '0.85rem' }}>
                 Tentar novamente
               </button>
             </div>

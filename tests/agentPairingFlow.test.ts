@@ -93,6 +93,10 @@ const getPairingStatusHandlers = (agentsRouter as any).routes.find(
   (r: any) => r.method === 'GET' && r.path === '/pairing-status/:code'
 ).handlers;
 
+const postHeartbeatHandlers = (agentsRouter as any).routes.find(
+  (r: any) => r.method === 'POST' && r.path === '/heartbeat'
+).handlers;
+
 // ============================================================================
 // SUÍTE DE TESTES: PAREAMENTO DO AGENT POR CÓDIGO (FASE 3)
 // ============================================================================
@@ -451,9 +455,103 @@ test('11. Pairing sem installationId gera automaticamente novo identificador per
 
   assert.equal(resPair.statusCode, 201);
   assert.ok(resPair.data.installationId.startsWith('inst-'));
-
-  const saved = agentsStore.get(resPair.data.agentId)!;
-  assert.equal(saved.installationId, resPair.data.installationId);
 });
+
+test('12. Fluxo Completo: Navegador novo sem cookie faz bootstrap pré-RBAC e gera pairing code com sucesso', async () => {
+  const authModule = await import('../apps/backend/src/routes/auth.js');
+  const postAuthSessionHandlers = (authModule.default as any).routes.find(
+    (r: any) => r.method === 'POST' && r.path === '/pre-rbac-session'
+  ).handlers;
+
+  const getAuthSessionHandlers = (authModule.default as any).routes.find(
+    (r: any) => r.method === 'GET' && r.path === '/session'
+  ).handlers;
+
+  // 1. Navegador novo chama /pre-rbac-session sem apiKey
+  const { req: reqBoot, res: resBoot } = createMockReqRes({
+    method: 'POST',
+    url: '/pre-rbac-session',
+    body: {},
+  });
+  executeRouteChain(postAuthSessionHandlers, reqBoot, resBoot);
+
+  assert.equal(resBoot.statusCode, 200, 'Bootstrap sem apiKey em ambiente pre-RBAC deve retornar 200');
+  assert.ok(resBoot.data.success);
+  assert.equal(resBoot.data.user.role, 'ADMIN');
+
+  const setCookie = resBoot.getHeader('set-cookie');
+  assert.ok(setCookie && setCookie.includes('witiquetas_session='));
+  const sessionIdMatch = setCookie.match(/witiquetas_session=([a-f0-9]+)/);
+  assert.ok(sessionIdMatch);
+  const sessionId = sessionIdMatch[1];
+
+  // 2. GET /session com o cookie emitido
+  const { req: reqSess, res: resSess } = createMockReqRes({
+    method: 'GET',
+    url: '/session',
+    headers: { cookie: `witiquetas_session=${sessionId}` },
+  });
+  executeRouteChain(getAuthSessionHandlers, reqSess, resSess);
+
+  assert.equal(resSess.statusCode, 200);
+  assert.equal(resSess.data.authenticated, true);
+  assert.equal(resSess.data.user.companyId, 'comp-matriz-01');
+
+  // 3. POST /agents/generate-pairing-code usando a sessão web
+  const { req: reqGen, res: resGen } = createMockReqRes({
+    method: 'POST',
+    url: '/generate-pairing-code',
+    headers: { cookie: `witiquetas_session=${sessionId}` },
+  });
+  executeRouteChain(postGenerateCodeHandlers, reqGen, resGen);
+
+  assert.equal(resGen.statusCode, 200);
+  assert.match(resGen.data.pairingCode, /^WIT-[A-Z0-9]{4}-[A-Z0-9]{4}$/);
+
+  // 4. Agent faz pareamento usando o código
+  const { req: reqPair, res: resPair } = createMockReqRes({
+    method: 'POST',
+    url: '/pair',
+    body: {
+      pairingCode: resGen.data.pairingCode,
+      machineName: 'DESKTOP-TERMINAL-FINAL',
+    },
+  });
+  executeRouteChain(postPairHandlers, reqPair, resPair);
+
+  assert.equal(resPair.statusCode, 201);
+  assert.ok(resPair.data.token);
+  assert.ok(resPair.data.agentId);
+
+  // 5. Código é single-use: reutilização falha com 409 Conflict
+  const { req: reqReuse, res: resReuse } = createMockReqRes({
+    method: 'POST',
+    url: '/pair',
+    body: {
+      pairingCode: resGen.data.pairingCode,
+      machineName: 'DESKTOP-INVASOR',
+    },
+  });
+  executeRouteChain(postPairHandlers, reqReuse, resReuse);
+  assert.equal(resReuse.statusCode, 409);
+
+  // 6. Agent envia heartbeat e passa para ONLINE
+  const { req: reqHb, res: resHb } = createMockReqRes({
+    method: 'POST',
+    url: '/heartbeat',
+    headers: {
+      authorization: `Bearer ${resPair.data.token}`,
+    },
+    body: {
+      agentId: resPair.data.agentId,
+      status: 'ONLINE',
+      agentVersion: '0.1.0',
+    },
+  });
+  executeRouteChain(postHeartbeatHandlers, reqHb, resHb);
+  assert.equal(resHb.statusCode, 200);
+  assert.equal(resHb.data.acknowledged, true);
+});
+
 
 

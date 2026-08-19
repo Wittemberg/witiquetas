@@ -25,6 +25,7 @@ import EditorLayout from './editor/EditorLayout';
 import NewTemplateWizard from './editor/NewTemplateWizard';
 import DownloadAgentModal from './agent/DownloadAgentModal';
 import PairAgentModal from './agent/PairAgentModal';
+import { ensurePreRbacSession } from './auth/session';
 
 interface ServiceStatus {
   status: string;
@@ -86,6 +87,9 @@ export default function App() {
     setLoading(true);
     setError(null);
     try {
+      // PRE-RBAC / TEMPORÁRIA: Garante sessão web válida no backend
+      await ensurePreRbacSession();
+
       const [healthRes, versionRes, agentsRes] = await Promise.all([
         fetch('/api/health').then((r) => r.json()),
         fetch('/api/version').then((r) => r.json()),

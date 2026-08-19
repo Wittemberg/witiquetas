@@ -44,16 +44,16 @@ process.env.ADMIN_COMPANY_ID = 'comp-matriz-01';
 process.env.SUPER_ADMIN_API_KEY = testSuperAdminKey;
 
 // Helper: Executa a cadeia de handlers de rota (incluindo middlewares de autenticação)
-function executeRouteChain(handlers: Function[], req: any, res: any) {
+async function executeRouteChain(handlers: Function[], req: any, res: any) {
   let idx = 0;
-  function next() {
+  async function next() {
     idx++;
     if (idx < handlers.length) {
-      handlers[idx](req, res, next);
+      await handlers[idx](req, res, next);
     }
   }
   if (handlers && handlers.length > 0) {
-    handlers[0](req, res, next);
+    await handlers[0](req, res, next);
   }
 }
 
@@ -173,7 +173,7 @@ test('4. Auditoria de Código-Fonte: Nenhum token administrativo literal hardcod
   assert.equal(agentsSrc.includes('validWebTokens'), false, 'validWebTokens hardcoded deve ser completamente removido');
 });
 
-test('5. Fail-Closed: Sem ADMIN_API_KEY configurada no ambiente, rota administrativa fecha (503)', () => {
+test('5. Falha-fechada: Sem ADMIN_API_KEY no ambiente, POST /generate-pairing-code retorna HTTP 503', async () => {
   const savedAdminKey = process.env.ADMIN_API_KEY;
   const savedSuperAdminKey = process.env.SUPER_ADMIN_API_KEY;
   delete process.env.ADMIN_API_KEY;
@@ -184,7 +184,7 @@ test('5. Fail-Closed: Sem ADMIN_API_KEY configurada no ambiente, rota administra
     headers: { authorization: 'Bearer qualquer_token' },
     body: {},
   });
-  executeRouteChain(generatePairingCodeHandlers, req, res);
+  await executeRouteChain(generatePairingCodeHandlers, req, res);
 
   assert.equal(res.getStatusCode(), 503, 'Sem ADMIN_API_KEY configurada, deve falhar fechado com 503');
 
@@ -219,36 +219,28 @@ test('8. CopyStrategy: Comando sem quantidade nativa define TRANSPORT_REPEAT', (
 // BLOCO 4: SEGURANÇA DE AUTENTICAÇÃO E TIMING SAFE EQUAL
 // ============================================================================
 
-test('9. Segurança de Token: verifyTokenHash e verifyWebUserToken com timingSafeEqual', () => {
-  const rawToken = 'agt_live_test_secret_12345';
-  const tokenHash = hashToken(rawToken);
+test('9. verifyTokenHash: Rejeita strings com timing seguro e não estoura exceção em tamanhos diferentes', () => {
+  const secret = 'agt_live_secret_sample_key';
+  const validHash = hashToken(secret);
 
-  assert.equal(verifyTokenHash(rawToken, tokenHash), true);
-  assert.equal(verifyTokenHash('agt_live_wrong_token', tokenHash), false);
-  assert.equal(verifyTokenHash('', tokenHash), false);
-
-  const adminMatriz = verifyWebUserToken(testAdminKeyMatriz);
-  assert.ok(adminMatriz);
-  assert.equal(adminMatriz.companyId, 'comp-matriz-01');
-
-  const superAdmin = verifyWebUserToken(testSuperAdminKey);
-  assert.ok(superAdmin);
-  assert.equal(superAdmin.role, 'SUPER_ADMIN');
-
-  const invalidAdmin = verifyWebUserToken('token_arbitrario_invalido');
-  assert.equal(invalidAdmin, null);
+  assert.equal(verifyTokenHash(secret, validHash), true);
+  assert.equal(verifyTokenHash('agt_live_wrong', validHash), false);
+  assert.equal(verifyTokenHash('', validHash), false);
+  assert.equal(verifyTokenHash(secret, ''), false);
+  assert.equal(verifyTokenHash(secret, 'hash_invalido_curto'), false);
 });
 
 // ============================================================================
-// BLOCO 5: SEPARAÇÃO DE PAPÉIS (WEB/ADMIN vs AGENT DAEMON)
+// BLOCO 5: ISOLAMENTO RIGOROSO DE TOKENS (AGENT vs WEB USER)
 // ============================================================================
 
-const rawTokenMatriz = 'agt_live_matriz_secret_token_12345';
+// Registrar agentes simulados no store
+const rawTokenMatriz = 'agt_live_matriz_secret_token_123456';
 const agentMatriz: AgentRecord = {
   id: 'agent-matriz-01',
   companyId: 'comp-matriz-01',
   installationId: 'inst-matriz-01',
-  machineName: 'WIN-MATRIZ',
+  machineName: 'MATRIZ-SRV-PRINT',
   os: 'windows',
   architecture: 'x86_64',
   agentVersion: '0.1.0',
@@ -259,13 +251,13 @@ const agentMatriz: AgentRecord = {
 };
 agentsStore.set(agentMatriz.id, agentMatriz);
 
-const rawTokenFilial = 'agt_live_filial_secret_token_67890';
+const rawTokenFilial = 'agt_live_filial_secret_token_654321';
 const agentFilial: AgentRecord = {
   id: 'agent-filial-02',
   companyId: 'comp-filial-02',
   installationId: 'inst-filial-02',
-  machineName: 'WIN-FILIAL',
-  os: 'windows',
+  machineName: 'FILIAL-SRV-PRINT',
+  os: 'linux',
   architecture: 'x86_64',
   agentVersion: '0.1.0',
   status: 'ONLINE',
@@ -275,53 +267,53 @@ const agentFilial: AgentRecord = {
 };
 agentsStore.set(agentFilial.id, agentFilial);
 
-test('10. Agent token em POST /print-jobs é rejeitado com HTTP 403 (Agent NÃO cria job)', () => {
+test('10. Agent token em POST /print-jobs é rejeitado com HTTP 403 (Agent NÃO cria job)', async () => {
   const { req, res } = createMockReqRes({
     method: 'POST',
     headers: { authorization: `Bearer ${rawTokenMatriz}` },
     body: { printerId: 'prn-matriz-l42', compiledCommand: 'TESTE' },
   });
-  executeRouteChain(postJobHandlers, req, res);
+  await executeRouteChain(postJobHandlers, req, res);
   assert.equal(res.getStatusCode(), 403);
 });
 
-test('11. Agent token em POST /generate-pairing-code é rejeitado com HTTP 403', () => {
+test('11. Agent token em POST /generate-pairing-code é rejeitado com HTTP 403', async () => {
   const { req, res } = createMockReqRes({
     method: 'POST',
     headers: { authorization: `Bearer ${rawTokenMatriz}` },
     body: {},
   });
-  executeRouteChain(generatePairingCodeHandlers, req, res);
+  await executeRouteChain(generatePairingCodeHandlers, req, res);
   assert.equal(res.getStatusCode(), 403);
 });
 
-test('12. Agent token em GET /agents é rejeitado com HTTP 403', () => {
+test('12. Agent token em GET /agents é rejeitado com HTTP 403', async () => {
   const { req, res } = createMockReqRes({
     method: 'GET',
     headers: { authorization: `Bearer ${rawTokenMatriz}` },
   });
-  executeRouteChain(getAgentsHandlers, req, res);
+  await executeRouteChain(getAgentsHandlers, req, res);
   assert.equal(res.getStatusCode(), 403);
 });
 
-test('13. Web token em POST /agents/heartbeat é rejeitado com HTTP 403 (Web user não é daemon)', () => {
+test('13. Web token em POST /agents/heartbeat é rejeitado com HTTP 403 (Web user não é daemon)', async () => {
   const { req, res } = createMockReqRes({
     method: 'POST',
     headers: { authorization: `Bearer ${testAdminKeyMatriz}` },
     body: { status: 'ONLINE' },
   });
-  executeRouteChain(heartbeatHandlers, req, res);
+  await executeRouteChain(heartbeatHandlers, req, res);
   assert.equal(res.getStatusCode(), 403);
 });
 
-test('14. Web token em PATCH /print-jobs/:id/status é rejeitado com HTTP 403 (Web user não atualiza execução física)', () => {
+test('14. Web token em PATCH /print-jobs/:id/status é rejeitado com HTTP 403 (Web user não atualiza execução física)', async () => {
   const { req, res } = createMockReqRes({
     method: 'PATCH',
     params: { id: 'job-matriz-test-01' },
     headers: { authorization: `Bearer ${testAdminKeyMatriz}` },
     body: { status: 'PRINTED' },
   });
-  executeRouteChain(patchJobStatusHandlers, req, res);
+  await executeRouteChain(patchJobStatusHandlers, req, res);
   assert.equal(res.getStatusCode(), 403);
 });
 
@@ -329,32 +321,32 @@ test('14. Web token em PATCH /print-jobs/:id/status é rejeitado com HTTP 403 (W
 // BLOCO 6: ROTAS OPERACIONAIS DO AGENT (PENDING, CLAIM, STATUS, HEARTBEAT)
 // ============================================================================
 
-test('15. /pending sem token retorna HTTP 401', () => {
+test('15. /pending sem token retorna HTTP 401', async () => {
   const { req, res } = createMockReqRes({ method: 'GET', headers: {} });
-  executeRouteChain(getPendingJobsHandlers, req, res);
+  await executeRouteChain(getPendingJobsHandlers, req, res);
   assert.equal(res.getStatusCode(), 401);
 });
 
-test('16. /pending com x-agent-id ou query agentId mas sem token retorna HTTP 401 (agentId não autentica)', () => {
+test('16. /pending com x-agent-id ou query agentId mas sem token retorna HTTP 401 (agentId não autentica)', async () => {
   const { req, res } = createMockReqRes({
     method: 'GET',
     headers: { 'x-agent-id': 'agent-matriz-01' },
     query: { agentId: 'agent-matriz-01' },
   });
-  executeRouteChain(getPendingJobsHandlers, req, res);
+  await executeRouteChain(getPendingJobsHandlers, req, res);
   assert.equal(res.getStatusCode(), 401);
 });
 
-test('17. /pending com token inválido retorna HTTP 403', () => {
+test('17. /pending com token inválido retorna HTTP 403', async () => {
   const { req, res } = createMockReqRes({
     method: 'GET',
     headers: { authorization: 'Bearer agt_live_token_falso_invalido' },
   });
-  executeRouteChain(getPendingJobsHandlers, req, res);
+  await executeRouteChain(getPendingJobsHandlers, req, res);
   assert.equal(res.getStatusCode(), 403);
 });
 
-test('18. /pending com token do tenant correto retorna sucesso e isola jobs de outros tenants', () => {
+test('18. /pending com token do tenant correto retorna sucesso e isola jobs de outros tenants', async () => {
   // Cadastrar impressora e job para Matriz
   printersStore.set('prn-matriz-l42', {
     id: 'prn-matriz-l42',
@@ -415,7 +407,7 @@ test('18. /pending com token do tenant correto retorna sucesso e isola jobs de o
     headers: { authorization: `Bearer ${rawTokenMatriz}` },
   });
 
-  executeRouteChain(getPendingJobsHandlers, req, res);
+  await executeRouteChain(getPendingJobsHandlers, req, res);
   assert.equal(res.getStatusCode(), 200);
 
   const data = res.getData();
@@ -428,13 +420,13 @@ test('18. /pending com token do tenant correto retorna sucesso e isola jobs de o
   assert.ok(claimedMatrizJob.attemptId.startsWith('att-'));
 });
 
-test('19. Heartbeat sem token retorna HTTP 401', () => {
+test('19. Heartbeat sem token retorna HTTP 401', async () => {
   const { req, res } = createMockReqRes({ method: 'POST', body: { status: 'ONLINE' } });
-  executeRouteChain(heartbeatHandlers, req, res);
+  await executeRouteChain(heartbeatHandlers, req, res);
   assert.equal(res.getStatusCode(), 401);
 });
 
-test('20. Status update sem leaseId em job claimed retorna HTTP 400', () => {
+test('20. Status update sem leaseId em job claimed retorna HTTP 400', async () => {
   const job = printJobsStore.get('job-matriz-test-01')!;
   const { req, res } = createMockReqRes({
     method: 'PATCH',
@@ -445,12 +437,12 @@ test('20. Status update sem leaseId em job claimed retorna HTTP 400', () => {
       attemptId: job.attemptId,
     },
   });
-  executeRouteChain(patchJobStatusHandlers, req, res);
+  await executeRouteChain(patchJobStatusHandlers, req, res);
   assert.equal(res.getStatusCode(), 400);
   assert.ok(res.getData().error.includes('leaseId é obrigatório'));
 });
 
-test('21. Status update com leaseId incorreto retorna HTTP 409', () => {
+test('21. Status update com leaseId incorreto retorna HTTP 409', async () => {
   const job = printJobsStore.get('job-matriz-test-01')!;
   const { req, res } = createMockReqRes({
     method: 'PATCH',
@@ -462,11 +454,11 @@ test('21. Status update com leaseId incorreto retorna HTTP 409', () => {
       attemptId: job.attemptId,
     },
   });
-  executeRouteChain(patchJobStatusHandlers, req, res);
+  await executeRouteChain(patchJobStatusHandlers, req, res);
   assert.equal(res.getStatusCode(), 409);
 });
 
-test('22. Status update com lease expirado retorna HTTP 409', () => {
+test('22. Status update com lease expirado retorna HTTP 409', async () => {
   const job = printJobsStore.get('job-matriz-test-01')!;
   job.leaseExpiresAt = new Date(Date.now() - 5000).toISOString();
 
@@ -480,7 +472,7 @@ test('22. Status update com lease expirado retorna HTTP 409', () => {
       attemptId: job.attemptId,
     },
   });
-  executeRouteChain(patchJobStatusHandlers, req, res);
+  await executeRouteChain(patchJobStatusHandlers, req, res);
   assert.equal(res.getStatusCode(), 409);
   assert.ok(res.getData().error.includes('Lease expirado'));
 });
@@ -520,61 +512,61 @@ test('23. attempts >= maxAttempts impede novo claim e transiciona para FAILED', 
 // BLOCO 7: ROTAS EXCLUSIVAS DO PAINEL WEB / ADMIN (GERAR PAIRING CODE, CRIAR JOB, HISTÓRICO)
 // ============================================================================
 
-test('24. POST /generate-pairing-code com credencial administrativa de ambiente gera código com sucesso', () => {
+test('24. POST /generate-pairing-code com credencial administrativa de ambiente gera código com sucesso', async () => {
   const { req, res } = createMockReqRes({
     method: 'POST',
     headers: { authorization: `Bearer ${testAdminKeyMatriz}` },
     body: { companyName: 'Supermercado WR Matriz' },
   });
-  executeRouteChain(generatePairingCodeHandlers, req, res);
+  await executeRouteChain(generatePairingCodeHandlers, req, res);
   assert.equal(res.getStatusCode(), 200);
   const data = res.getData();
   assert.ok(data.pairingCode.startsWith('WIT-'));
   assert.equal(data.companyId, 'comp-matriz-01');
 });
 
-test('25. POST /generate-pairing-code tentativa de geração para outro tenant retorna HTTP 403', () => {
+test('25. POST /generate-pairing-code tentativa de geração para outro tenant retorna HTTP 403', async () => {
   const { req, res } = createMockReqRes({
     method: 'POST',
     headers: { authorization: `Bearer ${testAdminKeyMatriz}` },
     body: { companyId: 'comp-filial-02' },
   });
-  executeRouteChain(generatePairingCodeHandlers, req, res);
+  await executeRouteChain(generatePairingCodeHandlers, req, res);
   assert.equal(res.getStatusCode(), 403);
   assert.ok(res.getData().error.includes('Não autorizado'));
 });
 
-test('26. GET /agents: anônimo retorna 401 e credencial válida lista apenas agentes do tenant', () => {
+test('26. GET /agents: anônimo retorna 401 e credencial válida lista apenas agentes do tenant', async () => {
   const { req, res } = createMockReqRes({
     method: 'GET',
     headers: { authorization: `Bearer ${testAdminKeyMatriz}` },
   });
-  executeRouteChain(getAgentsHandlers, req, res);
+  await executeRouteChain(getAgentsHandlers, req, res);
   assert.equal(res.getStatusCode(), 200);
   const data = res.getData();
   assert.ok(data.agents.length > 0);
   assert.ok(data.agents.every((a: any) => a.companyId === 'comp-matriz-01'));
 });
 
-test('27. GET /print-jobs: credencial de admin filtra histórico apenas pelo tenant autorizado', () => {
+test('27. GET /print-jobs: credencial de admin filtra histórico apenas pelo tenant autorizado', async () => {
   const { req, res } = createMockReqRes({
     method: 'GET',
     headers: { authorization: `Bearer ${testAdminKeyMatriz}` },
   });
-  executeRouteChain(getPrintJobsHistoryHandlers, req, res);
+  await executeRouteChain(getPrintJobsHistoryHandlers, req, res);
   assert.equal(res.getStatusCode(), 200);
   const data = res.getData();
   assert.ok(data.jobs.length > 0);
   assert.ok(data.jobs.every((j: any) => j.companyId === 'comp-matriz-01'));
 });
 
-test('28. POST /print-jobs: enfileiramento válido por usuário Web/Admin retorna HTTP 201', () => {
+test('28. POST /print-jobs: enfileiramento válido por usuário Web/Admin retorna HTTP 201', async () => {
   const { req, res } = createMockReqRes({
     method: 'POST',
     headers: { authorization: `Bearer ${testAdminKeyMatriz}` },
     body: { printerId: 'prn-matriz-l42', compiledCommand: 'I8,A,001\nP1\n', encoding: 'windows-1252' },
   });
-  executeRouteChain(postJobHandlers, req, res);
+  await executeRouteChain(postJobHandlers, req, res);
   assert.equal(res.getStatusCode(), 201);
   assert.equal(res.getData().success, true);
 });

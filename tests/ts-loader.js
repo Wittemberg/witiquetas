@@ -5,6 +5,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const ZOD_SHIM_URL = pathToFileURL(path.join(__dirname, 'zod-shim.js')).href;
 const EXPRESS_SHIM_URL = pathToFileURL(path.join(__dirname, 'express-shim.js')).href;
+const PG_SHIM_URL = pathToFileURL(path.join(__dirname, 'pg-shim.js')).href;
+const DOTENV_SHIM_URL = pathToFileURL(path.join(__dirname, 'dotenv-shim.js')).href;
 
 export async function resolve(specifier, context, nextResolve) {
   if (specifier === 'zod') {
@@ -20,6 +22,22 @@ export async function resolve(specifier, context, nextResolve) {
       format: 'module',
       shortCircuit: true,
       url: EXPRESS_SHIM_URL,
+    };
+  }
+
+  if (specifier === 'pg') {
+    return {
+      format: 'module',
+      shortCircuit: true,
+      url: PG_SHIM_URL,
+    };
+  }
+
+  if (specifier === 'dotenv') {
+    return {
+      format: 'module',
+      shortCircuit: true,
+      url: DOTENV_SHIM_URL,
     };
   }
 

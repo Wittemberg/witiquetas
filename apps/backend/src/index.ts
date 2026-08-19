@@ -1,8 +1,8 @@
 import express, { Request, Response } from 'express';
 import cors from 'cors';
-import { Pool } from 'pg';
 import { S3Client, HeadBucketCommand, ListBucketsCommand } from '@aws-sdk/client-s3';
 import dotenv from 'dotenv';
+import { pgPool, initDatabase } from './db.js';
 
 dotenv.config();
 
@@ -11,17 +11,6 @@ const PORT = process.env.PORT || 3000;
 
 app.use(cors());
 app.use(express.json());
-
-// PostgreSQL Client Pool
-const dbUrl = process.env.DATABASE_URL;
-let pgPool: Pool | null = null;
-
-if (dbUrl) {
-  pgPool = new Pool({
-    connectionString: dbUrl,
-    connectionTimeoutMillis: 5000,
-  });
-}
 
 // S3 / MinIO Client Setup
 const s3Endpoint = process.env.S3_ENDPOINT;
@@ -204,5 +193,6 @@ app.get('/', (_req, res) => {
 
 app.listen(PORT, () => {
   console.log(`[Witiquetas Backend] Rodando na porta ${PORT} (ENV: ${process.env.NODE_ENV || 'development'})`);
+  initDatabase().catch((err) => console.error('[Database] Falha no bootstrap:', err));
   logAgentDistributionStatus();
 });

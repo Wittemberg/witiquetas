@@ -83,10 +83,17 @@ export function verifyTokenHash(incomingRawToken: string, storedTokenHash: strin
   }
 }
 
-const agentsStore = new Map<string, AgentRecord>();
+import {
+  AgentsRepository,
+  memoryAgentsStore,
+  type AgentRecord,
+} from '../repositories/agentsRepository.js';
+
+export { memoryAgentsStore as agentsStore };
+export type { AgentRecord };
 
 // Helper: Middleware de autenticação exclusiva de agente daemon (SHA-256 + timingSafeEqual)
-export function authenticateAgent(req: Request, res: Response, next: Function) {
+export async function authenticateAgent(req: Request, res: Response, next: Function) {
   const authHeader = req.headers.authorization || (req.headers['x-agent-token'] as string);
   if (!authHeader) {
     return res.status(401).json({ error: 'Token de agente não fornecido.' });
@@ -97,7 +104,8 @@ export function authenticateAgent(req: Request, res: Response, next: Function) {
     return res.status(401).json({ error: 'Token de agente vazio ou não fornecido.' });
   }
 
-  const agent = Array.from(agentsStore.values()).find((a) => verifyTokenHash(rawToken, a.tokenHash));
+  const incomingHash = hashToken(rawToken);
+  const agent = await AgentsRepository.findByTokenHash(incomingHash);
 
   if (!agent) {
     return res.status(403).json({ error: 'Credencial do agente inválida ou revogada.' });
@@ -239,7 +247,7 @@ router.post('/generate-pairing-code', authenticateWebUser, (req: Request, res: R
 });
 
 // 1.1 Consultar Status de Pareamento (Exclusivo Web/Admin para polling amigável no modal)
-router.get('/pairing-status/:code', authenticateWebUser, (req: Request, res: Response) => {
+router.get('/pairing-status/:code', authenticateWebUser, async (req: Request, res: Response) => {
   const user = (req as any).user as AuthWebUser;
   const code = (req.params.code || '').toUpperCase().trim();
   const pairing = pairingCodes.get(code);
@@ -257,20 +265,22 @@ router.get('/pairing-status/:code', authenticateWebUser, (req: Request, res: Res
   }
 
   let agentRecord: AgentDTO | null = null;
-  if (pairing.agentId && agentsStore.has(pairing.agentId)) {
-    const rawAgent = agentsStore.get(pairing.agentId)!;
-    agentRecord = {
-      id: rawAgent.id,
-      companyId: rawAgent.companyId,
-      installationId: rawAgent.installationId,
-      machineName: rawAgent.machineName,
-      os: rawAgent.os,
-      architecture: rawAgent.architecture,
-      agentVersion: rawAgent.agentVersion,
-      status: rawAgent.status,
-      lastSeenAt: rawAgent.lastSeenAt,
-      createdAt: rawAgent.createdAt,
-    };
+  if (pairing.agentId) {
+    const rawAgent = await AgentsRepository.findById(pairing.agentId);
+    if (rawAgent) {
+      agentRecord = {
+        id: rawAgent.id,
+        companyId: rawAgent.companyId,
+        installationId: rawAgent.installationId,
+        machineName: rawAgent.machineName,
+        os: rawAgent.os,
+        architecture: rawAgent.architecture,
+        agentVersion: rawAgent.agentVersion,
+        status: rawAgent.status,
+        lastSeenAt: rawAgent.lastSeenAt,
+        createdAt: rawAgent.createdAt,
+      };
+    }
   }
 
   res.json({
@@ -283,7 +293,7 @@ router.get('/pairing-status/:code', authenticateWebUser, (req: Request, res: Res
 });
 
 // 2. Parear Agente Local (Única rota não autenticada do ciclo de vida do agente)
-router.post('/pair', (req: Request, res: Response) => {
+router.post('/pair', async (req: Request, res: Response) => {
   const ip = req.ip || req.socket.remoteAddress || 'unknown';
   const nowMs = Date.now();
 
@@ -351,7 +361,7 @@ router.post('/pair', (req: Request, res: Response) => {
     tokenHash,
   };
 
-  agentsStore.set(agentId, newAgent);
+  await AgentsRepository.save(newAgent);
   pairing.agentId = agentId;
   pairing.agentDetails = {
     id: agentId,
@@ -375,7 +385,7 @@ router.post('/pair', (req: Request, res: Response) => {
 });
 
 // 3. Heartbeat do Agente (Obrigatoriamente autenticado via token de daemon)
-router.post('/heartbeat', authenticateAgent, (req: Request, res: Response) => {
+router.post('/heartbeat', authenticateAgent, async (req: Request, res: Response) => {
   const agent = (req as any).agent as AgentRecord;
   const body = req.body as AgentHeartbeatRequestDTO;
 
@@ -386,9 +396,7 @@ router.post('/heartbeat', authenticateAgent, (req: Request, res: Response) => {
     });
   }
 
-  agent.lastSeenAt = new Date().toISOString();
-  agent.status = body.status || 'ONLINE';
-  if (body.agentVersion) agent.agentVersion = body.agentVersion;
+  await AgentsRepository.updateHeartbeat(agent.id, body.status || 'ONLINE', body.agentVersion);
 
   // Calcular contagem de jobs pendentes dinamicamente para o tenant do agente
   const pendingJobsCount = Array.from(printJobsStore.values()).filter(
@@ -406,16 +414,12 @@ router.post('/heartbeat', authenticateAgent, (req: Request, res: Response) => {
 });
 
 // 4. Listar Agentes da Empresa (Exclusivo Web/Admin e Filtrado por Tenant)
-router.get('/', authenticateWebUser, (req: Request, res: Response) => {
+router.get('/', authenticateWebUser, async (req: Request, res: Response) => {
   const user = (req as any).user as AuthWebUser;
   const allowedCompanyId = user.companyId;
 
   const now = Date.now();
-  let agents = Array.from(agentsStore.values());
-
-  if (allowedCompanyId && allowedCompanyId !== '*') {
-    agents = agents.filter((a) => a.companyId === allowedCompanyId);
-  }
+  const agents = await AgentsRepository.listByCompany(allowedCompanyId);
 
   const agentsDTO: AgentDTO[] = agents.map((a) => {
     const isOnline = a.lastSeenAt && now - new Date(a.lastSeenAt).getTime() < 120000;
@@ -437,6 +441,16 @@ router.get('/', authenticateWebUser, (req: Request, res: Response) => {
     total: agentsDTO.length,
     agents: agentsDTO,
   });
+});
+
+// 5. Revogar / Desconectar Agente (Exclusivo Web/Admin)
+router.delete('/:id', authenticateWebUser, async (req: Request, res: Response) => {
+  const user = (req as any).user as AuthWebUser;
+  const success = await AgentsRepository.revoke(req.params.id, user.companyId);
+  if (!success) {
+    return res.status(404).json({ error: 'Agente não encontrado ou sem permissão para revogação.' });
+  }
+  res.json({ success: true, message: 'Agente revogado com sucesso.' });
 });
 
 // Resolução determinística do caminho do binário do Agent Windows x64:
@@ -549,6 +563,6 @@ router.get('/download/:platform', (req: Request, res: Response) => {
   });
 });
 
-export { agentsStore, pairingCodes };
+export { pairingCodes };
 export default router;
 

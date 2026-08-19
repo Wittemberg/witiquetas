@@ -3,16 +3,16 @@ import assert from 'node:assert/strict';
 import authRouter, { parseCookies } from '../apps/backend/src/routes/auth.js';
 import agentsRouter from '../apps/backend/src/routes/agents.js';
 
-function executeRouteChain(handlers: Function[], req: any, res: any) {
+async function executeRouteChain(handlers: Function[], req: any, res: any) {
   let idx = 0;
-  function next() {
+  async function next() {
     idx++;
     if (idx < handlers.length) {
-      handlers[idx](req, res, next);
+      await handlers[idx](req, res, next);
     }
   }
   if (handlers && handlers.length > 0) {
-    handlers[0](req, res, next);
+    await handlers[0](req, res, next);
   }
 }
 
@@ -136,13 +136,13 @@ test('E2E Pre-RBAC: 2. Reenvio do cookie em GET /api/auth/session mantém sessã
   assert.equal(res2.data.user.companyId, 'comp-matriz-01');
 });
 
-test('E2E Pre-RBAC: 3. Navegador com sessão gera código de pareamento WIT-XXXX-XXXX com sucesso', () => {
+test('E2E Pre-RBAC: 3. Navegador com sessão gera código de pareamento WIT-XXXX-XXXX com sucesso', async () => {
   const { req: reqBoot, res: resBoot } = createMockReqRes({
     method: 'POST',
     url: '/pre-rbac-session',
     body: {},
   });
-  executeRouteChain(postPreRbacSessionHandlers, reqBoot, resBoot);
+  await executeRouteChain(postPreRbacSessionHandlers, reqBoot, resBoot);
 
   const setCookie = resBoot.getHeader('set-cookie');
   const sessionId = setCookie.match(/witiquetas_session=([a-f0-9]+)/)![1];
@@ -154,7 +154,7 @@ test('E2E Pre-RBAC: 3. Navegador com sessão gera código de pareamento WIT-XXXX
       cookie: `witiquetas_session=${sessionId}`,
     },
   });
-  executeRouteChain(postGenerateCodeHandlers, reqGen, resGen);
+  await executeRouteChain(postGenerateCodeHandlers, reqGen, resGen);
 
   assert.equal(resGen.statusCode, 200);
   assert.match(resGen.data.pairingCode, /^WIT-[A-Z0-9]{4}-[A-Z0-9]{4}$/);
@@ -169,7 +169,7 @@ test('E2E Pre-RBAC: 3. Navegador com sessão gera código de pareamento WIT-XXXX
       machineName: 'CAIXA-E2E-TEST',
     },
   });
-  executeRouteChain(postPairHandlers, reqPair, resPair);
+  await executeRouteChain(postPairHandlers, reqPair, resPair);
 
   assert.equal(resPair.statusCode, 201);
   assert.ok(resPair.data.agentId);

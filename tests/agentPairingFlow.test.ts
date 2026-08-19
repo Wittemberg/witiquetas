@@ -14,16 +14,16 @@ process.env.ADMIN_API_KEY = testAdminKey;
 process.env.ADMIN_COMPANY_ID = 'comp-matriz-01';
 
 // Helper: Executa handlers Express
-function executeRouteChain(handlers: Function[], req: any, res: any) {
+async function executeRouteChain(handlers: Function[], req: any, res: any) {
   let idx = 0;
-  function next() {
+  async function next() {
     idx++;
     if (idx < handlers.length) {
-      handlers[idx](req, res, next);
+      await handlers[idx](req, res, next);
     }
   }
   if (handlers && handlers.length > 0) {
-    handlers[0](req, res, next);
+    await handlers[0](req, res, next);
   }
 }
 
@@ -101,7 +101,7 @@ const postHeartbeatHandlers = (agentsRouter as any).routes.find(
 // SUÍTE DE TESTES: PAREAMENTO DO AGENT POR CÓDIGO (FASE 3)
 // ============================================================================
 
-test('1. Geração de Pairing Code gera formato WIT-XXXX-XXXX sem caracteres ambíguos', () => {
+test('1. Geração de Pairing Code gera formato WIT-XXXX-XXXX sem caracteres ambíguos', async () => {
   const session = createWebSession({
     id: 'usr-matriz-01',
     companyId: 'comp-matriz-01',
@@ -117,7 +117,7 @@ test('1. Geração de Pairing Code gera formato WIT-XXXX-XXXX sem caracteres amb
     body: {},
   });
 
-  executeRouteChain(postGenerateCodeHandlers, req, res);
+  await executeRouteChain(postGenerateCodeHandlers, req, res);
 
   assert.equal(res.statusCode, 200);
   assert.ok(res.data.pairingCode);
@@ -129,7 +129,7 @@ test('1. Geração de Pairing Code gera formato WIT-XXXX-XXXX sem caracteres amb
   assert.equal(res.data.companyId, 'comp-matriz-01');
 });
 
-test('2. Tenant correto atribuído server-side via sessão web autenticada', () => {
+test('2. Tenant correto atribuído server-side via sessão web autenticada', async () => {
   const sessionFilial = createWebSession({
     id: 'usr-filial-01',
     companyId: 'comp-filial-999',
@@ -145,12 +145,12 @@ test('2. Tenant correto atribuído server-side via sessão web autenticada', () 
     body: {},
   });
 
-  executeRouteChain(postGenerateCodeHandlers, req, res);
+  await executeRouteChain(postGenerateCodeHandlers, req, res);
   assert.equal(res.statusCode, 200);
   assert.equal(res.data.companyId, 'comp-filial-999');
 });
 
-test('3. Pareamento bem-sucedido: Agent conecta, recebe token e é registrado no backend', () => {
+test('3. Pareamento bem-sucedido: Agent conecta, recebe token e é registrado no backend', async () => {
   // 1. Gerar código
   const session = createWebSession({
     id: 'usr-matriz-01',
@@ -162,7 +162,7 @@ test('3. Pareamento bem-sucedido: Agent conecta, recebe token e é registrado no
     url: '/generate-pairing-code',
     headers: { cookie: `witiquetas_session=${session.sessionId}` },
   });
-  executeRouteChain(postGenerateCodeHandlers, reqGen, resGen);
+  await executeRouteChain(postGenerateCodeHandlers, reqGen, resGen);
   const code = resGen.data.pairingCode;
 
   // 2. Agent envia requisição de pareamento
@@ -178,7 +178,7 @@ test('3. Pareamento bem-sucedido: Agent conecta, recebe token e é registrado no
       installationId: 'inst-estoque-01-uuid',
     },
   });
-  executeRouteChain(postPairHandlers, reqPair, resPair);
+  await executeRouteChain(postPairHandlers, reqPair, resPair);
 
   assert.equal(resPair.statusCode, 201);
   assert.ok(resPair.data.success);
@@ -198,7 +198,7 @@ test('3. Pareamento bem-sucedido: Agent conecta, recebe token e é registrado no
   );
 });
 
-test('4. Código de uso único: Segundo Agent tentando usar o mesmo código é rejeitado com 409 Conflict', () => {
+test('4. Código de uso único: Segundo Agent tentando usar o mesmo código é rejeitado com 409 Conflict', async () => {
   // 1. Gerar código
   const session = createWebSession({
     id: 'usr-matriz-01',
@@ -210,7 +210,7 @@ test('4. Código de uso único: Segundo Agent tentando usar o mesmo código é r
     url: '/generate-pairing-code',
     headers: { cookie: `witiquetas_session=${session.sessionId}` },
   });
-  executeRouteChain(postGenerateCodeHandlers, reqGen, resGen);
+  await executeRouteChain(postGenerateCodeHandlers, reqGen, resGen);
   const code = resGen.data.pairingCode;
 
   // 2. Primeiro Agent consome o código
@@ -219,7 +219,7 @@ test('4. Código de uso único: Segundo Agent tentando usar o mesmo código é r
     url: '/pair',
     body: { pairingCode: code, machineName: 'TERMINAL-1' },
   });
-  executeRouteChain(postPairHandlers, reqPair1, resPair1);
+  await executeRouteChain(postPairHandlers, reqPair1, resPair1);
   assert.equal(resPair1.statusCode, 201);
 
   // 3. Segundo Agent tenta o mesmo código
@@ -228,23 +228,23 @@ test('4. Código de uso único: Segundo Agent tentando usar o mesmo código é r
     url: '/pair',
     body: { pairingCode: code, machineName: 'TERMINAL-2' },
   });
-  executeRouteChain(postPairHandlers, reqPair2, resPair2);
+  await executeRouteChain(postPairHandlers, reqPair2, resPair2);
   assert.equal(resPair2.statusCode, 409, 'Segundo uso do mesmo código deve retornar 409 Conflict');
   assert.ok(resPair2.data.error.includes('já foi utilizado'));
 });
 
-test('5. Código de pareamento inexistente retorna 400 Bad Request', () => {
+test('5. Código de pareamento inexistente retorna 400 Bad Request', async () => {
   const { req, res } = createMockReqRes({
     method: 'POST',
     url: '/pair',
     body: { pairingCode: 'WIT-XXXX-INEXISTENTE', machineName: 'TERMINAL-INV' },
   });
-  executeRouteChain(postPairHandlers, req, res);
+  await executeRouteChain(postPairHandlers, req, res);
   assert.equal(res.statusCode, 400);
   assert.ok(res.data.error.includes('inválido ou não encontrado'));
 });
 
-test('6. Polling GET /api/agents/pairing-status/:code reflete a conclusão do pareamento', () => {
+test('6. Polling GET /api/agents/pairing-status/:code reflete a conclusão do pareamento', async () => {
   const session = createWebSession({
     id: 'usr-matriz-01',
     companyId: 'comp-matriz-01',
@@ -257,7 +257,7 @@ test('6. Polling GET /api/agents/pairing-status/:code reflete a conclusão do pa
     url: '/generate-pairing-code',
     headers: { cookie: `witiquetas_session=${session.sessionId}` },
   });
-  executeRouteChain(postGenerateCodeHandlers, reqGen, resGen);
+  await executeRouteChain(postGenerateCodeHandlers, reqGen, resGen);
   const code = resGen.data.pairingCode;
 
   // 2. Consultar status antes do pareamento -> PENDING
@@ -267,7 +267,7 @@ test('6. Polling GET /api/agents/pairing-status/:code reflete a conclusão do pa
     headers: { cookie: `witiquetas_session=${session.sessionId}` },
     params: { code },
   });
-  executeRouteChain(getPairingStatusHandlers, reqStatusBefore, resStatusBefore);
+  await executeRouteChain(getPairingStatusHandlers, reqStatusBefore, resStatusBefore);
   assert.equal(resStatusBefore.statusCode, 200);
   assert.equal(resStatusBefore.data.status, 'PENDING');
 
@@ -277,7 +277,7 @@ test('6. Polling GET /api/agents/pairing-status/:code reflete a conclusão do pa
     url: '/pair',
     body: { pairingCode: code, machineName: 'CAIXA-03', os: 'windows', architecture: 'x86_64' },
   });
-  executeRouteChain(postPairHandlers, reqPair, resPair);
+  await executeRouteChain(postPairHandlers, reqPair, resPair);
   assert.equal(resPair.statusCode, 201);
 
   // 4. Consultar status após pareamento -> USED com dados do Agent
@@ -287,14 +287,14 @@ test('6. Polling GET /api/agents/pairing-status/:code reflete a conclusão do pa
     headers: { cookie: `witiquetas_session=${session.sessionId}` },
     params: { code },
   });
-  executeRouteChain(getPairingStatusHandlers, reqStatusAfter, resStatusAfter);
+  await executeRouteChain(getPairingStatusHandlers, reqStatusAfter, resStatusAfter);
   assert.equal(resStatusAfter.statusCode, 200);
   assert.equal(resStatusAfter.data.status, 'USED');
   assert.equal(resStatusAfter.data.agent.machineName, 'CAIXA-03');
   assert.equal(resStatusAfter.data.agent.status, 'ONLINE');
 });
 
-test('7. Código de pareamento expirado (TTL > 15 min) é rejeitado com 400', () => {
+test('7. Código de pareamento expirado (TTL > 15 min) é rejeitado com 400', async () => {
   const session = createWebSession({
     id: 'usr-matriz-01',
     companyId: 'comp-matriz-01',
@@ -306,13 +306,8 @@ test('7. Código de pareamento expirado (TTL > 15 min) é rejeitado com 400', ()
     url: '/generate-pairing-code',
     headers: { cookie: `witiquetas_session=${session.sessionId}` },
   });
-  executeRouteChain(postGenerateCodeHandlers, reqGen, resGen);
+  await executeRouteChain(postGenerateCodeHandlers, reqGen, resGen);
   const code = resGen.data.pairingCode;
-
-  // Forçar expiração do código manipulando o store
-  const postHeartbeatHandlers = (agentsRouter as any).routes.find(
-    (r: any) => r.method === 'POST' && r.path === '/heartbeat'
-  ).handlers;
 
   // Tentativa com código que expirou
   const { req: reqPair, res: resPair } = createMockReqRes({
@@ -320,11 +315,11 @@ test('7. Código de pareamento expirado (TTL > 15 min) é rejeitado com 400', ()
     url: '/pair',
     body: { pairingCode: 'WIT-EXPIRADO-1234' },
   });
-  executeRouteChain(postPairHandlers, reqPair, resPair);
+  await executeRouteChain(postPairHandlers, reqPair, resPair);
   assert.equal(resPair.statusCode, 400);
 });
 
-test('8. Rate limit de tentativas com código inválido retorna 429 Too Many Requests', () => {
+test('8. Rate limit de tentativas com código inválido retorna 429 Too Many Requests', async () => {
   const badIp = '192.168.99.99';
   for (let i = 0; i < 20; i++) {
     const { req, res } = createMockReqRes({
@@ -333,7 +328,7 @@ test('8. Rate limit de tentativas com código inválido retorna 429 Too Many Req
       body: { pairingCode: `WIT-FAIL-${i}` },
       ip: badIp,
     });
-    executeRouteChain(postPairHandlers, req, res);
+    await executeRouteChain(postPairHandlers, req, res);
   }
 
   // A 21ª tentativa a partir do mesmo IP deve ser bloqueada por rate limit
@@ -343,11 +338,11 @@ test('8. Rate limit de tentativas com código inválido retorna 429 Too Many Req
     body: { pairingCode: 'WIT-FAIL-BLOCKED' },
     ip: badIp,
   });
-  executeRouteChain(postPairHandlers, reqBlocked, resBlocked);
+  await executeRouteChain(postPairHandlers, reqBlocked, resBlocked);
   assert.equal(resBlocked.statusCode, 429, 'Tentativas excessivas devem retornar 429');
 });
 
-test('9. Token emitido no pareamento autentica com sucesso no heartbeat do Agent', () => {
+test('9. Token emitido no pareamento autentica com sucesso no heartbeat do Agent', async () => {
   const session = createWebSession({
     id: 'usr-matriz-01',
     companyId: 'comp-matriz-01',
@@ -360,14 +355,14 @@ test('9. Token emitido no pareamento autentica com sucesso no heartbeat do Agent
     url: '/generate-pairing-code',
     headers: { cookie: `witiquetas_session=${session.sessionId}` },
   });
-  executeRouteChain(postGenerateCodeHandlers, reqGen, resGen);
+  await executeRouteChain(postGenerateCodeHandlers, reqGen, resGen);
 
   const { req: reqPair, res: resPair } = createMockReqRes({
     method: 'POST',
     url: '/pair',
     body: { pairingCode: resGen.data.pairingCode, machineName: 'PDV-05' },
   });
-  executeRouteChain(postPairHandlers, reqPair, resPair);
+  await executeRouteChain(postPairHandlers, reqPair, resPair);
   assert.equal(resPair.statusCode, 201);
 
   const { agentId, token } = resPair.data;
@@ -389,13 +384,13 @@ test('9. Token emitido no pareamento autentica com sucesso no heartbeat do Agent
       agentVersion: '0.1.0',
     },
   });
-  executeRouteChain(postHeartbeatHandlers, reqHb, resHb);
+  await executeRouteChain(postHeartbeatHandlers, reqHb, resHb);
 
   assert.equal(resHb.statusCode, 200);
   assert.equal(resHb.data.acknowledged, true);
 });
 
-test('10. Pairing com installationId informado preserva exatamente o mesmo valor', () => {
+test('10. Pairing com installationId informado preserva exatamente o mesmo valor', async () => {
   const session = createWebSession({
     id: 'usr-matriz-01',
     companyId: 'comp-matriz-01',
@@ -407,7 +402,7 @@ test('10. Pairing com installationId informado preserva exatamente o mesmo valor
     url: '/generate-pairing-code',
     headers: { cookie: `witiquetas_session=${session.sessionId}` },
   });
-  executeRouteChain(postGenerateCodeHandlers, reqGen, resGen);
+  await executeRouteChain(postGenerateCodeHandlers, reqGen, resGen);
 
   const customInstallationId = 'inst-custom-hardware-guid-999';
 
@@ -420,7 +415,7 @@ test('10. Pairing com installationId informado preserva exatamente o mesmo valor
       installationId: customInstallationId,
     },
   });
-  executeRouteChain(postPairHandlers, reqPair, resPair);
+  await executeRouteChain(postPairHandlers, reqPair, resPair);
 
   assert.equal(resPair.statusCode, 201);
   assert.equal(resPair.data.installationId, customInstallationId, 'Deve preservar exatamente o installationId enviado');
@@ -429,7 +424,7 @@ test('10. Pairing com installationId informado preserva exatamente o mesmo valor
   assert.equal(saved.installationId, customInstallationId);
 });
 
-test('11. Pairing sem installationId gera automaticamente novo identificador persistente', () => {
+test('11. Pairing sem installationId gera automaticamente novo identificador persistente', async () => {
   const session = createWebSession({
     id: 'usr-matriz-01',
     companyId: 'comp-matriz-01',
@@ -441,7 +436,7 @@ test('11. Pairing sem installationId gera automaticamente novo identificador per
     url: '/generate-pairing-code',
     headers: { cookie: `witiquetas_session=${session.sessionId}` },
   });
-  executeRouteChain(postGenerateCodeHandlers, reqGen, resGen);
+  await executeRouteChain(postGenerateCodeHandlers, reqGen, resGen);
 
   const { req: reqPair, res: resPair } = createMockReqRes({
     method: 'POST',
@@ -451,7 +446,7 @@ test('11. Pairing sem installationId gera automaticamente novo identificador per
       machineName: 'CAIXA-AUTO-INST',
     },
   });
-  executeRouteChain(postPairHandlers, reqPair, resPair);
+  await executeRouteChain(postPairHandlers, reqPair, resPair);
 
   assert.equal(resPair.statusCode, 201);
   assert.ok(resPair.data.installationId.startsWith('inst-'));
@@ -473,7 +468,7 @@ test('12. Fluxo Completo: Navegador novo sem cookie faz bootstrap pré-RBAC e ge
     url: '/pre-rbac-session',
     body: {},
   });
-  executeRouteChain(postAuthSessionHandlers, reqBoot, resBoot);
+  await executeRouteChain(postAuthSessionHandlers, reqBoot, resBoot);
 
   assert.equal(resBoot.statusCode, 200, 'Bootstrap sem apiKey em ambiente pre-RBAC deve retornar 200');
   assert.ok(resBoot.data.success);
@@ -491,7 +486,7 @@ test('12. Fluxo Completo: Navegador novo sem cookie faz bootstrap pré-RBAC e ge
     url: '/session',
     headers: { cookie: `witiquetas_session=${sessionId}` },
   });
-  executeRouteChain(getAuthSessionHandlers, reqSess, resSess);
+  await executeRouteChain(getAuthSessionHandlers, reqSess, resSess);
 
   assert.equal(resSess.statusCode, 200);
   assert.equal(resSess.data.authenticated, true);
@@ -503,7 +498,7 @@ test('12. Fluxo Completo: Navegador novo sem cookie faz bootstrap pré-RBAC e ge
     url: '/generate-pairing-code',
     headers: { cookie: `witiquetas_session=${sessionId}` },
   });
-  executeRouteChain(postGenerateCodeHandlers, reqGen, resGen);
+  await executeRouteChain(postGenerateCodeHandlers, reqGen, resGen);
 
   assert.equal(resGen.statusCode, 200);
   assert.match(resGen.data.pairingCode, /^WIT-[A-Z0-9]{4}-[A-Z0-9]{4}$/);
@@ -517,7 +512,7 @@ test('12. Fluxo Completo: Navegador novo sem cookie faz bootstrap pré-RBAC e ge
       machineName: 'DESKTOP-TERMINAL-FINAL',
     },
   });
-  executeRouteChain(postPairHandlers, reqPair, resPair);
+  await executeRouteChain(postPairHandlers, reqPair, resPair);
 
   assert.equal(resPair.statusCode, 201);
   assert.ok(resPair.data.token);
@@ -532,7 +527,7 @@ test('12. Fluxo Completo: Navegador novo sem cookie faz bootstrap pré-RBAC e ge
       machineName: 'DESKTOP-INVASOR',
     },
   });
-  executeRouteChain(postPairHandlers, reqReuse, resReuse);
+  await executeRouteChain(postPairHandlers, reqReuse, resReuse);
   assert.equal(resReuse.statusCode, 409);
 
   // 6. Agent envia heartbeat e passa para ONLINE
@@ -548,7 +543,7 @@ test('12. Fluxo Completo: Navegador novo sem cookie faz bootstrap pré-RBAC e ge
       agentVersion: '0.1.0',
     },
   });
-  executeRouteChain(postHeartbeatHandlers, reqHb, resHb);
+  await executeRouteChain(postHeartbeatHandlers, reqHb, resHb);
   assert.equal(resHb.statusCode, 200);
   assert.equal(resHb.data.acknowledged, true);
 });

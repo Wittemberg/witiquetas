@@ -1,21 +1,23 @@
 # Witiquetas — DOCUMENTACAO-FRONTEND
 
 ## 1. Objetivo
+ 
+O frontend do **Witiquetas** é a aplicação Web responsável pela experiência administrativa e operacional da plataforma, implementando o **Application Shell**, o **Witiquetas Editor Universal**, a **Central de Impressão Universal (Universal Print Center)**, gestão de modelos ("Meus Modelos"), empresas/filiais, usuários, perfis, integrações e monitoramento de Agents e impressoras.
 
-O frontend do **Witiquetas** será a aplicação Web responsável pela experiência administrativa e operacional da plataforma, incluindo o editor visual de etiquetas de gôndola, gestão de clientes/grupos, empresas/filiais, usuários, permissões, modelos de etiqueta, fila de impressão e comunicação indireta com o Agente Local.
+*(Para diretrizes detalhadas de UX, limites físicos, margem de 1.0 mm, magnetic snap, QR 1:1, Universal Print Center e Application Shell, consulte [`docs/product/PRODUCT-UX-CONSOLIDATION.md`](file:///c:/Users/start/OneDrive/Área%20de%20Trabalho/Aprendendo/Witiquetas/witiquetas/docs/product/PRODUCT-UX-CONSOLIDATION.md)).*
 
 **URL inicial de produção**
-
+ 
 ```text
 https://witiquetas.wrtec.com.br
 ```
-
+ 
 **Repositório**
-
+ 
 ```text
 https://github.com/Wittemberg/witiquetas
 ```
-
+ 
 A arquitetura deve tratar o frontend como um consumidor da API. Regras de negócio, segurança multi-tenant, persistência, compilação de linguagens e controle de impressão não devem ficar acoplados à interface.
 
 ---

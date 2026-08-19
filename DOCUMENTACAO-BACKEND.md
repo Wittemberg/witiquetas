@@ -34,30 +34,22 @@ PostgreSQL 14 foi escolhido para manter compatibilidade com a stack já utilizad
 ---
 
 ## 3. Responsabilidades
-
-O backend será responsável por:
-
-- autenticação;
-- validação de e-mail;
-- recuperação de senha;
-- aprovação de cliente;
-- multi-tenancy;
-- grupos e filiais;
-- usuários;
-- RBAC;
-- modelos;
-- versões;
-- compilação;
-- geração TXT;
-- jobs;
-- agentes locais;
-- impressoras;
-- auditoria;
-- configurações;
-- S3/MinIO;
-- futuras integrações ERP;
-- painel de manutenção;
-- integração segura com IA.
+ 
+O backend é responsável por:
+ 
+- autenticação e segurança multi-tenant (Customer, Company, Branch);
+- validação de e-mail e recuperação de credenciais;
+- perfis e permissões RBAC (Administrador, Designer, Operador) e controle de licenças/planos;
+- ciclo de vida de modelos ("Meus Modelos") e schemas versionados (`LabelDocument`);
+- gestão da **Universal Data Architecture** e **Integration Field Catalog** (`docs/architecture/UNIVERSAL-DATA-ARCHITECTURE.md`);
+- resolução de campos do sistema (`system.printDateTime`);
+- motor de compilação multi-linguagem (PPLA, PPLB, ZPL, EPL);
+- gestão de fila de **Print Jobs** com leases, expiração, re-tentativas e auditoria;
+- autenticação, pareamento e comunicação segura com o **Witiquetas Agent**;
+- cadastro e monitoramento de impressoras de rede e locais;
+- armazenamento de assets, logos e layouts em S3/MinIO;
+- contratos de API pública e SDK para ERPs parceiros (`docs/architecture/INTEGRATION-FIELD-CATALOG.md`);
+- painel de manutenção e integração assistida por IA.
 
 ---
 

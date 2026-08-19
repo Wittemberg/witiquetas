@@ -1,7 +1,14 @@
-# Witiquetas — Roadmap Inicial
+# Witiquetas — Roadmap
+ 
+> **AVISO DE ATUALIZAÇÃO / FASE 3.5:**
+> Este roadmap preliminar foi formalizado e expandido no documento oficial:
+> **[`docs/product/ROADMAP-PHASE-3-5.md`](file:///c:/Users/start/OneDrive/Área%20de%20Trabalho/Aprendendo/Witiquetas/witiquetas/docs/product/ROADMAP-PHASE-3-5.md)**
+> que organiza as metas em **P0 (Editor Confiável, Universal Data Binding, Conditional Preview, Model Lifecycle, Application Shell)**, **P1 (Smart Import, Universal Print Center, RBAC, Agent UX, Printer KB)**, **P2 (SDK)** e **Laboratório (Universal Scale Gateway)**.
+
+---
 
 ## Objetivo
-
+ 
 Este roadmap organiza o desenvolvimento do Witiquetas em fases validáveis. A prioridade é comprovar primeiro o coração do produto: desenhar uma etiqueta, compilar o layout e gerar um comando que imprima corretamente.
 
 ---

@@ -1,6 +1,6 @@
 # Witiquetas
 
-Plataforma Web para criação, gestão, compilação e impressão de etiquetas térmicas de gôndola.
+Plataforma multinicho para criação, integração, gerenciamento e impressão de etiquetas térmicas, independente do ERP, contexto operacional e linguagem de impressão suportada.
 
 ## Produção
 
@@ -14,14 +14,20 @@ https://witiquetas.wrtec.com.br
 https://github.com/Wittemberg/witiquetas
 ```
 
-## Três pilares
+## Arquitetura em 4 Camadas
 
-1. **Frontend Web** — editor visual e gestão.
-2. **Backend/API** — segurança, dados, compiladores e jobs.
-3. **Agente Local** — comunicação com impressoras e atualização local.
+1. **Camada de Dados** — ERP / API / Integração fornece registros e catálogo de campos.
+2. **Camada de Modelo** — Usuário monta visualmente a etiqueta e associa elementos gráficos.
+3. **Motor Witiquetas** — Regras, condições, cálculos, preview, validação física e representação intermediária.
+4. **Camada de Impressão** — Compiladores (PPLA, PPLB, ZPL, EPL), fila de Print Jobs e Witiquetas Agent residente.
 
-## Documentação principal
+## Documentação Principal
 
+- `docs/product/PRODUCT-UX-CONSOLIDATION.md` (Consolidação de Produto, UX e Regras do Editor)
+- `docs/architecture/UNIVERSAL-DATA-ARCHITECTURE.md` (Arquitetura Universal de Dados e 4 Camadas)
+- `docs/architecture/INTEGRATION-FIELD-CATALOG.md` (Catálogo Dinâmico de Campos e SDK)
+- `docs/architecture/PRINTER-LANGUAGE-KNOWLEDGE-BASE.md` (Base de Conhecimento de Linguagens Térmicas)
+- `docs/product/ROADMAP-PHASE-3-5.md` (Roadmap Oficial Consolidado — P0, P1, P2 e Laboratório)
 - `ARQUITETURA.md`
 - `ROADMAP.md`
 - `DOCUMENTACAO-FRONTEND.md`

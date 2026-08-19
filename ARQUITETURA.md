@@ -15,55 +15,55 @@ As razões por trás das decisões mais relevantes ficam registradas em `docs/de
 ---
 
 ## 2. Visão do produto
+ 
+> **Definição Oficial:** O Witiquetas é uma plataforma multinicho para criação, integração, gerenciamento e impressão de etiquetas térmicas, independente do ERP, do contexto operacional e da linguagem de impressão suportada.
 
-O Witiquetas será uma plataforma comercial para criação, gestão, compilação e impressão de etiquetas térmicas, com foco inicial em etiquetas de gôndola.
+*(Nota de evolução / FASE 3.5: O foco inicial de gôndola/supermercado foi expandido para o modelo universal multinicho, mantendo o varejo como apenas um dos contextos operacionais suportados. Consulte `docs/product/PRODUCT-UX-CONSOLIDATION.md` e `docs/architecture/UNIVERSAL-DATA-ARCHITECTURE.md` para a especificação completa).*
 
 O produto deve ser:
-
-- independente de ERP;
+ 
+- multinicho (varejo, saúde, logística, indústria, alimentos, patrimônio, eventos, documentos, genérico);
+- independente de ERP e com catálogo dinâmico de campos (`Integration Field Catalog`);
 - independente de fabricante de impressora;
 - multiempresa e multifilial;
 - extensível para novas linguagens de impressão;
-- operável via Web;
-- capaz de imprimir diretamente em impressoras locais por meio de Agente Local;
+- operável via Web com Application Shell moderno;
+- capaz de imprimir diretamente em impressoras de rede/locais por meio do Witiquetas Agent residente;
 - auditável;
 - atualizável;
-- preparado para comercialização SaaS.
+- preparado para comercialização SaaS com planos e licenciamento.
 
 ---
 
-## 3. Três pilares
+## 3. Arquitetura Conceitual em 4 Camadas
 
 ```text
-┌──────────────────┐
-│   FRONTEND WEB   │
-│ React/TypeScript │
-└────────┬─────────┘
-         │ HTTPS
-         ▼
-┌──────────────────┐
-│   BACKEND/API    │
-│ NestJS/TypeScript│
-└───────┬──────────┘
-        │
-        ├──────────── PostgreSQL
-        │
-        ├──────────── MinIO / S3
-        │
-        └──────────── Print Jobs
-                           │
-                           ▼
-                  ┌─────────────────┐
-                  │  AGENTE LOCAL   │
-                  │  Tauri / Rust   │
-                  └────────┬────────┘
-                           │
-                  RAW TCP / Serial /
-                   USB / Spooler
-                           │
-                           ▼
-                     Impressora
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 1. CAMADA DE DADOS                                                          │
+│    ERP / API / WMS / Integração fornece catálogo de campos e registros      │
+└──────────────────────────────────────┬──────────────────────────────────────┘
+                                       │ Catálogo & Valores
+                                       ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 2. CAMADA DE MODELO                                                         │
+│    Usuário monta visualmente a etiqueta (LabelDocument) e vincula campos    │
+└──────────────────────────────────────┬──────────────────────────────────────┘
+                                       │ Schema + Registro
+                                       ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 3. MOTOR WITIQUETAS                                                         │
+│    Regras, condições, cálculos, preview ("Visualizar como"), limites físicos│
+└──────────────────────────────────────┬──────────────────────────────────────┘
+                                       │ Modelo Resolvido + Dados
+                                       ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 4. CAMADA DE IMPRESSÃO                                                      │
+│    Compiladores (PPLA/PPLB/ZPL/EPL) → Print Jobs → Agent → Impressora      │
+└─────────────────────────────────────────────────────────────────────────────┘
 ```
+
+Fluxo ponta a ponta:
+`Dados → Modelo → Motor Witiquetas → Compilador → Print Job → Agent → Impressora`
 
 ---
 

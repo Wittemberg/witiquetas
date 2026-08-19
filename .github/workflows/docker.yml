@@ -114,15 +114,105 @@ jobs:
 
       - name: Validate Backend Container Download Endpoint
         run: |
-          echo "Testando endpoint de download em container temporário..."
-          docker run -d --name test-backend -p 3000:3000 -e ADMIN_API_KEY=ci_test_key ghcr.io/wittemberg/witiquetas-backend:latest
-          sleep 4
-          curl -f http://localhost:3000/api/agents/download/windows-x64 -o downloaded-agent.exe
-          ls -la downloaded-agent.exe
-          test $(stat -c%s downloaded-agent.exe) -gt 1000000
-          head -c 2 downloaded-agent.exe | grep -q "MZ"
-          echo "Download endpoint retornou executavel PE Windows valido (> 1MB, header MZ)."
-          docker stop test-backend && docker rm test-backend
+          set -e
+          
+          cleanup() {
+            echo "==> Limpando recursos efêmeros do CI..."
+            docker stop test-backend test-postgres >/dev/null 2>&1 || true
+            docker rm -f test-backend test-postgres >/dev/null 2>&1 || true
+            docker network rm witiquetas-ci >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+
+          echo "==> Criando network temporária witiquetas-ci..."
+          docker network create witiquetas-ci
+
+          echo "==> Iniciando PostgreSQL 16 Alpine efêmero..."
+          docker run -d \
+            --name test-postgres \
+            --network witiquetas-ci \
+            -e POSTGRES_DB=witiquetas \
+            -e POSTGRES_USER=witiquetas \
+            -e POSTGRES_PASSWORD=ci_test_password \
+            postgres:16-alpine
+
+          echo "==> Aguardando PostgreSQL ficar pronto (pg_isready)..."
+          for i in $(seq 1 30); do
+            if docker exec test-postgres pg_isready -U witiquetas -d witiquetas >/dev/null 2>&1; then
+              echo "PostgreSQL pronto após $i tentativas."
+              break
+            fi
+            if [ "$i" -eq 30 ]; then
+              echo "Erro: Timeout aguardando PostgreSQL ficar disponível."
+              docker logs test-postgres
+              exit 1
+            fi
+            sleep 1
+          done
+
+          echo "==> Iniciando backend container com DATABASE_URL e NODE_ENV=production..."
+          docker run -d \
+            --name test-backend \
+            --network witiquetas-ci \
+            -p 3000:3000 \
+            -e NODE_ENV=production \
+            -e ADMIN_API_KEY=ci_test_key \
+            -e ADMIN_COMPANY_ID=comp-ci \
+            -e DATABASE_URL=postgresql://witiquetas:ci_test_password@test-postgres:5432/witiquetas \
+            ghcr.io/wittemberg/witiquetas-backend:latest
+
+          echo "==> Aguardando backend responder em /api/health..."
+          BACKEND_HEALTHY=false
+          for i in $(seq 1 30); do
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/api/health || true)
+            if [ "$HTTP_CODE" = "200" ]; then
+              echo "Backend saudável (HTTP 200 em /api/health) após $i tentativas."
+              BACKEND_HEALTHY=true
+              break
+            fi
+            sleep 1
+          done
+
+          if [ "$BACKEND_HEALTHY" != "true" ]; then
+            echo "Erro: Backend não ficou saudável a tempo!"
+            echo "=== Logs do Backend (test-backend) ==="
+            docker logs test-backend || true
+            echo "=== Logs do PostgreSQL (test-postgres) ==="
+            docker logs test-postgres || true
+            exit 1
+          fi
+
+          echo "==> Validando criação da tabela agents no PostgreSQL..."
+          TABLE_CHECK=$(docker exec test-postgres psql -U witiquetas -d witiquetas -t -c "SELECT to_regclass('public.agents');" | tr -d '[:space:]')
+          if [ "$TABLE_CHECK" != "agents" ]; then
+            echo "Erro: Tabela 'agents' não foi encontrada no banco de dados!"
+            docker exec test-postgres psql -U witiquetas -d witiquetas -c "\dt"
+            docker logs test-backend
+            exit 1
+          fi
+          echo "Tabela 'agents' confirmada no PostgreSQL com sucesso."
+
+          echo "==> Testando download do agent Windows x64 (GET /api/agents/download/windows-x64)..."
+          DOWNLOAD_STATUS=$(curl -s -w "%{http_code}" http://localhost:3000/api/agents/download/windows-x64 -o downloaded-agent.exe)
+          if [ "$DOWNLOAD_STATUS" != "200" ]; then
+            echo "Erro: Endpoint de download retornou HTTP $DOWNLOAD_STATUS (esperado 200)"
+            docker logs test-backend
+            exit 1
+          fi
+
+          FILE_SIZE=$(stat -c%s downloaded-agent.exe 2>/dev/null || stat -f%z downloaded-agent.exe)
+          echo "Tamanho do executável baixado: $FILE_SIZE bytes"
+          if [ "$FILE_SIZE" -le 1000000 ]; then
+            echo "Erro: Arquivo baixado é menor que 1 MB ($FILE_SIZE bytes)!"
+            exit 1
+          fi
+
+          if ! head -c 2 downloaded-agent.exe | grep -q "MZ"; then
+            echo "Erro: Binário baixado não inicia com o cabeçalho 'MZ' do formato PE Windows!"
+            exit 1
+          fi
+
+          echo "Smoke test concluído com sucesso: Postgres READY, Backend HEALTHY, Tabela agents EXISTS, Download HTTP 200 com PE válido (> 1MB, header MZ)."
 
       - name: Build & Push Frontend Image
         uses: docker/build-push-action@v6

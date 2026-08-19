@@ -11,12 +11,16 @@ import type {
 } from '@witiquetas/contracts';
 import { printJobsStore } from './printJobs.js';
 
+import {
+  AgentsRepository,
+  memoryAgentsStore,
+  type AgentRecord,
+} from '../repositories/agentsRepository.js';
+
 const router = Router();
 
-// Storage em memória inicial (com fallback/mock para persistência antes de migrations do banco)
-export interface AgentRecord extends AgentDTO {
-  tokenHash: string;
-}
+export { memoryAgentsStore as agentsStore };
+export type { AgentRecord };
 
 export interface AuthWebUser {
   id: string;
@@ -82,15 +86,6 @@ export function verifyTokenHash(incomingRawToken: string, storedTokenHash: strin
     return false;
   }
 }
-
-import {
-  AgentsRepository,
-  memoryAgentsStore,
-  type AgentRecord,
-} from '../repositories/agentsRepository.js';
-
-export { memoryAgentsStore as agentsStore };
-export type { AgentRecord };
 
 // Helper: Middleware de autenticação exclusiva de agente daemon (SHA-256 + timingSafeEqual)
 export async function authenticateAgent(req: Request, res: Response, next: Function) {
@@ -361,7 +356,18 @@ router.post('/pair', async (req: Request, res: Response) => {
     tokenHash,
   };
 
-  await AgentsRepository.save(newAgent);
+  try {
+    await AgentsRepository.save(newAgent);
+  } catch (err: any) {
+    console.error(`[Agents] Erro ao persistir agente no banco durante pareamento: ${err.message}`);
+    // Reverte status do código para não queimar o código do usuário em caso de falha de infraestrutura
+    pairing.status = 'PENDING';
+    delete pairing.usedAt;
+    return res.status(503).json({
+      error: 'Falha ao persistir identidade do agente no banco de dados. Tente novamente.',
+    });
+  }
+
   pairing.agentId = agentId;
   pairing.agentDetails = {
     id: agentId,

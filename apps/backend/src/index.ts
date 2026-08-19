@@ -191,8 +191,15 @@ app.get('/', (_req, res) => {
   });
 });
 
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log(`[Witiquetas Backend] Rodando na porta ${PORT} (ENV: ${process.env.NODE_ENV || 'development'})`);
-  initDatabase().catch((err) => console.error('[Database] Falha no bootstrap:', err));
+  try {
+    await initDatabase();
+  } catch (err: any) {
+    console.error('[Database] Falha crítica no bootstrap do banco:', err.message);
+    if (process.env.NODE_ENV === 'production') {
+      process.exit(1);
+    }
+  }
   logAgentDistributionStatus();
 });

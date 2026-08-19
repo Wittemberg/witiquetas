@@ -350,3 +350,44 @@ test('5. Segurança: Token bruto nunca é persistido ou retornado nas consultas'
   assert.equal((agentInList as any).token, undefined, 'Token bruto nunca deve ser exposto na API');
   assert.equal((agentInList as any).tokenHash, undefined, 'TokenHash nunca deve ser exposto no DTO público');
 });
+
+test('6. Fail-Closed: Falha de persistência no pareamento não entrega token e retorna 503', async () => {
+  const session = createWebSession({
+    id: 'usr-admin-fail',
+    companyId: 'comp-matriz-01',
+    role: 'ADMIN',
+  });
+
+  const { req: reqGen, res: resGen } = createMockReqRes({
+    method: 'POST',
+    url: '/generate-pairing-code',
+    headers: { cookie: `witiquetas_session=${session.sessionId}` },
+  });
+  await executeRouteChain(postGenerateCodeHandlers, reqGen, resGen);
+
+  // Forçar falha no save simulando erro de conexão ao banco de dados
+  const originalSave = AgentsRepository.save;
+  (AgentsRepository as any).save = async () => {
+    throw new Error('ECONNREFUSED: Database connection timeout');
+  };
+
+  try {
+    const { req: reqPair, res: resPair } = createMockReqRes({
+      method: 'POST',
+      url: '/pair',
+      body: {
+        pairingCode: resGen.data.pairingCode,
+        machineName: 'FAIL-AGENT',
+        installationId: 'inst-fail-01',
+        agentVersion: '0.1.0',
+      },
+    });
+    await executeRouteChain(postPairHandlers, reqPair, resPair);
+
+    assert.equal(resPair.statusCode, 503);
+    assert.equal(resPair.data.token, undefined, 'Token nunca deve ser emitido se o banco falhar');
+  } finally {
+    (AgentsRepository as any).save = originalSave;
+  }
+});
+

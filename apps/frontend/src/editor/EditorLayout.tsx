@@ -14,6 +14,7 @@ import {
   EyeOff,
   ZoomIn,
   ZoomOut,
+  Maximize2,
   Undo2,
   Redo2,
   Type,
@@ -58,6 +59,7 @@ export default function EditorLayout({
     setSelectedElementId,
     zoom,
     setZoom,
+    fitToScreen,
     showPreviewData,
     setShowPreviewData,
     showGhostConditionalElements,
@@ -355,6 +357,14 @@ export default function EditorLayout({
             </button>
             <button className="btn" style={{ padding: '0.35rem' }} onClick={() => setZoom(zoom + 0.15)} title="Aumentar Zoom">
               <ZoomIn size={14} />
+            </button>
+            <button
+              className="btn"
+              style={{ padding: '0.35rem 0.55rem', fontSize: '0.72rem', fontWeight: 600 }}
+              onClick={() => fitToScreen()}
+              title="Ajustar etiqueta à área disponível da tela"
+            >
+              <span>Ajustar</span>
             </button>
           </div>
 

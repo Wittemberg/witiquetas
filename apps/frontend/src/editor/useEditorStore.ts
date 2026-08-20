@@ -283,6 +283,7 @@ interface EditorState {
 
   // Visualização e Ferramentas
   setZoom: (zoom: number) => void;
+  fitToScreen: (containerW?: number, containerH?: number) => void;
   setSnapToGrid: (snap: boolean) => void;
   setShowRulers: (show: boolean) => void;
   setShowSafeArea: (show: boolean) => void;
@@ -513,7 +514,27 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   selectAll: () => set({ selectedElementIds: get().document.elements.map((el) => el.id) }),
   clearSelection: () => set({ selectedElementIds: [] }),
 
-  setZoom: (zoom) => set({ zoom: Math.max(0.25, Math.min(6, zoom)) }),
+  setZoom: (zoom) => set({ zoom: Math.max(0.25, Math.min(4.0, parseFloat((Number(zoom) || 1.0).toFixed(2)))) }),
+  fitToScreen: (containerW = 800, containerH = 500) => {
+    const { document } = get();
+    const widthMm = Number(document?.dimensions?.widthMm) || 100;
+    const heightMm = Number(document?.dimensions?.heightMm) || 30;
+    const dpi = Number(document?.dimensions?.dpi) || 203;
+
+    const stageW = mmToPx(widthMm, dpi);
+    const stageH = mmToPx(heightMm, dpi);
+
+    const paddingPx = 64;
+    const availW = Math.max(100, containerW - paddingPx);
+    const availH = Math.max(100, containerH - paddingPx);
+
+    const scaleW = availW / stageW;
+    const scaleH = availH / stageH;
+    const targetZoom = Math.min(scaleW, scaleH);
+    const clampedZoom = Math.max(0.25, Math.min(4.0, parseFloat(targetZoom.toFixed(2))));
+
+    set({ zoom: clampedZoom });
+  },
   setSnapToGrid: (snapToGrid) => set({ snapToGrid }),
   setShowRulers: (showRulers) => set({ showRulers }),
   setShowSafeArea: (showSafeArea) => set({ showSafeArea }),

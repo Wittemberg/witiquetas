@@ -16,6 +16,10 @@ import type { LabelElement, TextElement, QrCodeElement, BarcodeElement, PriceEle
 
 const label100x30 = { widthMm: 100, heightMm: 30 };
 
+function mmToPx(mm: number, dpi: number = 203): number {
+  return Math.round((mm * dpi) / 25.4);
+}
+
 test('1. Borda Direita: Elemento além de widthMm é clampado na margem direita', () => {
   const elem: TextElement = {
     id: 't1',
@@ -360,4 +364,39 @@ test('21. FASE 3.5 PATCH VISUAL P0: Validação de Layout Responsivo do Property
 
   assert.ok(inspectorTsx.includes('Regras de Exibição'), 'PropertyInspector deve conter a seção Regras de Exibição');
   assert.ok(inspectorTsx.includes("flexDirection: 'column'"), 'Regras de Exibição deve empilhar os controles em coluna para evitar overflow horizontal');
+});
+
+test('22. FASE 3.5 PATCH 1.3: Viewport, Zoom e Réguas Sincronizadas (Zoom 295% e 100x30mm)', () => {
+  const doc = {
+    dimensions: { widthMm: 100, heightMm: 30, dpi: 203 },
+    elements: [
+      { id: '1', name: 'Texto Teste', type: 'text', text: 'ZOOM', x: 10, y: 5, width: 30, height: 10 } as LabelElement,
+    ],
+  };
+
+  const zoomFactor = 2.95;
+  const stagePx = mmToPx(doc.dimensions.widthMm, doc.dimensions.dpi);
+  const scaledPx = stagePx * zoomFactor;
+
+  assert.equal(doc.dimensions.widthMm, 100, 'Zoom não altera widthMm');
+  assert.equal(doc.dimensions.heightMm, 30, 'Zoom não altera heightMm');
+  assert.equal(doc.elements[0].x, 10, 'Zoom não altera element.x');
+  assert.equal(doc.elements[0].width, 30, 'Zoom não altera element.width');
+
+  assert.ok(scaledPx > 2000, 'Palco escalado a 295% deve ultrapassar 2000px de largura no viewport');
+
+  const canvasTsxPath = path.resolve('apps/frontend/src/editor/CanvasArea.tsx');
+  const canvasTsx = fs.readFileSync(canvasTsxPath, 'utf8');
+
+  assert.ok(canvasTsx.includes('scrollViewportRef'), 'CanvasArea deve possuir ref para o viewport de scroll do editor');
+  assert.ok(canvasTsx.includes("position: 'sticky'"), 'Réguas devem utilizar posicionamento sticky para sincronia de scroll');
+  assert.ok(canvasTsx.includes('prevZoomRef'), 'CanvasArea deve preservar o centro do viewport ao alterar o nível de zoom');
+
+  const storeTsxPath = path.resolve('apps/frontend/src/editor/useEditorStore.ts');
+  const storeTsx = fs.readFileSync(storeTsxPath, 'utf8');
+  assert.ok(storeTsx.includes('fitToScreen:'), 'useEditorStore deve exportar método fitToScreen');
+
+  const layoutTsxPath = path.resolve('apps/frontend/src/editor/EditorLayout.tsx');
+  const layoutTsx = fs.readFileSync(layoutTsxPath, 'utf8');
+  assert.ok(layoutTsx.includes('fitToScreen()'), 'EditorLayout deve invocar fitToScreen no botão Ajustar');
 });

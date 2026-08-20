@@ -332,6 +332,30 @@ export default function CanvasArea() {
   } = useEditorStore();
 
   const stageRef = useRef<any>(null);
+  const scrollViewportRef = useRef<HTMLDivElement>(null);
+  const prevZoomRef = useRef(zoom);
+
+  useEffect(() => {
+    const oldZoom = prevZoomRef.current;
+    if (oldZoom !== zoom && scrollViewportRef.current) {
+      const el = scrollViewportRef.current;
+      const viewW = el.clientWidth;
+      const viewH = el.clientHeight;
+
+      if (el.scrollWidth > viewW || el.scrollHeight > viewH) {
+        const centerX = el.scrollLeft + viewW / 2;
+        const centerY = el.scrollTop + viewH / 2;
+        const ratio = zoom / oldZoom;
+
+        const newScrollLeft = centerX * ratio - viewW / 2;
+        const newScrollTop = centerY * ratio - viewH / 2;
+
+        el.scrollLeft = Math.max(0, newScrollLeft);
+        el.scrollTop = Math.max(0, newScrollTop);
+      }
+    }
+    prevZoomRef.current = zoom;
+  }, [zoom]);
   const transformerRef = useRef<any>(null);
 
   const [cursorMm, setCursorMm] = useState<{ x: number | null; y: number | null }>({ x: null, y: null });
@@ -1115,15 +1139,17 @@ export default function CanvasArea() {
         </div>
       )}
 
-      {/* Área Central: Prancheta com Réguas Precisas (0,0) */}
+      {/* Área Central: Viewport Scrollável com Réguas Sincronizadas (0,0) */}
       <div
+        ref={scrollViewportRef}
         style={{
           flex: 1,
           overflow: 'auto',
           display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '2.5rem',
+          background: 'var(--canvas-bg)',
+          position: 'relative',
+          padding: '2rem',
+          boxSizing: 'border-box',
         }}
         onClick={(e) => {
           if (e.target === e.currentTarget) {
@@ -1133,19 +1159,25 @@ export default function CanvasArea() {
       >
         <div
           style={{
+            margin: 'auto',
             display: 'grid',
             gridTemplateColumns: showRulers ? '22px auto' : 'auto',
             gridTemplateRows: showRulers ? '22px auto' : 'auto',
             boxShadow: 'var(--shadow-elevated), 0 0 0 1px var(--border-color)',
             borderRadius: '4px',
-            overflow: 'hidden',
+            overflow: 'visible',
             background: 'var(--aside-bg)',
+            position: 'relative',
           }}
         >
-          {/* Canto mm */}
+          {/* Canto mm Sticky */}
           {showRulers && (
             <div
               style={{
+                position: 'sticky',
+                top: 0,
+                left: 0,
+                zIndex: 25,
                 width: 22,
                 height: 22,
                 background: 'var(--aside-bg)',
@@ -1166,24 +1198,28 @@ export default function CanvasArea() {
             </div>
           )}
 
-          {/* Régua Horizontal */}
+          {/* Régua Horizontal Sticky */}
           {showRulers && (
-            <HorizontalRuler
-              widthMm={widthMm}
-              dpi={dpi}
-              zoom={zoom}
-              cursorXmm={cursorMm.x}
-            />
+            <div style={{ position: 'sticky', top: 0, zIndex: 20, overflow: 'hidden' }}>
+              <HorizontalRuler
+                widthMm={widthMm}
+                dpi={dpi}
+                zoom={zoom}
+                cursorXmm={cursorMm.x}
+              />
+            </div>
           )}
 
-          {/* Régua Vertical */}
+          {/* Régua Vertical Sticky */}
           {showRulers && (
-            <VerticalRuler
-              heightMm={heightMm}
-              dpi={dpi}
-              zoom={zoom}
-              cursorYmm={cursorMm.y}
-            />
+            <div style={{ position: 'sticky', left: 0, zIndex: 20, overflow: 'hidden' }}>
+              <VerticalRuler
+                heightMm={heightMm}
+                dpi={dpi}
+                zoom={zoom}
+                cursorYmm={cursorMm.y}
+              />
+            </div>
           )}
 
           {/* Canvas da Etiqueta */}

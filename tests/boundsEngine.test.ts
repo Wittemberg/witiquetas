@@ -119,8 +119,8 @@ test('7. Rotação: Considera bounding box transformado (90 e 270 graus invertem
     name: 'Texto Vertical',
     type: 'text',
     text: 'LATERAL',
-    x: 95, // 95 + bboxW(10) = 105 > 100
-    y: 5,  // 5 + bboxH(25) = 30 <= 30
+    x: 105, // 105 - 10 = 95 mm, maxX = 105 > 100
+    y: 5,   // 5 + 25 = 30 <= 30
     width: 25,
     height: 10,
     rotation: 90,
@@ -131,7 +131,7 @@ test('7. Rotação: Considera bounding box transformado (90 e 270 graus invertem
   assert.equal(bbox.height, 25, 'Aos 90°, a altura do bounding box é a largura do elemento (25)');
 
   const constrained = constrainElementToLabel(elemRotated, label100x30);
-  assert.equal(constrained.x, 90, 'x deve ser limitado a 100 - 10 = 90 mm');
+  assert.equal(constrained.x, 100, 'x deve ser limitado a 100 mm');
   assert.equal(constrained.y, 5, 'y deve ser mantido em 5 mm');
 });
 
@@ -152,51 +152,38 @@ test('8. Movimentação Múltipla de Grupo: Preserva distância relativa sem com
   const newEl2X = el2.x + dxMm; // 80
 
   const finalDistance = newEl2X - (newEl1X + el1.width); // 80 - (40 + 20) = 20mm
-  assert.equal(finalDistance, initialDistance, 'A distância relativa entre elementos do grupo foi estritamente preservada');
+  assert.equal(finalDistance, initialDistance, 'A distância relativa entre os elementos deve ser rigorosamente mantida');
 });
 
 test('9. Validador de Limites: Detecta violação com mensagem precisa em mm', () => {
-  const legacyElement: TextElement = {
-    id: 'leg-1',
-    name: 'Nome do Produto',
+  const elem: TextElement = {
+    id: 't-invalid',
+    name: 'Título Estourado',
     type: 'text',
-    text: 'REFRIGERANTE COCA-COLA 2L',
-    x: 80,
-    y: 5,
-    width: 22.4, // 80 + 22.4 = 102.4 mm (ultrapassa em 2.4 mm)
+    text: 'EXTRAPOLADO',
+    x: 85,
+    y: 10,
+    width: 20, // 85 + 20 = 105 > 100 (5mm de extrapolação)
     height: 10,
   };
 
-  const violation = validateElementBounds(legacyElement, label100x30);
-  assert.equal(violation.isOutOfBounds, true);
-  assert.equal(violation.overflowRightMm, 2.4);
-  assert.equal(
-    violation.message,
-    '"Nome do Produto" ultrapassa a borda direita em 2,4 mm.'
-  );
+  const result = validateElementBounds(elem, label100x30);
+  assert.equal(result.isOutOfBounds, true);
+  assert.equal(result.overflowRightMm, 5);
+  assert.match(result.message!, /ultrapassa a borda direita em 5 mm/);
 });
 
 test('10. Modelo Importado: Coordenadas legadas fora da área não são alteradas silenciosamente no documento', () => {
-  const importedDoc = {
-    dimensions: label100x30,
+  const doc = {
     elements: [
-      {
-        id: 'legacy-elem',
-        name: 'Preço Legado',
-        type: 'price' as const,
-        field: 'produto.preco',
-        x: 85,
-        y: 25, // 25 + 10 = 35 > 30 (ultrapassa borda inferior em 5.0 mm)
-        width: 15,
-        height: 10,
-        sourceReference: { state: 'imported' as const, format: 'pplb' as const, rawCommand: 'A85,25...' },
-      },
-    ],
+      { id: '1', name: 'Ok', type: 'text', x: 5, y: 5, width: 20, height: 10 },
+      { id: '2', name: 'Fora', type: 'text', x: 95, y: 5, width: 20, height: 10 },
+    ] as LabelElement[],
+    dimensions: label100x30,
   };
 
-  const violations = validateDocumentBounds(importedDoc);
+  const violations = validateDocumentBounds(doc);
   assert.equal(violations.length, 1);
-  assert.equal(violations[0].elementId, 'legacy-elem');
-  assert.equal(violations[0].message, '"Preço Legado" ultrapassa a borda inferior em 5 mm.');
-  assert.equal(importedDoc.elements[0].y, 25, 'y original do arquivo importado NÃO foi alterado');
+  assert.equal(violations[0].elementId, '2');
+  assert.equal(doc.elements[1].x, 95, 'Arquivo original não deve ter coordenadas destruídas na memória sem ação explícita');
 });

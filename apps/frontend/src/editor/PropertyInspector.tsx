@@ -448,6 +448,19 @@ export default function PropertyInspector() {
               />
               <span>Manter em uma linha (sem quebra)</span>
             </label>
+
+            {/* Ajustar Fonte Automaticamente (AutoFit P0) */}
+            <label
+              style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.75rem', cursor: 'pointer', marginTop: '0.3rem' }}
+              title="Reduz o tamanho da fonte automaticamente quando o conteúdo não couber no espaço disponível"
+            >
+              <input
+                type="checkbox"
+                checked={(elem as TextElement).autoFit !== false}
+                onChange={(e) => updateElement(elem.id, { autoFit: e.target.checked })}
+              />
+              <span>Ajustar fonte automaticamente</span>
+            </label>
           </div>
         </>
       )}
@@ -739,22 +752,24 @@ export default function PropertyInspector() {
           <div className="inspector-section-title">Moldura & Preenchimento</div>
 
           <div>
-            <label className="metric-label">Preenchimento</label>
-            <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
-              <button
-                className={`btn ${(elem as RectangleElement).fillColor === 'transparent' ? 'btn-primary' : ''}`}
-                style={{ flex: 1, padding: '0.35rem', fontSize: '0.75rem', justifyContent: 'center' }}
-                onClick={() => updateElement(elem.id, { fillColor: 'transparent' })}
-              >
-                Transparente
-              </button>
+            <label className="metric-label">Cor de fundo</label>
+            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
               <input
                 type="color"
                 className="inspector-input"
                 style={{ width: '45px', height: '32px', padding: '2px' }}
                 value={(elem as RectangleElement).fillColor === 'transparent' ? '#ffffff' : (elem as RectangleElement).fillColor || '#000000'}
                 onChange={(e) => updateElement(elem.id, { fillColor: e.target.value })}
+                disabled={(elem as RectangleElement).fillColor === 'transparent'}
               />
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.75rem', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={(elem as RectangleElement).fillColor === 'transparent'}
+                  onChange={(e) => updateElement(elem.id, { fillColor: e.target.checked ? 'transparent' : '#ffffff' })}
+                />
+                <span>Transparente</span>
+              </label>
             </div>
           </div>
 
@@ -845,156 +860,6 @@ export default function PropertyInspector() {
                 <option value={180}>180° (Invertido)</option>
                 <option value={270}>270° (Girar Esquerda)</option>
               </select>
-            </div>
-
-            {/* Recorte de Texto / Substring (Item 275-276) para elementos de texto */}
-            {elem.type === 'text' && (
-              <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '0.5rem' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.75rem', cursor: 'pointer', fontWeight: 600 }}>
-                  <input
-                    type="checkbox"
-                    checked={!!(elem.transformations && elem.transformations.length > 0)}
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        updateElement(elem.id, {
-                          transformations: [{ type: 'substring', start: 0, length: 18 }],
-                        });
-                      } else {
-                        updateElement(elem.id, { transformations: undefined });
-                      }
-                    }}
-                  />
-                  <span>Recorte de Campo (Substring)</span>
-                </label>
-
-                {elem.transformations && elem.transformations.length > 0 && (
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.4rem', marginTop: '0.4rem' }}>
-                    <div>
-                      <label className="metric-label">Início (caractere)</label>
-                      <input
-                        type="number"
-                        min="0"
-                        className="inspector-input"
-                        value={elem.transformations[0]?.start ?? 0}
-                        onChange={(e) => {
-                          const val = parseInt(e.target.value) || 0;
-                          const current = elem.transformations![0];
-                          updateElement(elem.id, {
-                            transformations: [{ type: 'substring', start: val, length: current?.length || 18 }],
-                          });
-                        }}
-                      />
-                    </div>
-                    <div>
-                      <label className="metric-label">Comprimento</label>
-                      <input
-                        type="number"
-                        min="1"
-                        className="inspector-input"
-                        value={elem.transformations[0]?.length ?? 18}
-                        onChange={(e) => {
-                          const val = parseInt(e.target.value) || 1;
-                          const current = elem.transformations![0];
-                          updateElement(elem.id, {
-                            transformations: [{ type: 'substring', start: current?.start || 0, length: val }],
-                          });
-                        }}
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Condição de Exibição (Item 277-284) */}
-            <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '0.5rem' }}>
-              <div className="inspector-section-title" style={{ fontSize: '0.72rem', marginBottom: '0.3rem' }}>
-                Condição de Exibição (fx)
-              </div>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.75rem', cursor: 'pointer', fontWeight: 600 }}>
-                <input
-                  type="checkbox"
-                  checked={!!elem.visibilityRule}
-                  onChange={(e) => {
-                    if (e.target.checked) {
-                      updateElement(elem.id, {
-                        visibilityRule: {
-                          field: 'produto.promocao',
-                          operator: '>',
-                          value: '0',
-                        },
-                      });
-                    } else {
-                      updateElement(elem.id, { visibilityRule: undefined });
-                    }
-                  }}
-                />
-                <span>Exibir sob condição</span>
-              </label>
-
-              {elem.visibilityRule && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginTop: '0.4rem', background: 'var(--canvas-bg)', padding: '0.5rem', borderRadius: '4px' }}>
-                  <div>
-                    <label className="metric-label">Campo ERP</label>
-                    <select
-                      className="inspector-select"
-                      value={elem.visibilityRule.field}
-                      onChange={(e) =>
-                        updateElement(elem.id, {
-                          visibilityRule: { ...elem.visibilityRule!, field: e.target.value },
-                        })
-                      }
-                    >
-                      <option value="produto.promocao">Promoção (produto.promocao)</option>
-                      <option value="produto.preco">Preço Normal (produto.preco)</option>
-                      <option value="produto.ean">Código EAN (produto.ean)</option>
-                      <option value="produto.descricao">Descrição (produto.descricao)</option>
-                      <option value="custom.promocao">PROMOCAO (Legado)</option>
-                      <option value="custom.fatorbarra">FATORBARRA (Legado)</option>
-                    </select>
-                  </div>
-
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.4rem' }}>
-                    <div>
-                      <label className="metric-label">Operador</label>
-                      <select
-                        className="inspector-select"
-                        value={elem.visibilityRule.operator}
-                        onChange={(e) =>
-                          updateElement(elem.id, {
-                            visibilityRule: { ...elem.visibilityRule!, operator: e.target.value as any },
-                          })
-                        }
-                      >
-                        <option value=">">&gt; (Maior que)</option>
-                        <option value="<">&lt; (Menor que)</option>
-                        <option value="=">= (Igual a)</option>
-                        <option value="!=">≠ (Diferente de)</option>
-                        <option value=">=">&gt;= (Maior ou igual)</option>
-                        <option value="<=">&lt;= (Menor ou igual)</option>
-                        <option value="not_empty">Não está vazio</option>
-                        <option value="empty">Está vazio</option>
-                      </select>
-                    </div>
-
-                    {!['empty', 'not_empty'].includes(elem.visibilityRule.operator) && (
-                      <div>
-                        <label className="metric-label">Valor de Teste</label>
-                        <input
-                          type="text"
-                          className="inspector-input"
-                          value={elem.visibilityRule.value}
-                          onChange={(e) =>
-                            updateElement(elem.id, {
-                              visibilityRule: { ...elem.visibilityRule!, value: e.target.value },
-                            })
-                          }
-                        />
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
             </div>
 
             {/* Metadados de Origem do Round-Trip (Item 313-315) */}

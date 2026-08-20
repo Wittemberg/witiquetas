@@ -410,7 +410,7 @@ export default function EditorLayout({
                     checked={showSafeArea}
                     onChange={(e) => setShowSafeArea(e.target.checked)}
                   />
-                  <span>Margem Segura (1.5 mm)</span>
+                  <span>Margem Segura (1.0 mm)</span>
                 </label>
 
                 <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.78rem', cursor: 'pointer' }}>

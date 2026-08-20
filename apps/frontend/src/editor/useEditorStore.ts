@@ -340,7 +340,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   gridSizeMm: 1,
   showRulers: true,
   showSafeArea: false,
-  safeAreaMarginMm: 1.5,
+  safeAreaMarginMm: 1.0,
   showPreviewData: true,
   showGhostConditionalElements: true, // Modo Fantasma: elementos condicionais inativos aparecem translúcidos
   previewScenario: 'promo',

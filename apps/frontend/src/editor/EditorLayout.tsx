@@ -284,34 +284,34 @@ export default function EditorLayout({
               </span>
             </div>
 
-            {(saveStatus === 'unsaved' || saveStatus === 'error') && (
-              <button
-                className="btn"
-                style={{
-                  padding: '0.2rem 0.55rem',
-                  fontSize: '0.72rem',
-                  fontWeight: 700,
-                  background: 'var(--accent-blue)',
-                  color: '#ffffff',
-                  border: 'none',
-                  borderRadius: '4px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.3rem',
-                }}
-                onClick={() => saveDocumentToBackend()}
-                title="Salvar modelo no servidor (Ctrl+S)"
-              >
-                {saveStatus === 'saving' ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
-                <span>{saveStatus === 'error' ? 'Tentar novamente' : 'Salvar'}</span>
-              </button>
-            )}
+            <button
+              className="btn"
+              style={{
+                padding: '0.2rem 0.55rem',
+                fontSize: '0.72rem',
+                fontWeight: 700,
+                background: saveStatus === 'saved' ? 'var(--bg-card)' : 'var(--accent-blue)',
+                color: saveStatus === 'saved' ? 'var(--text-muted)' : '#ffffff',
+                border: saveStatus === 'saved' ? '1px solid var(--border-color)' : 'none',
+                borderRadius: '4px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.3rem',
+                opacity: saveStatus === 'saved' ? 0.7 : 1,
+              }}
+              onClick={() => saveDocumentToBackend()}
+              disabled={saveStatus === 'saving' || saveStatus === 'saved'}
+              title="Salvar modelo no servidor (Ctrl+S)"
+            >
+              {saveStatus === 'saving' ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
+              <span>{saveStatus === 'error' ? 'Tentar novamente' : saveStatus === 'saved' ? 'Salvo' : 'Salvar'}</span>
+            </button>
           </div>
         </div>
 
         {/* Lado Direito: Ações Globais Essenciais (Desfazer, Zoom, Guias [▦], Dados, Tema, Imprimir) */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          {/* Seletor de Cenário de Teste / Preview (Item 285) */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+          {/* Seletor de Cenário de Teste / Preview (Visualizar como) */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
             <select
               className="inspector-select"
@@ -325,10 +325,10 @@ export default function EditorLayout({
               }}
               value={previewScenario}
               onChange={(e) => setPreviewScenario(e.target.value as any)}
-              title="Alternar dados de teste para validar regras condicionais (Item 285)"
+              title="Simula diferentes condições dos dados para conferir como a etiqueta será impressa."
             >
-              <option value="promo">Cenário: Promoção (R$ 7,99)</option>
-              <option value="normal">Cenário: Normal (R$ 9,99)</option>
+              <option value="promo">Visualizar como: Promoção (R$ 7,99)</option>
+              <option value="normal">Visualizar como: Normal (R$ 9,99)</option>
             </select>
           </div>
 

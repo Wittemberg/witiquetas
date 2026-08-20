@@ -11,6 +11,7 @@ import {
 import { LabelElement, QrCodeElement, TextElement, BarcodeElement, PriceElement } from '@witiquetas/label-schema';
 import { generateQRCodeDataUrl } from './qrCodeGenerator';
 import { generateBarcodeModules } from './barcodeEngine';
+import { getElementBoundingBox, constrainGroupMovement, applyMagneticRotationSnap, normalizeElementGeometry, SAFE_AREA_MARGIN_MM } from './bounds';
 import {
   Copy,
   Scissors,
@@ -964,13 +965,15 @@ export default function CanvasArea() {
           message: `"${el.name || (el.type ? el.type.toUpperCase() : 'ELEMENTO')}" está parcialmente fora da etiqueta`,
         });
       } else {
-        const isBeyondSafe = x < 1.49 || y < 1.49 || (x + w) > (widthMm - 1.49) || (y + h) > (heightMm - 1.49);
+        const bbox = getElementBoundingBox(el);
+        const safeMargin = SAFE_AREA_MARGIN_MM;
+        const isBeyondSafe = bbox.minX < safeMargin - 0.05 || bbox.minY < safeMargin - 0.05 || bbox.maxX > widthMm - safeMargin + 0.05 || bbox.maxY > heightMm - safeMargin + 0.05;
         if (isBeyondSafe) {
           issues.push({
             id: el.id,
             name: el.name || (el.type ? el.type.toUpperCase() : 'ELEMENTO'),
             type: 'safeArea',
-            message: `"${el.name || (el.type ? el.type.toUpperCase() : 'ELEMENTO')}" ultrapassa a margem segura (1.5 mm)`,
+            message: `"${el.name || (el.type ? el.type.toUpperCase() : 'ELEMENTO')}" ultrapassa a margem segura (1 mm)`,
           });
         }
       }

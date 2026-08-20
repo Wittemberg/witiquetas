@@ -13,6 +13,7 @@ import {
   validateElementBounds,
   normalizeRotation,
   normalizeElementGeometry,
+  SAFE_AREA_MARGIN_MM,
 } from '../bounds.ts';
 import { encodeQRData, generateQRCodeDataUrl } from '../qrCodeGenerator.ts';
 import type { LabelElement, TextElement, QrCodeElement } from '@witiquetas/label-schema';
@@ -240,10 +241,9 @@ describe('Editor Bounds & Geometry Suite', () => {
         secondLineScale: 0.75,
       };
 
-      // Se auto-fit reduz a fonte principal em 10% (40 -> 36), a segunda linha reduz de 30 para 27 (36 * 0.75)
       const scaleFactor = 0.9;
-      const baseSize = textElem.fontSize * scaleFactor; // 36
-      const secondLineSize = baseSize * (textElem.secondLineScale || 1.0); // 27
+      const baseSize = textElem.fontSize * scaleFactor;
+      const secondLineSize = baseSize * (textElem.secondLineScale || 1.0);
 
       assert.equal(baseSize, 36);
       assert.equal(secondLineSize, 27);
@@ -255,7 +255,7 @@ describe('Editor Bounds & Geometry Suite', () => {
         id: 't-inside',
         type: 'text',
         text: 'Dentro',
-        x: 2, // 2mm da borda esquerda (> 1mm safe margin)
+        x: 2,
         y: 2,
         width: 20,
         height: 5,
@@ -265,6 +265,12 @@ describe('Editor Bounds & Geometry Suite', () => {
 
       const violation = validateElementBounds(elemInside, dimensions, 1.0);
       assert.equal(violation.isOutOfBounds, false, 'Elemento fisicamente a 2mm não viola bordas nem margem segura');
+    });
+  });
+
+  describe('7. Auditoria de Imports e Integridade de Runtime (Hotfix P0)', () => {
+    it('deve exportar e resolver SAFE_AREA_MARGIN_MM em bounds.ts sem ReferenceError', () => {
+      assert.equal(SAFE_AREA_MARGIN_MM, 1.0, 'SAFE_AREA_MARGIN_MM deve ser 1.0 mm');
     });
   });
 });

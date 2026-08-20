@@ -1,8 +1,8 @@
 import {
   DEFAULT_RETAIL_CATALOG,
   type ElementBinding,
-} from './canonicalFields.ts';
-import type { VisibilityRule } from './types.ts';
+} from './canonicalFields.js';
+import type { VisibilityRule } from './types.js';
 
 export const MOCK_PRODUCT_DATA: Record<string, string> = {
   // Retail (Varejo)
@@ -76,7 +76,7 @@ export function resolveFieldValue(
   } else {
     source = bindingOrField.source;
     fieldId = bindingOrField.fieldId || bindingOrField.field;
-    format = bindingOrField.format || bindingOrField.bindingFormat;
+    format = bindingOrField.format;
     manualVal = bindingOrField.value;
   }
 

@@ -7,15 +7,13 @@ import {
   DEFAULT_HOSPITAL_CATALOG,
   DEFAULT_LOGISTICS_CATALOG,
   SYSTEM_FIELDS,
-  type IntegrationFieldDefinition,
-  type ElementBinding,
-} from '../packages/label-schema/src/canonicalFields.ts';
-import {
   resolveFieldValue,
   evaluateVisibilityRule,
   MOCK_PRODUCT_DATA,
-} from '../packages/label-schema/src/dataBindingEngine.ts';
-import type { TextElement, PriceElement, BarcodeElement, QrCodeElement } from '../packages/label-schema/src/types.ts';
+  type IntegrationFieldDefinition,
+  type ElementBinding,
+} from '@witiquetas/label-schema';
+import type { TextElement, PriceElement, BarcodeElement, QrCodeElement } from '@witiquetas/label-schema';
 
 test('1. FASE 3.5 PATCH 2.1: Catálogo Dinâmico e Categorias Abertas (Sem Union Fechada)', () => {
   const customField: IntegrationFieldDefinition = {

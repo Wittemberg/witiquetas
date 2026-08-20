@@ -278,7 +278,7 @@ export default function PropertyInspector() {
         <>
           <div className="inspector-section">
             <div className="inspector-section-title">Conteúdo do Texto</div>
-            
+
             <FieldPicker
               label="Campo da integração ou sistema"
               value={(elem as TextElement).field || ''}
@@ -291,8 +291,8 @@ export default function PropertyInspector() {
                 <select
                   className="inspector-select"
                   style={{ width: '100%', minWidth: 0, textOverflow: 'ellipsis' }}
-                  value={(elem as any).bindingFormat || (elem as any).format || 'datetime'}
-                  onChange={(e) => updateElement(elem.id, { format: e.target.value as any, bindingFormat: e.target.value as any })}
+                  value={(elem as any).format || 'datetime'}
+                  onChange={(e) => updateElement(elem.id, { format: e.target.value as any })}
                 >
                   <option value="datetime">Data e hora (Ex: 20/08/2026 12:35)</option>
                   <option value="date">Data (Ex: 20/08/2026)</option>
@@ -301,7 +301,7 @@ export default function PropertyInspector() {
               </div>
             )}
 
-            <div>
+            <div style={{ marginTop: '0.5rem' }}>
               <label className="metric-label">Texto Manual</label>
               <input
                 type="text"

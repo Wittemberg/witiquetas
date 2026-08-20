@@ -8,17 +8,18 @@ import type {
   RectangleElement,
   VisibilityRule,
 } from '@witiquetas/label-schema';
+
 import type {
   ASTNode,
   VisualASTNode,
   ConditionalASTNode,
   ConfigASTNode,
   LabelAST,
-} from './astTypes';
-import { LegacyPreprocessor, ERP_MACRO_MAP, invertVisibilityRule } from './legacyPreprocessor';
-import { calculatePPLBTextGeometry } from './pplbFontMetrics';
-import { calculatePPLBBarcodeGeometry } from './pplbBarcodeMetrics';
-import type { ImportDiagnosticItem, ImportResult } from './types';
+} from './astTypes.js';
+import { LegacyPreprocessor, ERP_MACRO_MAP, invertVisibilityRule } from './legacyPreprocessor.js';
+import { calculatePPLBTextGeometry } from './pplbFontMetrics.js';
+import { calculatePPLBBarcodeGeometry } from './pplbBarcodeMetrics.js';
+import type { ImportDiagnosticItem, ImportResult } from './types.js';
 
 /**
  * Converte Dots da impressora para Milímetros (precisão em ponto flutuante)
@@ -28,10 +29,6 @@ export function dotsToMm(dots: number, dpi: number = 203): number {
   return (dots * 25.4) / dpi;
 }
 
-/**
- * Converte Milímetros para Dots inteiros da impressora térmica
- * Fórmula física oficial: dots = Math.round((mm * dpi) / 25.4)
- */
 export function mmToDots(mm: number, dpi: number = 203): number {
   return Math.round((mm * dpi) / 25.4);
 }

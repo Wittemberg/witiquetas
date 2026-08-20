@@ -43,7 +43,6 @@ export interface BaseElement {
   transformations?: FieldTransformation[];
   sourceReference?: ElementSourceReference;
   binding?: ElementBinding;
-  bindingFormat?: 'date' | 'datetime' | 'time' | string;
   format?: 'date' | 'datetime' | 'time' | string;
 }
 

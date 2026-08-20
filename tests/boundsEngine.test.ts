@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { CANONICAL_FIELDS } from '../packages/label-schema/src/canonicalFields.ts';
 import {
   constrainElementToLabel,
   constrainGroupMovement,
@@ -399,4 +400,47 @@ test('22. FASE 3.5 PATCH 1.3: Viewport, Zoom e Réguas Sincronizadas (Zoom 295% 
   const layoutTsxPath = path.resolve('apps/frontend/src/editor/EditorLayout.tsx');
   const layoutTsx = fs.readFileSync(layoutTsxPath, 'utf8');
   assert.ok(layoutTsx.includes('fitToScreen()'), 'EditorLayout deve invocar fitToScreen no botão Ajustar');
+});
+
+test('23. FASE 3.5 COMMIT 2: Resolução de Campos do Sistema (system.printDateTime, printDate, printTime)', () => {
+  const storeTsxPath = path.resolve('apps/frontend/src/editor/useEditorStore.ts');
+  const storeTsx = fs.readFileSync(storeTsxPath, 'utf8');
+
+  assert.ok(storeTsx.includes('resolveFieldValue'), 'useEditorStore deve exportar a função resolveFieldValue');
+  assert.ok(storeTsx.includes('system.printDateTime'), 'MOCK_PRODUCT_DATA e resolveFieldValue devem suportar system.printDateTime');
+  assert.ok(storeTsx.includes('system.printDate'), 'MOCK_PRODUCT_DATA e resolveFieldValue devem suportar system.printDate');
+  assert.ok(storeTsx.includes('system.printTime'), 'MOCK_PRODUCT_DATA e resolveFieldValue devem suportar system.printTime');
+});
+
+test('24. FASE 3.5 COMMIT 2: Componente Reutilizável FieldPicker e Catálogo Unificado', () => {
+  const fieldPickerPath = path.resolve('apps/frontend/src/editor/FieldPicker.tsx');
+  assert.ok(fs.existsSync(fieldPickerPath), 'Componente FieldPicker.tsx deve existir em apps/frontend/src/editor/');
+
+  const fieldPickerContent = fs.readFileSync(fieldPickerPath, 'utf8');
+  assert.ok(fieldPickerContent.includes('Campos da Integração'), 'FieldPicker deve agrupar opções sob a categoria Campos da Integração');
+  assert.ok(fieldPickerContent.includes('Campos do Sistema Witiquetas'), 'FieldPicker deve agrupar opções sob a categoria Campos do Sistema Witiquetas');
+  assert.ok(fieldPickerContent.includes("textOverflow: 'ellipsis'"), 'FieldPicker deve impor textOverflow ellipsis para evitar estoiro horizontal');
+});
+
+test('25. FASE 3.5 COMMIT 2: UI de Regras de Exibição Reutiliza o FieldPicker (Sem Hardcode)', () => {
+  const inspectorPath = path.resolve('apps/frontend/src/editor/PropertyInspector.tsx');
+  const inspectorContent = fs.readFileSync(inspectorPath, 'utf8');
+
+  assert.ok(inspectorContent.includes('FieldPicker'), 'PropertyInspector.tsx deve importar e utilizar o FieldPicker');
+  assert.ok(!inspectorContent.includes('<option value="produto.promocao">PROMOCAO (produto.promocao)</option>'), 'Regras de Exibição NÃO deve conter opções hardcodadas de campos');
+  assert.ok(inspectorContent.includes('Campo da integração'), 'A nomenclatura da interface deve utilizar "Campo da integração"');
+  assert.ok(!inspectorContent.includes('Campo ERP'), 'A nomenclatura "Campo ERP" não deve ser exibida na interface do PropertyInspector');
+});
+
+test('26. FASE 3.5 COMMIT 2: Auditoria de Regressão Visual no PropertyInspector (Design Contract 224599d)', () => {
+  const indexCssPath = path.resolve('apps/frontend/src/index.css');
+  const indexCss = fs.readFileSync(indexCssPath, 'utf8');
+
+  assert.ok(indexCss.includes('overflow-x: hidden !important;'), 'editor-sidebar-right deve manter overflow-x: hidden !important');
+  assert.ok(indexCss.includes('min-width: 0;'), '.inspector-section deve manter min-width: 0');
+
+  const inspectorPath = path.resolve('apps/frontend/src/editor/PropertyInspector.tsx');
+  const inspectorContent = fs.readFileSync(inspectorPath, 'utf8');
+
+  assert.ok(inspectorContent.includes('minWidth: 0'), 'PropertyInspector deve manter a regra de minWidth: 0 em todos os containers e selects');
 });

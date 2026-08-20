@@ -265,7 +265,16 @@ function KonvaQRCode({
   onDblClick: (e: any) => void;
   onContextMenu: (e: any) => void;
 }) {
-  const qrDataUrl = useMemo(() => generateQRCodeDataUrl(elem.value || 'https://witiquetas.wrtec.com.br', 256), [elem.value]);
+  const { showPreviewData, mockProductData } = useEditorStore();
+  const valueStr = useMemo(() => {
+    if (showPreviewData && elem.field) {
+      const resolved = resolveFieldValue(elem.field, mockProductData);
+      if (resolved) return resolved;
+    }
+    return elem.value || 'https://witiquetas.wrtec.com.br';
+  }, [showPreviewData, elem.field, elem.value, mockProductData]);
+
+  const qrDataUrl = useMemo(() => generateQRCodeDataUrl(valueStr, 256), [valueStr]);
   const [image] = useImage(qrDataUrl);
 
   return (

@@ -65,7 +65,48 @@ export const MOCK_PRODUCT_DATA: Record<string, string> = {
   'job.quantidade': '1',
   'impressao.data': '15/08/2026',
   'impressao.hora': '15:30',
+  'system.printDateTime': '20/08/2026 12:35',
+  'system.printDate': '20/08/2026',
+  'system.printTime': '12:35',
 };
+
+
+// Resolvedor Universal de Campos da Integração e do Sistema
+export function resolveFieldValue(
+  field?: string,
+  data: Record<string, string> = MOCK_PRODUCT_DATA
+): string | undefined {
+  if (!field) return undefined;
+
+  if (data[field] !== undefined) {
+    return data[field];
+  }
+
+  if (field === 'system.printDateTime') {
+    const now = new Date();
+    const dd = String(now.getDate()).padStart(2, '0');
+    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    const yyyy = now.getFullYear();
+    const hh = String(now.getHours()).padStart(2, '0');
+    const min = String(now.getMinutes()).padStart(2, '0');
+    return `${dd}/${mm}/${yyyy} ${hh}:${min}`;
+  }
+  if (field === 'system.printDate') {
+    const now = new Date();
+    const dd = String(now.getDate()).padStart(2, '0');
+    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    const yyyy = now.getFullYear();
+    return `${dd}/${mm}/${yyyy}`;
+  }
+  if (field === 'system.printTime') {
+    const now = new Date();
+    const hh = String(now.getHours()).padStart(2, '0');
+    const min = String(now.getMinutes()).padStart(2, '0');
+    return `${hh}:${min}`;
+  }
+
+  return undefined;
+}
 
 // Avaliador Seguro de Regras de Visibilidade Condicional (Item 277-286)
 export function evaluateVisibilityRule(
@@ -74,7 +115,8 @@ export function evaluateVisibilityRule(
 ): boolean {
   if (!rule || !rule.field) return true;
 
-  const rawVal = data[rule.field] !== undefined ? String(data[rule.field]).trim() : '';
+  const resolved = resolveFieldValue(rule.field, data);
+  const rawVal = resolved !== undefined ? String(resolved).trim() : '';
   const targetVal = String(rule.value || '').trim();
 
   switch (rule.operator) {

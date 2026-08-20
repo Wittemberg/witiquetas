@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useEditorStore, formatDimensionBR } from './useEditorStore';
+import FieldPicker from './FieldPicker';
 import { CANONICAL_FIELDS, TextElement, PriceElement, BarcodeElement, QrCodeElement, RectangleElement, LineElement } from '@witiquetas/label-schema';
 import { CURATED_FONTS, getFontCompatibility } from './fontsCatalog';
 import { QRCodeLibraryItemDTO } from '@witiquetas/contracts';
@@ -278,21 +279,11 @@ export default function PropertyInspector() {
           <div className="inspector-section">
             <div className="inspector-section-title">Conteúdo do Texto</div>
             
-            <div>
-              <label className="metric-label">Vínculo ERP (Opcional)</label>
-              <select
-                className="inspector-select"
-                value={(elem as TextElement).field || ''}
-                onChange={(e) => updateElement(elem.id, { field: e.target.value || undefined })}
-              >
-                <option value="">-- Texto Estático Manual --</option>
-                {CANONICAL_FIELDS.map((f) => (
-                  <option key={f.key} value={f.key}>
-                    {f.label} ({f.key})
-                  </option>
-                ))}
-              </select>
-            </div>
+            <FieldPicker
+              label="Campo da integração"
+              value={(elem as TextElement).field || ''}
+              onChange={(val) => updateElement(elem.id, { field: val || undefined })}
+            />
 
             <div>
               <label className="metric-label">Texto Manual</label>
@@ -503,7 +494,7 @@ export default function PropertyInspector() {
               </select>
               {priceElem.field && (
                 <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
-                  Na impressão será utilizado o preço do produto no ERP.
+                  Na impressão será utilizado o preço do produto vindo da integração.
                 </div>
               )}
             </div>
@@ -601,7 +592,7 @@ export default function PropertyInspector() {
               </select>
               {barcodeElem.field && (
                 <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
-                  Na impressão física será utilizado o código do produto cadastrado no ERP.
+                  Na impressão física será utilizado o código do produto vindo da integração.
                 </div>
               )}
             </div>
@@ -665,8 +656,16 @@ export default function PropertyInspector() {
         <div className="inspector-section">
           <div className="inspector-section-title">Link do QR Code</div>
 
+          <FieldPicker
+            label="Campo da integração (Opcional)"
+            allowStatic={true}
+            staticLabel="-- URL / Conteúdo Fixo --"
+            value={(elem as QrCodeElement).field || ''}
+            onChange={(val) => updateElement(elem.id, { field: val || undefined })}
+          />
+
           <div>
-            <label className="metric-label">URL / Destino</label>
+            <label className="metric-label">URL / Destino Fixo</label>
             <input
               type="text"
               className="inspector-input"
@@ -881,19 +880,12 @@ export default function PropertyInspector() {
             {isEnabled && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', background: 'var(--bg-card)', padding: '0.6rem', borderRadius: '6px', border: '1px solid var(--border-color)', width: '100%', minWidth: 0, boxSizing: 'border-box' }}>
                 <div style={{ width: '100%', minWidth: 0 }}>
-                  <label className="metric-label">Campo ERP</label>
-                  <select
-                    className="inspector-select"
-                    style={{ width: '100%', minWidth: 0, textOverflow: 'ellipsis' }}
-                    value={rule?.field || ''}
-                    title={rule?.field || ''}
-                    onChange={(e) => updateElement(elem.id, { visibilityRule: { ...rule, field: e.target.value } })}
-                  >
-                    <option value="produto.promocao">PROMOCAO (produto.promocao)</option>
-                    <option value="produto.promocao.preco">PREÇO PROMO (produto.promocao.preco)</option>
-                    <option value="produto.preco">PREÇO (produto.preco)</option>
-                    <option value="produto.descricao">DESCRIÇÃO (produto.descricao)</option>
-                  </select>
+                  <FieldPicker
+                    label="Campo da integração"
+                    allowStatic={false}
+                    value={rule?.field || 'produto.promocao'}
+                    onChange={(val) => updateElement(elem.id, { visibilityRule: { ...rule!, field: val } })}
+                  />
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', width: '100%', minWidth: 0 }}>

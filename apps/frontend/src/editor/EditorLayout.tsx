@@ -451,10 +451,10 @@ export default function EditorLayout({
             className={`btn ${showPreviewData ? 'btn-primary' : ''}`}
             style={{ padding: '0.35rem 0.6rem', fontSize: '0.75rem' }}
             onClick={() => setShowPreviewData(!showPreviewData)}
-            title="Alternar dados comerciais de teste do ERP"
+            title="Alternar dados de teste da integração"
           >
             {showPreviewData ? <Eye size={13} /> : <EyeOff size={13} />}
-            <span>Dados ERP</span>
+            <span>Dados de Integração</span>
           </button>
 
           {/* Alternância de Tema */}

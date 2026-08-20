@@ -6,7 +6,7 @@ import {
   calculateOrientation,
 } from '@witiquetas/label-schema';
 import { QRCodeLibraryItemDTO, PrinterDTO } from '@witiquetas/contracts';
-import { constrainElementToLabel, constrainGroupMovement, validateDocumentBounds } from './bounds';
+import { normalizeElementGeometry, constrainElementToLabel, constrainGroupMovement, validateDocumentBounds, SAFE_AREA_MARGIN_MM } from './bounds';
 
 // Converter Milímetros ➔ Pixels com base no DPI (ex: 203 DPI = ~8 dots/mm)
 export function mmToPx(mm: number, dpi: number = 203): number {
@@ -342,7 +342,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   showSafeArea: false,
   safeAreaMarginMm: 1.0,
   showPreviewData: true,
-  showGhostConditionalElements: true, // Modo Fantasma: elementos condicionais inativos aparecem translúcidos
+  showGhostConditionalElements: false, // Modo Fantasma: elementos condicionais inativos aparecem translúcidos
   previewScenario: 'promo',
   mockProductData: { ...MOCK_PRODUCT_DATA },
   isDirty: false,
@@ -999,7 +999,23 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     );
     if (selectedElements.length === 0) return;
 
-    // Move o grupo preservando a distância relativa exata entre os elementos
+    if (selectedElements.length === 1) {
+      const el = selectedElements[0];
+      const moved = {
+        ...el,
+        x: el.x + dxMm,
+        y: el.y + dyMm,
+      };
+      const normalized = normalizeElementGeometry(moved, document.dimensions, { dpi: document.dimensions.dpi });
+
+      if (normalized.x === el.x && normalized.y === el.y) return;
+
+      const updatedElements = document.elements.map((item) => (item.id === el.id ? normalized : item));
+      set({ document: { ...document, elements: updatedElements }, isDirty: true });
+      pushHistory();
+      return;
+    }
+
     const { dxMm: allowedDx, dyMm: allowedDy } = constrainGroupMovement(
       selectedElements,
       dxMm,
@@ -1011,11 +1027,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
     const updatedElements = document.elements.map((el) => {
       if (!selectedElementIds.includes(el.id) || el.locked) return el;
-      return {
+      const moved = {
         ...el,
-        x: parseFloat((el.x + allowedDx).toFixed(2)),
-        y: parseFloat((el.y + allowedDy).toFixed(2)),
+        x: el.x + allowedDx,
+        y: el.y + allowedDy,
       };
+      return normalizeElementGeometry(moved, document.dimensions, { dpi: document.dimensions.dpi });
     });
 
     set({ document: { ...document, elements: updatedElements }, isDirty: true });

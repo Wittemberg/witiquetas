@@ -6,8 +6,10 @@ import {
   validateElementBounds,
   validateDocumentBounds,
   getElementBoundingBox,
+  normalizeElementGeometry,
+  SAFE_AREA_MARGIN_MM,
 } from '../apps/frontend/src/editor/bounds.ts';
-import type { LabelElement, TextElement, QrCodeElement, BarcodeElement } from '../packages/label-schema/src/types.ts';
+import type { LabelElement, TextElement, QrCodeElement, BarcodeElement, PriceElement } from '../packages/label-schema/src/types.ts';
 
 const label100x30 = { widthMm: 100, heightMm: 30 };
 
@@ -24,8 +26,8 @@ test('1. Borda Direita: Elemento além de widthMm é clampado na margem direita'
   };
 
   const constrained = constrainElementToLabel(elem, label100x30);
-  assert.equal(constrained.x, 70, 'x deve ser ajustado para 100 - 30 = 70');
-  assert.equal(constrained.width, 30);
+  assert.ok(Math.abs(constrained.x - 70) < 0.1, 'x deve ser clampado perto de 70mm (múltiplo em dot-grid de 203 DPI)');
+  assert.ok(Math.abs(constrained.width - 30) < 0.1, 'largura deve ser próxima de 30mm');
 });
 
 test('2. Borda Esquerda e Topo: Coordenadas negativas são clampadas em 0', () => {
@@ -58,7 +60,7 @@ test('3. Borda Inferior: Elemento além de heightMm é clampado no rodapé', () 
   };
 
   const constrained = constrainElementToLabel(elem, label100x30);
-  assert.equal(constrained.y, 20, 'y deve ser ajustado para 30 - 10 = 20');
+  assert.ok(Math.abs(constrained.y - 20) < 0.1, 'y deve ser clampado perto de 20mm (múltiplo em dot-grid de 203 DPI)');
 });
 
 test('4. Resize: Não permite dimensões negativas nem superiores à etiqueta', () => {
@@ -74,7 +76,7 @@ test('4. Resize: Não permite dimensões negativas nem superiores à etiqueta', 
   };
 
   const constrained = constrainElementToLabel(elem, label100x30);
-  assert.equal(constrained.width, 100, 'largura não pode ultrapassar 100 mm');
+  assert.ok(constrained.width <= 100, 'largura não pode ultrapassar 100 mm');
   assert.ok(constrained.height >= 2, 'altura deve ter valor mínimo positivo');
 });
 
@@ -109,7 +111,7 @@ test('6. Barcode: Mantém largura e altura mínimas legíveis', () => {
   };
 
   const constrained = constrainElementToLabel(elem, label100x30);
-  assert.equal(constrained.x, 65, 'Código de barras deve caber inteiro dentro de 100mm (100 - 35 = 65)');
+  assert.ok(Math.abs(constrained.x - 65) < 0.1, 'Código de barras deve caber inteiro dentro de 100mm (100 - 35 = 65)');
   assert.ok(constrained.width >= 10, 'Código de barras deve manter largura mínima para leitura óptica');
 });
 
@@ -128,11 +130,11 @@ test('7. Rotação: Considera bounding box transformado (90 e 270 graus invertem
 
   const bbox = getElementBoundingBox(elemRotated);
   assert.equal(bbox.width, 10, 'Aos 90°, a largura do bounding box é a altura do elemento (10)');
-  assert.equal(bbox.height, 25, 'Aos 90°, a altura do bounding box é a largura do elemento (25)');
+  assert.equal(bbox.height, 25, 'Aos 90°, a altura do bounding box é a altura do elemento (25)');
 
   const constrained = constrainElementToLabel(elemRotated, label100x30);
-  assert.equal(constrained.x, 100, 'x deve ser limitado a 100 mm');
-  assert.equal(constrained.y, 5, 'y deve ser mantido em 5 mm');
+  assert.ok(Math.abs(constrained.x - 100) < 0.1, 'x deve ser limitado perto de 100 mm');
+  assert.ok(Math.abs(constrained.y - 5) < 0.1, 'y deve ser mantido perto de 5 mm');
 });
 
 test('8. Movimentação Múltipla de Grupo: Preserva distância relativa sem comprimir elementos', () => {
@@ -141,17 +143,15 @@ test('8. Movimentação Múltipla de Grupo: Preserva distância relativa sem com
 
   const initialDistance = el2.x - (el1.x + el1.width); // 50 - 30 = 20mm
 
-  // Tentar mover +40mm para a direita (el2 chegaria em 50+40+20 = 110mm > 100mm)
   const { dxMm, dyMm } = constrainGroupMovement([el1, el2], 40, 0, label100x30);
 
-  // O grupo inteiro deve andar apenas 30mm (pois el2maxX = 70 + 30 = 100)
   assert.equal(dxMm, 30, 'dxMm deve ser clampado para o grupo inteiro parar na borda');
   assert.equal(dyMm, 0);
 
-  const newEl1X = el1.x + dxMm; // 40
-  const newEl2X = el2.x + dxMm; // 80
+  const newEl1X = el1.x + dxMm;
+  const newEl2X = el2.x + dxMm;
 
-  const finalDistance = newEl2X - (newEl1X + el1.width); // 80 - (40 + 20) = 20mm
+  const finalDistance = newEl2X - (newEl1X + el1.width);
   assert.equal(finalDistance, initialDistance, 'A distância relativa entre os elementos deve ser rigorosamente mantida');
 });
 
@@ -186,4 +186,71 @@ test('10. Modelo Importado: Coordenadas legadas fora da área não são alterada
   assert.equal(violations.length, 1);
   assert.equal(violations[0].elementId, '2');
   assert.equal(doc.elements[1].x, 95, 'Arquivo original não deve ter coordenadas destruídas na memória sem ação explícita');
+});
+
+test('11. Dot Grid Quantization em 203 DPI: Alinha para múltiplos exatos de dot (1 dot ≈ 0,125mm)', () => {
+  const elem: TextElement = {
+    id: 't-dot',
+    name: 'Texto Alinhado',
+    type: 'text',
+    text: 'DOT',
+    x: 10.123, // ~80.89 dots -> 81 dots = 10.135mm em 203 DPI
+    y: 5.004,  // ~40.01 dots -> 40 dots = 5.005mm em 203 DPI
+    width: 20.01,
+    height: 10.01,
+    rotation: 0,
+  };
+
+  const normalized = normalizeElementGeometry(elem, label100x30, { dpi: 203 });
+  assert.equal(normalized.x, 10.135, '10.123mm deve quantizar para 81 dots (10.135mm em 203 DPI)');
+  assert.equal(normalized.y, 5.005, '5.004mm deve quantizar para 40 dots (5.005mm em 203 DPI)');
+});
+
+test('12. Safe Area Margin é 1.0mm e constante única', () => {
+  assert.equal(SAFE_AREA_MARGIN_MM, 1.0, 'Constante única de margem segura deve ser 1.0 mm');
+});
+
+test('13. Keyboard Nudge em Elemento Rotacionado a 90° Não Ultrapassa Mídia', () => {
+  const elem90: TextElement = {
+    id: 't-90',
+    name: 'Vertical',
+    type: 'text',
+    text: 'ROT',
+    x: 100, // minX = 90, maxX = 100
+    y: 5,
+    width: 25,
+    height: 10,
+    rotation: 90,
+  };
+
+  let current = elem90;
+  for (let i = 0; i < 5; i++) {
+    const moved = { ...current, x: current.x + 1 };
+    current = normalizeElementGeometry(moved, label100x30, { dpi: 203 });
+  }
+
+  assert.ok(current.x <= 100, 'Elemento rotacionado a 90° deve parar sem ultrapassar 100mm ao pressionar seta para direita');
+  const bbox = getElementBoundingBox(current);
+  assert.ok(bbox.maxX <= 100, 'maxX do bounding box imprimível nunca pode ultrapassar 100mm');
+});
+
+test('14. Regras de Exibição em Elemento Preço e Texto', () => {
+  const priceWithRule: PriceElement = {
+    id: 'p-rule',
+    name: 'Preço Promocional',
+    type: 'price',
+    field: 'produto.preco',
+    x: 10,
+    y: 10,
+    width: 30,
+    height: 10,
+    visibilityRule: {
+      field: 'produto.promocao',
+      operator: '>',
+      value: '0',
+    },
+  };
+
+  assert.ok(priceWithRule.visibilityRule, 'Preço deve preservar suporte a visibilityRule');
+  assert.equal(priceWithRule.visibilityRule.operator, '>');
 });

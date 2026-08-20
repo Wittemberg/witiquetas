@@ -61,6 +61,7 @@ export interface TextElement extends BaseElement {
   horizontalMultiplier?: number; // Multiplicador horizontal de fonte nativo (1..8)
   verticalMultiplier?: number; // Multiplicador vertical de fonte nativo (1..8)
   scaleX?: number; // Fator de escala horizontal derivado para renderização
+  secondLineScale?: number; // Fator de escala para a segunda linha de texto
   reversePrint?: boolean; // Impressão reversa (branco sobre preto)
 }
 

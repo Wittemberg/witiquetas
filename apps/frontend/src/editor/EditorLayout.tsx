@@ -395,7 +395,7 @@ export default function EditorLayout({
                   Visualização & Guias
                 </div>
 
-                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.78rem', cursor: 'pointer' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.78rem', cursor: 'pointer' }} title="Exibe de forma transparente os elementos ocultos pelas Regras de Exibição para permitir sua edição. Eles não serão impressos neste cenário.">
                   <input
                     type="checkbox"
                     checked={snapToGrid}
@@ -430,7 +430,7 @@ export default function EditorLayout({
                     checked={showGhostConditionalElements}
                     onChange={toggleShowGhostConditionalElements}
                   />
-                  <span>Modo Fantasma (fx translúcido)</span>
+                  <span>Mostrar elementos ocultos</span>
                 </label>
               </div>
             )}

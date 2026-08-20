@@ -1,5 +1,7 @@
 import type { LabelElement } from '@witiquetas/label-schema';
 
+export const SAFE_AREA_MARGIN_MM = 1.0;
+
 export interface BoundingBoxMm {
   x: number;
   y: number;
@@ -20,6 +22,11 @@ export interface BoundsViolation {
   overflowRightMm: number;
   overflowBottomMm: number;
   message?: string;
+}
+
+export interface NormalizeGeometryContext {
+  dpi?: number;
+  safeAreaMarginMm?: number;
 }
 
 /**
@@ -272,18 +279,53 @@ export function clampElementToMedia<T extends LabelElement>(
 
   return {
     ...element,
-    x: parseFloat(clampedX.toFixed(2)),
-    y: parseFloat(clampedY.toFixed(2)),
-    width: parseFloat(width.toFixed(2)),
-    height: parseFloat(height.toFixed(2)),
+    x: parseFloat(clampedX.toFixed(3)),
+    y: parseFloat(clampedY.toFixed(3)),
+    width: parseFloat(width.toFixed(3)),
+    height: parseFloat(height.toFixed(3)),
     rotation,
   };
 }
 
 /**
+ * Funçao canônica única de normalização de geometria.
+ * Aplica atração magnética de rotação, quantização cardinal em dot-grid (quando ortogonal)
+ * e clamping físico aos limites da mídia.
+ */
+export function normalizeElementGeometry<T extends LabelElement>(
+  element: T,
+  dimensions: { widthMm: number; heightMm: number },
+  context: NormalizeGeometryContext = {}
+): T {
+  const dpi = context.dpi || 203;
+
+  // 1. Rotação Magnética (0°, 90°, 180°, 270°)
+  let rotation = normalizeRotation(element.rotation || 0);
+  const snapResult = applyMagneticRotationSnap(rotation);
+  rotation = snapResult.angle;
+
+  let elem = { ...element, rotation };
+
+  // 2. Quantização Cardinal em Dot Grid (apenas para ângulos cardinais ortogonais)
+  const isCardinal = rotation === 0 || rotation === 90 || rotation === 180 || rotation === 270;
+  if (isCardinal) {
+    const mmToDot = (mm: number) => Math.round((mm * dpi) / 25.4);
+    const dotToMm = (dot: number) => parseFloat(((dot * 25.4) / dpi).toFixed(3));
+
+    elem.x = dotToMm(mmToDot(Number(elem.x) || 0));
+    elem.y = dotToMm(mmToDot(Number(elem.y) || 0));
+    elem.width = dotToMm(mmToDot(Number(elem.width) || 1));
+    elem.height = dotToMm(mmToDot(Number(elem.height) || 1));
+  }
+
+  // 3. Clamping físico rigoroso à mídia
+  return clampElementToMedia(elem, dimensions);
+}
+
+/**
  * Alias mantido para compatibilidade retroativa
  */
-export const constrainElementToLabel = clampElementToMedia;
+export const constrainElementToLabel = normalizeElementGeometry;
 
 /**
  * Move um grupo de elementos mantendo a distância relativa exata entre eles,
@@ -321,8 +363,8 @@ export function constrainGroupMovement(
   }
 
   return {
-    dxMm: parseFloat(allowedDx.toFixed(2)),
-    dyMm: parseFloat(allowedDy.toFixed(2)),
+    dxMm: parseFloat(allowedDx.toFixed(3)),
+    dyMm: parseFloat(allowedDy.toFixed(3)),
   };
 }
 
@@ -332,7 +374,7 @@ export function constrainGroupMovement(
 export function validateElementBounds(
   element: LabelElement,
   dimensions: { widthMm: number; heightMm: number },
-  safeMarginMm: number = 1.0
+  safeMarginMm: number = SAFE_AREA_MARGIN_MM
 ): BoundsViolation {
   const bbox = getElementBoundingBox(element);
   const maxW = dimensions.widthMm;
@@ -381,6 +423,6 @@ export function validateDocumentBounds(
 ): BoundsViolation[] {
   return document.elements
     .filter((el) => el.visible !== false)
-    .map((el) => validateElementBounds(el, document.dimensions, 1.0))
+    .map((el) => validateElementBounds(el, document.dimensions, SAFE_AREA_MARGIN_MM))
     .filter((v) => v.isOutOfBounds);
 }

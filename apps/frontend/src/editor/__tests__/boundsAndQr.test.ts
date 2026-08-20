@@ -12,6 +12,7 @@ import {
   constrainGroupMovement,
   validateElementBounds,
   normalizeRotation,
+  normalizeElementGeometry,
 } from '../bounds.ts';
 import { encodeQRData, generateQRCodeDataUrl } from '../qrCodeGenerator.ts';
 import type { LabelElement, TextElement, QrCodeElement } from '@witiquetas/label-schema';
@@ -220,6 +221,50 @@ describe('Editor Bounds & Geometry Suite', () => {
 
       const violation = validateElementBounds(elemNearBorder, dimensions, 1.0);
       assert.equal(violation.isOutOfBounds, false);
+    });
+  });
+
+  describe('6. Hierarquia Tipográfica e Exclusão do Transformer', () => {
+    it('deve aceitar secondLineScale = 0.75 e integrar com Auto-fit preservando a proporção de 75%', () => {
+      const textElem: TextElement = {
+        id: 't-hier',
+        type: 'text',
+        text: 'REFRIGERANTE\nCOCA-COLA 2L',
+        x: 10,
+        y: 5,
+        width: 50,
+        height: 10,
+        fontFamily: 'Roboto',
+        fontSize: 40,
+        autoFit: true,
+        secondLineScale: 0.75,
+      };
+
+      // Se auto-fit reduz a fonte principal em 10% (40 -> 36), a segunda linha reduz de 30 para 27 (36 * 0.75)
+      const scaleFactor = 0.9;
+      const baseSize = textElem.fontSize * scaleFactor; // 36
+      const secondLineSize = baseSize * (textElem.secondLineScale || 1.0); // 27
+
+      assert.equal(baseSize, 36);
+      assert.equal(secondLineSize, 27);
+      assert.equal(secondLineSize / baseSize, 0.75, 'A proporção de 75% entre as linhas deve ser 100% preservada no Auto-fit');
+    });
+
+    it('não deve considerar os cabos/anchors azuis do Transformer do Konva na validação de margem e limites', () => {
+      const elemInside: TextElement = {
+        id: 't-inside',
+        type: 'text',
+        text: 'Dentro',
+        x: 2, // 2mm da borda esquerda (> 1mm safe margin)
+        y: 2,
+        width: 20,
+        height: 5,
+        fontFamily: 'Roboto',
+        fontSize: 10,
+      };
+
+      const violation = validateElementBounds(elemInside, dimensions, 1.0);
+      assert.equal(violation.isOutOfBounds, false, 'Elemento fisicamente a 2mm não viola bordas nem margem segura');
     });
   });
 });

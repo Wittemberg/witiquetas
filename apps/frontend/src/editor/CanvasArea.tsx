@@ -350,7 +350,7 @@ export default function CanvasArea() {
   const stageWidthPx = mmToPx(widthMm, dpi);
   const stageHeightPx = mmToPx(heightMm, dpi);
   const gridSizePx = Math.max(4, mmToPx(Number(gridSizeMm) || 1, dpi));
-  const safeAreaMarginPx = mmToPx(Number(safeAreaMarginMm) || 1.5, dpi);
+  const safeAreaMarginPx = mmToPx(SAFE_AREA_MARGIN_MM, dpi);
 
   const primarySelected = useMemo(() => {
     const elements = document?.elements || [];

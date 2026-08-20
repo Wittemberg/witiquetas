@@ -1000,8 +1000,7 @@ export default function CanvasArea() {
       } else {
         const bbox = getElementBoundingBox(el);
         const safeMargin = SAFE_AREA_MARGIN_MM;
-        const epsilonMm = 0.0625;
-        const isBeyondSafe = bbox.minX < safeMargin - epsilonMm || bbox.minY < safeMargin - epsilonMm || bbox.maxX > widthMm - safeMargin + epsilonMm || bbox.maxY > heightMm - safeMargin + epsilonMm;
+        const isBeyondSafe = bbox.minX < safeMargin - 0.05 || bbox.minY < safeMargin - 0.05 || bbox.maxX > widthMm - safeMargin + 0.05 || bbox.maxY > heightMm - safeMargin + 0.05;
         if (isBeyondSafe) {
           issues.push({
             id: el.id,

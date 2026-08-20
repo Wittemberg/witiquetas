@@ -153,6 +153,29 @@ export default function App() {
           >
             {theme === 'dark' ? <Sun size={18} color="#f59e0b" /> : <Moon size={18} color="#3b82f6" />}
           </button>
+
+          {/* Abrir Editor Direto */}
+          <button 
+            className="btn"
+            onClick={() => setCurrentView('editor')}
+          >
+            <PenTool size={16} color="var(--accent-blue)" />
+            <span>Abrir Editor</span>
+          </button>
+
+          <button 
+            className="btn" 
+            onClick={() => setAutoRefresh(!autoRefresh)}
+            style={{ opacity: autoRefresh ? 1 : 0.6 }}
+          >
+            <Clock size={16} />
+            {autoRefresh ? 'Auto-refresh On' : 'Auto-refresh Off'}
+          </button>
+
+          <button className="btn" onClick={fetchData} disabled={loading}>
+            <RefreshCw size={16} className={loading ? 'spin' : ''} />
+            <span>Atualizar</span>
+          </button>
         </div>
       </header>
 

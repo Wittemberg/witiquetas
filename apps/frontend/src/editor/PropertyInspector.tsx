@@ -278,14 +278,30 @@ export default function PropertyInspector() {
         <>
           <div className="inspector-section">
             <div className="inspector-section-title">Conteúdo do Texto</div>
-
+            
             <FieldPicker
               label="Campo da integração ou sistema"
               value={(elem as TextElement).field || ''}
               onChange={(val) => updateElement(elem.id, { field: val || undefined })}
             />
 
-            <div style={{ marginTop: '0.5rem' }}>
+            {((elem as TextElement).field === 'system.printDateTime' || (elem as any).binding?.fieldId === 'system.printDateTime') && (
+              <div style={{ marginTop: '0.4rem', width: '100%', minWidth: 0 }}>
+                <label className="metric-label">Formato de Data e Hora</label>
+                <select
+                  className="inspector-select"
+                  style={{ width: '100%', minWidth: 0, textOverflow: 'ellipsis' }}
+                  value={(elem as any).format || 'datetime'}
+                  onChange={(e) => updateElement(elem.id, { format: e.target.value as any })}
+                >
+                  <option value="datetime">Data e hora (Ex: 20/08/2026 12:35)</option>
+                  <option value="date">Data (Ex: 20/08/2026)</option>
+                  <option value="time">Hora (Ex: 12:35)</option>
+                </select>
+              </div>
+            )}
+
+            <div>
               <label className="metric-label">Texto Manual</label>
               <input
                 type="text"
@@ -880,9 +896,6 @@ export default function PropertyInspector() {
 
             {isEnabled && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', background: 'var(--bg-card)', padding: '0.6rem', borderRadius: '6px', border: '1px solid var(--border-color)', width: '100%', minWidth: 0, boxSizing: 'border-box' }}>
-                <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)' }}>
-                  Mostrar este conteúdo quando...
-                </div>
                 <div style={{ width: '100%', minWidth: 0 }}>
                   <FieldPicker
                     label="Campo da integração"
@@ -961,36 +974,6 @@ export default function PropertyInspector() {
                 <option value={270}>270° (Girar Esquerda)</option>
               </select>
             </div>
-
-            {/* Customização de Formato de Data/Hora (system.printDateTime) */}
-            {((elem as TextElement).field === 'system.printDateTime' || (elem as any).binding?.fieldId === 'system.printDateTime') && (
-              <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '0.5rem', width: '100%', minWidth: 0 }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.75rem', cursor: 'pointer' }}>
-                  <input
-                    type="checkbox"
-                    checked={!!(elem as any).customFormatActive}
-                    onChange={(e) => updateElement(elem.id, { customFormatActive: e.target.checked, format: e.target.checked ? ((elem as any).format || 'datetime') : 'datetime' })}
-                  />
-                  <span>Personalizar formato de data/hora</span>
-                </label>
-
-                {(elem as any).customFormatActive && (
-                  <div style={{ marginTop: '0.4rem', width: '100%', minWidth: 0 }}>
-                    <label className="metric-label">Formato de Exibição</label>
-                    <select
-                      className="inspector-select"
-                      style={{ width: '100%', minWidth: 0, textOverflow: 'ellipsis' }}
-                      value={(elem as any).format || 'datetime'}
-                      onChange={(e) => updateElement(elem.id, { format: e.target.value as any })}
-                    >
-                      <option value="datetime">Data e hora</option>
-                      <option value="date">Data</option>
-                      <option value="time">Hora</option>
-                    </select>
-                  </div>
-                )}
-              </div>
-            )}
 
             {/* Metadados de Origem do Round-Trip */}
             {elem.sourceReference && (

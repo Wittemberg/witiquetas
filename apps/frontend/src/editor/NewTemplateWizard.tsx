@@ -132,10 +132,6 @@ export default function NewTemplateWizard({ isOpen, onClose, onSuccess }: Wizard
 
     onClose();
     onSuccess?.();
-    setStep('niche');
-    setSelectedNiche(null);
-    setSelectedSize(null);
-    setCustomTitle('');
   };
 
   return (

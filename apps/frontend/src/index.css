@@ -884,12 +884,16 @@ body {
   align-items: center;
   gap: 0.5rem;
   min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .card-subtitle {
   font-size: 0.75rem;
   color: var(--text-muted);
   margin-top: 0.2rem;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .grid {
@@ -907,6 +911,23 @@ body {
   min-width: 0;
 }
 
+.metric-value {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.technical-spec-value {
+  color: var(--text-primary);
+  font-weight: 600;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
 .code-block {
   background: var(--bg-input);
   padding: 0.75rem;
@@ -915,6 +936,8 @@ body {
   font-family: var(--font-mono);
   font-size: 0.75rem;
   overflow-x: auto;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .footer {
@@ -1001,4 +1024,81 @@ body {
   min-width: 0;
   box-sizing: border-box;
   text-overflow: ellipsis;
+}
+
+
+/* ==========================================================================
+   VIEWPORT, ZOOM & RÉGUAS DO EDITOR (COMMIT b2aeac8)
+   ========================================================================== */
+.editor-canvas-container, .editor-workspace-row {
+  flex: 1;
+  background: var(--canvas-bg);
+  position: relative;
+  overflow: auto !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ==========================================================================
+   UTILITÁRIOS ADICIONAIS & ANIMATION HELPERS
+   ========================================================================== */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.animate-spin, .spin {
+  animation: spin 1s linear infinite;
+}
+
+.badge-tag {
+  background: var(--accent-blue-subtle);
+  color: var(--accent-blue);
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+}
+
+.inspector-accordion {
+  border-bottom: 1px solid var(--border-color);
+}
+
+.inspector-accordion-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.6rem 0.85rem;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.8rem;
+  color: var(--text-primary);
+}
+
+.inspector-accordion-content {
+  padding: 0.6rem 0.85rem;
+}
+
+.metric-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.pipeline-flow {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.flow-step {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.flow-arrow {
+  color: var(--text-muted);
 }

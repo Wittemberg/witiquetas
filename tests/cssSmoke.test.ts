@@ -65,3 +65,22 @@ test('2. COMPILED CSS BUNDLE SMOKE TEST: Bundle CSS Compilado Contém o Design S
   assert.ok(compiledCss.includes('.inspector-section'), 'Bundle compilado deve conter a classe .inspector-section');
   assert.ok(compiledCss.includes('min-width:0') || compiledCss.includes('min-width: 0'), 'Bundle compilado deve conter min-width: 0');
 });
+
+test('3. DESIGN CONTRACTS AUDIT (COMMITS b2d63e0, 224599d, b2aeac8): Preservação dos Patches Visuais Homologados', () => {
+  const cssPath = path.resolve('apps/frontend/src/index.css');
+  const cssCode = fs.readFileSync(cssPath, 'utf8');
+
+  // b2d63e0: Card Design Contract (container-type: inline-size, 2-column grid, 38px button height, word-break & overflow-wrap for long domains like witiquetas.wrtec.com.br)
+  assert.ok(cssCode.includes('container-type: inline-size') || cssCode.includes('container-type:inline-size'), 'b2d63e0: .card deve definir container-type: inline-size');
+  assert.ok(cssCode.includes('grid-template-columns: repeat(2, minmax(0, 1fr))') || cssCode.includes('grid-template-columns:repeat(2,minmax(0,1fr))'), 'b2d63e0: .card-actions deve definir grid simétrico de 2 colunas');
+  assert.ok(cssCode.includes('height: 38px') || cssCode.includes('height:38px'), 'b2d63e0: .card-actions .btn deve possuir altura de 38px');
+  assert.ok(cssCode.includes('overflow-wrap: anywhere') || cssCode.includes('overflow-wrap:anywhere'), 'b2d63e0: deve conter overflow-wrap: anywhere para prevenir estourar colunas com URLs/domínios longos');
+  assert.ok(cssCode.includes('word-break: break-word') || cssCode.includes('word-break:break-word'), 'b2d63e0: deve conter word-break: break-word');
+
+  // 224599d: Inspector Responsivo (overflow-x: hidden !important, max-width: 100%, min-width: 0)
+  assert.ok(cssCode.includes('overflow-x: hidden !important') || cssCode.includes('overflow-x:hidden!important'), '224599d: .editor-sidebar-right deve conter overflow-x: hidden !important');
+  assert.ok(cssCode.includes('.inspector-section'), '224599d: deve conter .inspector-section');
+
+  // b2aeac8: Viewport / Zoom (overflow: auto !important no container do viewport do editor)
+  assert.ok(cssCode.includes('overflow: auto !important') || cssCode.includes('overflow:auto!important'), 'b2aeac8: .editor-canvas-container / .editor-workspace-row deve conter overflow: auto !important');
+});

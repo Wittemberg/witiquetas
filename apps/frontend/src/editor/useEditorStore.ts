@@ -1,3 +1,5 @@
+
+import { create } from 'zustand';
 import { LabelElement, LabelDocument, ElementType, TextElement, PriceElement, BarcodeElement, QrCodeElement, CANONICAL_FIELDS, DEFAULT_RETAIL_CATALOG, DEFAULT_HOSPITAL_CATALOG, DEFAULT_LOGISTICS_CATALOG, IntegrationFieldDefinition, ElementBinding, MOCK_PRODUCT_DATA, resolveFieldValue, evaluateVisibilityRule, ResolveBindingContext } from '@witiquetas/label-schema';
 export { MOCK_PRODUCT_DATA, resolveFieldValue, evaluateVisibilityRule, type ResolveBindingContext };
 import { QRCodeLibraryItemDTO, PrinterDTO } from '@witiquetas/contracts';

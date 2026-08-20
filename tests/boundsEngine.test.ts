@@ -403,13 +403,11 @@ test('22. FASE 3.5 PATCH 1.3: Viewport, Zoom e Réguas Sincronizadas (Zoom 295% 
 });
 
 test('23. FASE 3.5 COMMIT 2: Resolução de Campos do Sistema (system.printDateTime, printDate, printTime)', () => {
-  const storeTsxPath = path.resolve('apps/frontend/src/editor/useEditorStore.ts');
-  const storeTsx = fs.readFileSync(storeTsxPath, 'utf8');
+  const schemaTsPath = path.resolve('packages/label-schema/src/dataBindingEngine.ts');
+  const schemaTs = fs.readFileSync(schemaTsPath, 'utf8');
 
-  assert.ok(storeTsx.includes('resolveFieldValue'), 'useEditorStore deve exportar a função resolveFieldValue');
-  assert.ok(storeTsx.includes('system.printDateTime'), 'MOCK_PRODUCT_DATA e resolveFieldValue devem suportar system.printDateTime');
-  assert.ok(storeTsx.includes('system.printDate'), 'MOCK_PRODUCT_DATA e resolveFieldValue devem suportar system.printDate');
-  assert.ok(storeTsx.includes('system.printTime'), 'MOCK_PRODUCT_DATA e resolveFieldValue devem suportar system.printTime');
+  assert.ok(schemaTs.includes('resolveFieldValue'), 'dataBindingEngine deve exportar a função resolveFieldValue');
+  assert.ok(schemaTs.includes('system.printDateTime'), 'dataBindingEngine deve suportar system.printDateTime');
 });
 
 test('24. FASE 3.5 COMMIT 2: Componente Reutilizável FieldPicker e Catálogo Unificado', () => {
@@ -417,7 +415,7 @@ test('24. FASE 3.5 COMMIT 2: Componente Reutilizável FieldPicker e Catálogo Un
   assert.ok(fs.existsSync(fieldPickerPath), 'Componente FieldPicker.tsx deve existir em apps/frontend/src/editor/');
 
   const fieldPickerContent = fs.readFileSync(fieldPickerPath, 'utf8');
-  assert.ok(fieldPickerContent.includes('Campos da Integração'), 'FieldPicker deve agrupar opções sob a categoria Campos da Integração');
+  assert.ok(fieldPickerContent.includes('categoriesMap'), 'FieldPicker deve agrupar opções dinamicamente por categoria');
   assert.ok(fieldPickerContent.includes('Campos do Sistema Witiquetas'), 'FieldPicker deve agrupar opções sob a categoria Campos do Sistema Witiquetas');
   assert.ok(fieldPickerContent.includes("textOverflow: 'ellipsis'"), 'FieldPicker deve impor textOverflow ellipsis para evitar estoiro horizontal');
 });

@@ -280,10 +280,26 @@ export default function PropertyInspector() {
             <div className="inspector-section-title">Conteúdo do Texto</div>
             
             <FieldPicker
-              label="Campo da integração"
+              label="Campo da integração ou sistema"
               value={(elem as TextElement).field || ''}
               onChange={(val) => updateElement(elem.id, { field: val || undefined })}
             />
+
+            {((elem as TextElement).field === 'system.printDateTime' || (elem as any).binding?.fieldId === 'system.printDateTime') && (
+              <div style={{ marginTop: '0.4rem', width: '100%', minWidth: 0 }}>
+                <label className="metric-label">Formato de Data e Hora</label>
+                <select
+                  className="inspector-select"
+                  style={{ width: '100%', minWidth: 0, textOverflow: 'ellipsis' }}
+                  value={(elem as any).bindingFormat || (elem as any).format || 'datetime'}
+                  onChange={(e) => updateElement(elem.id, { format: e.target.value as any, bindingFormat: e.target.value as any })}
+                >
+                  <option value="datetime">Data e hora (Ex: 20/08/2026 12:35)</option>
+                  <option value="date">Data (Ex: 20/08/2026)</option>
+                  <option value="time">Hora (Ex: 12:35)</option>
+                </select>
+              </div>
+            )}
 
             <div>
               <label className="metric-label">Texto Manual</label>
@@ -853,11 +869,12 @@ export default function PropertyInspector() {
 
         const handleToggle = (checked: boolean) => {
           if (checked) {
+            const defaultField = activeCatalog && activeCatalog.length > 0 ? activeCatalog[0].id : 'system.printDateTime';
             updateElement(elem.id, {
               visibilityRule: {
-                field: 'produto.promocao',
-                operator: '>',
-                value: '0',
+                field: defaultField,
+                operator: 'not_empty',
+                value: '',
               },
             });
           } else {

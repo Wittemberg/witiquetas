@@ -1,9 +1,11 @@
 import React from 'react';
-import { CANONICAL_FIELDS, CanonicalFieldDefinition } from '@witiquetas/label-schema';
+import { IntegrationFieldDefinition, SYSTEM_FIELDS, DEFAULT_RETAIL_CATALOG } from '@witiquetas/label-schema';
+import { useEditorStore } from './useEditorStore';
 
 export interface FieldPickerProps {
   value: string;
   onChange: (value: string) => void;
+  fields?: IntegrationFieldDefinition[];
   allowStatic?: boolean;
   staticLabel?: string;
   label?: string;
@@ -17,6 +19,7 @@ export interface FieldPickerProps {
 export const FieldPicker: React.FC<FieldPickerProps> = ({
   value,
   onChange,
+  fields,
   allowStatic = true,
   staticLabel = '-- Texto Estático Manual --',
   label,
@@ -25,14 +28,21 @@ export const FieldPicker: React.FC<FieldPickerProps> = ({
   title,
   id,
 }) => {
-  const integrationFields = CANONICAL_FIELDS.filter((f) =>
-    ['produto', 'empresa', 'promocao'].includes(f.category)
-  );
-  const systemFields = CANONICAL_FIELDS.filter((f) =>
-    ['sistema', 'impressao'].includes(f.category)
-  );
+  const storeCatalog = useEditorStore((s) => s.activeCatalog);
+  const activeFields = fields || storeCatalog || DEFAULT_RETAIL_CATALOG;
 
-  const isKnown = !value || CANONICAL_FIELDS.some((f) => f.key === value);
+  const categoriesMap = new Map<string, IntegrationFieldDefinition[]>();
+  for (const f of activeFields) {
+    const catName = f.category || 'Geral';
+    if (!categoriesMap.has(catName)) {
+      categoriesMap.set(catName, []);
+    }
+    categoriesMap.get(catName)!.push(f);
+  }
+
+  const isSystemField = SYSTEM_FIELDS.some((sf) => sf.id === value);
+  const isKnownIntegration = activeFields.some((f) => f.id === value);
+  const isKnown = !value || isSystemField || isKnownIntegration;
 
   return (
     <div style={{ width: '100%', minWidth: 0, boxSizing: 'border-box' }}>
@@ -52,20 +62,22 @@ export const FieldPicker: React.FC<FieldPickerProps> = ({
         onChange={(e) => onChange(e.target.value)}
       >
         {allowStatic && <option value="">{staticLabel}</option>}
-        {!isKnown && <option value={value}>{value} (Campo Personalizado)</option>}
+        {!isKnown && <option value={value}>{value} (Campo Personalizado / Legado)</option>}
 
-        <optgroup label="Campos da Integração">
-          {integrationFields.map((f) => (
-            <option key={f.key} value={f.key}>
-              {f.label} ({f.key})
-            </option>
-          ))}
-        </optgroup>
+        {Array.from(categoriesMap.entries()).map(([catName, catFields]) => (
+          <optgroup key={catName} label={`Campos: ${catName}`}>
+            {catFields.map((f) => (
+              <option key={f.id} value={f.id}>
+                {f.label} ({f.id})
+              </option>
+            ))}
+          </optgroup>
+        ))}
 
         <optgroup label="Campos do Sistema Witiquetas">
-          {systemFields.map((f) => (
-            <option key={f.key} value={f.key}>
-              {f.label} ({f.key})
+          {SYSTEM_FIELDS.map((sf) => (
+            <option key={sf.id} value={sf.id}>
+              {sf.label} ({sf.id})
             </option>
           ))}
         </optgroup>

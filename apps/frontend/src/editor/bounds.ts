@@ -426,3 +426,44 @@ export function validateDocumentBounds(
     .map((el) => validateElementBounds(el, document.dimensions, SAFE_AREA_MARGIN_MM))
     .filter((v) => v.isOutOfBounds);
 }
+
+/**
+ * Normaliza a geometria de todos os elementos de um documento em lote.
+ * Garante que nenhum elemento permaneça parcialmente ou totalmente fora da mídia
+ * na entrada do documento (criação, abertura, importação, restore ou template legado).
+ */
+export function normalizeDocumentGeometry<T extends { elements: LabelElement[]; dimensions: { widthMm: number; heightMm: number; dpi?: number } }>(
+  document: T
+): T {
+  if (!document || !Array.isArray(document.elements)) return document;
+
+  const dpi = document.dimensions?.dpi || 203;
+  let hasOutOfBoundsElement = false;
+
+  const normalizedElements = document.elements.map((el) => {
+    if (!el) return el;
+
+    const bbox = getElementBoundingBox(el);
+    if (
+      bbox.minX < -0.05 ||
+      bbox.minY < -0.05 ||
+      bbox.maxX > document.dimensions.widthMm + 0.05 ||
+      bbox.maxY > document.dimensions.heightMm + 0.05
+    ) {
+      hasOutOfBoundsElement = true;
+    }
+
+    return normalizeElementGeometry(el, document.dimensions, { dpi });
+  });
+
+  if (hasOutOfBoundsElement) {
+    console.warn(
+      'Alguns elementos excedem o tamanho selecionado. O tamanho da mídia pode não corresponder ao modelo original.'
+    );
+  }
+
+  return {
+    ...document,
+    elements: normalizedElements,
+  };
+}

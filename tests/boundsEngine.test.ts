@@ -7,6 +7,7 @@ import {
   validateDocumentBounds,
   getElementBoundingBox,
   normalizeElementGeometry,
+  normalizeDocumentGeometry,
   SAFE_AREA_MARGIN_MM,
 } from '../apps/frontend/src/editor/bounds.ts';
 import type { LabelElement, TextElement, QrCodeElement, BarcodeElement, PriceElement } from '../packages/label-schema/src/types.ts';
@@ -130,7 +131,7 @@ test('7. Rotação: Considera bounding box transformado (90 e 270 graus invertem
 
   const bbox = getElementBoundingBox(elemRotated);
   assert.equal(bbox.width, 10, 'Aos 90°, a largura do bounding box é a altura do elemento (10)');
-  assert.equal(bbox.height, 25, 'Aos 90°, a altura do bounding box é a altura do elemento (25)');
+  assert.equal(bbox.height, 25, 'Aos 90°, a altura do bounding box é a largura do elemento (25)');
 
   const constrained = constrainElementToLabel(elemRotated, label100x30);
   assert.ok(Math.abs(constrained.x - 100) < 0.1, 'x deve ser limitado perto de 100 mm');
@@ -253,4 +254,93 @@ test('14. Regras de Exibição em Elemento Preço e Texto', () => {
 
   assert.ok(priceWithRule.visibilityRule, 'Preço deve preservar suporte a visibilityRule');
   assert.equal(priceWithRule.visibilityRule.operator, '>');
+});
+
+test('15. FASE 3.5 PATCH 1.2: Normalização em Lote na Entrada do Documento (Borda Direita x=92, w=15)', () => {
+  const doc = {
+    dimensions: label100x30,
+    elements: [
+      { id: '1', name: 'Texto Fora', type: 'text', text: 'TESTE', x: 92, y: 10, width: 15, height: 10 } as LabelElement,
+    ],
+  };
+
+  const normalizedDoc = normalizeDocumentGeometry(doc);
+  const el = normalizedDoc.elements[0];
+
+  assert.ok(Math.abs(el.x - 85) < 0.2, `Elemento x=92 width=15 deve ser clampado para x=85 na borda direita (obtido: ${el.x})`);
+  assert.notEqual(el.x, 42.5, 'NÃO deve centralizar o elemento na mídia');
+});
+
+test('16. FASE 3.5 PATCH 1.2: Normalização de Elementos Fora da Esquerda (x=-10)', () => {
+  const doc = {
+    dimensions: label100x30,
+    elements: [
+      { id: '1', name: 'Texto Negativo', type: 'text', text: 'NEG', x: -10, y: 5, width: 20, height: 10 } as LabelElement,
+    ],
+  };
+
+  const normalizedDoc = normalizeDocumentGeometry(doc);
+  assert.equal(normalizedDoc.elements[0].x, 0, 'Elemento fora da esquerda deve encostar na borda x=0');
+});
+
+test('17. FASE 3.5 PATCH 1.2: Seleção/Clique de Elemento é Idempotente', () => {
+  const doc = {
+    dimensions: label100x30,
+    elements: [
+      { id: '1', name: 'Texto', type: 'text', text: 'OK', x: 10, y: 10, width: 20, height: 10 } as LabelElement,
+    ],
+  };
+
+  const normalizedDoc = normalizeDocumentGeometry(doc);
+  const beforeSelect = { ...normalizedDoc.elements[0] };
+
+  const afterSelect = normalizeElementGeometry(normalizedDoc.elements[0], doc.dimensions, { dpi: 203 });
+
+  assert.equal(beforeSelect.x, afterSelect.x);
+  assert.equal(beforeSelect.y, afterSelect.y);
+  assert.equal(beforeSelect.width, afterSelect.width);
+  assert.equal(beforeSelect.height, afterSelect.height);
+});
+
+test('18. FASE 3.5 PATCH 1.2: Elemento Maior que a Própria Mídia (Oversized)', () => {
+  const doc = {
+    dimensions: label100x30,
+    elements: [
+      { id: '1', name: 'Gigante', type: 'text', text: 'EXTREMO', x: 0, y: 0, width: 120, height: 40 } as LabelElement,
+    ],
+  };
+
+  const normalizedDoc = normalizeDocumentGeometry(doc);
+  const el = normalizedDoc.elements[0];
+
+  assert.ok(el.width <= 100, 'Largura oversized deve ser limitada à largura da mídia (100mm)');
+  assert.ok(el.height <= 30, 'Altura oversized deve ser limitada à altura da mídia (30mm)');
+});
+
+test('19. FASE 3.5 PATCH 1.2: QR Code Oversized Preserva 1:1 Estrito', () => {
+  const doc = {
+    dimensions: label100x30,
+    elements: [
+      { id: 'qr-huge', name: 'QR Gigante', type: 'qrcode', value: 'https://witiquetas.wrtec.com.br', x: 0, y: 0, width: 120, height: 120 } as QrCodeElement,
+    ],
+  };
+
+  const normalizedDoc = normalizeDocumentGeometry(doc);
+  const qr = normalizedDoc.elements[0];
+
+  assert.equal(qr.width, qr.height, 'QR Code deve continuar 1:1');
+  assert.ok(qr.width <= 30, 'QR Code oversized deve ser limitado à menor dimensão da mídia (30mm)');
+});
+
+test('20. FASE 3.5 PATCH 1.2: Documento Totalmente Válido Permanece Inalterado', () => {
+  const doc = {
+    dimensions: label100x30,
+    elements: [
+      { id: '1', name: 'Válido', type: 'text', text: 'OK', x: 10.135, y: 5.005, width: 20.01, height: 10.01 } as LabelElement,
+    ],
+  };
+
+  const normalizedDoc = normalizeDocumentGeometry(doc);
+  assert.equal(normalizedDoc.elements[0].x, 10.135);
+  assert.equal(normalizedDoc.elements[0].y, 5.005);
 });

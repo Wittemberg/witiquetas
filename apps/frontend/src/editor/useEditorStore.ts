@@ -6,7 +6,7 @@ import {
   calculateOrientation,
 } from '@witiquetas/label-schema';
 import { QRCodeLibraryItemDTO, PrinterDTO } from '@witiquetas/contracts';
-import { normalizeElementGeometry, constrainElementToLabel, constrainGroupMovement, validateDocumentBounds, SAFE_AREA_MARGIN_MM } from './bounds';
+import { normalizeElementGeometry, normalizeDocumentGeometry, constrainElementToLabel, constrainGroupMovement, validateDocumentBounds, SAFE_AREA_MARGIN_MM } from './bounds';
 
 // Converter Milímetros ➔ Pixels com base no DPI (ex: 203 DPI = ~8 dots/mm)
 export function mmToPx(mm: number, dpi: number = 203): number {
@@ -333,7 +333,7 @@ interface EditorState {
 }
 
 export const useEditorStore = create<EditorState>((set, get) => ({
-  document: initialDocument,
+  document: normalizeDocumentGeometry(initialDocument),
   selectedElementIds: ['prod-desc'],
   zoom: 1.0, // Zoom padrão inicial de 100%
   snapToGrid: true,
@@ -355,16 +355,17 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   selectedPrinter: null,
   qrCodeLibrary: [],
 
-  history: [initialDocument],
+  history: [normalizeDocumentGeometry(initialDocument)],
   historyIndex: 0,
   clipboard: [],
 
   setDocument: (doc, templateId) => {
+    const normalizedDoc = normalizeDocumentGeometry(doc);
     set({
-      document: doc,
+      document: normalizedDoc,
       currentTemplateId: templateId || null,
       selectedElementIds: [],
-      history: [doc],
+      history: [normalizedDoc],
       historyIndex: 0,
       isDirty: false,
       saveStatus: 'saved',

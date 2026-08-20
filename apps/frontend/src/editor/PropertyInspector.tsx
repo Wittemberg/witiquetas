@@ -846,9 +846,100 @@ export default function PropertyInspector() {
       )}
 
       {/* =====================================================================
+         REGRAS DE EXIBIÇÃO CONDICIONAL (Texto e Preço)
+         ===================================================================== */}
+      {(elem.type === 'text' || elem.type === 'price') && (() => {
+        const rule = elem.visibilityRule;
+        const isEnabled = !!rule && !!rule.field;
+
+        const handleToggle = (checked: boolean) => {
+          if (checked) {
+            updateElement(elem.id, {
+              visibilityRule: {
+                field: 'produto.promocao',
+                operator: '>',
+                value: '0',
+              },
+            });
+          } else {
+            updateElement(elem.id, { visibilityRule: undefined });
+          }
+        };
+
+        return (
+          <div className="inspector-section" style={{ width: '100%', minWidth: 0, boxSizing: 'border-box' }}>
+            <div className="inspector-section-title">Regras de Exibição</div>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.75rem', cursor: 'pointer', minWidth: 0 }}>
+              <input
+                type="checkbox"
+                checked={isEnabled}
+                onChange={(e) => handleToggle(e.target.checked)}
+              />
+              <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Ativar exibição condicional</span>
+            </label>
+
+            {isEnabled && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', background: 'var(--bg-card)', padding: '0.6rem', borderRadius: '6px', border: '1px solid var(--border-color)', width: '100%', minWidth: 0, boxSizing: 'border-box' }}>
+                <div style={{ width: '100%', minWidth: 0 }}>
+                  <label className="metric-label">Campo ERP</label>
+                  <select
+                    className="inspector-select"
+                    style={{ width: '100%', minWidth: 0, textOverflow: 'ellipsis' }}
+                    value={rule?.field || ''}
+                    title={rule?.field || ''}
+                    onChange={(e) => updateElement(elem.id, { visibilityRule: { ...rule, field: e.target.value } })}
+                  >
+                    <option value="produto.promocao">PROMOCAO (produto.promocao)</option>
+                    <option value="produto.promocao.preco">PREÇO PROMO (produto.promocao.preco)</option>
+                    <option value="produto.preco">PREÇO (produto.preco)</option>
+                    <option value="produto.descricao">DESCRIÇÃO (produto.descricao)</option>
+                  </select>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', width: '100%', minWidth: 0 }}>
+                  <div style={{ width: '100%', minWidth: 0 }}>
+                    <label className="metric-label">Operador</label>
+                    <select
+                      className="inspector-select"
+                      style={{ width: '100%', minWidth: 0, textOverflow: 'ellipsis' }}
+                      value={rule?.operator || '>'}
+                      onChange={(e) => updateElement(elem.id, { visibilityRule: { ...rule, operator: e.target.value as any } })}
+                    >
+                      <option value=">">Maior que (&gt;)</option>
+                      <option value=">=">Maior ou igual (&gt;=)</option>
+                      <option value="<">Menor que (&lt;)</option>
+                      <option value="<=">Menor ou igual (&lt;=)</option>
+                      <option value="=">Igual (=)</option>
+                      <option value="!=">Diferente (!=)</option>
+                      <option value="not_empty">Preenchido (not empty)</option>
+                      <option value="empty">Vazio (empty)</option>
+                    </select>
+                  </div>
+
+                  {!['empty', 'not_empty'].includes(rule?.operator || '') && (
+                    <div style={{ width: '100%', minWidth: 0 }}>
+                      <label className="metric-label">Valor Esperado</label>
+                      <input
+                        type="text"
+                        className="inspector-input"
+                        style={{ width: '100%', minWidth: 0 }}
+                        value={rule?.value || ''}
+                        placeholder="Ex: 0"
+                        onChange={(e) => updateElement(elem.id, { visibilityRule: { ...rule, value: e.target.value } })}
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
+      {/* =====================================================================
          SEÇÃO ÚNICA AVANÇADA (RECOLHÍVEL)
          ===================================================================== */}
-      <div className="inspector-section" style={{ borderBottom: 'none' }}>
+      <div className="inspector-section" style={{ borderBottom: 'none', width: '100%', minWidth: 0, boxSizing: 'border-box' }}>
         <div
           style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}
           onClick={() => setIsAdvancedOpen(!isAdvancedOpen)}
@@ -860,7 +951,7 @@ export default function PropertyInspector() {
         </div>
 
         {isAdvancedOpen && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', marginTop: '0.5rem' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', marginTop: '0.5rem', width: '100%', minWidth: 0 }}>
             <div>
               <label className="metric-label">Rotação (Graus)</label>
               <select
@@ -875,7 +966,7 @@ export default function PropertyInspector() {
               </select>
             </div>
 
-            {/* Metadados de Origem do Round-Trip (Item 313-315) */}
+            {/* Metadados de Origem do Round-Trip */}
             {elem.sourceReference && (
               <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '0.5rem', fontSize: '0.68rem', color: 'var(--text-muted)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -892,108 +983,24 @@ export default function PropertyInspector() {
               </div>
             )}
 
-            <div style={{ display: 'flex', gap: '0.4rem', borderTop: '1px solid var(--border-color)', paddingTop: '0.5rem' }}>
+            <div style={{ display: 'flex', gap: '0.4rem', borderTop: '1px solid var(--border-color)', paddingTop: '0.5rem', width: '100%', minWidth: 0 }}>
               <button
                 className="btn"
-                style={{ flex: 1, justifyContent: 'center', fontSize: '0.72rem' }}
+                style={{ flex: 1, justifyContent: 'center', fontSize: '0.72rem', minWidth: 0 }}
                 onClick={() => toggleLock(elem.id)}
               >
                 {elem.locked ? <Lock size={12} color="var(--status-warning)" /> : <Unlock size={12} />}
-                <span>{elem.locked ? 'Bloqueado' : 'Desbloqueado'}</span>
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{elem.locked ? 'Bloqueado' : 'Desbloqueado'}</span>
               </button>
 
               <button
                 className="btn"
-                style={{ flex: 1, justifyContent: 'center', fontSize: '0.72rem' }}
+                style={{ flex: 1, justifyContent: 'center', fontSize: '0.72rem', minWidth: 0 }}
                 onClick={() => toggleVisibility(elem.id)}
               >
                 {elem.visible !== false ? <Eye size={12} /> : <EyeOff size={12} color="var(--status-danger)" />}
-                <span>{elem.visible !== false ? 'Visível' : 'Oculto'}</span>
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{elem.visible !== false ? 'Visível' : 'Oculto'}</span>
               </button>
-            {/* =====================================================================
-               REGRAS DE EXIBIÇÃO CONDICIONAL (Texto e Preço)
-               ===================================================================== */}
-            {(elem.type === 'text' || elem.type === 'price') && (() => {
-              const rule = elem.visibilityRule;
-              const isEnabled = !!rule && !!rule.field;
-
-              const handleToggle = (checked: boolean) => {
-                if (checked) {
-                  updateElement(elem.id, {
-                    visibilityRule: {
-                      field: 'produto.promocao',
-                      operator: '>',
-                      value: '0',
-                    },
-                  });
-                } else {
-                  updateElement(elem.id, { visibilityRule: undefined });
-                }
-              };
-
-              return (
-                <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '0.5rem', marginTop: '0.5rem' }}>
-                  <div className="inspector-section-title">Regras de Exibição</div>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.75rem', cursor: 'pointer', marginBottom: '0.5rem' }}>
-                    <input
-                      type="checkbox"
-                      checked={isEnabled}
-                      onChange={(e) => handleToggle(e.target.checked)}
-                    />
-                    <span>Ativar exibição condicional</span>
-                  </label>
-
-                  {isEnabled && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', background: 'var(--bg-card)', padding: '0.5rem', borderRadius: '4px', border: '1px solid var(--border-color)' }}>
-                      <div>
-                        <label className="metric-label">Campo ERP</label>
-                        <select
-                          className="inspector-select"
-                          value={rule?.field || ''}
-                          onChange={(e) => updateElement(elem.id, { visibilityRule: { ...rule, field: e.target.value } })}
-                        >
-                          <option value="produto.promocao">PROMOCAO (produto.promocao)</option>
-                          <option value="produto.promocao.preco">PREÇO PROMO (produto.promocao.preco)</option>
-                          <option value="produto.preco">PREÇO (produto.preco)</option>
-                          <option value="produto.descricao">DESCRIÇÃO (produto.descricao)</option>
-                        </select>
-                      </div>
-
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.4rem' }}>
-                        <div>
-                          <label className="metric-label">Operador</label>
-                          <select
-                            className="inspector-select"
-                            value={rule?.operator || '>'}
-                            onChange={(e) => updateElement(elem.id, { visibilityRule: { ...rule, operator: e.target.value as any } })}
-                          >
-                            <option value=">">Maior que (&gt;)</option>
-                            <option value=">=">Maior ou igual (&gt;=)</option>
-                            <option value="<">Menor que (&lt;)</option>
-                            <option value="<=">Menor ou igual (&lt;=)</option>
-                            <option value="=">Igual (=)</option>
-                            <option value="!=">Diferente (!=)</option>
-                            <option value="not_empty">Preenchido (not empty)</option>
-                            <option value="empty">Vazio (empty)</option>
-                          </select>
-                        </div>
-
-                        <div>
-                          <label className="metric-label">Valor Esperado</label>
-                          <input
-                            type="text"
-                            className="inspector-input"
-                            value={rule?.value || ''}
-                            placeholder="Ex: 0"
-                            onChange={(e) => updateElement(elem.id, { visibilityRule: { ...rule, value: e.target.value } })}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })()}
             </div>
           </div>
         )}

@@ -1,5 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
 import {
   constrainElementToLabel,
   constrainGroupMovement,
@@ -343,4 +345,19 @@ test('20. FASE 3.5 PATCH 1.2: Documento Totalmente Válido Permanece Inalterado'
   const normalizedDoc = normalizeDocumentGeometry(doc);
   assert.equal(normalizedDoc.elements[0].x, 10.135);
   assert.equal(normalizedDoc.elements[0].y, 5.005);
+});
+
+test('21. FASE 3.5 PATCH VISUAL P0: Validação de Layout Responsivo do PropertyInspector (Sem Scroll Horizontal)', () => {
+  const indexCssPath = path.resolve('apps/frontend/src/index.css');
+  const indexCss = fs.readFileSync(indexCssPath, 'utf8');
+
+  assert.ok(indexCss.includes('overflow-x: hidden !important;'), 'editor-sidebar-right deve impor overflow-x: hidden !important');
+  assert.ok(indexCss.includes('min-width: 0;'), '.inspector-section deve possuir min-width: 0');
+  assert.ok(indexCss.includes('text-overflow: ellipsis;'), '.inspector-select deve possuir text-overflow: ellipsis');
+
+  const inspectorTsxPath = path.resolve('apps/frontend/src/editor/PropertyInspector.tsx');
+  const inspectorTsx = fs.readFileSync(inspectorTsxPath, 'utf8');
+
+  assert.ok(inspectorTsx.includes('Regras de Exibição'), 'PropertyInspector deve conter a seção Regras de Exibição');
+  assert.ok(inspectorTsx.includes("flexDirection: 'column'"), 'Regras de Exibição deve empilhar os controles em coluna para evitar overflow horizontal');
 });

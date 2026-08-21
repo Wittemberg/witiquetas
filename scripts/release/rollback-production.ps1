@@ -1,4 +1,4 @@
-# Script de Rollback Instantâneo de Produção (Sem Rebuild) — Witiquetas
+# Script de Rollback Instantaneo de Producao (Sem Rebuild) — Witiquetas
 [CmdletBinding()]
 param (
     [string]$TargetSHA = "previous",
@@ -9,7 +9,7 @@ $ErrorActionPreference = "Stop"
 
 $ManifestPath = Join-Path $PSScriptRoot "..\..\docs\releases\release-manifest.json"
 if (-not (Test-Path $ManifestPath)) {
-    Write-Error "Manifesto de release não encontrado em: $ManifestPath"
+    Write-Error "Manifesto de release nao encontrado em: $ManifestPath"
 }
 
 $Manifest = Get-Content $ManifestPath -Raw | ConvertFrom-Json
@@ -22,7 +22,7 @@ if ($TargetSHA -eq "previous" -or [string]::IsNullOrWhiteSpace($TargetSHA)) {
     }
 }
 
-Write-Host "🔄 Iniciando Rollback Instantâneo de Produção..." -ForegroundColor Yellow
+Write-Host "[ROLLBACK] Iniciando Rollback Instantaneo de Producao..." -ForegroundColor Yellow
 Write-Host "   SHA Atual:    $($Manifest.commitSha)" -ForegroundColor Red
 Write-Host "   Target SHA:   $ResolvedSHA" -ForegroundColor Green
 
@@ -34,11 +34,11 @@ Write-Host "   Frontend Target: $FrontendTargetImage" -ForegroundColor Cyan
 Write-Host "   Backend Target:  $BackendTargetImage" -ForegroundColor Cyan
 
 if (-not [string]::IsNullOrWhiteSpace($PortainerWebhookUrl)) {
-    Write-Host "📡 Acionando Webhook do Portainer para atualizar a Stack..." -ForegroundColor Yellow
+    Write-Host "[PORTAINER] Acionando Webhook do Portainer para atualizar a Stack..." -ForegroundColor Yellow
     Invoke-RestMethod -Uri $PortainerWebhookUrl -Method Post -TimeoutSec 30
-    Write-Host "✅ Webhook acionado com sucesso!" -ForegroundColor Green
+    Write-Host "[PORTAINER] Webhook acionado com sucesso!" -ForegroundColor Green
 } else {
-    Write-Host "⚠️ PORTAINER_WEBHOOK_URL não configurado. Rollback de imagens registrado." -ForegroundColor Warning
+    Write-Host "[PORTAINER] PORTAINER_WEBHOOK_URL nao configurado. Rollback de imagens registrado." -ForegroundColor Yellow
 }
 
 # Atualizar manifesto local com status de rollback
@@ -56,4 +56,4 @@ $NewManifest = @{
 
 $NewManifest | ConvertTo-Json -Depth 5 | Set-Content -Path $ManifestPath -Encoding UTF8
 
-Write-Host "✅ ROLLBACK EXECUTADO COM SUCESSO PARA: $ResolvedSHA" -ForegroundColor Green
+Write-Host "[SUCCESS] ROLLBACK EXECUTADO COM SUCESSO PARA: $ResolvedSHA" -ForegroundColor Green

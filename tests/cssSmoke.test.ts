@@ -27,7 +27,9 @@ test('1. FRONTEND CSS SMOKE TEST: index.css Contém Todos os Módulos do Design 
   // 4. Wizard e Modais
   assert.ok(cssCode.includes('.wizard-modal-overlay') || cssCode.includes('.modal-backdrop'), 'Deve conter classes de modais e overlays');
   assert.ok(cssCode.includes('.wizard-modal-content'), 'Deve conter conteúdo do wizard modal');
-  assert.ok(cssCode.includes('.niche-grid') || cssCode.includes('.size-chips-grid'), 'Deve conter grids do wizard');
+  assert.ok(cssCode.includes('.niche-grid') || cssCode.includes('.wizard-size-grid'), 'Deve conter grids do wizard');
+  assert.ok(cssCode.includes('.wizard-size-card'), 'Deve conter .wizard-size-card do novo seletor de formatos');
+  assert.ok(cssCode.includes('.wizard-format-panel'), 'Deve conter .wizard-format-panel do painel formato selecionado');
 
   // 5. Botões, Controles e Agent Card
   assert.ok(cssCode.includes('.btn'), 'Deve conter a classe .btn');

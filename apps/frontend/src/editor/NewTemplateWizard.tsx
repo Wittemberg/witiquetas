@@ -203,18 +203,18 @@ export default function NewTemplateWizard({ isOpen, onClose, onSuccess }: Wizard
              ========================================================================= */}
           {step === 'size' && selectedNiche && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              {/* Botão de Trocar Nicho no Topo junto com Identificador */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-card)', padding: '0.6rem 0.85rem', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <div className="niche-card-icon" style={{ width: '28px', height: '28px' }}>
+              {/* Barra do Nicho Limpa no Topo com Botão de Trocar Nicho */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-card)', padding: '0.65rem 0.95rem', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                  <div className="niche-card-icon" style={{ width: '30px', height: '30px', borderRadius: '8px' }}>
                     {getNicheIcon(selectedNiche.icon)}
                   </div>
                   <div>
-                    <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-                      Nicho: {selectedNiche.name}
+                    <span style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-primary)', display: 'block', lineHeight: 1.2 }}>
+                      {selectedNiche.name}
                     </span>
-                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginLeft: '0.5rem' }}>
-                      ({availableSizes.length} tamanhos homologados)
+                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                      {availableSizes.length} formatos homologados
                     </span>
                   </div>
                 </div>
@@ -229,61 +229,69 @@ export default function NewTemplateWizard({ isOpen, onClose, onSuccess }: Wizard
                 </button>
               </div>
 
-              {/* Grid Duplo: Seleção de Tamanhos à Esquerda e Ficha Técnica com Preview Proporcional à Direita */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'minmax(280px, 1.2fr) minmax(280px, 1fr)', gap: '1.25rem', alignItems: 'start' }}>
-                {/* Coluna Esquerda: Chips de Tamanhos */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-                  <div className="size-search-bar">
-                    <Search size={15} color="var(--text-muted)" />
+              {/* Grid Principal: Seletor Visual de Formatos à Esquerda e Painel Formato Selecionado à Direita */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.35fr) minmax(330px, 0.8fr)', gap: '1.25rem', alignItems: 'start' }}>
+                {/* Coluna Esquerda: Busca e Grid de Formatos */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  <div className="size-search-bar" style={{ height: '40px', borderRadius: '10px' }}>
+                    <Search size={16} color="var(--text-muted)" />
                     <input
                       type="text"
                       className="size-search-input"
-                      placeholder="Filtrar medidas (ex: 100x30, 40, gôndola)..."
+                      placeholder="Buscar tamanho (ex: 100x30, 50x40...)"
                       value={searchSize}
                       onChange={(e) => setSearchSize(e.target.value)}
                     />
                   </div>
 
-                  <div className="size-chips-grid">
+                  <div className="wizard-size-grid">
                     {availableSizes.map((size) => {
                       const isSelected = selectedSize?.id === size.id;
-                      const formattedDimension = `${size.widthMm} × ${size.heightMm} mm`;
-
                       return (
                         <div
                           key={size.id}
-                          className={`size-chip ${isSelected ? 'selected' : ''}`}
+                          className={`wizard-size-card ${isSelected ? 'selected' : ''}`}
                           onClick={() => setSelectedSize(size)}
                         >
-                          {size.featured && <span className="size-featured-tag">MAIS USADO</span>}
+                          {size.featured && <span className="wizard-size-badge">MAIS USADO</span>}
                           {isSelected && (
-                            <div className="size-chip-check">
-                              <Check size={12} />
+                            <div className="wizard-size-check">
+                              <Check size={13} />
                             </div>
                           )}
-                          <div className="size-chip-content">
-                            <div className="size-chip-dimension">{formattedDimension}</div>
+                          <div className="wizard-size-card-content">
+                            <div className="wizard-size-dimension">{size.widthMm} × {size.heightMm}</div>
+                            <div className="wizard-size-unit">mm</div>
                           </div>
                         </div>
                       );
                     })}
                   </div>
+
+                  {/* Nome do Modelo Reposicionado Imediatamente Abaixo da Seleção */}
+                  <div style={{ marginTop: '0.5rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.35rem' }}>
+                      <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)' }}>Nome do modelo</span>
+                      <span style={{ fontSize: '0.7rem', fontWeight: 500, color: 'var(--text-muted)' }}>Opcional</span>
+                    </div>
+                    <input
+                      type="text"
+                      className="size-search-input"
+                      style={{ width: '100%', height: '40px', padding: '0 0.75rem', borderRadius: '10px', border: '1px solid var(--border-color)', background: 'var(--bg-input)', fontSize: '0.82rem', color: 'var(--text-primary)', boxSizing: 'border-box' }}
+                      placeholder={`Ex: ${selectedNiche.name} ${selectedSize ? `${selectedSize.widthMm}x${selectedSize.heightMm}` : ''}`}
+                      value={customTitle}
+                      onChange={(e) => setCustomTitle(e.target.value)}
+                    />
+                  </div>
                 </div>
 
-                {/* Coluna Direita: Ficha Técnica e Preview Proporcional */}
+                {/* Coluna Direita: Painel "FORMATO SELECIONADO" */}
                 {selectedSize && (
-                  <div className="preview-proportional-container">
-                    {/* Visualizador Proporcional */}
-                    <div
-                      style={{
-                        width: '100%',
-                        height: '140px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        marginBottom: '1rem',
-                      }}
-                    >
+                  <div className="wizard-format-panel">
+                    <span className="wizard-format-panel-title">FORMATO SELECIONADO</span>
+
+                    {/* Preview Proporcional */}
+                    <div className="wizard-format-preview">
                       <div
                         className="preview-label-box"
                         style={{
@@ -291,50 +299,46 @@ export default function NewTemplateWizard({ isOpen, onClose, onSuccess }: Wizard
                           height: `${Math.min(120, Math.max(45, (selectedSize.heightMm / 104) * 200))}px`,
                         }}
                       >
-                        <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#0f172a', whiteSpace: 'nowrap' }}>
-                          {selectedSize.label}
-                        </span>
-                        <span style={{ fontSize: '0.7rem', fontWeight: 600, color: '#64748b', whiteSpace: 'nowrap', marginTop: '0.2rem' }}>
-                          {formatDimensionBR(selectedSize.widthMm)} × {formatDimensionBR(selectedSize.heightMm)} mm
+                        <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#0f172a', whiteSpace: 'nowrap' }}>
+                          {selectedSize.widthMm} × {selectedSize.heightMm} mm
                         </span>
                       </div>
                     </div>
 
-                    {/* Ficha Técnica 2 Colunas Sem Quebra Indevida */}
-                    <div className="technical-spec-grid">
-                      <span className="technical-spec-label">Segmento:</span>
-                      <span className="technical-spec-value">{selectedNiche.name}</span>
+                    {/* Título do Formato */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+                      <h4 style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>
+                        {selectedSize.widthMm} × {selectedSize.heightMm} mm
+                      </h4>
+                      <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                        {selectedNiche.name}
+                      </span>
+                    </div>
 
-                      <span className="technical-spec-label">Dimensões Reais:</span>
-                      <span className="technical-spec-value">
+                    {/* Especificações Técnicas Limpas */}
+                    <div className="wizard-format-specs">
+                      <span className="technical-spec-label">Dimensões:</span>
+                      <span className="technical-spec-value" style={{ fontWeight: 700 }}>
                         {formatDimensionBR(selectedSize.widthMm)} × {formatDimensionBR(selectedSize.heightMm)} mm
                       </span>
 
                       <span className="technical-spec-label">Orientação:</span>
-                      <span className="technical-spec-value" style={{ textTransform: 'capitalize' }}>
+                      <span className="technical-spec-value" style={{ textTransform: 'capitalize', fontWeight: 600 }}>
                         {calculateOrientation(selectedSize.widthMm, selectedSize.heightMm)}
                       </span>
 
-                      <span className="technical-spec-label">Resolução Nativa:</span>
-                      <span className="technical-spec-value">203 DPI (~8 pontos/mm)</span>
+                      <span className="technical-spec-label">Resolução:</span>
+                      <span className="technical-spec-value" style={{ fontWeight: 600 }}>
+                        203 DPI (~8 dots/mm)
+                      </span>
 
-                      <span className="technical-spec-label">Cabeçote Térmico:</span>
-                      <span className="technical-spec-value">Padrão 104 mm (4 polegadas)</span>
+                      <span className="technical-spec-label">Cabeçote:</span>
+                      <span className="technical-spec-value" style={{ fontWeight: 600 }}>
+                        Padrão 104 mm (4 polegadas)
+                      </span>
                     </div>
                   </div>
                 )}
-              </div>
-
-              {/* Título Personalizado Opcional */}
-              <div style={{ marginTop: '0.25rem' }}>
-                <label className="metric-label">Nome do Modelo (Opcional)</label>
-                <input
-                  type="text"
-                  className="inspector-input"
-                  placeholder={`Ex: ${selectedNiche.name} - ${selectedSize?.label || 'Padrão'}`}
-                  value={customTitle}
-                  onChange={(e) => setCustomTitle(e.target.value)}
-                />
               </div>
             </div>
           )}

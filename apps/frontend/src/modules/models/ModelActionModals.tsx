@@ -157,7 +157,7 @@ export const DeleteModelModal: React.FC<DeleteModalProps> = ({
               color: 'var(--status-danger)',
               display: 'flex',
               alignItems: 'center',
-              justify-content: 'center',
+              justifyContent: 'center',
             }}>
               <AlertTriangle size={16} />
             </div>

@@ -4,7 +4,6 @@ import {
   LabelElement,
   ElementType,
   calculateOrientation,
-  DEFAULT_RETAIL_CATALOG,
 } from '@witiquetas/label-schema';
 import { QRCodeLibraryItemDTO, PrinterDTO } from '@witiquetas/contracts';
 import { normalizeElementGeometry, normalizeDocumentGeometry, constrainElementToLabel, constrainGroupMovement, validateDocumentBounds, SAFE_AREA_MARGIN_MM } from './bounds';
@@ -47,30 +46,6 @@ export function isEditingTextInput(): boolean {
 
 // Dados comerciais de teste simulados para o modo Preview
 export const MOCK_PRODUCT_DATA: Record<string, string> = {
-  // Retail (Varejo)
-  'retail.code': '789123',
-  'retail.description': 'REFRIGERANTE COCA-COLA 2L',
-  'retail.ean': '7894900011517',
-  'retail.price': '9.99',
-  'retail.promoPrice': '7.99',
-  'retail.unit': 'UN',
-  'retail.brand': 'COCA-COLA',
-
-  // Hospital (Saúde)
-  'hospital.patientName': 'MARIA DA SILVA SOUZA',
-  'hospital.medicalRecord': 'PAC-2026-8841',
-  'hospital.bed': 'LEITO 402-A',
-  'hospital.doctor': 'DRA. CARLA MENDES',
-  'hospital.bloodType': 'O POSITIVO (O+)',
-
-  // Logistics (Logística)
-  'logistics.orderNumber': 'PED-99482',
-  'logistics.trackingCode': 'BR884910293PT',
-  'logistics.recipient': 'JOÃO PEDRO OLIVEIRA',
-  'logistics.address': 'AV. PAULISTA, 1000 - APTO 42',
-  'logistics.weightKg': '12.50',
-
-  // Legado (Compatibilidade)
   'produto.codigo': '789123',
   'produto.descricao': 'REFRIGERANTE COCA-COLA 2L',
   'produto.descricaoLonga': 'REFRIGERANTE COCA-COLA PET 2 LITROS - EMBALAGEM FAMÍLIA',
@@ -81,96 +56,58 @@ export const MOCK_PRODUCT_DATA: Record<string, string> = {
   'produto.promocao.preco': '7.99',
   'produto.promocao.inicio': '10/08/2026',
   'produto.promocao.fim': '20/08/2026',
+  'produto.referencia.unidade': '1L',
+  'produto.referencia.preco': '5.00',
+  'produto.fabricante': 'COCA-COLA',
+  'empresa.razaoSocial': 'WR TECNOLOGIA SUPERMERCADOS LTDA',
   'empresa.nomeFantasia': 'SUPERMERCADO WR',
   'empresa.nomeFilial': 'MATRIZ SÃO PAULO',
+  'job.quantidade': '1',
   'impressao.data': '15/08/2026',
   'impressao.hora': '15:30',
+  'system.printDateTime': '20/08/2026 12:35',
+  'system.printDate': '20/08/2026',
+  'system.printTime': '12:35',
 };
 
-export interface ResolveBindingContext {
-  mode?: 'preview' | 'print';
-  timestamp?: Date;
-  catalogData?: Record<string, string>;
-}
 
 // Resolvedor Universal de Campos da Integração e do Sistema
 export function resolveFieldValue(
-  bindingOrField?: ElementBinding | string,
-  context: ResolveBindingContext | Record<string, string> = {}
+  field?: string,
+  data: Record<string, string> = MOCK_PRODUCT_DATA
 ): string | undefined {
-  if (!bindingOrField) return undefined;
+  if (!field) return undefined;
 
-  let fieldId: string | undefined;
-  let source: 'integration' | 'system' | 'manual' | undefined;
-  let format: string | undefined;
-  let manualVal: string | undefined;
-
-  if (typeof bindingOrField === 'string') {
-    fieldId = bindingOrField;
-    if (fieldId.startsWith('system.')) {
-      source = 'system';
-    } else {
-      source = 'integration';
-    }
-  } else {
-    source = bindingOrField.source;
-    fieldId = bindingOrField.fieldId || bindingOrField.field;
-    format = bindingOrField.format || bindingOrField.bindingFormat;
-    manualVal = bindingOrField.value;
+  if (data[field] !== undefined) {
+    return data[field];
   }
 
-  if (source === 'manual') {
-    return manualVal;
-  }
-
-  let mode: 'preview' | 'print' = 'preview';
-  let timestamp: Date | undefined;
-  let catalogData: Record<string, string> = MOCK_PRODUCT_DATA;
-
-  if (context && typeof context === 'object') {
-    if ('catalogData' in context || 'mode' in context || 'timestamp' in context) {
-      const ctx = context as ResolveBindingContext;
-      mode = ctx.mode || 'preview';
-      timestamp = ctx.timestamp;
-      catalogData = ctx.catalogData || MOCK_PRODUCT_DATA;
-    } else {
-      catalogData = context as Record<string, string>;
-    }
-  }
-
-  // 1. SISTEMA (SYSTEM NAMESPACE IS RESERVED AND PROTECTED)
-  if (source === 'system' || (fieldId && fieldId.startsWith('system.'))) {
-    // PROTEÇÃO: O namespace system.* NUNCA pode ser sobrescrito pelo mock da integração!
-    const effectiveDate = timestamp || new Date();
-    const resolvedFormat = format || (fieldId === 'system.printDate' ? 'date' : fieldId === 'system.printTime' ? 'time' : 'datetime');
-
-    const dd = String(effectiveDate.getDate()).padStart(2, '0');
-    const mm = String(effectiveDate.getMonth() + 1).padStart(2, '0');
-    const yyyy = effectiveDate.getFullYear();
-    const hh = String(effectiveDate.getHours()).padStart(2, '0');
-    const min = String(effectiveDate.getMinutes()).padStart(2, '0');
-
-    if (resolvedFormat === 'date') {
-      return `${dd}/${mm}/${yyyy}`;
-    }
-    if (resolvedFormat === 'time') {
-      return `${hh}:${min}`;
-    }
+  if (field === 'system.printDateTime') {
+    const now = new Date();
+    const dd = String(now.getDate()).padStart(2, '0');
+    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    const yyyy = now.getFullYear();
+    const hh = String(now.getHours()).padStart(2, '0');
+    const min = String(now.getMinutes()).padStart(2, '0');
     return `${dd}/${mm}/${yyyy} ${hh}:${min}`;
   }
-
-  // 2. INTEGRAÇÃO
-  if (fieldId) {
-    if (catalogData[fieldId] !== undefined) {
-      return catalogData[fieldId];
-    }
-    if (MOCK_PRODUCT_DATA[fieldId] !== undefined) {
-      return MOCK_PRODUCT_DATA[fieldId];
-    }
+  if (field === 'system.printDate') {
+    const now = new Date();
+    const dd = String(now.getDate()).padStart(2, '0');
+    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    const yyyy = now.getFullYear();
+    return `${dd}/${mm}/${yyyy}`;
+  }
+  if (field === 'system.printTime') {
+    const now = new Date();
+    const hh = String(now.getHours()).padStart(2, '0');
+    const min = String(now.getMinutes()).padStart(2, '0');
+    return `${hh}:${min}`;
   }
 
-  return manualVal;
+  return undefined;
 }
+
 // Avaliador Seguro de Regras de Visibilidade Condicional (Item 277-286)
 export function evaluateVisibilityRule(
   rule?: import('@witiquetas/label-schema').VisibilityRule | null,
@@ -353,10 +290,6 @@ interface EditorState {
   showGhostConditionalElements: boolean; // Modo Fantasma: elementos condicionais inativos com opacidade (Item 286)
   previewScenario: 'normal' | 'promo' | 'custom'; // Cenário de teste (Item 285)
   mockProductData: Record<string, string>;
-  activeCatalog: IntegrationFieldDefinition[];
-  activeNiche: 'retail' | 'hospital' | 'logistics';
-  setActiveCatalog: (catalog: IntegrationFieldDefinition[]) => void;
-  setNiche: (niche: 'retail' | 'hospital' | 'logistics') => void;
   isDirty: boolean;
   saveStatus: 'saved' | 'unsaved' | 'saving' | 'error';
   currentTemplateId: string | null;
@@ -455,15 +388,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   showGhostConditionalElements: false, // Modo Fantasma: elementos condicionais inativos aparecem translúcidos
   previewScenario: 'promo',
   mockProductData: { ...MOCK_PRODUCT_DATA },
-  activeCatalog: DEFAULT_RETAIL_CATALOG,
-  activeNiche: 'retail',
-  setActiveCatalog: (catalog) => set({ activeCatalog: catalog }),
-  setNiche: (niche) => {
-    let catalog = DEFAULT_RETAIL_CATALOG;
-    if (niche === 'hospital') catalog = DEFAULT_HOSPITAL_CATALOG;
-    if (niche === 'logistics') catalog = DEFAULT_LOGISTICS_CATALOG;
-    set({ activeNiche: niche, activeCatalog: catalog });
-  },
   isDirty: false,
   saveStatus: 'saved',
   currentTemplateId: null,

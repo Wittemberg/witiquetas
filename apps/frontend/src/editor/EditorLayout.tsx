@@ -60,8 +60,6 @@ export default function EditorLayout({
     zoom,
     setZoom,
     fitToScreen,
-    activeNiche,
-    setNiche,
     showPreviewData,
     setShowPreviewData,
     showGhostConditionalElements,

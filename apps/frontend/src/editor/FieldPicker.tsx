@@ -1,11 +1,9 @@
-import React from 'react';
-import { IntegrationFieldDefinition, SYSTEM_FIELDS, DEFAULT_RETAIL_CATALOG } from '@witiquetas/label-schema';
-import { useEditorStore } from './useEditorStore';
+import React, { useMemo } from 'react';
+import { CANONICAL_FIELDS, CanonicalFieldDefinition } from '@witiquetas/label-schema';
 
 export interface FieldPickerProps {
   value: string;
   onChange: (value: string) => void;
-  fields?: IntegrationFieldDefinition[];
   allowStatic?: boolean;
   staticLabel?: string;
   label?: string;
@@ -14,12 +12,12 @@ export interface FieldPickerProps {
   style?: React.CSSProperties;
   title?: string;
   id?: string;
+  activeFields?: CanonicalFieldDefinition[];
 }
 
 export const FieldPicker: React.FC<FieldPickerProps> = ({
   value,
   onChange,
-  fields,
   allowStatic = true,
   staticLabel = '-- Texto Estático Manual --',
   label,
@@ -27,22 +25,29 @@ export const FieldPicker: React.FC<FieldPickerProps> = ({
   style,
   title,
   id,
+  activeFields,
 }) => {
-  const storeCatalog = useEditorStore((s) => s.activeCatalog);
-  const activeFields = fields || storeCatalog || DEFAULT_RETAIL_CATALOG;
+  const fields = activeFields || CANONICAL_FIELDS;
 
-  const categoriesMap = new Map<string, IntegrationFieldDefinition[]>();
-  for (const f of activeFields) {
-    const catName = f.category || 'Geral';
-    if (!categoriesMap.has(catName)) {
-      categoriesMap.set(catName, []);
-    }
-    categoriesMap.get(catName)!.push(f);
-  }
+  const categoriesMap = useMemo(() => {
+    const map = new Map<string, CanonicalFieldDefinition[]>();
+    (fields || []).forEach((f) => {
+      const catKey = f.category || 'outros';
+      const existing = map.get(catKey) || [];
+      existing.push(f);
+      map.set(catKey, existing);
+    });
+    return map;
+  }, [fields]);
 
-  const isSystemField = SYSTEM_FIELDS.some((sf) => sf.id === value);
-  const isKnownIntegration = activeFields.some((f) => f.id === value);
-  const isKnown = !value || isSystemField || isKnownIntegration;
+  const integrationFields = fields.filter((f) =>
+    ['produto', 'empresa', 'promocao', 'varejo', 'hospital', 'logistica'].includes(f.category)
+  );
+  const systemFields = fields.filter((f) =>
+    ['sistema', 'impressao'].includes(f.category)
+  );
+
+  const isKnown = !value || fields.some((f) => f.key === value);
 
   return (
     <div style={{ width: '100%', minWidth: 0, boxSizing: 'border-box' }}>
@@ -62,22 +67,20 @@ export const FieldPicker: React.FC<FieldPickerProps> = ({
         onChange={(e) => onChange(e.target.value)}
       >
         {allowStatic && <option value="">{staticLabel}</option>}
-        {!isKnown && <option value={value}>{value} (Campo Personalizado / Legado)</option>}
+        {!isKnown && <option value={value}>{value} (Campo Personalizado)</option>}
 
-        {Array.from(categoriesMap.entries()).map(([catName, catFields]) => (
-          <optgroup key={catName} label={`Campos: ${catName}`}>
-            {catFields.map((f) => (
-              <option key={f.id} value={f.id}>
-                {f.label} ({f.id})
-              </option>
-            ))}
-          </optgroup>
-        ))}
+        <optgroup label="Campos da Integração">
+          {integrationFields.map((f) => (
+            <option key={f.key} value={f.key}>
+              {f.label} ({f.key})
+            </option>
+          ))}
+        </optgroup>
 
         <optgroup label="Campos do Sistema Witiquetas">
-          {SYSTEM_FIELDS.map((sf) => (
-            <option key={sf.id} value={sf.id}>
-              {sf.label} ({sf.id})
+          {systemFields.map((f) => (
+            <option key={f.key} value={f.key}>
+              {f.label} ({f.key})
             </option>
           ))}
         </optgroup>

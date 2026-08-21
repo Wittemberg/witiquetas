@@ -247,6 +247,13 @@ export default function NewTemplateWizard({ isOpen, onClose, onSuccess }: Wizard
                   <div className="size-chips-grid">
                     {availableSizes.map((size) => {
                       const isSelected = selectedSize?.id === size.id;
+                      const formattedMeta = `${size.widthMm} × ${size.heightMm} mm`;
+                      const cleanLabel = (size.label || '').replace(/\s+/g, '').toLowerCase();
+                      const isRedundant =
+                        cleanLabel === `${size.widthMm}x${size.heightMm}` ||
+                        cleanLabel === `${size.widthMm}x${size.heightMm}mm` ||
+                        size.label === formattedMeta;
+
                       return (
                         <div
                           key={size.id}
@@ -260,10 +267,10 @@ export default function NewTemplateWizard({ isOpen, onClose, onSuccess }: Wizard
                             </div>
                           )}
                           <div className="size-chip-content">
-                            <div className="size-chip-dimension">{size.label}</div>
-                            <div className="size-chip-meta">
-                              {size.widthMm} × {size.heightMm} mm
-                            </div>
+                            <div className="size-chip-dimension">{isRedundant ? formattedMeta : size.label}</div>
+                            {!isRedundant && (
+                              <div className="size-chip-meta">{formattedMeta}</div>
+                            )}
                           </div>
                         </div>
                       );

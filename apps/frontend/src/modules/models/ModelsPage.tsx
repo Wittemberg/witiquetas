@@ -114,10 +114,12 @@ export const ModelsPage: React.FC<ModelsPageProps> = ({ onOpenModel, onCreateNew
           </p>
         </div>
 
-        <button type="button" className="btn-primary-action" onClick={onCreateNew}>
-          <Plus size={18} />
-          <span>Nova Etiqueta</span>
-        </button>
+        {!loading && !error && templates.length > 0 && (
+          <button type="button" className="btn-primary-action" onClick={onCreateNew}>
+            <Plus size={18} />
+            <span>Nova Etiqueta</span>
+          </button>
+        )}
       </div>
 
       {/* Barra de Busca Unificada */}

@@ -365,6 +365,18 @@ body {
   box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
 }
 
+.btn-danger {
+  background: linear-gradient(135deg, var(--status-danger), #dc2626);
+  border-color: transparent;
+  color: #ffffff !important;
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3);
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: linear-gradient(135deg, #dc2626, #b91c1c);
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
+}
+
 .btn-theme-toggle {
   display: inline-flex;
   align-items: center;
@@ -1615,6 +1627,10 @@ body {
   position: relative;
 }
 
+.app-shell-body.full-height {
+  height: 100vh;
+}
+
 .app-main-content {
   flex: 1;
   height: 100%;
@@ -1789,6 +1805,11 @@ body {
   justify-content: space-between;
   padding: 0 0.85rem;
   border-bottom: 1px solid var(--border-color);
+}
+
+.app-sidebar.collapsed .sidebar-header {
+  justify-content: center;
+  padding: 0;
 }
 
 .brand-logo {

@@ -38,6 +38,16 @@ interface WizardProps {
   onSuccess?: () => void;
 }
 
+function formatNumBR(val: number): string {
+  if (val === undefined || val === null || isNaN(Number(val))) return '0';
+  const num = Number(val);
+  return Number.isInteger(num) ? num.toString() : num.toFixed(2).replace(/\.?0+$/, '').replace('.', ',');
+}
+
+function formatDimensionPair(widthMm: number, heightMm: number): string {
+  return `${formatNumBR(widthMm)} × ${formatNumBR(heightMm)} mm`;
+}
+
 export default function NewTemplateWizard({ isOpen, onClose, onSuccess }: WizardProps) {
   const { createNewDocument } = useEditorStore();
 
@@ -260,7 +270,7 @@ export default function NewTemplateWizard({ isOpen, onClose, onSuccess }: Wizard
                             </div>
                           )}
                           <div className="wizard-size-card-content">
-                            <div className="wizard-size-dimension">{size.widthMm} × {size.heightMm}</div>
+                            <div className="wizard-size-dimension">{formatNumBR(size.widthMm)} × {formatNumBR(size.heightMm)}</div>
                             <div className="wizard-size-unit">mm</div>
                           </div>
                         </div>
@@ -278,7 +288,7 @@ export default function NewTemplateWizard({ isOpen, onClose, onSuccess }: Wizard
                       type="text"
                       className="size-search-input"
                       style={{ width: '100%', height: '40px', padding: '0 0.75rem', borderRadius: '10px', border: '1px solid var(--border-color)', background: 'var(--bg-input)', fontSize: '0.82rem', color: 'var(--text-primary)', boxSizing: 'border-box' }}
-                      placeholder={`Ex: ${selectedNiche.name} ${selectedSize ? `${selectedSize.widthMm}x${selectedSize.heightMm}` : ''}`}
+                      placeholder={`Ex: ${selectedNiche.name} ${selectedSize ? formatDimensionPair(selectedSize.widthMm, selectedSize.heightMm) : ''}`}
                       value={customTitle}
                       onChange={(e) => setCustomTitle(e.target.value)}
                     />
@@ -300,26 +310,28 @@ export default function NewTemplateWizard({ isOpen, onClose, onSuccess }: Wizard
                         }}
                       >
                         <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#0f172a', whiteSpace: 'nowrap' }}>
-                          {selectedSize.widthMm} × {selectedSize.heightMm} mm
+                          {formatDimensionPair(selectedSize.widthMm, selectedSize.heightMm)}
                         </span>
                       </div>
                     </div>
 
-                    {/* Título do Formato */}
+                    {/* Título do Formato (Exibe o Nicho sem repetir a dimensão intermediária) */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
                       <h4 style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>
-                        {selectedSize.widthMm} × {selectedSize.heightMm} mm
-                      </h4>
-                      <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
                         {selectedNiche.name}
-                      </span>
+                      </h4>
+                      {selectedSize.label && (
+                        <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                          {selectedSize.label}
+                        </span>
+                      )}
                     </div>
 
                     {/* Especificações Técnicas Limpas */}
                     <div className="wizard-format-specs">
                       <span className="technical-spec-label">Dimensões:</span>
                       <span className="technical-spec-value" style={{ fontWeight: 700 }}>
-                        {formatDimensionBR(selectedSize.widthMm)} × {formatDimensionBR(selectedSize.heightMm)} mm
+                        {formatDimensionPair(selectedSize.widthMm, selectedSize.heightMm)}
                       </span>
 
                       <span className="technical-spec-label">Orientação:</span>

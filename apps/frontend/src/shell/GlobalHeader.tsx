@@ -1,5 +1,5 @@
 import React from 'react';
-import { Menu, Building2, Sun, Moon, Bell } from 'lucide-react';
+import { Menu, Building2, Sun, Moon } from 'lucide-react';
 
 interface GlobalHeaderProps {
   currentModuleName: string;
@@ -51,16 +51,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({
           {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
         </button>
 
-        {/* Elemento Estrutural Discreto: Notificações (Desativado / Sem ação falsa) */}
-        <div
-          className="header-icon-placeholder disabled"
-          title="Notificações do sistema — em breve"
-          aria-disabled="true"
-        >
-          <Bell size={18} />
-        </div>
-
-        {/* Elemento Estrutural Discreto: Perfil do Usuário (Desativado / Sem ação falsa) */}
+        {/* Elemento Estrutural Discreto: Perfil do Usuário (Sessão Ativa) */}
         <div
           className="header-profile-placeholder disabled"
           title="Perfil do Usuário (Sessão Ativa)"

@@ -9,7 +9,6 @@ import {
   Plug,
   Settings,
   ChevronLeft,
-  ChevronRight,
   Tag,
 } from 'lucide-react';
 
@@ -19,7 +18,6 @@ export interface NavItem {
   icon: React.ComponentType<{ className?: string; size?: number }>;
   description: string;
   path: string;
-  badge?: string;
 }
 
 export const NAV_ITEMS: NavItem[] = [
@@ -48,17 +46,15 @@ export const NAV_ITEMS: NavItem[] = [
     id: 'print-center',
     label: 'Central de Impressão',
     icon: ListOrdered,
-    description: 'Fila de trabalhos e ordens de impressão',
+    description: 'Central de Impressão — Em desenvolvimento',
     path: '/print-center',
-    badge: 'Em Breve',
   },
   {
     id: 'printers',
     label: 'Impressoras',
     icon: Printer,
-    description: 'Impressoras locais e de rede homologadas',
+    description: 'Impressoras — Em desenvolvimento',
     path: '/printers',
-    badge: 'Em Breve',
   },
   {
     id: 'agents',
@@ -71,17 +67,15 @@ export const NAV_ITEMS: NavItem[] = [
     id: 'integrations',
     label: 'Integrações',
     icon: Plug,
-    description: 'Conectores REST e APIs de ERPs',
+    description: 'Integrações — Em desenvolvimento',
     path: '/integrations',
-    badge: 'Em Breve',
   },
   {
     id: 'admin',
     label: 'Administração',
     icon: Settings,
-    description: 'Configurações gerais do tenant e logs',
+    description: 'Administração — Em desenvolvimento',
     path: '/admin',
-    badge: 'Em Breve',
   },
 ];
 
@@ -117,21 +111,37 @@ export const Sidebar: React.FC<SidebarProps> = ({
         aria-label="Navegação principal"
       >
         <div className="sidebar-header">
-          <div className="brand-logo" onClick={() => onSelectModule('home')}>
-            <div className="brand-icon-wrapper">
-              <Tag size={20} className="brand-icon-svg" />
+          {collapsed ? (
+            <div
+              className="brand-logo"
+              onClick={onToggleCollapse}
+              title="Expandir menu"
+              aria-label="Expandir menu"
+              style={{ cursor: 'pointer' }}
+            >
+              <div className="brand-icon-wrapper">
+                <Tag size={20} className="brand-icon-svg" />
+              </div>
             </div>
-            {!collapsed && <span className="brand-title">Witiquetas</span>}
-          </div>
-          <button
-            type="button"
-            className="sidebar-toggle-btn"
-            onClick={onToggleCollapse}
-            title={collapsed ? 'Expandir menu' : 'Recolher menu'}
-            aria-label={collapsed ? 'Expandir menu' : 'Recolher menu'}
-          >
-            {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
-          </button>
+          ) : (
+            <>
+              <div className="brand-logo" onClick={() => onSelectModule('home')}>
+                <div className="brand-icon-wrapper">
+                  <Tag size={20} className="brand-icon-svg" />
+                </div>
+                <span className="brand-title">Witiquetas</span>
+              </div>
+              <button
+                type="button"
+                className="sidebar-toggle-btn"
+                onClick={onToggleCollapse}
+                title="Recolher menu"
+                aria-label="Recolher menu"
+              >
+                <ChevronLeft size={16} />
+              </button>
+            </>
+          )}
         </div>
 
         <nav className="sidebar-nav">
@@ -153,24 +163,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   <IconComponent size={20} />
                 </span>
                 {!collapsed && <span className="nav-label">{item.label}</span>}
-                {!collapsed && item.badge && <span className="nav-badge">{item.badge}</span>}
               </button>
             );
           })}
         </nav>
-
-        <div className="sidebar-footer">
-          {!collapsed ? (
-            <div className="sidebar-version-info">
-              <span className="version-name">Witiquetas Enterprise</span>
-              <span className="version-details">v0.1.0 • Multi-tenant</span>
-            </div>
-          ) : (
-            <div className="sidebar-version-compact" title="Witiquetas Enterprise v0.1.0">
-              <small>v0.1</small>
-            </div>
-          )}
-        </div>
       </aside>
     </>
   );

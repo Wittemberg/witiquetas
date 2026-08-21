@@ -45,16 +45,20 @@ export const ApplicationShell: React.FC<ApplicationShellProps> = ({
   const activeItem = NAV_ITEMS.find((item) => item.id === currentModule);
   const moduleTitle = activeItem ? activeItem.label : currentModule === 'editor' ? 'Editor de Etiquetas' : 'Início';
 
+  const isEditor = currentModule === 'editor';
+
   return (
     <div className={`app-shell-container theme-${theme}`}>
-      <GlobalHeader
-        currentModuleName={moduleTitle}
-        theme={theme}
-        onToggleTheme={onToggleTheme}
-        onOpenMobileMenu={() => setIsMobileOpen(true)}
-      />
+      {!isEditor && (
+        <GlobalHeader
+          currentModuleName={moduleTitle}
+          theme={theme}
+          onToggleTheme={onToggleTheme}
+          onOpenMobileMenu={() => setIsMobileOpen(true)}
+        />
+      )}
 
-      <div className="app-shell-body">
+      <div className={`app-shell-body ${isEditor ? 'full-height' : ''}`}>
         <Sidebar
           currentModule={currentModule}
           onSelectModule={onSelectModule}

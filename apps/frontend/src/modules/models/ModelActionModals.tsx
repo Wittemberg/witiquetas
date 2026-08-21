@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { X, AlertTriangle, Edit3 } from 'lucide-react';
 
 interface RenameModalProps {
   isOpen: boolean;
@@ -44,23 +45,45 @@ export const RenameModelModal: React.FC<RenameModalProps> = ({
 
   return (
     <div className="wizard-modal-overlay" onKeyDown={handleKeyDown}>
-      <div className="wizard-modal-content" style={{ maxWidth: '440px' }}>
+      <div className="wizard-modal-content" style={{ maxWidth: '460px' }}>
         <div className="wizard-header">
-          <h2>Renomear Modelo</h2>
-          <button type="button" className="wizard-close-btn" onClick={onClose}>
-            ×
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+            <div className="niche-card-icon" style={{ width: '32px', height: '32px', borderRadius: '8px' }}>
+              <Edit3 size={16} />
+            </div>
+            <h2 style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+              Renomear Modelo
+            </h2>
+          </div>
+          <button
+            type="button"
+            className="btn"
+            style={{ padding: '0.4rem', border: 'none', background: 'transparent' }}
+            onClick={onClose}
+          >
+            <X size={18} />
           </button>
         </div>
 
         <form onSubmit={handleSubmit}>
-          <div className="wizard-body" style={{ padding: '1.5rem 0' }}>
-            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>
-              Nome do Modelo:
+          <div className="wizard-body" style={{ padding: '1.25rem 0', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            <label style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+              Nome do modelo
             </label>
             <input
               type="text"
-              className="niche-search-input"
-              style={{ width: '100%', padding: '0.6rem 0.8rem' }}
+              className="size-search-input"
+              style={{
+                width: '100%',
+                height: '42px',
+                padding: '0 0.85rem',
+                borderRadius: '10px',
+                border: '1px solid var(--border-color)',
+                background: 'var(--bg-input)',
+                fontSize: '0.875rem',
+                color: 'var(--text-primary)',
+                boxSizing: 'border-box',
+              }}
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Digite o novo nome do modelo..."
@@ -69,7 +92,7 @@ export const RenameModelModal: React.FC<RenameModalProps> = ({
               disabled={isLoading}
             />
             {error && (
-              <span style={{ color: '#ef4444', fontSize: '0.85rem', marginTop: '0.4rem', display: 'block' }}>
+              <span style={{ color: 'var(--status-danger)', fontSize: '0.8rem', fontWeight: 500 }}>
                 {error}
               </span>
             )}
@@ -78,14 +101,17 @@ export const RenameModelModal: React.FC<RenameModalProps> = ({
           <div className="wizard-footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
             <button
               type="button"
-              className="niche-card-btn"
-              style={{ background: 'transparent', border: '1px solid var(--border-color, #cbd5e1)' }}
+              className="btn"
               onClick={onClose}
               disabled={isLoading}
             >
               Cancelar
             </button>
-            <button type="submit" className="wizard-primary-btn" disabled={isLoading || !title.trim()}>
+            <button
+              type="submit"
+              className="btn btn-primary"
+              disabled={isLoading || !title.trim()}
+            >
               {isLoading ? 'Salvando...' : 'Renomear'}
             </button>
           </div>
@@ -120,28 +146,59 @@ export const DeleteModelModal: React.FC<DeleteModalProps> = ({
 
   return (
     <div className="wizard-modal-overlay" onKeyDown={handleKeyDown}>
-      <div className="wizard-modal-content" style={{ maxWidth: '440px' }}>
+      <div className="wizard-modal-content" style={{ maxWidth: '460px' }}>
         <div className="wizard-header">
-          <h2 style={{ color: '#ef4444' }}>Excluir Modelo</h2>
-          <button type="button" className="wizard-close-btn" onClick={onClose}>
-            ×
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+            <div style={{
+              width: '32px',
+              height: '32px',
+              borderRadius: '8px',
+              background: 'rgba(239, 68, 68, 0.12)',
+              color: 'var(--status-danger)',
+              display: 'flex',
+              alignItems: 'center',
+              justify-content: 'center',
+            }}>
+              <AlertTriangle size={16} />
+            </div>
+            <h2 style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+              Excluir Modelo
+            </h2>
+          </div>
+          <button
+            type="button"
+            className="btn"
+            style={{ padding: '0.4rem', border: 'none', background: 'transparent' }}
+            onClick={onClose}
+          >
+            <X size={18} />
           </button>
         </div>
 
-        <div className="wizard-body" style={{ padding: '1.5rem 0' }}>
-          <p style={{ fontSize: '1rem', color: 'var(--text-main, #0f172a)', marginBottom: '0.5rem' }}>
-            Tem certeza que deseja excluir o modelo <strong>"{modelTitle}"</strong>?
+        <div className="wizard-body" style={{ padding: '1.25rem 0', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+          <p style={{ fontSize: '0.925rem', color: 'var(--text-primary)', lineHeight: 1.5 }}>
+            Tem certeza que deseja excluir:
           </p>
-          <p style={{ fontSize: '0.875rem', color: '#64748b' }}>
-            Esta ação remove o modelo da sua lista de trabalho.
+          <div style={{
+            padding: '0.65rem 0.85rem',
+            borderRadius: '8px',
+            background: 'var(--bg-input)',
+            border: '1px solid var(--border-color)',
+            fontSize: '0.9rem',
+            fontWeight: 700,
+            color: 'var(--text-primary)',
+          }}>
+            {modelTitle}
+          </div>
+          <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
+            Esta ação remove o modelo da sua lista.
           </p>
         </div>
 
         <div className="wizard-footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
           <button
             type="button"
-            className="niche-card-btn"
-            style={{ background: 'transparent', border: '1px solid var(--border-color, #cbd5e1)' }}
+            className="btn"
             onClick={onClose}
             disabled={isLoading}
           >
@@ -149,8 +206,7 @@ export const DeleteModelModal: React.FC<DeleteModalProps> = ({
           </button>
           <button
             type="button"
-            className="wizard-primary-btn"
-            style={{ backgroundColor: '#dc2626', borderColor: '#dc2626' }}
+            className="btn btn-danger"
             onClick={onConfirm}
             disabled={isLoading}
           >

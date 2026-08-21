@@ -10,8 +10,6 @@ import {
   GitBranch, 
   Layers, 
   ShieldCheck, 
-  Sparkles, 
-  Maximize2, 
   Download, 
   KeyRound,
   ListOrdered,
@@ -250,41 +248,6 @@ export default function App() {
                 </div>
               </div>
             )}
-
-            {/* Banner de Chamada para Nova Etiqueta */}
-            <div
-              className="card"
-              style={{
-                marginBottom: '1.5rem',
-                background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.12), rgba(139, 92, 246, 0.12))',
-                border: '1px solid var(--border-color-glow)',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                padding: '1.25rem 1.75rem',
-              }}
-            >
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
-                  <Sparkles size={20} color="var(--accent-blue)" />
-                  <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-                    Criação Guiada de Etiquetas Térmicas
-                  </h3>
-                </div>
-                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                  Selecione o nicho de aplicação (Gôndola, Produto, Logística, Farmácia, Hospital, etc.) e utilize formatos homologados de fábrica.
-                </p>
-              </div>
-
-              <button
-                className="btn btn-primary"
-                onClick={() => setIsWizardOpen(true)}
-                style={{ whiteSpace: 'nowrap', padding: '0.75rem 1.4rem' }}
-              >
-                <Maximize2 size={16} />
-                <span>Selecionar Nicho & Tamanho</span>
-              </button>
-            </div>
 
             {/* Grid de Serviços de Infraestrutura */}
             <div className="grid">

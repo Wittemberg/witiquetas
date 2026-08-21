@@ -230,7 +230,7 @@ export default function NewTemplateWizard({ isOpen, onClose, onSuccess }: Wizard
               </div>
 
               {/* Grid Duplo: Seleção de Tamanhos à Esquerda e Ficha Técnica com Preview Proporcional à Direita */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'minmax(280px, 1.2fr) minmax(280px, 1fr)', gap: '1.25rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'minmax(280px, 1.2fr) minmax(280px, 1fr)', gap: '1.25rem', alignItems: 'start' }}>
                 {/* Coluna Esquerda: Chips de Tamanhos */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
                   <div className="size-search-bar">
@@ -247,12 +247,7 @@ export default function NewTemplateWizard({ isOpen, onClose, onSuccess }: Wizard
                   <div className="size-chips-grid">
                     {availableSizes.map((size) => {
                       const isSelected = selectedSize?.id === size.id;
-                      const formattedMeta = `${size.widthMm} × ${size.heightMm} mm`;
-                      const cleanLabel = (size.label || '').replace(/\s+/g, '').toLowerCase();
-                      const isRedundant =
-                        cleanLabel === `${size.widthMm}x${size.heightMm}` ||
-                        cleanLabel === `${size.widthMm}x${size.heightMm}mm` ||
-                        size.label === formattedMeta;
+                      const formattedDimension = `${size.widthMm} × ${size.heightMm} mm`;
 
                       return (
                         <div
@@ -267,10 +262,7 @@ export default function NewTemplateWizard({ isOpen, onClose, onSuccess }: Wizard
                             </div>
                           )}
                           <div className="size-chip-content">
-                            <div className="size-chip-dimension">{isRedundant ? formattedMeta : size.label}</div>
-                            {!isRedundant && (
-                              <div className="size-chip-meta">{formattedMeta}</div>
-                            )}
+                            <div className="size-chip-dimension">{formattedDimension}</div>
                           </div>
                         </div>
                       );

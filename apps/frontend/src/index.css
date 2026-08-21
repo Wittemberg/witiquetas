@@ -990,6 +990,415 @@ body {
 }
 
 /* ==========================================================================
+   DASHBOARD & UTILITÁRIOS
+   ========================================================================== */
+
+.container {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 1.5rem;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.brand-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 9px;
+  background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--shadow-sm);
+}
+
+.brand-title {
+  font-size: 1.25rem;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+}
+
+.brand-subtitle {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* ==========================================================================
+   DESIGN CONTRACT: CARDS & ACTIONS (RESPONSIVO E SEM OVERFLOW HORIZONTAL)
+   ========================================================================== */
+
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 1.25rem;
+  box-shadow: var(--shadow-card);
+  transition: all 0.2s ease;
+  min-width: 0;
+  max-width: 100%;
+  display: flex;
+  flex-direction: column;
+  container-type: inline-size;
+}
+
+.card-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+  width: 100%;
+  margin-top: 1rem;
+}
+
+.card-actions .btn {
+  width: 100%;
+  min-width: 0;
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  text-align: center;
+  padding: 0.45rem 0.75rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  white-space: nowrap;
+  box-sizing: border-box;
+}
+
+@container (max-width: 340px) {
+  .card-actions {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .card-actions {
+    grid-template-columns: 1fr;
+  }
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 1rem;
+  min-width: 0;
+}
+
+.card-title {
+  font-size: 1rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.card-subtitle {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: 0.2rem;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.25rem;
+  margin-bottom: 1.5rem;
+  min-width: 0;
+}
+
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.code-block {
+  background: var(--bg-input);
+  padding: 0.75rem;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  overflow-x: auto;
+}
+
+.footer {
+  text-align: center;
+  padding: 1.5rem 0;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  border-top: 1px solid var(--border-color);
+  margin-top: 2rem;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.spin {
+  animation: spin 1s linear infinite;
+}
+
+/* Indicador de Salvamento */
+.save-status-indicator {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.72rem;
+}
+
+.save-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+
+.save-status-dot.saved {
+  background-color: var(--status-success);
+  box-shadow: 0 0 6px rgba(16, 185, 129, 0.4);
+}
+
+.save-status-dot.unsaved {
+  background-color: var(--status-warning);
+  box-shadow: 0 0 6px rgba(245, 158, 11, 0.4);
+}
+
+.save-status-dot.saving {
+  background-color: var(--accent-blue);
+  animation: pulse 1s infinite alternate;
+}
+
+.save-status-dot.error {
+  background-color: var(--status-danger);
+  box-shadow: 0 0 6px rgba(239, 68, 68, 0.4);
+}
+
+@keyframes pulse {
+  0% { opacity: 0.4; }
+  100% { opacity: 1; }
+}
+
+/* ==========================================================================
+   WIZARD — SELETOR DE TAMANHOS HOMOLOGADOS (ALINHAMENTO GEOMÉTRICO FINAL)
+   ========================================================================== */
+
+.size-chips-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.65rem;
+  max-height: 280px;
+  overflow-y: auto;
+  padding-right: 0.25rem;
+}
+
+.size-chip {
+  position: relative;
+  min-width: 0;
+  min-height: 88px;
+  padding: 0.85rem 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  background: var(--bg-card);
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background-color 0.15s ease,
+    box-shadow 0.15s ease,
+    transform 0.15s ease;
+}
+
+.size-chip:hover {
+  border-color: var(--accent-blue);
+  background: rgba(59, 130, 246, 0.035);
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
+}
+
+.size-chip.selected {
+  border: 1.5px solid var(--accent-blue);
+  background: rgba(59, 130, 246, 0.07);
+  box-shadow: inset 0 0 0 1px rgba(59, 130, 246, 0.04);
+}
+
+.size-chip-content {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 0.2rem;
+  min-width: 0;
+  pointer-events: none;
+  padding: 0.5rem;
+  box-sizing: border-box;
+}
+
+.size-chip-dimension {
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  line-height: 1.2;
+}
+
+.size-chip.selected .size-chip-dimension {
+  font-weight: 700;
+  color: var(--accent-blue);
+}
+
+.size-chip-meta {
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.size-featured-tag {
+  position: absolute;
+  top: 0.55rem;
+  left: 0.55rem;
+  display: inline-flex;
+  align-items: center;
+  padding: 0.18rem 0.38rem;
+  border-radius: 5px;
+  background: #10b981;
+  color: #fff;
+  font-size: 0.61rem;
+  line-height: 1;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.size-featured-tag::before {
+  content: "★ ";
+  margin-right: 0.15rem;
+}
+
+.size-chip-check {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  width: 19px;
+  height: 19px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--accent-blue);
+  color: #fff;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.preview-proportional-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 1.25rem;
+}
+
+.preview-label-box {
+  background-color: #ffffff;
+  border: 2px solid var(--border-color-active);
+  box-shadow: var(--shadow-label);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  padding: 0.5rem;
+  transition: all 0.2s ease;
+}
+
+.preview-dimension-badge {
+  background: rgba(37, 99, 235, 0.12);
+  color: var(--accent-blue);
+  font-weight: 700;
+  font-size: 0.78rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  font-family: var(--font-mono);
+}
+
+.technical-spec-grid {
+  display: grid;
+  grid-template-columns: minmax(120px, auto) minmax(0, 1fr);
+  gap: 0.55rem 1rem;
+  align-items: baseline;
+}
+
+.technical-spec-label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.technical-spec-value {
+  min-width: 0;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 1100px) {
+  .size-chips-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .size-chips-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .technical-spec-grid {
+    grid-template-columns: 1fr;
+    gap: 0.15rem;
+  }
+
+  .technical-spec-value {
+    margin-bottom: 0.45rem;
+  }
+}
+
+/* ==========================================================================
    DESIGN CONTRACT: PROPERTY INSPECTOR RESPONSIVIDADE & LAYOUT
    ========================================================================== */
 

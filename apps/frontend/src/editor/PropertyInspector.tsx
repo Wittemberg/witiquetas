@@ -845,9 +845,9 @@ export default function PropertyInspector() {
       )}
 
       {/* =====================================================================
-         REGRAS DE EXIBIÇÃO CONDICIONAL (Texto e Preço)
+         REGRAS DE EXIBIÇÃO CONDICIONAL (Texto, Preço e metadados legados - Itens 7 e 8)
          ===================================================================== */}
-      {(elem.type === 'text' || elem.type === 'price') && (() => {
+      {(elem.type === 'text' || elem.type === 'price' || !!elem.visibilityRule) && (() => {
         const rule = elem.visibilityRule;
         const isEnabled = !!rule && !!rule.field;
 
@@ -867,7 +867,7 @@ export default function PropertyInspector() {
 
         return (
           <div className="inspector-section" style={{ width: '100%', minWidth: 0, boxSizing: 'border-box' }}>
-            <div className="inspector-section-title">Regras de Exibição</div>
+            <div className="inspector-section-title">REGRAS DE EXIBIÇÃO</div>
             <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.75rem', cursor: 'pointer', minWidth: 0 }}>
               <input
                 type="checkbox"
@@ -879,9 +879,12 @@ export default function PropertyInspector() {
 
             {isEnabled && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', background: 'var(--bg-card)', padding: '0.6rem', borderRadius: '6px', border: '1px solid var(--border-color)', width: '100%', minWidth: 0, boxSizing: 'border-box' }}>
+                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 600 }}>
+                  Mostrar este conteúdo quando...
+                </div>
                 <div style={{ width: '100%', minWidth: 0 }}>
                   <FieldPicker
-                    label="Campo da integração"
+                    label="Campo"
                     allowStatic={false}
                     value={rule?.field || 'produto.promocao'}
                     onChange={(val) => updateElement(elem.id, { visibilityRule: { ...rule!, field: val } })}
@@ -957,6 +960,44 @@ export default function PropertyInspector() {
                 <option value={270}>270° (Girar Esquerda)</option>
               </select>
             </div>
+
+            {/* Configuração de Formato de Data/Hora (system.printDateTime - Item 10) */}
+            {elem.field === 'system.printDateTime' && (() => {
+              const isCustomFormat = !!elem.format && elem.format !== 'datetime';
+              return (
+                <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '0.5rem' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.75rem', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={isCustomFormat}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          updateElement(elem.id, { format: 'date' });
+                        } else {
+                          updateElement(elem.id, { format: 'datetime' });
+                        }
+                      }}
+                    />
+                    <span>Personalizar formato de data/hora</span>
+                  </label>
+
+                  {isCustomFormat && (
+                    <div style={{ marginTop: '0.4rem' }}>
+                      <label className="metric-label">Formato de Exibição</label>
+                      <select
+                        className="inspector-select"
+                        value={elem.format || 'datetime'}
+                        onChange={(e) => updateElement(elem.id, { format: e.target.value })}
+                      >
+                        <option value="datetime">Data e hora</option>
+                        <option value="date">Data</option>
+                        <option value="time">Hora</option>
+                      </select>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
 
             {/* Metadados de Origem do Round-Trip */}
             {elem.sourceReference && (

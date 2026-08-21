@@ -363,7 +363,7 @@ test('21. FASE 3.5 PATCH VISUAL P0: Validação de Layout Responsivo do Property
   const inspectorTsxPath = path.resolve('apps/frontend/src/editor/PropertyInspector.tsx');
   const inspectorTsx = fs.readFileSync(inspectorTsxPath, 'utf8');
 
-  assert.ok(inspectorTsx.includes('Regras de Exibição'), 'PropertyInspector deve conter a seção Regras de Exibição');
+  assert.ok(inspectorTsx.includes('REGRAS DE EXIBIÇÃO') || inspectorTsx.includes('Regras de Exibição'), 'PropertyInspector deve conter a seção Regras de Exibição');
   assert.ok(inspectorTsx.includes("flexDirection: 'column'"), 'Regras de Exibição deve empilhar os controles em coluna para evitar overflow horizontal');
 });
 

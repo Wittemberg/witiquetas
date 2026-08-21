@@ -1,10 +1,10 @@
 {
-  "commitSha": "cf9c4be67406a4699130ac9ef784860d5bdf3f38",
-  "shortSha": "cf9c4be",
-  "frontendImage": "ghcr.io/wittemberg/witiquetas-frontend:production-cf9c4be67406a4699130ac9ef784860d5bdf3f38",
-  "backendImage": "ghcr.io/wittemberg/witiquetas-backend:production-cf9c4be67406a4699130ac9ef784860d5bdf3f38",
-  "createdAt": "2026-08-21T09:06:00Z",
-  "previousStableSha": "aafd195be9ce9bc6049612db09189cc1e6516653",
+  "commitSha": "db0a8448ebf5cbeab6d2a4a3501ee824c30c33a2",
+  "shortSha": "db0a844",
+  "frontendImage": "ghcr.io/wittemberg/witiquetas-frontend:production-db0a8448ebf5cbeab6d2a4a3501ee824c30c33a2",
+  "backendImage": "ghcr.io/wittemberg/witiquetas-backend:production-db0a8448ebf5cbeab6d2a4a3501ee824c30c33a2",
+  "createdAt": "2026-08-21T12:25:00Z",
+  "previousStableSha": "61c18254dcd9294dbdbaf9557fbf05e49b460f38",
   "databaseSchemaVersion": "1.0.0",
   "testsPassed": true,
   "status": "stable"

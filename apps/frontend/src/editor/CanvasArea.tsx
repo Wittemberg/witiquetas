@@ -7,6 +7,7 @@ import {
   pxToMm,
   MOCK_PRODUCT_DATA,
   evaluateVisibilityRule,
+  resolveFieldValue,
 } from './useEditorStore';
 import { LabelElement, QrCodeElement, TextElement, BarcodeElement, PriceElement } from '@witiquetas/label-schema';
 import { generateQRCodeDataUrl } from './qrCodeGenerator';
@@ -575,8 +576,9 @@ export default function CanvasArea() {
       switch (elem.type) {
         case 'text': {
           const textElem = elem as TextElement;
-          let textContent = showPreviewData && textElem.field && (mockProductData?.[textElem.field] || MOCK_PRODUCT_DATA[textElem.field])
-            ? (mockProductData?.[textElem.field] || MOCK_PRODUCT_DATA[textElem.field])
+          const resolvedValue = resolveFieldValue(textElem.field, mockProductData || MOCK_PRODUCT_DATA, textElem.format);
+          let textContent = showPreviewData && textElem.field && resolvedValue !== undefined
+            ? resolvedValue
             : textElem.text;
 
           // Aplicação de Transformações de Substring (Item 275-276)

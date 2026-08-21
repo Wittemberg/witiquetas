@@ -309,7 +309,7 @@ export default function EditorLayout({
 
         {/* Lado Direito: Ações Globais Essenciais (Desfazer, Zoom, Guias [▦], Dados, Tema, Imprimir) */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          {/* Seletor de Cenário de Teste / Preview (Item 285) */}
+          {/* Seletor 'Visualizar como' (Itens 5 e 6 da especificacao UX) */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
             <select
               className="inspector-select"
@@ -318,15 +318,15 @@ export default function EditorLayout({
                 fontSize: '0.72rem',
                 height: '28px',
                 background: 'var(--bg-card)',
-                minWidth: '140px',
+                minWidth: '160px',
                 fontWeight: 600,
               }}
               value={previewScenario}
               onChange={(e) => setPreviewScenario(e.target.value as any)}
-              title="Alternar dados de teste para validar regras condicionais (Item 285)"
+              title="Simula diferentes condições dos dados para conferir como a etiqueta será impressa."
             >
-              <option value="promo">Cenário: Promoção (R$ 7,99)</option>
-              <option value="normal">Cenário: Normal (R$ 9,99)</option>
+              <option value="normal">Visualizar como: Normal</option>
+              <option value="promo">Visualizar como: Promoção</option>
             </select>
           </div>
 

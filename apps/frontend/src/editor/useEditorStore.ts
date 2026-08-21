@@ -74,35 +74,24 @@ export const MOCK_PRODUCT_DATA: Record<string, string> = {
 // Resolvedor Universal de Campos da Integração e do Sistema
 export function resolveFieldValue(
   field?: string,
-  data: Record<string, string> = MOCK_PRODUCT_DATA
+  data: Record<string, string> = MOCK_PRODUCT_DATA,
+  format?: string
 ): string | undefined {
   if (!field) return undefined;
 
-  if (data[field] !== undefined) {
-    return data[field];
+  if (field === 'system.printDateTime' || field === 'system.printDate' || field === 'system.printTime') {
+    const fmt = format || (field === 'system.printDate' ? 'date' : field === 'system.printTime' ? 'time' : 'datetime');
+    if (fmt === 'date') {
+      return data['system.printDate'] || '20/08/2026';
+    }
+    if (fmt === 'time') {
+      return data['system.printTime'] || '12:35';
+    }
+    return data['system.printDateTime'] || '20/08/2026 12:35';
   }
 
-  if (field === 'system.printDateTime') {
-    const now = new Date();
-    const dd = String(now.getDate()).padStart(2, '0');
-    const mm = String(now.getMonth() + 1).padStart(2, '0');
-    const yyyy = now.getFullYear();
-    const hh = String(now.getHours()).padStart(2, '0');
-    const min = String(now.getMinutes()).padStart(2, '0');
-    return `${dd}/${mm}/${yyyy} ${hh}:${min}`;
-  }
-  if (field === 'system.printDate') {
-    const now = new Date();
-    const dd = String(now.getDate()).padStart(2, '0');
-    const mm = String(now.getMonth() + 1).padStart(2, '0');
-    const yyyy = now.getFullYear();
-    return `${dd}/${mm}/${yyyy}`;
-  }
-  if (field === 'system.printTime') {
-    const now = new Date();
-    const hh = String(now.getHours()).padStart(2, '0');
-    const min = String(now.getMinutes()).padStart(2, '0');
-    return `${hh}:${min}`;
+  if (data[field] !== undefined) {
+    return data[field];
   }
 
   return undefined;

@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# Git Pre-Commit Hook de Segurança — Witiquetas
+set -e
+
+echo "[SAFETY] Executando checkpoint pré-commit..."
+
+if command -v pwsh >/dev/null 2>&1; then
+  pwsh -File ./scripts/safety/create-checkpoint.ps1 -Label "pre-commit"
+elif command -v powershell >/dev/null 2>&1; then
+  powershell -File ./scripts/safety/create-checkpoint.ps1 -Label "pre-commit"
+else
+  bash ./scripts/safety/create-checkpoint.sh "pre-commit"
+fi
+
+echo "[SAFETY] Checkpoint concluído. Continuando commit..."

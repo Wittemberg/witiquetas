@@ -1,0 +1,11 @@
+{
+  "commitSha": "aafd195be9ce9bc6049612db09189cc1e6516653",
+  "shortSha": "aafd195",
+  "frontendImage": "ghcr.io/wittemberg/witiquetas-frontend:production-aafd195be9ce9bc6049612db09189cc1e6516653",
+  "backendImage": "ghcr.io/wittemberg/witiquetas-backend:production-aafd195be9ce9bc6049612db09189cc1e6516653",
+  "createdAt": "2026-08-21T08:26:00Z",
+  "previousStableSha": "eb3e046065f521ab7f56b23cbfc08d18d0675182",
+  "databaseSchemaVersion": "1.0.0",
+  "testsPassed": true,
+  "status": "stable"
+}

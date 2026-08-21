@@ -21,6 +21,9 @@ build/
 .env.production.local
 *.env
 
+# Local recovery checkpoints
+.recovery/
+
 # IDE / Editores
 .vscode/
 .idea/

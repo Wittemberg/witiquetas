@@ -104,13 +104,16 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GHCR_TOKEN }}
 
-      - name: Build & Push Backend Image
+      - name: Build & Push Backend Image (Candidate & Production SHA)
         uses: docker/build-push-action@v6
         with:
           context: .
           file: apps/backend/Dockerfile
           push: true
-          tags: ghcr.io/wittemberg/witiquetas-backend:latest
+          tags: |
+            ghcr.io/wittemberg/witiquetas-backend:candidate-${{ github.sha }}
+            ghcr.io/wittemberg/witiquetas-backend:production-${{ github.sha }}
+            ghcr.io/wittemberg/witiquetas-backend:stable
 
       - name: Validate Backend Container Download Endpoint
         run: |
@@ -159,7 +162,7 @@ jobs:
             -e ADMIN_API_KEY=ci_test_key \
             -e ADMIN_COMPANY_ID=comp-ci \
             -e DATABASE_URL=postgresql://witiquetas:ci_test_password@test-postgres:5432/witiquetas \
-            ghcr.io/wittemberg/witiquetas-backend:latest
+            ghcr.io/wittemberg/witiquetas-backend:candidate-${{ github.sha }}
 
           echo "==> Aguardando backend responder em /api/health..."
           BACKEND_HEALTHY=false
@@ -214,13 +217,16 @@ jobs:
 
           echo "Smoke test concluído com sucesso: Postgres READY, Backend HEALTHY, Tabela agents EXISTS, Download HTTP 200 com PE válido (> 1MB, header MZ)."
 
-      - name: Build & Push Frontend Image
+      - name: Build & Push Frontend Image (Candidate & Production SHA)
         uses: docker/build-push-action@v6
         with:
           context: .
           file: apps/frontend/Dockerfile
           push: true
-          tags: ghcr.io/wittemberg/witiquetas-frontend:latest
+          tags: |
+            ghcr.io/wittemberg/witiquetas-frontend:candidate-${{ github.sha }}
+            ghcr.io/wittemberg/witiquetas-frontend:production-${{ github.sha }}
+            ghcr.io/wittemberg/witiquetas-frontend:stable
 
       - name: Trigger Portainer Webhook for Auto Redeploy
         if: success()

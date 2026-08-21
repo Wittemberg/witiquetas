@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# Git Pre-Push Hook de Segurança — Witiquetas
+set -e
+
+echo "[SAFETY] Executando validação de segurança pré-push..."
+
+BRANCH=$(git rev-parse --abbrev-ref HEAD)
+SHORT_SHA=$(git rev-parse --short HEAD)
+TIMESTAMP=$(date +"%Y%m%d-%H%M%S")
+
+if [ "$BRANCH" = "main" ]; then
+  BACKUP_BRANCH="backup/pre-push-${TIMESTAMP}-${SHORT_SHA}"
+  echo "[SAFETY] Criando branch de backup remoto: ${BACKUP_BRANCH}..."
+  git branch "$BACKUP_BRANCH" HEAD
+  git push origin "$BACKUP_BRANCH" --no-verify || true
+fi
+
+echo "[SAFETY] Pre-push validation concluída com sucesso."

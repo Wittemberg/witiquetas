@@ -282,6 +282,7 @@ interface EditorState {
   isDirty: boolean;
   saveStatus: 'saved' | 'unsaved' | 'saving' | 'error';
   currentTemplateId: string | null;
+  currentTemplateVersion: number | null;
 
   // Painéis
   isLeftSidebarCollapsed: boolean;
@@ -299,7 +300,7 @@ interface EditorState {
   clipboard: LabelElement[];
 
   // Actions
-  setDocument: (doc: LabelDocument, templateId?: string) => void;
+  setDocument: (doc: LabelDocument, templateId?: string, version?: number) => void;
   createNewDocument: (params: CreateNewDocumentParams) => void;
   updateDimensions: (widthMm: number, heightMm: number, dpi: 203 | 300 | 600) => void;
   saveDocumentToBackend: () => Promise<boolean>;
@@ -346,96 +347,6 @@ interface EditorState {
   sendToBack: (id: string) => void;
   bringForward: (id: string) => void;
   sendBackward: (id: string) => void;
-
-  // Clipboard (Copiar / Recortar / Colar)
-  copySelection: () => void;
-  cutSelection: () => void;
-  pasteSelection: () => void;
-
-  // Alinhamento & Nudge
-  alignElements: (direction: 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom') => void;
-  distributeElements: (direction: 'horizontal' | 'vertical') => void;
-  nudgeElements: (dxMm: number, dyMm: number) => void;
-
-  // Histórico & Auto-save
-  undo: () => void;
-  redo: () => void;
-  pushHistory: () => void;
-  markSaved: () => void;
-}
-
-export const useEditorStore = create<EditorState>((set, get) => ({
-  document: normalizeDocumentGeometry(initialDocument),
-  selectedElementIds: ['prod-desc'],
-  zoom: 1.0, // Zoom padrão inicial de 100%
-  snapToGrid: true,
-  gridSizeMm: 1,
-  showRulers: true,
-  showSafeArea: false,
-  safeAreaMarginMm: 1.0,
-  showPreviewData: true,
-  showGhostConditionalElements: false, // Modo Fantasma: elementos condicionais inativos aparecem translúcidos
-  previewScenario: 'promo',
-  mockProductData: { ...MOCK_PRODUCT_DATA },
-  isDirty: false,
-  saveStatus: 'saved',
-  currentTemplateId: string | null;
-  currentTemplateVersion: number | null;
-
-  // Painéis
-  isLeftSidebarCollapsed: boolean;
-  isRightSidebarCollapsed: boolean;
-
-  // Impressora Ativa e Biblioteca de QR Codes
-  selectedPrinter: PrinterDTO | null;
-  qrCodeLibrary: QRCodeLibraryItemDTO[];
-
-  // Histórico Undo / Redo
-  history: LabelDocument[];
-  historyIndex: number;
-
-  // Área de transferência
-  clipboard: LabelElement[];
-
-  // Actions
-  setDocument: (doc: LabelDocument, templateId?: string, version?: number) => void;
-  createNewDocument: (params: CreateNewDocumentParams) => void;
-  updateDimensions: (widthMm: number, heightMm: number, dpi: 203 | 300 | 600) => void;
-  saveDocumentToBackend: () => Promise<boolean>;
-  setSaveStatus: (status: 'saved' | 'unsaved' | 'saving' | 'error') => void;
-
-  // Seleção
-  setSelectedElementId: (id: string | null) => void;
-  setSelectedElementIds: (ids: string[]) => void;
-  toggleSelectElement: (id: string, multi?: boolean) => void;
-  selectAll: () => void;
-  clearSelection: () => void;
-
-  // Visualização e Ferramentas
-  setZoom: (zoom: number) => void;
-  fitToScreen: (containerW?: number, containerH?: number) => void;
-  setSnapToGrid: (snap: boolean) => void;
-  setShowRulers: (show: boolean) => void;
-  setShowSafeArea: (show: boolean) => void;
-  setSafeAreaMarginMm: (marginMm: number) => void;
-  setShowPreviewData: (show: boolean) => void;
-  setShowGhostConditionalElements: (show: boolean) => void;
-  setPreviewScenario: (scenario: 'normal' | 'promo' | 'custom') => void;
-  setMockProductData: (data: Record<string, string>) => void;
-  updateMockProductDataField: (key: string, value: string) => void;
-
-  // Modificação de Elementos
-  addElement: (type: ElementType) => void;
-  updateElement: (id: string, patch: Partial<LabelElement>) => void;
-  updateSelectedElements: (patch: Partial<LabelElement>) => void;
-  removeElement: (id: string) => void;
-  removeSelectedElements: () => void;
-  duplicateSelectedElements: () => void;
-  renameElement: (id: string, name: string) => void;
-
-  toggleLock: (id: string) => void;
-  toggleVisibility: (id: string) => void;
-  reorderElement: (id: string, direction: 'up' | 'down' | 'top' | 'bottom') => void;
 
   // Clipboard (Copiar / Recortar / Colar)
   copySelection: () => void;

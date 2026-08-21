@@ -2,6 +2,16 @@ import React, { useState, useEffect } from 'react';
 import type { TemplateSummaryDTO } from '@witiquetas/contracts';
 import { templatesApi } from '../../services/templatesApi.js';
 import { RenameModelModal, DeleteModelModal } from './ModelActionModals.js';
+import {
+  Plus,
+  Search,
+  LayoutTemplate,
+  MoreVertical,
+  Copy,
+  Edit3,
+  Trash2,
+  RefreshCw,
+} from 'lucide-react';
 
 interface ModelsPageProps {
   onOpenModel: (id: string) => void;
@@ -97,40 +107,44 @@ export const ModelsPage: React.FC<ModelsPageProps> = ({ onOpenModel, onCreateNew
     <div className="models-page-container">
       {/* Header da Página */}
       <div className="models-page-header">
-        <div>
+        <div className="models-header-content">
           <h1 className="models-page-title">Meus Modelos</h1>
           <p className="models-page-subtitle">
             Crie, organize e reutilize seus modelos de etiquetas térmicas.
           </p>
         </div>
 
-        <button type="button" className="wizard-primary-btn" onClick={onCreateNew}>
-          + Nova Etiqueta
+        <button type="button" className="btn-primary-action" onClick={onCreateNew}>
+          <Plus size={18} />
+          <span>Nova Etiqueta</span>
         </button>
       </div>
 
       {/* Barra de Busca Unificada */}
-      <div className="models-search-bar" style={{ margin: '1.5rem 0' }}>
-        <input
-          type="text"
-          className="niche-search-input"
-          style={{ width: '100%', maxWidth: '540px', padding: '0.7rem 1rem' }}
-          placeholder="Buscar modelo por nome, nicho, dimensão ou linguagem..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-        />
+      <div className="models-search-bar">
+        <div className="search-input-wrapper">
+          <Search size={18} className="search-icon" />
+          <input
+            type="text"
+            className="models-search-input"
+            placeholder="Buscar modelo por nome, nicho, dimensão ou linguagem..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </div>
       </div>
 
       {/* Estado de Erro */}
       {error && (
-        <div className="models-error-state" style={{ padding: '2rem', textAlign: 'center' }}>
-          <p style={{ color: '#ef4444', fontWeight: 600, marginBottom: '1rem' }}>{error}</p>
+        <div className="models-error-state">
+          <p className="error-message">{error}</p>
           <button
             type="button"
-            className="niche-card-btn"
+            className="btn-retry"
             onClick={() => fetchTemplates(searchQuery)}
           >
-            Tentar novamente
+            <RefreshCw size={16} />
+            <span>Tentar novamente</span>
           </button>
         </div>
       )}
@@ -151,16 +165,18 @@ export const ModelsPage: React.FC<ModelsPageProps> = ({ onOpenModel, onCreateNew
       {/* Estado Vazio (Empty State) */}
       {!loading && !error && templates.length === 0 && (
         <div className="models-empty-state">
-          <div className="empty-icon">📄</div>
+          <div className="empty-icon-badge">
+            <LayoutTemplate size={36} />
+          </div>
           <h2>Nenhum modelo salvo ainda</h2>
           <p>Crie seu primeiro modelo escolhendo um nicho e um formato de etiqueta.</p>
           <button
             type="button"
-            className="wizard-primary-btn"
-            style={{ marginTop: '1.25rem' }}
+            className="btn-primary-action"
             onClick={onCreateNew}
           >
-            Criar primeira etiqueta
+            <Plus size={18} />
+            <span>Criar primeira etiqueta</span>
           </button>
         </div>
       )}
@@ -176,8 +192,6 @@ export const ModelsPage: React.FC<ModelsPageProps> = ({ onOpenModel, onCreateNew
                   className="model-card-mini-canvas"
                   style={{
                     aspectRatio: `${t.widthMm} / ${t.heightMm}`,
-                    maxHeight: '80px',
-                    maxWidth: '180px',
                   }}
                 >
                   <span className="mini-dim-label">
@@ -206,8 +220,7 @@ export const ModelsPage: React.FC<ModelsPageProps> = ({ onOpenModel, onCreateNew
               <div className="model-card-actions">
                 <button
                   type="button"
-                  className="wizard-primary-btn"
-                  style={{ padding: '0.4rem 1rem', fontSize: '0.875rem' }}
+                  className="btn-open-model"
                   onClick={() => onOpenModel(t.id)}
                 >
                   Abrir
@@ -217,13 +230,13 @@ export const ModelsPage: React.FC<ModelsPageProps> = ({ onOpenModel, onCreateNew
                 <div className="model-card-menu-container">
                   <button
                     type="button"
-                    className="btn-icon"
+                    className="btn-icon-more"
                     onClick={() =>
                       setActionMenuOpenId(actionMenuOpenId === t.id ? null : t.id)
                     }
                     title="Mais opções"
                   >
-                    ⋯
+                    <MoreVertical size={16} />
                   </button>
 
                   {actionMenuOpenId === t.id && (
@@ -233,7 +246,8 @@ export const ModelsPage: React.FC<ModelsPageProps> = ({ onOpenModel, onCreateNew
                         className="dropdown-item"
                         onClick={() => handleDuplicate(t)}
                       >
-                        📋 Duplicar
+                        <Copy size={14} />
+                        <span>Duplicar</span>
                       </button>
                       <button
                         type="button"
@@ -243,7 +257,8 @@ export const ModelsPage: React.FC<ModelsPageProps> = ({ onOpenModel, onCreateNew
                           setRenameTarget(t);
                         }}
                       >
-                        ✏️ Renomear
+                        <Edit3 size={14} />
+                        <span>Renomear</span>
                       </button>
                       <button
                         type="button"
@@ -253,7 +268,8 @@ export const ModelsPage: React.FC<ModelsPageProps> = ({ onOpenModel, onCreateNew
                           setDeleteTarget(t);
                         }}
                       >
-                        🗑️ Excluir
+                        <Trash2 size={14} />
+                        <span>Excluir</span>
                       </button>
                     </div>
                   )}
@@ -287,3 +303,4 @@ export const ModelsPage: React.FC<ModelsPageProps> = ({ onOpenModel, onCreateNew
     </div>
   );
 };
+

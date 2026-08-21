@@ -13,7 +13,11 @@ import {
   Sparkles, 
   Maximize2, 
   Download, 
-  KeyRound 
+  KeyRound,
+  ListOrdered,
+  Printer,
+  Plug,
+  Settings
 } from 'lucide-react';
 import EditorLayout from './editor/EditorLayout.js';
 import NewTemplateWizard from './editor/NewTemplateWizard.js';
@@ -173,14 +177,9 @@ export default function App() {
         return (
           <PlaceholderModulePage
             title="Central de Impressão"
-            icon="📋"
-            description="Gerenciamento em tempo real da fila de trabalhos e ordens de impressão."
-            upcomingFeatures={[
-              'Monitoramento de status por trabalho (PENDING, PRINTING, SUCCESS, FAILED)',
-              'Re-tentativas automáticas com jitter e fallback de impressora',
-              'Histórico consolidado e auditoria de impressões por usuário',
-              'Cancelamento e reordenamento de trabalhos na fila',
-            ]}
+            icon={ListOrdered}
+            description="Gerencie filas, status e histórico de impressão."
+            onGoHome={() => setCurrentModule('home')}
           />
         );
 
@@ -188,14 +187,9 @@ export default function App() {
         return (
           <PlaceholderModulePage
             title="Impressoras"
-            icon="🖨️"
-            description="Cadastro e diagnóstico de impressoras locais e de rede homologadas."
-            upcomingFeatures={[
-              'Suporte completo a linguagens térmicas (PPLB, PPLA, ZPL, EPL)',
-              'Mapeamento de portas (RAW TCP 9100, Spooler Windows, USB, Serial)',
-              'Envio de comandos de teste de calibração e teste de página física',
-              'Detecção automática de status de papel e cabeça de impressão',
-            ]}
+            icon={Printer}
+            description="Cadastre e acompanhe impressoras locais e de rede."
+            onGoHome={() => setCurrentModule('home')}
           />
         );
 
@@ -203,29 +197,19 @@ export default function App() {
         return (
           <PlaceholderModulePage
             title="Agents de Impressão"
-            icon="🖥️"
-            description="Status e pareamento de agentes de hardware locais (Witiquetas Agent)."
-            upcomingFeatures={[
-              'Pareamento seguro por código OTP temporário',
-              'Heartbeat e telemetria de memória e uso de CPU em tempo real',
-              'Download de binários homologados x64 para Windows/Linux/macOS',
-              'Revogação remota de tokens de comunicação',
-            ]}
+            icon={Cpu}
+            description="Gerencie os computadores responsáveis pela impressão local."
+            onGoHome={() => setCurrentModule('home')}
           />
         );
 
       case 'integrations':
         return (
           <PlaceholderModulePage
-            title="Integrações ERP"
-            icon="🔌"
-            description="Conectores de dados e APIs REST públicas para ERPs e e-commerce."
-            upcomingFeatures={[
-              'Universal Data Architecture com Mapeador Nível de Campo',
-              'Consultas em lote de produtos e alterações de preços',
-              'Webhooks de gatilho automático de impressão na emissão de nota',
-              'Chaves de API criptografadas em repouso',
-            ]}
+            title="Integrações"
+            icon={Plug}
+            description="Conecte o Witiquetas às fontes de dados da sua empresa."
+            onGoHome={() => setCurrentModule('home')}
           />
         );
 
@@ -233,14 +217,9 @@ export default function App() {
         return (
           <PlaceholderModulePage
             title="Administração"
-            icon="⚙️"
-            description="Configurações gerais do tenant, usuários, filiais e logs de auditoria."
-            upcomingFeatures={[
-              'Clonagem inteligente de filial (CNPJ/Company cloning)',
-              'Perfis de acesso RBAC (Administrador, Designer, Operador)',
-              'Gestão de licenças e cotas de impressão',
-              'Trilha completa de auditoria de alterações em modelos',
-            ]}
+            icon={Settings}
+            description="Gerencie configurações e recursos da sua organização."
+            onGoHome={() => setCurrentModule('home')}
           />
         );
 

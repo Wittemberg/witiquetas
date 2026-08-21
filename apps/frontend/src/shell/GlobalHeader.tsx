@@ -1,4 +1,5 @@
 import React from 'react';
+import { Menu, Building2, Sun, Moon, Bell } from 'lucide-react';
 
 interface GlobalHeaderProps {
   currentModuleName: string;
@@ -20,12 +21,12 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({
           type="button"
           className="mobile-menu-trigger btn-icon"
           onClick={onOpenMobileMenu}
-          aria-label="Abrir menu"
+          aria-label="Abrir menu principal"
         >
-          ☰
+          <Menu size={20} />
         </button>
 
-        <nav className="header-breadcrumb" aria-label="Breadcrumb">
+        <nav className="header-breadcrumb" aria-label="Navegação hierárquica">
           <span className="breadcrumb-root">Witiquetas</span>
           <span className="breadcrumb-separator">/</span>
           <span className="breadcrumb-current">{currentModuleName}</span>
@@ -35,7 +36,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({
       <div className="header-right">
         {/* Tenant/Company Badge */}
         <div className="tenant-badge" title="Empresa / Tenant ativo">
-          <span className="tenant-icon">🏢</span>
+          <Building2 size={16} className="tenant-icon" />
           <span className="tenant-name">Empresa Padrão</span>
         </div>
 
@@ -47,22 +48,22 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({
           title={theme === 'dark' ? 'Alternar para Modo Claro' : 'Alternar para Modo Escuro'}
           aria-label="Alternar Tema"
         >
-          {theme === 'dark' ? '☀️' : '🌙'}
+          {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
         </button>
 
         {/* Elemento Estrutural Discreto: Notificações (Desativado / Sem ação falsa) */}
         <div
           className="header-icon-placeholder disabled"
-          title="Notificações do sistema (Em breve)"
+          title="Notificações do sistema — em breve"
           aria-disabled="true"
         >
-          🔔
+          <Bell size={18} />
         </div>
 
         {/* Elemento Estrutural Discreto: Perfil do Usuário (Desativado / Sem ação falsa) */}
         <div
           className="header-profile-placeholder disabled"
-          title="Perfil do usuário (Sessão Ativa)"
+          title="Perfil do Usuário (Sessão Ativa)"
           aria-disabled="true"
         >
           <span className="user-avatar">US</span>
@@ -71,3 +72,4 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({
     </header>
   );
 };
+

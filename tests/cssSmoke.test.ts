@@ -86,3 +86,38 @@ test('3. DESIGN CONTRACTS AUDIT (COMMITS b2d63e0, 224599d, b2aeac8): Preservaç�
   // b2aeac8: Viewport / Zoom (overflow: auto !important no container do viewport do editor)
   assert.ok(cssCode.includes('overflow: auto !important') || cssCode.includes('overflow:auto!important'), 'b2aeac8: .editor-canvas-container / .editor-workspace-row deve conter overflow: auto !important');
 });
+
+test('4. APPLICATION SHELL DESIGN SYSTEM COVERAGE (PATCH 3.1): Preservação de Todas as Classes da Shell', () => {
+  const cssPath = path.resolve('apps/frontend/src/index.css');
+  const cssCode = fs.readFileSync(cssPath, 'utf8');
+
+  // Application Shell Layout Container
+  assert.ok(cssCode.includes('.app-shell-container'), 'Deve conter .app-shell-container');
+  assert.ok(cssCode.includes('.app-shell-body'), 'Deve conter .app-shell-body');
+  assert.ok(cssCode.includes('.app-main-content'), 'Deve conter .app-main-content');
+
+  // Global Header
+  assert.ok(cssCode.includes('.global-app-header'), 'Deve conter .global-app-header');
+  assert.ok(cssCode.includes('.header-breadcrumb'), 'Deve conter .header-breadcrumb');
+  assert.ok(cssCode.includes('.tenant-badge'), 'Deve conter .tenant-badge');
+
+  // Application Sidebar
+  assert.ok(cssCode.includes('.app-sidebar'), 'Deve conter .app-sidebar');
+  assert.ok(cssCode.includes('.sidebar-header'), 'Deve conter .sidebar-header');
+  assert.ok(cssCode.includes('.brand-logo'), 'Deve conter .brand-logo');
+  assert.ok(cssCode.includes('.sidebar-nav'), 'Deve conter .sidebar-nav');
+  assert.ok(cssCode.includes('.sidebar-nav-item'), 'Deve conter .sidebar-nav-item');
+
+  // Meus Modelos Page
+  assert.ok(cssCode.includes('.models-page-container'), 'Deve conter .models-page-container');
+  assert.ok(cssCode.includes('.models-page-header'), 'Deve conter .models-page-header');
+  assert.ok(cssCode.includes('.models-search-bar'), 'Deve conter .models-search-bar');
+  assert.ok(cssCode.includes('.models-grid'), 'Deve conter .models-grid');
+  assert.ok(cssCode.includes('.model-card'), 'Deve conter .model-card');
+  assert.ok(cssCode.includes('.models-empty-state'), 'Deve conter .models-empty-state');
+
+  // Placeholders
+  assert.ok(cssCode.includes('.placeholder-module-container'), 'Deve conter .placeholder-module-container');
+  assert.ok(cssCode.includes('.placeholder-card'), 'Deve conter .placeholder-card');
+});
+

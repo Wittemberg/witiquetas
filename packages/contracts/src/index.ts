@@ -1,27 +1,65 @@
 import type { LabelDocument } from '@witiquetas/label-schema';
 
 // ==========================================
-// TEMPLATES
+// TEMPLATES / CICLO DE VIDA DE MODELOS
 // ==========================================
-export interface TemplateDTO {
+
+/**
+ * Resumo leve do modelo retornado em listagens (Sem carregar document_schema JSONB)
+ */
+export interface TemplateSummaryDTO {
   id: string;
-  name: string;
-  scope: 'PLATFORM' | 'CUSTOMER' | 'COMPANY';
-  document: LabelDocument;
+  companyId: string;
+  title: string;
+  name: string; // Alias de compatibilidade para title
+  description?: string;
+  nicheId?: string;
+  nicheName: string;
+  widthMm: number;
+  heightMm: number;
+  dpi: number;
+  orientation: 'portrait' | 'landscape';
+  printerLanguage: string;
+  version: number;
   createdAt: string;
   updatedAt: string;
+  scope?: 'PLATFORM' | 'CUSTOMER' | 'COMPANY';
+}
+
+/**
+ * Modelo completo incluindo o document_schema (LabelDocument)
+ */
+export interface TemplateDTO extends TemplateSummaryDTO {
+  document: LabelDocument;
 }
 
 export interface CreateTemplateDTO {
   name: string;
+  title?: string;
+  companyId?: string;
+  description?: string;
+  nicheId?: string;
+  nicheName?: string;
   scope?: 'PLATFORM' | 'CUSTOMER' | 'COMPANY';
   document: LabelDocument;
 }
 
 export interface UpdateTemplateDTO {
   name?: string;
+  title?: string;
+  description?: string;
   document?: LabelDocument;
+  expectedVersion?: number; // Para Optimistic Locking (HTTP 409 Conflict se versão desatualizada)
 }
+
+export interface RenameTemplateDTO {
+  title: string;
+}
+
+export interface DuplicateTemplateDTO {
+  newTitle?: string;
+}
+
 
 // ==========================================
 // BIBLIOTECA DE QR CODES REUTILIZÁVEIS

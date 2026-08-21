@@ -28,14 +28,14 @@ As entregas P0 representam os requisitos essenciais para a usabilidade e consist
 - [ ] **Golden Model de Regras:** Validação oficial dos cenários de *Venda normal*, *Promoção*, *Atacado* e *Fidelidade* utilizando o arquivo real `16-ARGOX REGRA - ATACADO.txt`.
 
 ### P0.4 — Ciclo de Vida do Modelo ("Meus Modelos")
-- [ ] **Persistência Completa:** Fluxo de salvar e atualizar no banco de dados com feedback visual imediato.
-- [ ] **Operações de Gestão:** Abrir, renomear, duplicar e excluir modelos com confirmação de segurança.
-- [ ] **Disparo Direto:** Botão para envio rápido do modelo para a Central de Impressão.
+- [x] **Persistência Completa:** Fluxo de salvar e atualizar no banco de dados com feedback visual imediato e Fail-Closed no PostgreSQL.
+- [x] **Operações de Gestão:** Abrir, renomear, duplicar (server-side) e excluir modelos (soft-delete) com confirmação de segurança e Optimistic Locking (HTTP 409).
+- [ ] **Disparo Direto:** Botão para envio rápido do modelo para a Central de Impressão (Fase 4).
 
 ### P0.5 — Application Shell & Navegação
-- [ ] **Sidebar Recolhível:** Menu com estados expandido/compacto (com tooltips descritivos no hover) e Drawer no mobile/tablet.
-- [ ] **Ícones Diferenciados:** Distinção visual explícita entre Central de Impressão, Impressoras físicas, Agents e Integrações.
-- [ ] **Header Desacoplado:** Remoção de controles internos do editor do cabeçalho global; foco em breadcrumb, empresa/filial, notificações e perfil.
+- [x] **Sidebar Recolhível:** Menu com estados expandido/compacto (com tooltips descritivos no hover), persistência em localStorage e Drawer no mobile/tablet.
+- [x] **Ícones Diferenciados:** Distinção visual explícita entre Central de Impressão, Impressoras físicas, Agents e Integrações.
+- [x] **Header Desacoplado:** Remoção de controles internos do editor do cabeçalho global; foco em breadcrumb, empresa/filial, tema e elementos estruturais.
 
 ---
 

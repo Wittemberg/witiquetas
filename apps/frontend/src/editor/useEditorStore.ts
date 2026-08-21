@@ -379,7 +379,98 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   mockProductData: { ...MOCK_PRODUCT_DATA },
   isDirty: false,
   saveStatus: 'saved',
+  currentTemplateId: string | null;
+  currentTemplateVersion: number | null;
+
+  // Painéis
+  isLeftSidebarCollapsed: boolean;
+  isRightSidebarCollapsed: boolean;
+
+  // Impressora Ativa e Biblioteca de QR Codes
+  selectedPrinter: PrinterDTO | null;
+  qrCodeLibrary: QRCodeLibraryItemDTO[];
+
+  // Histórico Undo / Redo
+  history: LabelDocument[];
+  historyIndex: number;
+
+  // Área de transferência
+  clipboard: LabelElement[];
+
+  // Actions
+  setDocument: (doc: LabelDocument, templateId?: string, version?: number) => void;
+  createNewDocument: (params: CreateNewDocumentParams) => void;
+  updateDimensions: (widthMm: number, heightMm: number, dpi: 203 | 300 | 600) => void;
+  saveDocumentToBackend: () => Promise<boolean>;
+  setSaveStatus: (status: 'saved' | 'unsaved' | 'saving' | 'error') => void;
+
+  // Seleção
+  setSelectedElementId: (id: string | null) => void;
+  setSelectedElementIds: (ids: string[]) => void;
+  toggleSelectElement: (id: string, multi?: boolean) => void;
+  selectAll: () => void;
+  clearSelection: () => void;
+
+  // Visualização e Ferramentas
+  setZoom: (zoom: number) => void;
+  fitToScreen: (containerW?: number, containerH?: number) => void;
+  setSnapToGrid: (snap: boolean) => void;
+  setShowRulers: (show: boolean) => void;
+  setShowSafeArea: (show: boolean) => void;
+  setSafeAreaMarginMm: (marginMm: number) => void;
+  setShowPreviewData: (show: boolean) => void;
+  setShowGhostConditionalElements: (show: boolean) => void;
+  setPreviewScenario: (scenario: 'normal' | 'promo' | 'custom') => void;
+  setMockProductData: (data: Record<string, string>) => void;
+  updateMockProductDataField: (key: string, value: string) => void;
+
+  // Modificação de Elementos
+  addElement: (type: ElementType) => void;
+  updateElement: (id: string, patch: Partial<LabelElement>) => void;
+  updateSelectedElements: (patch: Partial<LabelElement>) => void;
+  removeElement: (id: string) => void;
+  removeSelectedElements: () => void;
+  duplicateSelectedElements: () => void;
+  renameElement: (id: string, name: string) => void;
+
+  toggleLock: (id: string) => void;
+  toggleVisibility: (id: string) => void;
+  reorderElement: (id: string, direction: 'up' | 'down' | 'top' | 'bottom') => void;
+
+  // Clipboard (Copiar / Recortar / Colar)
+  copySelection: () => void;
+  cutSelection: () => void;
+  pasteSelection: () => void;
+
+  // Alinhamento & Nudge
+  alignElements: (direction: 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom') => void;
+  distributeElements: (direction: 'horizontal' | 'vertical') => void;
+  nudgeElements: (dxMm: number, dyMm: number) => void;
+
+  // Histórico & Auto-save
+  undo: () => void;
+  redo: () => void;
+  pushHistory: () => void;
+  markSaved: () => void;
+}
+
+export const useEditorStore = create<EditorState>((set, get) => ({
+  document: normalizeDocumentGeometry(initialDocument),
+  selectedElementIds: ['prod-desc'],
+  zoom: 1.0, // Zoom padrão inicial de 100%
+  snapToGrid: true,
+  gridSizeMm: 1,
+  showRulers: true,
+  showSafeArea: false,
+  safeAreaMarginMm: 1.0,
+  showPreviewData: true,
+  showGhostConditionalElements: false, // Modo Fantasma: elementos condicionais inativos aparecem translúcidos
+  previewScenario: 'promo',
+  mockProductData: { ...MOCK_PRODUCT_DATA },
+  isDirty: false,
+  saveStatus: 'saved',
   currentTemplateId: null,
+  currentTemplateVersion: null,
 
   isLeftSidebarCollapsed: false,
   isRightSidebarCollapsed: false,
@@ -391,11 +482,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   historyIndex: 0,
   clipboard: [],
 
-  setDocument: (doc, templateId) => {
+  setDocument: (doc, templateId, version) => {
     const normalizedDoc = normalizeDocumentGeometry(doc);
     set({
       document: normalizedDoc,
       currentTemplateId: templateId || null,
+      currentTemplateVersion: version !== undefined ? version : null,
       selectedElementIds: [],
       history: [normalizedDoc],
       historyIndex: 0,
@@ -1117,55 +1209,46 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   markSaved: () => set({ isDirty: false, saveStatus: 'saved' }),
 
   saveDocumentToBackend: async () => {
-    const { document, currentTemplateId } = get();
+    const { document, currentTemplateId, currentTemplateVersion } = get();
     set({ saveStatus: 'saving' });
 
     try {
-      if (currentTemplateId) {
-        const res = await fetch(`/api/templates/${currentTemplateId}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            name: document.title,
-            document,
-          }),
-        });
-        if (!res.ok) throw new Error('Falha ao atualizar modelo no backend');
-      } else {
-        const res = await fetch('/api/templates', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            name: document.title || 'Etiqueta Térmica',
-            scope: 'COMPANY',
-            companyId: 'comp-matriz-01',
-            document,
-          }),
-        });
-        if (res.ok) {
-          const data = await res.json();
-          if (data && data.id) {
-            set({ currentTemplateId: data.id });
-          }
-        } else {
-          throw new Error('Falha ao criar modelo no backend');
-        }
-      }
+      // Importar dinamicamente templatesApi para evitar dependências circulares de módulo
+      const { templatesApi } = await import('../services/templatesApi.js');
 
-      set({ saveStatus: 'saved', isDirty: false });
-      return true;
-    } catch (err) {
-      console.warn('Erro na persistência do backend, salvando rascunho localmente:', err);
-      // Salva localmente como proteção de sessão
-      try {
-        localStorage.setItem('witiquetas-draft-current', JSON.stringify(document));
-        // Se estiver em modo offline/desenvolvimento sem backend online, aceita persistência local
-        set({ saveStatus: 'saved', isDirty: false });
-        return true;
-      } catch {
-        set({ saveStatus: 'error' });
-        return false;
+      if (currentTemplateId) {
+        const updated = await templatesApi.updateTemplate(currentTemplateId, {
+          title: document.title,
+          name: document.title,
+          document,
+          expectedVersion: currentTemplateVersion || undefined,
+        });
+        set({
+          currentTemplateVersion: updated.version,
+          saveStatus: 'saved',
+          isDirty: false,
+        });
+      } else {
+        const created = await templatesApi.createTemplate({
+          title: document.title || 'Etiqueta Térmica',
+          name: document.title || 'Etiqueta Térmica',
+          scope: 'COMPANY',
+          document,
+        });
+        set({
+          currentTemplateId: created.id,
+          currentTemplateVersion: created.version,
+          saveStatus: 'saved',
+          isDirty: false,
+        });
       }
+      return true;
+    } catch (err: any) {
+      console.error('[EditorStore] Falha no salvamento no backend:', err);
+      // REGRA: Em caso de erro (ex: 409 Conflito ou indisponibilidade de rede),
+      // mantém o documento aberto e as alterações vivas em memória local sem descartar nada
+      set({ saveStatus: 'error' });
+      return false;
     }
   },
 

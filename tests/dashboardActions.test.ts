@@ -13,30 +13,26 @@ const pairModalContent = fs.readFileSync(pairModalPath, 'utf8');
 const downloadModalPath = path.resolve('apps/frontend/src/agent/DownloadAgentModal.tsx');
 const downloadModalContent = fs.readFileSync(downloadModalPath, 'utf8');
 
+const globalHeaderPath = path.resolve('apps/frontend/src/shell/GlobalHeader.tsx');
+const globalHeaderContent = fs.existsSync(globalHeaderPath) ? fs.readFileSync(globalHeaderPath, 'utf8') : '';
+
 // ============================================================================
 // SUÍTE DE TESTES: DASHBOARD ACTIONS E AUSÊNCIA DE REDUNDÂNCIAS
 // ============================================================================
 
 test('1. Header NÃO contém botões redundantes de Nova Etiqueta, Conectar Agent ou Baixar Agent', () => {
-  // Extrai a seção do header
-  const headerMatch = appTsxContent.match(/<header className="header">([\s\S]*?)<\/header>/);
-  assert.ok(headerMatch, 'Header principal deve existir em App.tsx');
-  const headerHtml = headerMatch[1];
-
-  assert.ok(!headerHtml.includes('Nova Etiqueta (Por Nicho)'), 'Header NÃO deve ter botão Nova Etiqueta redundante');
-  assert.ok(!headerHtml.includes('Conectar Agent'), 'Header NÃO deve ter botão Conectar Agent redundante');
-  assert.ok(!headerHtml.includes('Baixar Agent'), 'Header NÃO deve ter botão Baixar Agent redundante');
+  const contentToTest = globalHeaderContent || appTsxContent;
+  assert.ok(!contentToTest.includes('Nova Etiqueta (Por Nicho)'), 'Header NÃO deve ter botão Nova Etiqueta redundante');
+  assert.ok(!contentToTest.includes('Conectar Agent'), 'Header NÃO deve ter botão Conectar Agent redundante');
+  assert.ok(!contentToTest.includes('Baixar Agent'), 'Header NÃO deve ter botão Baixar Agent redundante');
 });
 
 test('2. Header mantém exclusivamente controle de Tema e remove botões redundantes (Abrir Editor, Auto-refresh e Atualizar)', () => {
-  const headerMatch = appTsxContent.match(/<header className="header">([\s\S]*?)<\/header>/);
-  assert.ok(headerMatch);
-  const headerHtml = headerMatch[1];
-
-  assert.ok(headerHtml.includes('btn-theme-toggle'), 'Header deve conter alternador de tema');
-  assert.ok(!headerHtml.includes('Abrir Editor'), 'Header NÃO deve conter botão Abrir Editor');
-  assert.ok(!headerHtml.includes('Auto-refresh'), 'Header NÃO deve conter controle de Auto-refresh');
-  assert.ok(!headerHtml.includes('Atualizar'), 'Header NÃO deve conter botão de Atualizar');
+  const contentToTest = globalHeaderContent || appTsxContent;
+  assert.ok(contentToTest.includes('btn-theme-toggle'), 'Header deve conter alternador de tema');
+  assert.ok(!contentToTest.includes('Abrir Editor'), 'Header NÃO deve conter botão Abrir Editor');
+  assert.ok(!contentToTest.includes('Auto-refresh'), 'Header NÃO deve conter controle de Auto-refresh');
+  assert.ok(!contentToTest.includes('Atualizar'), 'Header NÃO deve conter botão de Atualizar');
 });
 
 test('3. Banner principal é o ponto único para criação guiada com CTA "Selecionar Nicho & Tamanho"', () => {

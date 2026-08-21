@@ -1,190 +1,181 @@
 import { Router, Request, Response } from 'express';
-import { type LabelDocument, LabelDocumentSchema } from '@witiquetas/label-schema';
-import type { TemplateDTO, CreateTemplateDTO } from '@witiquetas/contracts';
+import { LabelDocumentSchema } from '@witiquetas/label-schema';
+import {
+  templateRepository,
+  MismatchedVersionError,
+} from '../repositories/templateRepository.ts';
+import type { CreateTemplateDTO, UpdateTemplateDTO, RenameTemplateDTO } from '@witiquetas/contracts';
 
 const router = Router();
 
-// In-memory templates storage (com suporte a fallback se o banco relacional não estiver povoado com migrations)
-const sampleTemplate: TemplateDTO = {
-  id: 'tpl-gondola-padrao-100x30',
-  name: 'Etiqueta de Gôndola Padrão (100x30mm)',
-  scope: 'PLATFORM',
-  createdAt: new Date().toISOString(),
-  updatedAt: new Date().toISOString(),
-  document: {
-    schemaVersion: 1,
-    title: 'Etiqueta de Gôndola Padrão (100x30mm)',
-    dimensions: {
-      widthMm: 100,
-      heightMm: 30,
-      dpi: 203,
-      orientation: 'landscape',
-    },
-    elements: [
-      {
-        id: 'header-bg',
-        type: 'rectangle',
-        x: 0,
-        y: 0,
-        width: 100,
-        height: 6,
-        strokeWidth: 0,
-        fillColor: '#1e293b',
-      },
-      {
-        id: 'header-text',
-        type: 'text',
-        text: 'OFERTA ESPECIAL',
-        x: 2,
-        y: 1,
-        width: 96,
-        height: 4,
-        fontFamily: 'Inter',
-        fontSize: 10,
-        fontWeight: 'bold',
-        alignment: 'center',
-        color: '#ffffff',
-      },
-      {
-        id: 'prod-desc',
-        type: 'text',
-        text: 'REFRIGERANTE COCA-COLA 2L',
-        field: 'produto.descricao',
-        x: 4,
-        y: 8,
-        width: 60,
-        height: 10,
-        fontFamily: 'Inter',
-        fontSize: 12,
-        fontWeight: 'bold',
-        alignment: 'left',
-        color: '#0f172a',
-      },
-      {
-        id: 'prod-price',
-        type: 'price',
-        field: 'produto.preco',
-        prefix: 'R$',
-        x: 65,
-        y: 7,
-        width: 31,
-        height: 14,
-        integerFontSize: 24,
-        fractionFontSize: 14,
-        currencyFontSize: 12,
-        color: '#dc2626',
-      },
-      {
-        id: 'prod-ean',
-        type: 'barcode',
-        format: 'EAN13',
-        field: 'produto.ean',
-        value: '7894900011517',
-        x: 4,
-        y: 19,
-        width: 50,
-        height: 9,
-        showText: true,
-      },
-      {
-        id: 'company-name',
-        type: 'text',
-        text: 'SUPERMERCADO WR',
-        field: 'empresa.nomeFantasia',
-        x: 56,
-        y: 22,
-        width: 40,
-        height: 5,
-        fontFamily: 'Inter',
-        fontSize: 8,
-        alignment: 'right',
-        color: '#475569',
-      },
-    ],
-  },
-};
-
-const templatesStore = new Map<string, TemplateDTO>([
-  [sampleTemplate.id, sampleTemplate],
-]);
-
-// Listar todos os modelos
-router.get('/', (_req: Request, res: Response) => {
-  const templates = Array.from(templatesStore.values());
-  res.json({
-    total: templates.length,
-    templates,
-  });
-});
-
-// Buscar modelo por ID
-router.get('/:id', (req: Request, res: Response) => {
-  const template = templatesStore.get(req.params.id);
-  if (!template) {
-    return res.status(404).json({ error: 'Modelo de etiqueta não encontrado.' });
+// Helper para obter companyId da requisição
+function getCompanyId(req: Request): string {
+  const headerCompany = req.headers['x-company-id'] as string;
+  if (headerCompany && headerCompany.trim()) {
+    return headerCompany.trim();
   }
-  res.json(template);
-});
+  return 'comp-default';
+}
 
-// Criar modelo
-router.post('/', (req: Request, res: Response) => {
-  const body = req.body as CreateTemplateDTO;
+/**
+ * GET /api/templates
+ * Retorna resumos leves dos modelos (Sem carregar document_schema JSONB)
+ */
+router.get('/', async (req: Request, res: Response) => {
+  try {
+    const companyId = getCompanyId(req);
+    const search = req.query.search as string;
+    const templates = await templateRepository.listTemplates({ companyId, search });
 
-  if (!body.name || !body.document) {
-    return res.status(400).json({ error: 'Nome e documento da etiqueta são obrigatórios.' });
-  }
-
-  const validation = LabelDocumentSchema.safeParse(body.document);
-  if (!validation.success) {
-    return res.status(400).json({
-      error: 'Documento de etiqueta inválido.',
-      details: validation.error.format(),
+    res.json({
+      total: templates.length,
+      templates,
     });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Erro ao listar modelos.', message: err.message });
   }
-
-  const id = `tpl-${Date.now()}`;
-  const now = new Date().toISOString();
-  const newTemplate: TemplateDTO = {
-    id,
-    name: body.name,
-    scope: body.scope || 'COMPANY',
-    document: body.document,
-    createdAt: now,
-    updatedAt: now,
-  };
-
-  templatesStore.set(id, newTemplate);
-  res.status(201).json(newTemplate);
 });
 
-// Atualizar modelo existente
-router.put('/:id', (req: Request, res: Response) => {
-  const template = templatesStore.get(req.params.id);
-  if (!template) {
-    return res.status(404).json({ error: 'Modelo de etiqueta não encontrado.' });
+/**
+ * GET /api/templates/:id
+ * Retorna o modelo completo incluindo document_schema
+ */
+router.get('/:id', async (req: Request, res: Response) => {
+  try {
+    const companyId = getCompanyId(req);
+    const template = await templateRepository.getTemplateById(req.params.id, companyId);
+
+    if (!template) {
+      return res.status(404).json({ error: 'Modelo de etiqueta não encontrado.' });
+    }
+
+    res.json(template);
+  } catch (err: any) {
+    res.status(500).json({ error: 'Erro ao buscar modelo.', message: err.message });
   }
+});
 
-  const { name, document } = req.body;
+/**
+ * POST /api/templates
+ * Criar novo modelo
+ */
+router.post('/', async (req: Request, res: Response) => {
+  try {
+    const companyId = getCompanyId(req);
+    const body = req.body as CreateTemplateDTO;
 
-  if (document) {
-    const validation = LabelDocumentSchema.safeParse(document);
+    if ((!body.name && !body.title) || !body.document) {
+      return res.status(400).json({ error: 'Nome e documento da etiqueta são obrigatórios.' });
+    }
+
+    const validation = LabelDocumentSchema.safeParse(body.document);
     if (!validation.success) {
       return res.status(400).json({
         error: 'Documento de etiqueta inválido.',
         details: validation.error.format(),
       });
     }
-    template.document = document;
+
+    const created = await templateRepository.createTemplate(body, companyId);
+    res.status(201).json(created);
+  } catch (err: any) {
+    res.status(500).json({ error: 'Erro ao criar modelo.', message: err.message });
   }
+});
 
-  if (name) {
-    template.name = name;
+/**
+ * PUT /api/templates/:id
+ * Atualizar modelo com suporte a Optimistic Locking (expectedVersion -> HTTP 409 Conflict)
+ */
+router.put('/:id', async (req: Request, res: Response) => {
+  try {
+    const companyId = getCompanyId(req);
+    const body = req.body as UpdateTemplateDTO;
+
+    if (body.document) {
+      const validation = LabelDocumentSchema.safeParse(body.document);
+      if (!validation.success) {
+        return res.status(400).json({
+          error: 'Documento de etiqueta inválido.',
+          details: validation.error.format(),
+        });
+      }
+    }
+
+    const updated = await templateRepository.updateTemplate(req.params.id, body, companyId);
+    res.json(updated);
+  } catch (err: any) {
+    if (err instanceof MismatchedVersionError) {
+      return res.status(409).json({
+        error: 'CONFLITO DE VERSÃO (Optimistic Locking)',
+        message:
+          'Este modelo foi alterado em outra sessão. Recarregue o modelo antes de salvar novamente.',
+        currentVersion: err.currentVersion,
+      });
+    }
+    if (err.message.includes('não encontrado')) {
+      return res.status(404).json({ error: err.message });
+    }
+    res.status(500).json({ error: 'Erro ao atualizar modelo.', message: err.message });
   }
+});
 
-  template.updatedAt = new Date().toISOString();
-  templatesStore.set(template.id, template);
+/**
+ * POST /api/templates/:id/duplicate
+ * Duplicar modelo no servidor
+ */
+router.post('/:id/duplicate', async (req: Request, res: Response) => {
+  try {
+    const companyId = getCompanyId(req);
+    const duplicated = await templateRepository.duplicateTemplate(req.params.id, companyId);
+    res.status(201).json(duplicated);
+  } catch (err: any) {
+    if (err.message.includes('não encontrado')) {
+      return res.status(404).json({ error: err.message });
+    }
+    res.status(500).json({ error: 'Erro ao duplicar modelo.', message: err.message });
+  }
+});
 
-  res.json(template);
+/**
+ * PATCH /api/templates/:id/name
+ * Renomear modelo
+ */
+router.patch('/:id/name', async (req: Request, res: Response) => {
+  try {
+    const companyId = getCompanyId(req);
+    const body = req.body as RenameTemplateDTO;
+
+    if (!body.title || !body.title.trim()) {
+      return res.status(400).json({ error: 'Título do modelo é obrigatório.' });
+    }
+
+    const updated = await templateRepository.renameTemplate(
+      req.params.id,
+      body.title.trim(),
+      companyId
+    );
+    res.json(updated);
+  } catch (err: any) {
+    if (err.message.includes('não encontrado')) {
+      return res.status(404).json({ error: err.message });
+    }
+    res.status(500).json({ error: 'Erro ao renomear modelo.', message: err.message });
+  }
+});
+
+/**
+ * DELETE /api/templates/:id
+ * Soft Delete do modelo (deleted_at = NOW())
+ */
+router.delete('/:id', async (req: Request, res: Response) => {
+  try {
+    const companyId = getCompanyId(req);
+    await templateRepository.deleteTemplate(req.params.id, companyId);
+    res.status(200).json({ success: true, message: 'Modelo removido com sucesso.' });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Erro ao remover modelo.', message: err.message });
+  }
 });
 
 export default router;

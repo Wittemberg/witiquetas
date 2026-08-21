@@ -19,15 +19,16 @@ const storeTsContent = fs.readFileSync(storeTsPath, 'utf8');
 const canvasTsxPath = path.resolve('apps/frontend/src/editor/CanvasArea.tsx');
 const canvasTsxContent = fs.readFileSync(canvasTsxPath, 'utf8');
 
-test('1. Dashboard: Controles redundantes (Abrir Editor, Auto-refresh, Atualizar) foram removidos do topo', () => {
-  const headerMatch = appTsxContent.match(/<header className="header">([\s\S]*?)<\/header>/);
-  assert.ok(headerMatch, 'Header principal deve existir em App.tsx');
-  const headerHtml = headerMatch[1];
+const globalHeaderPath = path.resolve('apps/frontend/src/shell/GlobalHeader.tsx');
+const globalHeaderContent = fs.existsSync(globalHeaderPath) ? fs.readFileSync(globalHeaderPath, 'utf8') : '';
 
-  assert.ok(!headerHtml.includes('Abrir Editor'), 'Header NÃO deve ter botão Abrir Editor');
-  assert.ok(!headerHtml.includes('Auto-refresh'), 'Header NÃO deve ter controle visual de Auto-refresh');
-  assert.ok(!headerHtml.includes('Atualizar'), 'Header NÃO deve ter botão de Atualizar');
-  assert.ok(headerHtml.includes('btn-theme-toggle'), 'Header deve preservar alternador de Tema');
+test('1. Dashboard: Controles redundantes (Abrir Editor, Auto-refresh, Atualizar) foram removidos do topo', () => {
+  const contentToTest = globalHeaderContent || appTsxContent;
+
+  assert.ok(!contentToTest.includes('Abrir Editor'), 'Header NÃO deve ter botão Abrir Editor');
+  assert.ok(!contentToTest.includes('Auto-refresh'), 'Header NÃO deve ter controle visual de Auto-refresh');
+  assert.ok(!contentToTest.includes('Atualizar'), 'Header NÃO deve ter botão de Atualizar');
+  assert.ok(contentToTest.includes('btn-theme-toggle'), 'Header deve preservar alternador de Tema');
 });
 
 test('2. Dashboard: Polling e background refresh continuam ativos e transparentes', () => {

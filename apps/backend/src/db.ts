@@ -20,54 +20,92 @@ if (dbUrl) {
 }
 
 /**
- * Carrega a migration SQL oficial
+ * Carrega e executa todas as migrations SQL oficiais da pasta migrations/
  */
-function getMigrationSql(): string {
-  const candidatePaths = [
-    path.resolve(__dirname, 'migrations/001_create_agents_table.sql'),
-    path.resolve(process.cwd(), 'apps/backend/src/migrations/001_create_agents_table.sql'),
-    path.resolve(process.cwd(), 'src/migrations/001_create_agents_table.sql'),
+function getMigrationsList(): Array<{ filename: string; sql: string }> {
+  const migrationsDirCandidates = [
+    path.resolve(__dirname, 'migrations'),
+    path.resolve(process.cwd(), 'apps/backend/src/migrations'),
+    path.resolve(process.cwd(), 'src/migrations'),
   ];
 
-  for (const p of candidatePaths) {
-    if (fs.existsSync(p)) {
+  for (const dirPath of migrationsDirCandidates) {
+    if (fs.existsSync(dirPath) && fs.statSync(dirPath).isDirectory()) {
       try {
-        return fs.readFileSync(p, 'utf-8');
+        const files = fs.readdirSync(dirPath).filter((f) => f.endsWith('.sql')).sort();
+        if (files.length > 0) {
+          return files.map((filename) => ({
+            filename,
+            sql: fs.readFileSync(path.join(dirPath, filename), 'utf-8'),
+          }));
+        }
       } catch {}
     }
   }
 
-  // Schema canônico idêntico à migration 001
-  return `
-    CREATE TABLE IF NOT EXISTS agents (
-      id VARCHAR(64) PRIMARY KEY,
-      company_id VARCHAR(64) NOT NULL,
-      installation_id VARCHAR(128) UNIQUE NOT NULL,
-      machine_name VARCHAR(255) NOT NULL,
-      os VARCHAR(32) NOT NULL,
-      os_version VARCHAR(64),
-      architecture VARCHAR(32) NOT NULL,
-      agent_version VARCHAR(32) NOT NULL,
-      protocol_version INTEGER NOT NULL DEFAULT 1,
-      token_hash VARCHAR(64) NOT NULL,
-      status VARCHAR(32) NOT NULL DEFAULT 'ONLINE',
-      last_seen_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-      paired_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-      created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-      updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-      revoked_at TIMESTAMP WITH TIME ZONE,
-      metadata JSONB
-    );
-
-    CREATE INDEX IF NOT EXISTS idx_agents_company_id ON agents (company_id);
-    CREATE INDEX IF NOT EXISTS idx_agents_last_seen_at ON agents (last_seen_at);
-    CREATE INDEX IF NOT EXISTS idx_agents_token_hash ON agents (token_hash);
-    CREATE INDEX IF NOT EXISTS idx_agents_installation_id ON agents (installation_id);
-  `;
+  // Schema fallback embutido se a pasta de arquivos SQL não for resolvida no bundle
+  return [
+    {
+      filename: '001_create_agents_table.sql',
+      sql: `
+        CREATE TABLE IF NOT EXISTS agents (
+          id VARCHAR(64) PRIMARY KEY,
+          company_id VARCHAR(64) NOT NULL,
+          installation_id VARCHAR(128) UNIQUE NOT NULL,
+          machine_name VARCHAR(255) NOT NULL,
+          os VARCHAR(32) NOT NULL,
+          os_version VARCHAR(64),
+          architecture VARCHAR(32) NOT NULL,
+          agent_version VARCHAR(32) NOT NULL,
+          protocol_version INTEGER NOT NULL DEFAULT 1,
+          token_hash VARCHAR(64) NOT NULL,
+          status VARCHAR(32) NOT NULL DEFAULT 'ONLINE',
+          last_seen_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+          paired_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+          created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+          updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+          revoked_at TIMESTAMP WITH TIME ZONE,
+          metadata JSONB
+        );
+        CREATE INDEX IF NOT EXISTS idx_agents_company_id ON agents (company_id);
+        CREATE INDEX IF NOT EXISTS idx_agents_last_seen_at ON agents (last_seen_at);
+        CREATE INDEX IF NOT EXISTS idx_agents_token_hash ON agents (token_hash);
+        CREATE INDEX IF NOT EXISTS idx_agents_installation_id ON agents (installation_id);
+      `,
+    },
+    {
+      filename: '002_create_label_templates_table.sql',
+      sql: `
+        CREATE TABLE IF NOT EXISTS label_templates (
+          id VARCHAR(64) PRIMARY KEY,
+          company_id VARCHAR(64) NOT NULL DEFAULT 'comp-default',
+          title VARCHAR(255) NOT NULL,
+          description TEXT,
+          niche_id VARCHAR(64),
+          niche_name VARCHAR(128) NOT NULL DEFAULT 'Geral',
+          width_mm REAL NOT NULL DEFAULT 100,
+          height_mm REAL NOT NULL DEFAULT 30,
+          dpi INTEGER NOT NULL DEFAULT 203,
+          orientation VARCHAR(32) NOT NULL DEFAULT 'landscape',
+          printer_language VARCHAR(32) NOT NULL DEFAULT 'PPLB',
+          document_schema JSONB NOT NULL,
+          version INTEGER NOT NULL DEFAULT 1,
+          created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+          updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+          deleted_at TIMESTAMP WITH TIME ZONE
+        );
+        CREATE INDEX IF NOT EXISTS idx_templates_company_id ON label_templates (company_id);
+        CREATE INDEX IF NOT EXISTS idx_templates_updated_at ON label_templates (updated_at);
+        CREATE INDEX IF NOT EXISTS idx_templates_title ON label_templates (title);
+        CREATE INDEX IF NOT EXISTS idx_templates_company_title ON label_templates (company_id, title);
+        CREATE INDEX IF NOT EXISTS idx_templates_deleted_at ON label_templates (deleted_at);
+      `,
+    },
+  ];
 }
 
 /**
- * Inicialização e migração defensiva de tabelas de infraestrutura
+ * Inicialização e migração defensiva de tabelas no PostgreSQL
  */
 export async function initDatabase(): Promise<void> {
   if (!pgPool) {
@@ -82,9 +120,11 @@ export async function initDatabase(): Promise<void> {
   try {
     const client = await pgPool.connect();
     try {
-      const migrationSql = getMigrationSql();
-      await client.query(migrationSql);
-      console.log('[Database] Tabela "agents" e índices verificados/inicializados com sucesso no PostgreSQL.');
+      const migrations = getMigrationsList();
+      for (const m of migrations) {
+        await client.query(m.sql);
+        console.log(`[Database] Migration "${m.filename}" verificada/executada com sucesso no PostgreSQL.`);
+      }
     } finally {
       client.release();
     }
@@ -97,3 +137,4 @@ export async function initDatabase(): Promise<void> {
     throw err;
   }
 }
+

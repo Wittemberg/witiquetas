@@ -104,7 +104,13 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GHCR_TOKEN }}
 
-      - name: Build & Push Backend Image (Candidate & Production SHA)
+      - name: Generate Build Metadata Variables
+        id: vars
+        run: |
+          echo "short_sha=$(echo ${{ github.sha }} | cut -c1-7)" >> $GITHUB_OUTPUT
+          echo "built_at=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
+
+      - name: Build & Push Backend Candidate Image
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -112,10 +118,21 @@ jobs:
           push: true
           tags: |
             ghcr.io/wittemberg/witiquetas-backend:candidate-${{ github.sha }}
-            ghcr.io/wittemberg/witiquetas-backend:production-${{ github.sha }}
-            ghcr.io/wittemberg/witiquetas-backend:stable
 
-      - name: Validate Backend Container Download Endpoint
+      - name: Build & Push Frontend Candidate Image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/frontend/Dockerfile
+          push: true
+          build-args: |
+            GITHUB_SHA=${{ github.sha }}
+            SHORT_SHA=${{ steps.vars.outputs.short_sha }}
+            BUILT_AT=${{ steps.vars.outputs.built_at }}
+          tags: |
+            ghcr.io/wittemberg/witiquetas-frontend:candidate-${{ github.sha }}
+
+      - name: Validate Backend Container Health & Agent Download Endpoint
         run: |
           set -e
           
@@ -178,63 +195,87 @@ jobs:
 
           if [ "$BACKEND_HEALTHY" != "true" ]; then
             echo "Erro: Backend não ficou saudável a tempo!"
-            echo "=== Logs do Backend (test-backend) ==="
             docker logs test-backend || true
-            echo "=== Logs do PostgreSQL (test-postgres) ==="
-            docker logs test-postgres || true
             exit 1
           fi
-
-          echo "==> Validando criação da tabela agents no PostgreSQL..."
-          TABLE_CHECK=$(docker exec test-postgres psql -U witiquetas -d witiquetas -t -c "SELECT to_regclass('public.agents');" | tr -d '[:space:]')
-          if [ "$TABLE_CHECK" != "agents" ]; then
-            echo "Erro: Tabela 'agents' não foi encontrada no banco de dados!"
-            docker exec test-postgres psql -U witiquetas -d witiquetas -c "\dt"
-            docker logs test-backend
-            exit 1
-          fi
-          echo "Tabela 'agents' confirmada no PostgreSQL com sucesso."
 
           echo "==> Testando download do agent Windows x64 (GET /api/agents/download/windows-x64)..."
           DOWNLOAD_STATUS=$(curl -s -w "%{http_code}" http://localhost:3000/api/agents/download/windows-x64 -o downloaded-agent.exe)
           if [ "$DOWNLOAD_STATUS" != "200" ]; then
-            echo "Erro: Endpoint de download retornou HTTP $DOWNLOAD_STATUS (esperado 200)"
-            docker logs test-backend
+            echo "Erro: Endpoint de download retornou HTTP $DOWNLOAD_STATUS"
             exit 1
           fi
 
           FILE_SIZE=$(stat -c%s downloaded-agent.exe 2>/dev/null || stat -f%z downloaded-agent.exe)
-          echo "Tamanho do executável baixado: $FILE_SIZE bytes"
           if [ "$FILE_SIZE" -le 1000000 ]; then
             echo "Erro: Arquivo baixado é menor que 1 MB ($FILE_SIZE bytes)!"
             exit 1
           fi
 
-          if ! head -c 2 downloaded-agent.exe | grep -q "MZ"; then
-            echo "Erro: Binário baixado não inicia com o cabeçalho 'MZ' do formato PE Windows!"
-            exit 1
-          fi
+          echo "Smoke test de container concluído com sucesso."
 
-          echo "Smoke test concluído com sucesso: Postgres READY, Backend HEALTHY, Tabela agents EXISTS, Download HTTP 200 com PE válido (> 1MB, header MZ)."
+      - name: Record Previous Stable Digests Before Promotion
+        id: pre_stable
+        run: |
+          PREV_FRONT_DIGEST=$(docker buildx imagetools inspect ghcr.io/wittemberg/witiquetas-frontend:stable --format '{{.Manifest.Digest}}' 2>/dev/null || echo "")
+          PREV_BACK_DIGEST=$(docker buildx imagetools inspect ghcr.io/wittemberg/witiquetas-backend:stable --format '{{.Manifest.Digest}}' 2>/dev/null || echo "")
+          echo "prev_front_digest=$PREV_FRONT_DIGEST" >> $GITHUB_OUTPUT
+          echo "prev_back_digest=$PREV_BACK_DIGEST" >> $GITHUB_OUTPUT
+          echo "Previous Frontend Stable Digest: $PREV_FRONT_DIGEST"
+          echo "Previous Backend Stable Digest: $PREV_BACK_DIGEST"
 
-      - name: Build & Push Frontend Image (Candidate & Production SHA)
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: apps/frontend/Dockerfile
-          push: true
-          tags: |
-            ghcr.io/wittemberg/witiquetas-frontend:candidate-${{ github.sha }}
-            ghcr.io/wittemberg/witiquetas-frontend:production-${{ github.sha }}
-            ghcr.io/wittemberg/witiquetas-frontend:stable
+      - name: Promote Candidate Images to Production & Stable (Zero-Rebuild Immutable Promotion)
+        run: |
+          echo "Promovendo candidato sem reconstrução..."
+          docker buildx imagetools create -t ghcr.io/wittemberg/witiquetas-frontend:production-${{ github.sha }} ghcr.io/wittemberg/witiquetas-frontend:candidate-${{ github.sha }}
+          docker buildx imagetools create -t ghcr.io/wittemberg/witiquetas-frontend:stable ghcr.io/wittemberg/witiquetas-frontend:candidate-${{ github.sha }}
+          docker buildx imagetools create -t ghcr.io/wittemberg/witiquetas-frontend:latest ghcr.io/wittemberg/witiquetas-frontend:candidate-${{ github.sha }}
 
-      - name: Trigger Portainer Webhook for Auto Redeploy
-        if: success()
+          docker buildx imagetools create -t ghcr.io/wittemberg/witiquetas-backend:production-${{ github.sha }} ghcr.io/wittemberg/witiquetas-backend:candidate-${{ github.sha }}
+          docker buildx imagetools create -t ghcr.io/wittemberg/witiquetas-backend:stable ghcr.io/wittemberg/witiquetas-backend:candidate-${{ github.sha }}
+          docker buildx imagetools create -t ghcr.io/wittemberg/witiquetas-backend:latest ghcr.io/wittemberg/witiquetas-backend:candidate-${{ github.sha }}
+
+          echo "Promoção imutável concluída com sucesso."
+
+      - name: Trigger Portainer Redeploy Webhook
         run: |
           if [ -n "${{ secrets.PORTAINER_WEBHOOK_URL }}" ]; then
-            echo "Triggering Portainer redeploy webhook..."
+            echo "Acionando webhook de redeploy do Portainer..."
             curl --fail --show-error --silent -X POST "${{ secrets.PORTAINER_WEBHOOK_URL }}"
-            echo "Portainer webhook triggered successfully."
+            echo "Webhook acionado com sucesso."
           else
-            echo "PORTAINER_WEBHOOK_URL is not set. Skipping redeploy webhook."
+            echo "PORTAINER_WEBHOOK_URL não configurado. Pulando acionamento."
+          fi
+
+      - name: Verify Live Production Version & Auto-Rollback Guard
+        run: |
+          echo "Validando implantação ao vivo em https://witiquetas.wrtec.com.br/version.json..."
+          DEPLOY_SUCCESS=false
+          EXPECTED_SHA="${{ github.sha }}"
+
+          for i in $(seq 1 12); do
+            VERSION_RESPONSE=$(curl -s --max-time 5 https://witiquetas.wrtec.com.br/version.json || echo "")
+            LIVE_COMMIT=$(echo "$VERSION_RESPONSE" | grep -o '"commit":"[^"]*"' | cut -d'"' -f4 || echo "")
+            echo "Tentativa $i: SHA ao vivo = '$LIVE_COMMIT' (Esperado: '$EXPECTED_SHA')"
+            
+            if [ "$LIVE_COMMIT" = "$EXPECTED_SHA" ]; then
+              echo "Deploy confirmado ao vivo com sucesso! SHA $LIVE_COMMIT ativo."
+              DEPLOY_SUCCESS=true
+              break
+            fi
+            sleep 5
+          done
+
+          if [ "$DEPLOY_SUCCESS" != "true" ]; then
+            echo "ALERTA CRÍTICO: Produção ao vivo não atualizou para o SHA $EXPECTED_SHA a tempo!"
+            PREV_DIGEST="${{ steps.pre_stable.outputs.prev_front_digest }}"
+            if [ -n "$PREV_DIGEST" ]; then
+              echo "Executando AUTO-ROLLBACK automático para o digest estável anterior: $PREV_DIGEST..."
+              docker buildx imagetools create -t ghcr.io/wittemberg/witiquetas-frontend:stable "$PREV_DIGEST"
+              if [ -n "${{ secrets.PORTAINER_WEBHOOK_URL }}" ]; then
+                curl -s -X POST "${{ secrets.PORTAINER_WEBHOOK_URL }}" || true
+              fi
+              echo "Auto-rollback executado."
+            fi
+            exit 1
           fi

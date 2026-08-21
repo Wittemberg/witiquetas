@@ -2,7 +2,7 @@ version: "3.8"
 
 services:
   frontend:
-    image: ghcr.io/wittemberg/witiquetas-frontend:latest
+    image: ghcr.io/wittemberg/witiquetas-frontend:stable
     networks:
       - interna
     deploy:
@@ -20,7 +20,7 @@ services:
       retries: 4
 
   backend:
-    image: ghcr.io/wittemberg/witiquetas-backend:latest
+    image: ghcr.io/wittemberg/witiquetas-backend:stable
     networks:
       - interna
     environment:

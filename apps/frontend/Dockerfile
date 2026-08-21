@@ -1,6 +1,10 @@
 # Estágio 1: Build da aplicação React/Vite
 FROM node:22-alpine AS builder
 
+ARG GITHUB_SHA=unknown
+ARG SHORT_SHA=unknown
+ARG BUILT_AT=unknown
+
 WORKDIR /app
 
 # Copia o monorepo (package.json raiz, pacotes e frontend)
@@ -32,6 +36,9 @@ RUN npm run build
 
 WORKDIR /app/apps/frontend
 RUN npm run build
+
+# Gerar version.json imutável durante o build
+RUN echo "{\"commit\":\"${GITHUB_SHA}\",\"shortCommit\":\"${SHORT_SHA}\",\"builtAt\":\"${BUILT_AT}\",\"imageTag\":\"production-${GITHUB_SHA}\"}" > /app/apps/frontend/dist/version.json
 
 # Estágio 2: Nginx para servir arquivos estáticos
 FROM nginx:alpine AS runner

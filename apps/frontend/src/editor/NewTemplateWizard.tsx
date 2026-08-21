@@ -225,7 +225,7 @@ export default function NewTemplateWizard({ isOpen, onClose, onSuccess }: Wizard
                   onClick={() => setStep('niche')}
                 >
                   <ArrowLeft size={13} />
-                  <span>← Trocar Nicho</span>
+                  <span>Trocar Nicho</span>
                 </button>
               </div>
 
@@ -253,11 +253,17 @@ export default function NewTemplateWizard({ isOpen, onClose, onSuccess }: Wizard
                           className={`size-chip ${isSelected ? 'selected' : ''}`}
                           onClick={() => setSelectedSize(size)}
                         >
-                          {size.featured && <span className="size-featured-tag">★ Mais Usado</span>}
-                          <div className="size-chip-dimension">{size.label}</div>
-                          <div className="size-chip-meta">
-                            <span>{size.category}</span>
-                            <span>{size.widthMm} x {size.heightMm} mm</span>
+                          {size.featured && <span className="size-featured-tag">MAIS USADO</span>}
+                          {isSelected && (
+                            <div className="size-chip-check">
+                              <Check size={12} />
+                            </div>
+                          )}
+                          <div className="size-chip-content">
+                            <div className="size-chip-dimension">{size.label}</div>
+                            <div className="size-chip-meta">
+                              {size.widthMm} × {size.heightMm} mm
+                            </div>
                           </div>
                         </div>
                       );
@@ -282,15 +288,15 @@ export default function NewTemplateWizard({ isOpen, onClose, onSuccess }: Wizard
                       <div
                         className="preview-label-box"
                         style={{
-                          width: `${Math.min(220, Math.max(70, (selectedSize.widthMm / 104) * 200))}px`,
-                          height: `${Math.min(120, Math.max(40, (selectedSize.heightMm / 104) * 200))}px`,
+                          width: `${Math.min(220, Math.max(80, (selectedSize.widthMm / 104) * 200))}px`,
+                          height: `${Math.min(120, Math.max(45, (selectedSize.heightMm / 104) * 200))}px`,
                         }}
                       >
-                        <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#0f172a' }}>
+                        <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#0f172a', whiteSpace: 'nowrap' }}>
                           {selectedSize.label}
                         </span>
-                        <span style={{ fontSize: '0.65rem', color: '#64748b' }}>
-                          {formatDimensionBR(selectedSize.widthMm)} × {formatDimensionBR(selectedSize.heightMm)}
+                        <span style={{ fontSize: '0.7rem', fontWeight: 600, color: '#64748b', whiteSpace: 'nowrap', marginTop: '0.2rem' }}>
+                          {formatDimensionBR(selectedSize.widthMm)} × {formatDimensionBR(selectedSize.heightMm)} mm
                         </span>
                       </div>
                     </div>
@@ -302,7 +308,7 @@ export default function NewTemplateWizard({ isOpen, onClose, onSuccess }: Wizard
 
                       <span className="technical-spec-label">Dimensões Reais:</span>
                       <span className="technical-spec-value">
-                        {formatDimensionBR(selectedSize.widthMm)} de largura × {formatDimensionBR(selectedSize.heightMm)} de altura
+                        {formatDimensionBR(selectedSize.widthMm)} × {formatDimensionBR(selectedSize.heightMm)} mm
                       </span>
 
                       <span className="technical-spec-label">Orientação:</span>

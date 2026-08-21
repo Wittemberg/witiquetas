@@ -582,61 +582,118 @@ body {
   color: var(--text-primary);
 }
 
-/* Chips de Tamanho com Badge Seguro */
+/* Chips de Tamanho Responsivos & Uniformes */
 .size-chips-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
-  gap: 0.5rem;
-  max-height: 280px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.65rem;
+  max-height: 320px;
   overflow-y: auto;
   padding-right: 0.25rem;
 }
 
+@media (max-width: 1100px) {
+  .size-chips-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .size-chips-grid {
+    grid-template-columns: repeat(1, minmax(0, 1fr));
+  }
+}
+
 .size-chip {
-  padding: 0.65rem;
-  border-radius: 8px;
+  padding: 0.85rem 0.5rem;
+  min-height: 88px;
+  height: 100%;
+  border-radius: 10px;
   border: 1px solid var(--border-color);
   background: var(--bg-card);
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all 0.2s ease;
   position: relative;
   display: flex;
   flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  box-sizing: border-box;
+  min-width: 0;
+  width: 100%;
 }
 
 .size-chip:hover {
   background: var(--bg-card-hover);
-  border-color: var(--border-color-glow);
+  border-color: rgba(59, 130, 246, 0.4);
 }
 
 .size-chip.selected {
-  background: var(--bg-card-active);
-  border-color: var(--accent-blue);
+  background: rgba(59, 130, 246, 0.08);
+  border: 1.5px solid var(--accent-blue);
+  box-shadow: 0 0 0 1px var(--accent-blue);
 }
 
-/* Badge "Mais Usado" Seguro sem Clipping */
+/* Badge "MAIS USADO" Discreto no Canto Superior Esquerdo */
 .size-featured-tag {
-  display: inline-flex;
-  align-items: center;
-  background: linear-gradient(135deg, #10b981, #059669);
-  color: #ffffff;
-  font-size: 0.58rem;
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  background: rgba(16, 185, 129, 0.15);
+  color: var(--status-success, #10b981);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  font-size: 0.55rem;
   font-weight: 800;
   padding: 0.1rem 0.35rem;
   border-radius: 4px;
   text-transform: uppercase;
-  margin-bottom: 0.25rem;
-  align-self: flex-start;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  pointer-events: none;
+}
+
+/* Indicador Check no Canto Superior Direito */
+.size-chip-check {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--accent-blue);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.size-chip-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-width: 0;
 }
 
 .size-chip-dimension {
   font-size: 0.85rem;
   font-weight: 700;
   color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.size-chip.selected .size-chip-dimension {
+  font-weight: 800;
+  color: var(--accent-blue);
 }
 
 .size-chip-meta {
-  font-size: 0.68rem;
   color: var(--text-muted);
   margin-top: 0.2rem;
   display: flex;

@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { type LabelDocument } from '@witiquetas/label-schema';
-import { templateRepository } from '../apps/backend/src/repositories/templateRepository.ts';
+import { templateRepository } from '../apps/backend/src/repositories/templateRepository';
 
 test('GATE BLOQUEANTE: Round-Trip Semântico de LabelDocument (PostgreSQL / Repository)', async () => {
   const companyId = 'comp-roundtrip-test';
@@ -9,7 +9,6 @@ test('GATE BLOQUEANTE: Round-Trip Semântico de LabelDocument (PostgreSQL / Repo
   const originalDocument: LabelDocument = {
     schemaVersion: 1,
     title: 'Etiqueta Teste Roundtrip Completa',
-    printerLanguage: 'ZPL',
     dimensions: {
       widthMm: 100,
       heightMm: 50,
@@ -96,11 +95,12 @@ test('GATE BLOQUEANTE: Round-Trip Semântico de LabelDocument (PostgreSQL / Repo
     ],
   };
 
-  // 1. Criar Modelo no Repository
+  // 1. Criar Modelo no Repository com printerLanguage = ZPL
   const created = await templateRepository.createTemplate(
     {
       title: originalDocument.title,
       name: originalDocument.title,
+      printerLanguage: 'ZPL',
       document: originalDocument,
     },
     companyId
@@ -108,17 +108,19 @@ test('GATE BLOQUEANTE: Round-Trip Semântico de LabelDocument (PostgreSQL / Repo
 
   assert.ok(created.id, 'Modelo deve possuir ID único gerado.');
   assert.equal(created.companyId, companyId, 'Company ID deve corresponder ao tenant.');
+  assert.equal(created.printerLanguage, 'ZPL', 'printerLanguage no DTO retornado deve ser ZPL.');
 
   // 2. Recuperar Modelo Completo por ID
   const retrieved = await templateRepository.getTemplateById(created.id, companyId);
   assert.ok(retrieved, 'Modelo deve ser recuperável por ID.');
+  assert.equal(retrieved!.printerLanguage, 'ZPL', 'printerLanguage no TemplateDTO recuperado deve ser ZPL.');
 
   const doc = retrieved!.document;
 
-  // 3. Validação Semântica Estrita de Campos e Atributos
+  // 3. Validação Semântica Estrita de Campos e Atributos no LabelDocument (que não possui printerLanguage)
   assert.equal(doc.schemaVersion, originalDocument.schemaVersion, 'schemaVersion deve ser preservado.');
   assert.equal(doc.title, originalDocument.title, 'Título deve ser preservado.');
-  assert.equal(doc.printerLanguage, originalDocument.printerLanguage, 'printerLanguage deve ser preservado.');
+  assert.equal((doc as any).printerLanguage, undefined, 'LabelDocument NÃO deve possuir a propriedade printerLanguage.');
 
   // Dimensões & DPI
   assert.equal(doc.dimensions.widthMm, originalDocument.dimensions.widthMm, 'widthMm deve ser idêntico.');
@@ -148,3 +150,46 @@ test('GATE BLOQUEANTE: Round-Trip Semântico de LabelDocument (PostgreSQL / Repo
     }
   }
 });
+
+test('GATE BLOQUEANTE: Preservação de Linguagem de Impressão (PPLA, PPLB, ZPL) em Updates de Documento', async () => {
+  const companyId = 'comp-lang-test';
+  const doc: LabelDocument = {
+    schemaVersion: 1,
+    title: 'Modelo PPLA Teste',
+    dimensions: { widthMm: 80, heightMm: 40, dpi: 203, orientation: 'portrait' },
+    elements: [],
+  };
+
+  // 1. Criar com PPLA
+  const createdPpla = await templateRepository.createTemplate(
+    { title: 'Modelo PPLA', document: doc, printerLanguage: 'PPLA' },
+    companyId
+  );
+  assert.equal(createdPpla.printerLanguage, 'PPLA');
+
+  // 2. Atualizar apenas o documento e o título (sem enviar printerLanguage no UpdateDTO)
+  const updatedDoc: LabelDocument = { ...doc, title: 'Modelo PPLA Atualizado' };
+  const updated = await templateRepository.updateTemplate(
+    createdPpla.id,
+    { title: 'Modelo PPLA Atualizado', document: updatedDoc },
+    companyId
+  );
+
+  // 3. Garantir que NÃO foi forçado para PPLB (permanece PPLA)
+  assert.equal(updated.printerLanguage, 'PPLA', 'Update sem printerLanguage no DTO deve PRESERVAR a linguagem existente (PPLA).');
+
+  // 4. Criar com PPLB e atualizar para ZPL explicitamente
+  const createdPplb = await templateRepository.createTemplate(
+    { title: 'Modelo PPLB', document: doc, printerLanguage: 'PPLB' },
+    companyId
+  );
+  assert.equal(createdPplb.printerLanguage, 'PPLB');
+
+  const updatedZpl = await templateRepository.updateTemplate(
+    createdPplb.id,
+    { printerLanguage: 'ZPL' },
+    companyId
+  );
+  assert.equal(updatedZpl.printerLanguage, 'ZPL', 'Update com printerLanguage explícito no DTO deve alterar para ZPL.');
+});
+

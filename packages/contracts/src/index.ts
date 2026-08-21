@@ -41,6 +41,7 @@ export interface CreateTemplateDTO {
   nicheId?: string;
   nicheName?: string;
   scope?: 'PLATFORM' | 'CUSTOMER' | 'COMPANY';
+  printerLanguage?: string;
   document: LabelDocument;
 }
 
@@ -48,6 +49,7 @@ export interface UpdateTemplateDTO {
   name?: string;
   title?: string;
   description?: string;
+  printerLanguage?: string;
   document?: LabelDocument;
   expectedVersion?: number; // Para Optimistic Locking (HTTP 409 Conflict se versão desatualizada)
 }

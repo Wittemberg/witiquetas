@@ -1,4 +1,4 @@
-import { pgPool, isProduction } from '../db.ts';
+import { pgPool, isProduction } from '../db';
 import type { LabelDocument } from '@witiquetas/label-schema';
 import type {
   TemplateDTO,
@@ -249,7 +249,7 @@ export const templateRepository = {
     const heightMm = doc.dimensions?.heightMm || 30;
     const dpi = doc.dimensions?.dpi || 203;
     const orientation = doc.dimensions?.orientation || 'landscape';
-    const printerLanguage = doc.printerLanguage || 'PPLB';
+    const printerLanguage = dto.printerLanguage || 'PPLB';
     const nicheName = dto.nicheName || 'Geral';
     const now = new Date().toISOString();
 
@@ -339,7 +339,7 @@ export const templateRepository = {
     const heightMm = updatedDoc.dimensions?.heightMm || existing.heightMm;
     const dpi = updatedDoc.dimensions?.dpi || existing.dpi;
     const orientation = updatedDoc.dimensions?.orientation || existing.orientation;
-    const printerLanguage = updatedDoc.printerLanguage || existing.printerLanguage;
+    const printerLanguage = dto.printerLanguage || existing.printerLanguage;
 
     if (!pgPool) {
       if (isProduction) {
@@ -426,6 +426,7 @@ export const templateRepository = {
         nicheId: existing.nicheId,
         nicheName: existing.nicheName,
         description: existing.description,
+        printerLanguage: existing.printerLanguage,
         document: clonedDoc,
       },
       companyId

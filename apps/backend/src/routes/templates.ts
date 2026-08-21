@@ -3,7 +3,7 @@ import { LabelDocumentSchema } from '@witiquetas/label-schema';
 import {
   templateRepository,
   MismatchedVersionError,
-} from '../repositories/templateRepository.ts';
+} from '../repositories/templateRepository';
 import type { CreateTemplateDTO, UpdateTemplateDTO, RenameTemplateDTO } from '@witiquetas/contracts';
 
 const router = Router();

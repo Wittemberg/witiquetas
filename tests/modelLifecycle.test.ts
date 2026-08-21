@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   templateRepository,
   MismatchedVersionError,
-} from '../apps/backend/src/repositories/templateRepository.ts';
+} from '../apps/backend/src/repositories/templateRepository';
 import type { LabelDocument } from '@witiquetas/label-schema';
 
 const sampleDoc: LabelDocument = {

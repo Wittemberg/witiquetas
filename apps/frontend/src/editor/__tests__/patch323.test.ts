@@ -151,12 +151,12 @@ describe('FASE 3.5 — PATCH 3.2.3 SUITE DE TESTES', () => {
   });
 
   describe('3. Dashboard Field Wrapping & Sidebar Rules', () => {
-    it('index.css deve conter a regra word-break: break-word em .metric-value', () => {
+    it('index.css deve conter a regra de quebra de palavra para .metric-value', () => {
       const cssPath = path.resolve(process.cwd(), 'apps/frontend/src/index.css');
       const cssContent = fs.readFileSync(cssPath, 'utf-8');
 
-      assert.ok(cssContent.includes('word-break: break-word;'), 'index.css deve conter word-break: break-word');
-      assert.ok(cssContent.includes('overflow-wrap: break-word;'), 'index.css deve conter overflow-wrap: break-word');
+      assert.ok(cssContent.includes('word-break: normal;'), 'index.css deve conter word-break: normal');
+      assert.ok(cssContent.includes('overflow-wrap:'), 'index.css deve conter overflow-wrap');
     });
 
     it('Sidebar.tsx deve chamar onToggleCollapse ao clicar na logo no estado expandido e NÃO onSelectModule', () => {

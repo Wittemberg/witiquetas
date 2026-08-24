@@ -1095,12 +1095,12 @@ export default function CanvasArea() {
         });
       } else {
         const safeMargin = SAFE_AREA_MARGIN_MM;
-        const halfDotMm = (0.5 * 25.4) / (dpi || 203);
+        const safeEpsilon = 0.005; // Tolerância estrita de ponto flutuante
         const isBeyondSafe =
-          bbox.minX < safeMargin - halfDotMm ||
-          bbox.minY < safeMargin - halfDotMm ||
-          bbox.maxX > widthMm - safeMargin + halfDotMm ||
-          bbox.maxY > heightMm - safeMargin + halfDotMm;
+          bbox.minX < safeMargin - safeEpsilon ||
+          bbox.minY < safeMargin - safeEpsilon ||
+          bbox.maxX > widthMm - safeMargin + safeEpsilon ||
+          bbox.maxY > heightMm - safeMargin + safeEpsilon;
         if (isBeyondSafe) {
           issues.push({
             id: el.id,

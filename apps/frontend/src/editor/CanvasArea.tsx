@@ -12,7 +12,7 @@ import {
 import { LabelElement, QrCodeElement, TextElement, BarcodeElement, PriceElement } from '@witiquetas/label-schema';
 import { generateQRCodeDataUrl } from './qrCodeGenerator';
 import { generateBarcodeModules } from './barcodeEngine';
-import { getElementBoundingBox, constrainGroupMovement, applyMagneticRotationSnap, normalizeElementGeometry, SAFE_AREA_MARGIN_MM, computeTextLines } from './bounds';
+import { getElementBoundingBox, constrainGroupMovement, applyMagneticRotationSnap, normalizeElementGeometry, normalizeRotation, SAFE_AREA_MARGIN_MM, computeTextLines } from './bounds';
 import {
   Copy,
   Scissors,

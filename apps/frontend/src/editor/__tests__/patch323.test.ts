@@ -177,5 +177,13 @@ describe('FASE 3.5 — PATCH 3.2.3 SUITE DE TESTES', () => {
       assert.ok(brandIdx > 0 && modelsIdx > 0, 'Marca Witiquetas e botão Modelos devem existir no layout');
       assert.ok(brandIdx < modelsIdx, 'Marca Witiquetas deve preceder o botão Modelos');
     });
+
+    it('CanvasArea.tsx deve importar normalizeRotation de ./bounds (Hotfix P0 3.2.3.1)', () => {
+      const canvasAreaPath = path.resolve(process.cwd(), 'apps/frontend/src/editor/CanvasArea.tsx');
+      const canvasContent = fs.readFileSync(canvasAreaPath, 'utf-8');
+
+      const importMatch = canvasContent.match(/import\s*\{[^}]*normalizeRotation[^}]*\}\s*from\s*['"]\.\/bounds['"]/);
+      assert.ok(importMatch, 'CanvasArea.tsx deve obrigatoriamente importar normalizeRotation de ./bounds');
+    });
   });
 });

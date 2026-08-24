@@ -308,11 +308,12 @@ export default function NewTemplateWizard({ isOpen, onClose, onSuccess }: Wizard
                           width: `${Math.min(220, Math.max(80, (selectedSize.widthMm / 104) * 200))}px`,
                           height: `${Math.min(120, Math.max(45, (selectedSize.heightMm / 104) * 200))}px`,
                         }}
-                      >
-                        <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#0f172a', whiteSpace: 'nowrap' }}>
-                          {formatDimensionPair(selectedSize.widthMm, selectedSize.heightMm)}
-                        </span>
-                      </div>
+                      />
+                    </div>
+                    <div style={{ textAlign: 'center', margin: '-0.3rem 0 0.5rem 0' }}>
+                      <span style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                        {formatDimensionPair(selectedSize.widthMm, selectedSize.heightMm)}
+                      </span>
                     </div>
 
                     {/* Título do Formato (Exibe o Nicho sem repetir a dimensão intermediária) */}

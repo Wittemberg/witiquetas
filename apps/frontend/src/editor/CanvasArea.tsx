@@ -403,7 +403,13 @@ export default function CanvasArea() {
 
       // Trava proporção 1:1 apenas para QR Code e Imagem
       const shouldKeepRatio = primarySelected?.type === 'qrcode' || primarySelected?.type === 'image';
+      const isLine = primarySelected?.type === 'line';
+      const enabledAnchors = isLine
+        ? ['middle-left', 'middle-right']
+        : ['top-left', 'top-center', 'top-right', 'middle-right', 'middle-left', 'bottom-left', 'bottom-center', 'bottom-right'];
+
       transformerRef.current.keepRatio(shouldKeepRatio);
+      transformerRef.current.enabledAnchors(enabledAnchors);
       transformerRef.current.nodes(nodes);
       transformerRef.current.getLayer()?.batchDraw();
     } else {
@@ -557,6 +563,15 @@ export default function CanvasArea() {
       let newWPx = Math.max(10, node.width() * scaleX);
       let newHPx = Math.max(8, node.height() * scaleY);
 
+      if (elem.type === 'line') {
+        updateElement(elem.id, {
+          x: pxToMm(node.x(), dpi),
+          y: pxToMm(node.y(), dpi),
+          width: pxToMm(newWPx, dpi),
+        });
+        return;
+      }
+
       // QR Code sempre quadrado 1:1
       if (elem.type === 'qrcode') {
         const side = Math.max(newWPx, newHPx);
@@ -602,6 +617,62 @@ export default function CanvasArea() {
             if (maxAllowedSize < calculatedFontSize) {
               calculatedFontSize = Math.max(6 * (dpi / 72), maxAllowedSize);
             }
+          }
+
+          const hasSecondLineScale = textElem.secondLineScale !== undefined && textElem.secondLineScale > 0 && !textElem.singleLine;
+          const textLines = textContent.split('\n');
+
+          if (hasSecondLineScale && textLines.length > 1) {
+            let currentY = 0;
+            const lineNodes = textLines.map((lineText, idx) => {
+              const lineScale = idx === 1 ? textElem.secondLineScale! : 1.0;
+              const lineFontSize = calculatedFontSize * lineScale;
+              const lineY = currentY;
+              currentY += lineFontSize * 1.15;
+
+              return (
+                <Text
+                  key={idx}
+                  width={wPx}
+                  text={lineText}
+                  fontFamily={textElem.fontFamily || 'Roboto'}
+                  fontSize={lineFontSize}
+                  fontStyle={fontStyleStr}
+                  textDecoration={textElem.textDecoration || 'none'}
+                  align={textElem.alignment || 'left'}
+                  fill={textElem.reversePrint ? '#ffffff' : textElem.color || '#000000'}
+                  y={lineY}
+                />
+              );
+            });
+
+            return (
+              <Group
+                key={textElem.id}
+                id={textElem.id}
+                x={xPx}
+                y={yPx}
+                width={wPx}
+                height={hPx}
+                draggable={!textElem.locked}
+                onClick={handleClick}
+                onTap={handleClick}
+                onDblClick={() => setSelectedElementId(textElem.id)}
+                onContextMenu={handleContextMenu}
+                onDragEnd={handleDragEnd}
+                onTransformEnd={handleTransformEnd}
+              >
+                {textElem.reversePrint && (
+                  <Rect
+                    width={wPx}
+                    height={hPx}
+                    fill={textElem.color || '#000000'}
+                    cornerRadius={1}
+                  />
+                )}
+                {lineNodes}
+              </Group>
+            );
           }
 
           if (textElem.reversePrint) {
@@ -1002,7 +1073,12 @@ export default function CanvasArea() {
       } else {
         const bbox = getElementBoundingBox(el);
         const safeMargin = SAFE_AREA_MARGIN_MM;
-        const isBeyondSafe = bbox.minX < safeMargin - 0.05 || bbox.minY < safeMargin - 0.05 || bbox.maxX > widthMm - safeMargin + 0.05 || bbox.maxY > heightMm - safeMargin + 0.05;
+        const halfDotMm = (0.5 * 25.4) / (dpi || 203);
+        const isBeyondSafe =
+          bbox.minX < safeMargin - halfDotMm ||
+          bbox.minY < safeMargin - halfDotMm ||
+          bbox.maxX > widthMm - safeMargin + halfDotMm ||
+          bbox.maxY > heightMm - safeMargin + halfDotMm;
         if (isBeyondSafe) {
           issues.push({
             id: el.id,

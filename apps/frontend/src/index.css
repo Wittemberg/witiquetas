@@ -927,7 +927,7 @@ body {
 
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
   gap: 1.25rem;
   margin-bottom: 1.5rem;
   min-width: 0;
@@ -940,7 +940,7 @@ body {
   min-width: 0;
 }
 
-@container (max-width: 450px) {
+@container (max-width: 430px) {
   .metrics {
     grid-template-columns: 1fr;
   }

@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { getElementBoundingBox, SAFE_AREA_MARGIN_MM } from '../bounds.js';
+import { getElementBoundingBox, getPriceVisualGeometry, SAFE_AREA_MARGIN_MM } from '../bounds.js';
 import type { PriceElement } from '@witiquetas/label-schema';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -75,8 +75,8 @@ describe('FASE 3.5 — PATCH 3.2.5 SUITE DE TESTES (SAFE AREA PRECISION & DASHBO
       const priceElem: PriceElement = {
         id: 'p1',
         type: 'price',
-        x: 10,
-        y: 10,
+        x: 0,
+        y: 0,
         width: 35,
         height: 15,
         sampleValue: '9.99',
@@ -85,6 +85,11 @@ describe('FASE 3.5 — PATCH 3.2.5 SUITE DE TESTES (SAFE AREA PRECISION & DASHBO
         locked: false,
         visible: true,
       };
+
+      // Cálculo programático da posição centralizada na mídia a partir da geometria visual real
+      const geom = getPriceVisualGeometry(priceElem, 203);
+      priceElem.x = (widthMm - geom.width) / 2;
+      priceElem.y = (heightMm - geom.height) / 2;
 
       const bbox = getElementBoundingBox(priceElem);
 
@@ -109,11 +114,11 @@ describe('FASE 3.5 — PATCH 3.2.5 SUITE DE TESTES (SAFE AREA PRECISION & DASHBO
       assert.ok(cssContent.includes('container-type: inline-size;'), 'index.css deve conter container-type: inline-size');
     });
 
-    it('index.css deve possuir container query de no mínimo 450px para .metrics', () => {
+    it('index.css deve possuir container query de 430px para .metrics', () => {
       const cssPath = path.resolve(process.cwd(), 'apps/frontend/src/index.css');
       const cssContent = fs.readFileSync(cssPath, 'utf-8');
 
-      assert.ok(cssContent.includes('@container (max-width: 450px)'), 'index.css deve conter container query de max-width: 450px');
+      assert.ok(cssContent.includes('@container (max-width: 430px)'), 'index.css deve conter container query de max-width: 430px');
     });
 
     it('index.css deve definir word-break: normal e overflow-wrap: anywhere em .metric-value', () => {

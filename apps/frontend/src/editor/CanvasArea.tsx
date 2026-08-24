@@ -12,7 +12,7 @@ import {
 import { LabelElement, QrCodeElement, TextElement, BarcodeElement, PriceElement } from '@witiquetas/label-schema';
 import { generateQRCodeDataUrl } from './qrCodeGenerator';
 import { generateBarcodeModules } from './barcodeEngine';
-import { getElementBoundingBox, constrainGroupMovement, applyMagneticRotationSnap, normalizeElementGeometry, normalizeRotation, SAFE_AREA_MARGIN_MM, computeTextLines } from './bounds';
+import { getElementBoundingBox, getPriceRenderMetrics, constrainGroupMovement, applyMagneticRotationSnap, normalizeElementGeometry, normalizeRotation, SAFE_AREA_MARGIN_MM, computeTextLines } from './bounds';
 import {
   Copy,
   Scissors,
@@ -765,30 +765,7 @@ export default function CanvasArea() {
           ? MOCK_PRODUCT_DATA[priceElem.field]
           : priceElem.sampleValue || '9.99';
 
-        // Parsing estrito do valor (sem concatenar prefixo nem quebrar formato)
-        const cleanNumber = String(rawValueStr || '9.99').replace(',', '.').trim();
-        const parts = cleanNumber.split('.');
-        const integerPart = parts[0] || '0';
-        const fractionPart = (parts[1] || '00').padEnd(2, '0').slice(0, 2);
-
-        const prefix = priceElem.prefix !== undefined && priceElem.prefix !== null ? String(priceElem.prefix).trim() : 'R$';
-        const isReduced = priceElem.reducedCents !== false; // Padrão Varejo Ativo
-
-        // Auto-fit proporcional da caixa sem quebra de linhas
-        const approxChars = (prefix ? prefix.length * 0.55 : 0) + integerPart.length * 0.6 + (isReduced ? 1.4 : 2.2);
-        const maxFontByWidth = (wPx / Math.max(1, approxChars)) * 1.35;
-        const maxFontByHeight = hPx * 0.88;
-        const integerSize = Math.max(9, Math.min(maxFontByHeight, maxFontByWidth));
-
-        const centsSize = isReduced ? integerSize * 0.60 : integerSize;
-        const prefixSize = isReduced ? integerSize * 0.48 : integerSize * 0.65;
-
-        const prefixWidth = prefix ? prefix.length * prefixSize * 0.65 + 4 : 0;
-        const integerWidth = integerPart.length * integerSize * 0.58;
-
-        const baseY = Math.max(0, (hPx - integerSize) / 2);
-        const centsY = isReduced ? baseY : baseY;
-        const prefixY = isReduced ? baseY + (integerSize - prefixSize) * 0.5 : baseY + (integerSize - prefixSize) * 0.4;
+        const metrics = getPriceRenderMetrics(priceElem, dpi, rawValueStr);
 
         return (
           <Group
@@ -807,40 +784,40 @@ export default function CanvasArea() {
             onTransformEnd={handleTransformEnd}
           >
             {/* Prefixo de Moeda (Ex: R$) */}
-            {prefix && (
+            {metrics.prefix && (
               <Text
-                text={prefix}
+                text={metrics.prefix}
                 fontFamily={priceElem.fontFamily || 'Roboto'}
-                fontSize={prefixSize}
+                fontSize={metrics.prefixSizePx}
                 fontStyle="bold"
                 fill={priceElem.color || '#dc2626'}
                 x={0}
-                y={prefixY}
+                y={metrics.prefixYPx}
                 wrap="none"
               />
             )}
 
             {/* Número Inteiro */}
             <Text
-              text={integerPart}
+              text={metrics.integerPart}
               fontFamily={priceElem.fontFamily || 'Roboto'}
-              fontSize={integerSize}
+              fontSize={metrics.integerSizePx}
               fontStyle="bold"
               fill={priceElem.color || '#dc2626'}
-              x={prefixWidth}
-              y={baseY}
+              x={metrics.prefixWidthPx}
+              y={metrics.baseYPx}
               wrap="none"
             />
 
             {/* Centavos Reduzidos (Padrão Varejo Superior) ou Centavos Normais */}
             <Text
-              text={`,${fractionPart}`}
+              text={`,${metrics.fractionPart}`}
               fontFamily={priceElem.fontFamily || 'Roboto'}
-              fontSize={centsSize}
+              fontSize={metrics.centsSizePx}
               fontStyle="bold"
               fill={priceElem.color || '#dc2626'}
-              x={prefixWidth + integerWidth + 1}
-              y={centsY}
+              x={metrics.prefixWidthPx + metrics.integerWidthPx + 1}
+              y={metrics.centsYPx}
               wrap="none"
             />
           </Group>

@@ -129,47 +129,68 @@ export function applyMagneticRotationSnap(rawAngle: number): {
   return { angle: normalized, isSnapped: false };
 }
 
+export interface PriceRenderMetrics {
+  integerPart: string;
+  fractionPart: string;
+  prefix: string;
+  isReduced: boolean;
+  integerSizePx: number;
+  centsSizePx: number;
+  prefixSizePx: number;
+  prefixWidthPx: number;
+  integerWidthPx: number;
+  centsWidthPx: number;
+  totalVisualWidthPx: number;
+  visualWidthMm: number;
+  visualHeightMm: number;
+  baseYPx: number;
+  centsYPx: number;
+  prefixYPx: number;
+  offsetXMm: number;
+  offsetYMm: number;
+}
+
 /**
- * Calcula a geometria visual renderizada real do PriceElement (prefixo + inteiro + centavos)
- * sem alterar a largura/altura persistida no documento/schema.
+ * Fonte única de verdade matemática para renderização e geometria do PriceElement
  */
-export function getPriceVisualGeometry(element: LabelElement, dpi: number = 203): { x: number; y: number; width: number; height: number } {
+export function getPriceRenderMetrics(element: LabelElement, dpi = 203, previewValue?: string): PriceRenderMetrics {
   const w = Math.max(0.1, Number(element.width) || 1);
   const h = Math.max(0.1, Number(element.height) || 1);
-  const x = Number(element.x) || 0;
-  const y = Number(element.y) || 0;
-
-  if (element.type !== 'price') {
-    return { x, y, width: w, height: h };
-  }
-
   const wPx = (w * dpi) / 25.4;
   const hPx = (h * dpi) / 25.4;
-  const rawValueStr = (element as any).sampleValue || '9.99';
+
+  const rawValueStr = previewValue !== undefined ? previewValue : ((element as any).sampleValue || '9.99');
   const cleanNumber = String(rawValueStr || '9.99').replace(',', '.').trim();
   const parts = cleanNumber.split('.');
   const integerPart = parts[0] || '0';
-  const centsPart = (parts[1] || '00').slice(0, 2).padEnd(2, '0');
+  const fractionPart = (parts[1] || '00').padEnd(2, '0').slice(0, 2);
+
   const prefix = (element as any).prefix !== undefined && (element as any).prefix !== null ? String((element as any).prefix).trim() : 'R$';
   const isReduced = (element as any).reducedCents !== false;
 
+  // Auto-fit proporcional da caixa sem quebra de linhas (Métrica Oficial de Renderização)
   const approxChars = (prefix ? prefix.length * 0.55 : 0) + integerPart.length * 0.6 + (isReduced ? 1.4 : 2.2);
   const maxFontByWidth = (wPx / Math.max(1, approxChars)) * 1.35;
   const maxFontByHeight = hPx * 0.88;
   const integerSizePx = Math.max(9, Math.min(maxFontByHeight, maxFontByWidth));
 
-  const prefixSizePx = integerSizePx * 0.42;
-  const centsSizePx = isReduced ? integerSizePx * 0.50 : integerSizePx * 0.88;
+  const centsSizePx = isReduced ? integerSizePx * 0.60 : integerSizePx;
+  const prefixSizePx = isReduced ? integerSizePx * 0.48 : integerSizePx * 0.65;
 
-  const prefixWidthPx = prefix ? prefix.length * (prefixSizePx * 0.60) : 0;
-  const integerWidthPx = integerPart.length * (integerSizePx * 0.60);
-  const centsWidthPx = 1 + centsPart.length * (centsSizePx * 0.60);
+  const prefixWidthPx = prefix ? prefix.length * prefixSizePx * 0.65 + 4 : 0;
+  const integerWidthPx = integerPart.length * integerSizePx * 0.58;
+  const centsWidthPx = (fractionPart.length + 1) * centsSizePx * 0.55;
 
-  const totalVisualWidthPx = prefixWidthPx + integerWidthPx + centsWidthPx;
+  const totalVisualWidthPx = prefixWidthPx + integerWidthPx + 1 + centsWidthPx;
   const visualWidthMm = Math.max(0.5, Math.min(w, (totalVisualWidthPx * 25.4) / dpi));
 
   const visualHeightPx = integerSizePx;
   const visualHeightMm = Math.max(0.5, Math.min(h, (visualHeightPx * 25.4) / dpi));
+
+  const baseYPx = Math.max(0, (hPx - integerSizePx) / 2);
+  const centsYPx = baseYPx;
+  const prefixYPx = isReduced ? baseYPx + (integerSizePx - prefixSizePx) * 0.5 : baseYPx + (integerSizePx - prefixSizePx) * 0.4;
+
   const offsetYMm = Math.max(0, (h - visualHeightMm) / 2);
 
   const alignment = (element as any).alignment || 'left';
@@ -181,10 +202,47 @@ export function getPriceVisualGeometry(element: LabelElement, dpi: number = 203)
   }
 
   return {
-    x: x + offsetXMm,
-    y: y + offsetYMm,
-    width: visualWidthMm,
-    height: visualHeightMm,
+    integerPart,
+    fractionPart,
+    prefix,
+    isReduced,
+    integerSizePx,
+    centsSizePx,
+    prefixSizePx,
+    prefixWidthPx,
+    integerWidthPx,
+    centsWidthPx,
+    totalVisualWidthPx,
+    visualWidthMm,
+    visualHeightMm,
+    baseYPx,
+    centsYPx,
+    prefixYPx,
+    offsetXMm,
+    offsetYMm,
+  };
+}
+
+/**
+ * Calculador de geometria visual do PriceElement e outros elementos
+ */
+export function getPriceVisualGeometry(element: LabelElement, dpi = 203): { x: number; y: number; width: number; height: number } {
+  const x = Number(element.x) || 0;
+  const y = Number(element.y) || 0;
+
+  if (element.type !== 'price') {
+    const w = Math.max(0.1, Number(element.width) || 1);
+    const h = Math.max(0.1, Number(element.height) || 1);
+    return { x, y, width: w, height: h };
+  }
+
+  const metrics = getPriceRenderMetrics(element, dpi);
+
+  return {
+    x: x + metrics.offsetXMm,
+    y: y + metrics.offsetYMm,
+    width: metrics.visualWidthMm,
+    height: metrics.visualHeightMm,
   };
 }
 

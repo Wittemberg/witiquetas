@@ -1,13 +1,13 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { getPriceVisualGeometry, getElementBoundingBox, clampElementToMedia, applyMagneticRotationSnap, normalizeRotation } from '../bounds.js';
+import { getPriceVisualGeometry, getPriceRenderMetrics, getElementBoundingBox, clampElementToMedia, applyMagneticRotationSnap, normalizeRotation } from '../bounds.js';
 import type { PriceElement, LineElement } from '@witiquetas/label-schema';
 import fs from 'node:fs';
 import path from 'node:path';
 
 describe('FASE 3.5 — PATCH 3.2.3 SUITE DE TESTES', () => {
   describe('1. Price Visual Geometry com Offset X e Bounding Box Real', () => {
-    it('deve calcular largura visual de ~14mm em uma caixa persistida de 35mm', () => {
+    it('deve calcular a largura visual exata alinhada ao renderer (~33.06mm para R$ 9,99 a 203 DPI)', () => {
       const priceElem: PriceElement = {
         id: 'p1',
         type: 'price',
@@ -22,12 +22,14 @@ describe('FASE 3.5 — PATCH 3.2.3 SUITE DE TESTES', () => {
         visible: true,
       };
 
+      const renderMetrics = getPriceRenderMetrics(priceElem, 203);
       const visualGeom = getPriceVisualGeometry(priceElem, 203);
+      const expectedWidth = renderMetrics.visualWidthMm; // ~33.06mm
 
       assert.equal(priceElem.width, 35, 'Width persistido deve ser mantido em 35mm');
       assert.equal(priceElem.height, 15, 'Height persistido deve ser mantido em 15mm');
-      assert.ok(visualGeom.width < 25, `Largura visual (${visualGeom.width}mm) deve ser significativamente menor que a caixa persistida (35mm)`);
-      assert.ok(visualGeom.width >= 10, `Largura visual (${visualGeom.width}mm) deve cobrir os glyphs`);
+      assert.ok(Math.abs(visualGeom.width - expectedWidth) < 0.001, `Largura visual (${visualGeom.width}mm) deve ser rigorosamente igual a ${expectedWidth}mm`);
+      assert.ok(visualGeom.width > 25, `Largura visual (${visualGeom.width}mm) deve refletir os caracteres reais (R$ 9,99)`);
       assert.equal(visualGeom.x, 10, 'Offset X deve ser 0 para alinhamento esquerdo');
     });
 
@@ -46,9 +48,12 @@ describe('FASE 3.5 — PATCH 3.2.3 SUITE DE TESTES', () => {
         visible: true,
       };
 
+      const renderMetrics = getPriceRenderMetrics(priceElem, 203);
       const bbox = getElementBoundingBox(priceElem);
-      assert.equal(bbox.minX, 10);
-      assert.ok(bbox.maxX < 35, `maxX visual (${bbox.maxX}mm) não deve atingir a borda de 45mm`);
+      const expectedMaxX = priceElem.x + renderMetrics.offsetXMm + renderMetrics.visualWidthMm;
+
+      assert.equal(bbox.minX, 10 + renderMetrics.offsetXMm, 'minX do BoundingBox deve ser exatamente x + offsetXMm');
+      assert.ok(Math.abs(bbox.maxX - expectedMaxX) < 0.001, `maxX visual (${bbox.maxX}mm) deve ser exatamente igual a ${expectedMaxX}mm`);
     });
   });
 

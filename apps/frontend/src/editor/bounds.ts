@@ -2,6 +2,64 @@ import type { LabelElement } from '@witiquetas/label-schema';
 
 export const SAFE_AREA_MARGIN_MM = 1.0;
 
+/**
+ * Calcula deterministicamente as linhas de texto físicas resultantes de quebras explícitas (\n)
+ * e wrap automático por estouro da largura útil (widthPx) utilizando a API Canvas 2D (measureText).
+ */
+export function computeTextLines(
+  text: string,
+  fontFamily: string,
+  fontSizePx: number,
+  fontStyleStr: string,
+  widthPx: number
+): string[] {
+  if (!text) return [''];
+
+  let measureWidth: (str: string) => number;
+
+  if (typeof document !== 'undefined') {
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      const cleanFamily = fontFamily || 'Roboto';
+      const cleanStyle = fontStyleStr !== 'normal' ? `${fontStyleStr} ` : '';
+      ctx.font = `${cleanStyle}${Math.max(1, fontSizePx)}px "${cleanFamily}"`;
+      measureWidth = (str: string) => ctx.measureText(str).width;
+    } else {
+      measureWidth = (str: string) => str.length * fontSizePx * 0.55;
+    }
+  } else {
+    measureWidth = (str: string) => str.length * fontSizePx * 0.55;
+  }
+
+  const paragraphs = text.split('\n');
+  const lines: string[] = [];
+
+  for (const paragraph of paragraphs) {
+    if (paragraph.length === 0) {
+      lines.push('');
+      continue;
+    }
+
+    const words = paragraph.split(' ');
+    let currentLine = words[0] || '';
+
+    for (let i = 1; i < words.length; i++) {
+      const word = words[i];
+      const testLine = `${currentLine} ${word}`;
+      if (measureWidth(testLine) <= widthPx + 0.5) {
+        currentLine = testLine;
+      } else {
+        lines.push(currentLine);
+        currentLine = word;
+      }
+    }
+    lines.push(currentLine);
+  }
+
+  return lines;
+}
+
 export interface BoundingBoxMm {
   x: number;
   y: number;
@@ -72,14 +130,61 @@ export function applyMagneticRotationSnap(rawAngle: number): {
 }
 
 /**
- * Calcula o Bounding Box exato (AABB) de um elemento considerando qualquer rotação (0° a 360°)
+ * Calcula a geometria visual renderizada real do PriceElement (prefixo + inteiro + centavos)
+ * sem alterar a largura/altura persistida no documento/schema.
  */
-export function getElementBoundingBox(element: LabelElement): BoundingBoxMm {
-  const rotation = normalizeRotation(element.rotation || 0);
+export function getPriceVisualGeometry(element: LabelElement, dpi: number = 203): { x: number; y: number; width: number; height: number } {
   const w = Math.max(0.1, Number(element.width) || 1);
   const h = Math.max(0.1, Number(element.height) || 1);
   const x = Number(element.x) || 0;
   const y = Number(element.y) || 0;
+
+  if (element.type !== 'price') {
+    return { x, y, width: w, height: h };
+  }
+
+  const wPx = (w * dpi) / 25.4;
+  const hPx = (h * dpi) / 25.4;
+  const rawValueStr = (element as any).sampleValue || '9.99';
+  const cleanNumber = String(rawValueStr || '9.99').replace(',', '.').trim();
+  const parts = cleanNumber.split('.');
+  const integerPart = parts[0] || '0';
+  const prefix = (element as any).prefix !== undefined && (element as any).prefix !== null ? String((element as any).prefix).trim() : 'R$';
+  const isReduced = (element as any).reducedCents !== false;
+
+  const approxChars = (prefix ? prefix.length * 0.55 : 0) + integerPart.length * 0.6 + (isReduced ? 1.4 : 2.2);
+  const maxFontByWidth = (wPx / Math.max(1, approxChars)) * 1.35;
+  const maxFontByHeight = hPx * 0.88;
+  const integerSizePx = Math.max(9, Math.min(maxFontByHeight, maxFontByWidth));
+
+  const visualHeightPx = integerSizePx;
+  const visualHeightMm = (visualHeightPx * 25.4) / dpi;
+  const offsetYMm = Math.max(0, (h - visualHeightMm) / 2);
+
+  return {
+    x,
+    y: y + offsetYMm,
+    width: w,
+    height: Math.min(h, visualHeightMm),
+  };
+}
+
+/**
+ * Calcula o Bounding Box exato (AABB) de um elemento considerando qualquer rotação (0° a 360°)
+ */
+export function getElementBoundingBox(element: LabelElement): BoundingBoxMm {
+  const geom = element.type === 'price' ? getPriceVisualGeometry(element) : {
+    x: Number(element.x) || 0,
+    y: Number(element.y) || 0,
+    width: Math.max(0.1, Number(element.width) || 1),
+    height: Math.max(0.1, Number(element.height) || 1),
+  };
+
+  const rotation = normalizeRotation(element.rotation || 0);
+  const w = geom.width;
+  const h = geom.height;
+  const x = geom.x;
+  const y = geom.y;
 
   // Otimização para os ângulos cardinais ortogonais
   if (rotation === 0) {
@@ -249,14 +354,22 @@ export function clampElementToMedia<T extends LabelElement>(
   const cos = Math.cos(rad);
   const sin = Math.sin(rad);
 
+  let visualYOffset = 0;
+  let effectiveHeight = height;
+  if (element.type === 'price') {
+    const geom = getPriceVisualGeometry(element);
+    visualYOffset = Math.max(0, geom.y - (Number(element.y) || 0));
+    effectiveHeight = geom.height;
+  }
+
   const dx0 = 0;
-  const dy0 = 0;
+  const dy0 = visualYOffset;
   const dx1 = width * cos;
-  const dy1 = width * sin;
-  const dx2 = width * cos - height * sin;
-  const dy2 = width * sin + height * cos;
-  const dx3 = -height * sin;
-  const dy3 = height * cos;
+  const dy1 = width * sin + visualYOffset;
+  const dx2 = width * cos - effectiveHeight * sin;
+  const dy2 = width * sin + effectiveHeight * cos + visualYOffset;
+  const dx3 = -effectiveHeight * sin;
+  const dy3 = effectiveHeight * cos + visualYOffset;
 
   const minDx = Math.min(dx0, dx1, dx2, dx3);
   const maxDx = Math.max(dx0, dx1, dx2, dx3);

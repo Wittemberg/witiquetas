@@ -12,7 +12,7 @@ import {
 import { LabelElement, QrCodeElement, TextElement, BarcodeElement, PriceElement } from '@witiquetas/label-schema';
 import { generateQRCodeDataUrl } from './qrCodeGenerator';
 import { generateBarcodeModules } from './barcodeEngine';
-import { getElementBoundingBox, constrainGroupMovement, applyMagneticRotationSnap, normalizeElementGeometry, SAFE_AREA_MARGIN_MM } from './bounds';
+import { getElementBoundingBox, constrainGroupMovement, applyMagneticRotationSnap, normalizeElementGeometry, SAFE_AREA_MARGIN_MM, computeTextLines } from './bounds';
 import {
   Copy,
   Scissors,
@@ -620,7 +620,9 @@ export default function CanvasArea() {
           }
 
           const hasSecondLineScale = textElem.secondLineScale !== undefined && textElem.secondLineScale > 0 && !textElem.singleLine;
-          const textLines = textContent.split('\n');
+          const textLines = hasSecondLineScale
+            ? computeTextLines(textContent, textElem.fontFamily || 'Roboto', calculatedFontSize, fontStyleStr, wPx)
+            : textContent.split('\n');
 
           if (hasSecondLineScale && textLines.length > 1) {
             let currentY = 0;
@@ -642,6 +644,7 @@ export default function CanvasArea() {
                   align={textElem.alignment || 'left'}
                   fill={textElem.reversePrint ? '#ffffff' : textElem.color || '#000000'}
                   y={lineY}
+                  wrap="none"
                 />
               );
             });

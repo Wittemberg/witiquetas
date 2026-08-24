@@ -318,7 +318,7 @@ export default function EditorLayout({
                 fontSize: '0.72rem',
                 height: '28px',
                 background: 'var(--bg-card)',
-                minWidth: '160px',
+                minWidth: '110px',
                 fontWeight: 600,
               }}
               value={previewScenario}

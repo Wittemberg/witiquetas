@@ -1077,13 +1077,15 @@ export default function CanvasArea() {
     const elements = document?.elements || [];
     elements.forEach((el) => {
       if (!el || el.visible === false) return;
-      const x = Number(el.x) || 0;
-      const y = Number(el.y) || 0;
-      const w = Number(el.width) || 10;
-      const h = Number(el.height) || 10;
+      const bbox = getElementBoundingBox(el);
 
       // Tolerância geométrica de 0.05 mm para prevenir falsos positivos por arredondamento
-      const isPhysical = x < -0.05 || y < -0.05 || (x + w) > (widthMm + 0.05) || (y + h) > (heightMm + 0.05);
+      const isPhysical =
+        bbox.minX < -0.05 ||
+        bbox.minY < -0.05 ||
+        bbox.maxX > (widthMm + 0.05) ||
+        bbox.maxY > (heightMm + 0.05);
+
       if (isPhysical) {
         issues.push({
           id: el.id,
@@ -1092,7 +1094,6 @@ export default function CanvasArea() {
           message: `"${el.name || (el.type ? el.type.toUpperCase() : 'ELEMENTO')}" está parcialmente fora da etiqueta`,
         });
       } else {
-        const bbox = getElementBoundingBox(el);
         const safeMargin = SAFE_AREA_MARGIN_MM;
         const halfDotMm = (0.5 * 25.4) / (dpi || 203);
         const isBeyondSafe =
@@ -1111,7 +1112,7 @@ export default function CanvasArea() {
       }
     });
     return issues;
-  }, [document?.elements, widthMm, heightMm]);
+  }, [document?.elements, widthMm, heightMm, dpi]);
 
   const [isIssuesPopoverOpen, setIsIssuesPopoverOpen] = useState(false);
   const isBarcodeTooSmall = primarySelected?.type === 'barcode' && ((Number(primarySelected.width) || 0) < 25 || (Number(primarySelected.height) || 0) < 8);

@@ -940,7 +940,7 @@ body {
   min-width: 0;
 }
 
-@container (max-width: 320px) {
+@container (max-width: 380px) {
   .metrics {
     grid-template-columns: 1fr;
   }
@@ -963,7 +963,7 @@ body {
   font-size: 0.85rem;
   font-weight: 700;
   color: var(--text-primary);
-  word-break: break-word;
+  word-break: normal;
   overflow-wrap: break-word;
   min-width: 0;
 }

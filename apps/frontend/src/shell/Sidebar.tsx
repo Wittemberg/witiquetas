@@ -125,7 +125,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </div>
           ) : (
             <>
-              <div className="brand-logo" onClick={() => onSelectModule('home')}>
+              <div
+                className="brand-logo"
+                onClick={onToggleCollapse}
+                title="Recolher menu"
+                aria-label="Recolher menu"
+                style={{ cursor: 'pointer' }}
+              >
                 <div className="brand-icon-wrapper">
                   <Tag size={20} className="brand-icon-svg" />
                 </div>

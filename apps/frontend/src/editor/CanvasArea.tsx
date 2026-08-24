@@ -457,8 +457,10 @@ export default function CanvasArea() {
   };
 
   const handleStageMouseDown = (e: any) => {
-    const clickedOnEmpty = e.target === stageRef.current;
-    if (clickedOnEmpty) {
+    const clickedTarget = e.target;
+    const isStageOrLayer = clickedTarget === stageRef.current || clickedTarget.getType?.() === 'Layer' || clickedTarget.name?.() === 'grid-line' || clickedTarget.name?.() === 'safe-area';
+
+    if (isStageOrLayer) {
       if (!e.evt.shiftKey && !e.evt.ctrlKey) {
         setSelectedElementIds([]);
       }
@@ -564,10 +566,17 @@ export default function CanvasArea() {
       let newHPx = Math.max(8, node.height() * scaleY);
 
       if (elem.type === 'line') {
+        const rawRotation = node.rotation() || 0;
+        const snappedRotation = applyMagneticRotationSnap(rawRotation).angle;
+        node.rotation(snappedRotation);
+
+        const newWidthPx = Math.max(1, node.width() * scaleX);
+
         updateElement(elem.id, {
           x: pxToMm(node.x(), dpi),
           y: pxToMm(node.y(), dpi),
-          width: pxToMm(newWPx, dpi),
+          width: pxToMm(newWidthPx, dpi),
+          rotation: snappedRotation,
         });
         return;
       }
@@ -960,18 +969,23 @@ export default function CanvasArea() {
       }
 
       case 'line': {
+        const lineElem = elem as any;
         return (
           <Line
-            key={elem.id}
-            id={elem.id}
-            points={[xPx, yPx, xPx + wPx, yPx]}
-            stroke={elem.color || '#000000'}
-            strokeWidth={elem.strokeWidth || 1}
-            draggable={!elem.locked}
+            key={lineElem.id}
+            id={lineElem.id}
+            x={xPx}
+            y={yPx}
+            points={[0, 0, wPx, 0]}
+            stroke={lineElem.color || '#000000'}
+            strokeWidth={lineElem.strokeWidth || 1}
+            rotation={normalizeRotation(lineElem.rotation || 0)}
+            draggable={!lineElem.locked}
             onClick={handleClick}
             onTap={handleClick}
             onContextMenu={handleContextMenu}
             onDragEnd={handleDragEnd}
+            onTransformEnd={handleTransformEnd}
           />
         );
       }
@@ -1015,10 +1029,12 @@ export default function CanvasArea() {
       lines.push(
         <Line
           key={`v-${i}`}
+          name="grid-line"
           points={[i, 0, i, maxH]}
           stroke="rgba(59, 130, 246, 0.12)"
           strokeWidth={1}
           dash={[2, 2]}
+          listening={false}
         />
       );
     }
@@ -1026,10 +1042,12 @@ export default function CanvasArea() {
       lines.push(
         <Line
           key={`h-${j}`}
+          name="grid-line"
           points={[0, j, maxW, j]}
           stroke="rgba(59, 130, 246, 0.12)"
           strokeWidth={1}
           dash={[2, 2]}
+          listening={false}
         />
       );
     }
@@ -1339,6 +1357,7 @@ export default function CanvasArea() {
               {showSafeArea && (
                 <Layer>
                   <Rect
+                    name="safe-area"
                     x={safeAreaMarginPx}
                     y={safeAreaMarginPx}
                     width={stageWidthPx - safeAreaMarginPx * 2}
@@ -1346,6 +1365,7 @@ export default function CanvasArea() {
                     stroke="rgba(245, 158, 11, 0.85)"
                     strokeWidth={1.5}
                     dash={[6, 4]}
+                    listening={false}
                   />
                 </Layer>
               )}
@@ -1363,6 +1383,7 @@ export default function CanvasArea() {
                     stroke="#3b82f6"
                     strokeWidth={1}
                     dash={[3, 3]}
+                    listening={false}
                   />
                 )}
 
@@ -1371,6 +1392,10 @@ export default function CanvasArea() {
                   rotateEnabled={true}
                   keepRatio={false}
                   boundBoxFunc={(oldBox, newBox) => {
+                    if (primarySelected?.type === 'line') {
+                      if (newBox.width < 5) return oldBox;
+                      return newBox;
+                    }
                     if (newBox.width < 8 || newBox.height < 8) return oldBox;
                     return newBox;
                   }}

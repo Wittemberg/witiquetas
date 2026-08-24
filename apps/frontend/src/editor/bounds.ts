@@ -149,6 +149,7 @@ export function getPriceVisualGeometry(element: LabelElement, dpi: number = 203)
   const cleanNumber = String(rawValueStr || '9.99').replace(',', '.').trim();
   const parts = cleanNumber.split('.');
   const integerPart = parts[0] || '0';
+  const centsPart = (parts[1] || '00').slice(0, 2).padEnd(2, '0');
   const prefix = (element as any).prefix !== undefined && (element as any).prefix !== null ? String((element as any).prefix).trim() : 'R$';
   const isReduced = (element as any).reducedCents !== false;
 
@@ -157,15 +158,33 @@ export function getPriceVisualGeometry(element: LabelElement, dpi: number = 203)
   const maxFontByHeight = hPx * 0.88;
   const integerSizePx = Math.max(9, Math.min(maxFontByHeight, maxFontByWidth));
 
+  const prefixSizePx = integerSizePx * 0.42;
+  const centsSizePx = isReduced ? integerSizePx * 0.50 : integerSizePx * 0.88;
+
+  const prefixWidthPx = prefix ? prefix.length * (prefixSizePx * 0.60) : 0;
+  const integerWidthPx = integerPart.length * (integerSizePx * 0.60);
+  const centsWidthPx = 1 + centsPart.length * (centsSizePx * 0.60);
+
+  const totalVisualWidthPx = prefixWidthPx + integerWidthPx + centsWidthPx;
+  const visualWidthMm = Math.max(0.5, Math.min(w, (totalVisualWidthPx * 25.4) / dpi));
+
   const visualHeightPx = integerSizePx;
-  const visualHeightMm = (visualHeightPx * 25.4) / dpi;
+  const visualHeightMm = Math.max(0.5, Math.min(h, (visualHeightPx * 25.4) / dpi));
   const offsetYMm = Math.max(0, (h - visualHeightMm) / 2);
 
+  const alignment = (element as any).alignment || 'left';
+  let offsetXMm = 0;
+  if (alignment === 'center') {
+    offsetXMm = Math.max(0, (w - visualWidthMm) / 2);
+  } else if (alignment === 'right') {
+    offsetXMm = Math.max(0, w - visualWidthMm);
+  }
+
   return {
-    x,
+    x: x + offsetXMm,
     y: y + offsetYMm,
-    width: w,
-    height: Math.min(h, visualHeightMm),
+    width: visualWidthMm,
+    height: visualHeightMm,
   };
 }
 
@@ -354,21 +373,25 @@ export function clampElementToMedia<T extends LabelElement>(
   const cos = Math.cos(rad);
   const sin = Math.sin(rad);
 
+  let visualXOffset = 0;
   let visualYOffset = 0;
+  let effectiveWidth = width;
   let effectiveHeight = height;
   if (element.type === 'price') {
     const geom = getPriceVisualGeometry(element);
+    visualXOffset = Math.max(0, geom.x - (Number(element.x) || 0));
     visualYOffset = Math.max(0, geom.y - (Number(element.y) || 0));
+    effectiveWidth = geom.width;
     effectiveHeight = geom.height;
   }
 
-  const dx0 = 0;
+  const dx0 = visualXOffset;
   const dy0 = visualYOffset;
-  const dx1 = width * cos;
-  const dy1 = width * sin + visualYOffset;
-  const dx2 = width * cos - effectiveHeight * sin;
-  const dy2 = width * sin + effectiveHeight * cos + visualYOffset;
-  const dx3 = -effectiveHeight * sin;
+  const dx1 = effectiveWidth * cos + visualXOffset;
+  const dy1 = effectiveWidth * sin + visualYOffset;
+  const dx2 = effectiveWidth * cos - effectiveHeight * sin + visualXOffset;
+  const dy2 = effectiveWidth * sin + effectiveHeight * cos + visualYOffset;
+  const dx3 = -effectiveHeight * sin + visualXOffset;
   const dy3 = effectiveHeight * cos + visualYOffset;
 
   const minDx = Math.min(dx0, dx1, dx2, dx3);

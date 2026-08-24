@@ -23,9 +23,9 @@ describe('FASE 3.5 — PATCH 3.2.2 SUITE DE TESTES', () => {
       };
 
       const visualGeom = getPriceVisualGeometry(priceElem, 203);
-      assert.equal(priceElem.width, 35);
-      assert.equal(priceElem.height, 15);
-      assert.equal(visualGeom.width, 35);
+      assert.equal(priceElem.width, 35, 'Width persistido deve ser 35mm');
+      assert.equal(priceElem.height, 15, 'Height persistido deve ser 15mm');
+      assert.ok(visualGeom.width < 35, 'Largura visual deve ser menor que os 35mm persistidos');
       assert.ok(visualGeom.height < 15, 'Altura visual deve ser menor que a caixa inflada de 15mm');
       assert.ok(visualGeom.y > 10, 'Y visual deve incluir o offset de centralização vertical');
     });

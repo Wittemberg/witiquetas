@@ -227,13 +227,6 @@ export default function EditorLayout({
       <header className="editor-header-fixed">
         {/* Lado Esquerdo: Navegação, Identificação e Estado */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-          {onBackToDashboard && (
-            <button className="btn" onClick={handleBackClick} style={{ fontSize: '0.75rem', padding: '0.35rem 0.6rem' }}>
-              <ChevronLeft size={14} />
-              <span>Modelos</span>
-            </button>
-          )}
-
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
             <div className="brand-icon" style={{ width: '26px', height: '26px', borderRadius: '6px' }}>
               <Sparkles size={13} color="#ffffff" />
@@ -242,6 +235,13 @@ export default function EditorLayout({
               Witiquetas
             </span>
           </div>
+
+          {onBackToDashboard && (
+            <button className="btn" onClick={handleBackClick} style={{ fontSize: '0.75rem', padding: '0.35rem 0.6rem' }}>
+              <ChevronLeft size={14} />
+              <span>Modelos</span>
+            </button>
+          )}
 
           <div style={{ width: '1px', height: '18px', background: 'var(--border-color)' }} />
 

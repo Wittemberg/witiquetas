@@ -952,6 +952,10 @@ body {
   min-width: 0;
 }
 
+.metric-item-full {
+  grid-column: 1 / -1;
+}
+
 .metric-label {
   font-size: 0.75rem;
   color: var(--text-muted);

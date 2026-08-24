@@ -268,7 +268,7 @@ export default function App() {
                 </div>
 
                 <div className="metrics">
-                  <div className="metric-item">
+                  <div className="metric-item metric-item-full">
                     <span className="metric-label">Domínio</span>
                     <span className="metric-value">witiquetas.wrtec.com.br</span>
                   </div>
@@ -318,7 +318,7 @@ export default function App() {
                     <span className="metric-label">Ambiente</span>
                     <span className="metric-value">{version?.environment || 'production'}</span>
                   </div>
-                  <div className="metric-item">
+                  <div className="metric-item metric-item-full">
                     <span className="metric-label">Timezone</span>
                     <span className="metric-value">{version?.timezone || 'America/Sao_Paulo'}</span>
                   </div>
@@ -416,7 +416,7 @@ export default function App() {
                     <span className="metric-label">Computador</span>
                     <span className="metric-value">{agents[0]?.machineName || 'Nenhum'}</span>
                   </div>
-                  <div className="metric-item">
+                  <div className="metric-item metric-item-full">
                     <span className="metric-label">Sistema / SO</span>
                     <span className="metric-value">{agents[0] ? `${agents[0].os} (${agents[0].architecture})` : 'Multiplataforma'}</span>
                   </div>

@@ -409,5 +409,47 @@ describe('FASE 3.5 — PATCH 3.2.8 SUITE DE TESTES (CONCORRÊNCIA, PRESENÇA E U
       const wizardPath = path.resolve(process.cwd(), 'apps/frontend/src/editor/NewTemplateWizard.tsx');
       assert.ok(fs.existsSync(wizardPath), 'NewTemplateWizard.tsx permanece intacto');
     });
+
+    it('PATCH 3.2.8.1 REGRESSÃO: AlertTriangle e todos os ícones JSX em EditorLayout.tsx estão devidamente importados', () => {
+      const layoutPath = path.resolve(process.cwd(), 'apps/frontend/src/editor/EditorLayout.tsx');
+      const layoutContent = fs.readFileSync(layoutPath, 'utf-8');
+
+      // 1. Verificar import estrito de AlertTriangle
+      const lucideImportMatch = layoutContent.match(/import\s*\{([\s\S]*?)\}\s*from\s*['"]lucide-react['"]/);
+      assert.ok(lucideImportMatch, 'EditorLayout deve importar de lucide-react');
+
+      const importedSymbols = lucideImportMatch[1]
+        .split(',')
+        .map((s) => s.trim().split(' as ')[0].trim())
+        .filter(Boolean);
+
+      assert.ok(importedSymbols.includes('AlertTriangle'), 'AlertTriangle DEVE estar na lista de imports do lucide-react');
+
+      // 2. Extrair todos os elementos JSX do tipo <IconName ... /> e garantir que estão no import
+      const jsxIconMatches = Array.from(layoutContent.matchAll(/<([A-Z][a-zA-Z0-9]+)\s/g)).map((m) => m[1]);
+      const uniqueJsxIcons = Array.from(new Set(jsxIconMatches)).filter(
+        (name) => !['EditorLayout', 'CanvasArea', 'PropertyInspector', 'NewTemplateWizard', 'CompileModal', 'ImportModal', 'RenameModelModal', 'DeleteModelModal'].includes(name)
+      );
+
+      for (const icon of uniqueJsxIcons) {
+        assert.ok(
+          importedSymbols.includes(icon),
+          `Ícone JSX <${icon}> usado em EditorLayout.tsx deve ser importado do lucide-react para evitar ReferenceError`
+        );
+      }
+    });
+
+    it('PATCH 3.2.8.1 REGRESSÃO: Modais de Conflito (MODEL_VERSION_CONFLICT e MODEL_NOT_FOUND) preservam o conteúdo local e contêm estrutura válida', () => {
+      const layoutPath = path.resolve(process.cwd(), 'apps/frontend/src/editor/EditorLayout.tsx');
+      const layoutContent = fs.readFileSync(layoutPath, 'utf-8');
+
+      // Verificar modal de conflito
+      assert.ok(layoutContent.includes('Conflito de Versão Detectado'), 'Modal de conflito de versão deve ser renderizado');
+      assert.ok(layoutContent.includes('Suas alterações locais foram totalmente preservadas'), 'Garante a mensagem de preservação do trabalho local');
+
+      // Verificar modal de modelo deletado
+      assert.ok(layoutContent.includes('Modelo Não Encontrado no Servidor'), 'Modal de modelo não encontrado deve ser renderizado');
+      assert.ok(layoutContent.includes('Suas alterações locais continuam disponíveis no canvas'), 'Garante a preservação no canvas ao excluir no servidor');
+    });
   });
 });

@@ -39,6 +39,7 @@ import {
   Layers,
   Save,
   AlertCircle,
+  AlertTriangle,
   Loader2
 } from 'lucide-react';
 

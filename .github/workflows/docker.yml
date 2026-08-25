@@ -241,8 +241,10 @@ jobs:
         run: |
           if [ -n "${{ secrets.PORTAINER_WEBHOOK_URL }}" ]; then
             echo "Acionando webhook de redeploy do Portainer..."
+            WEBHOOK_START_TIME=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+            echo "webhook_timestamp=$WEBHOOK_START_TIME" >> $GITHUB_ENV
             curl --fail --show-error --silent -X POST "${{ secrets.PORTAINER_WEBHOOK_URL }}"
-            echo "Webhook acionado com sucesso."
+            echo "Webhook acionado com sucesso em $WEBHOOK_START_TIME."
           else
             echo "PORTAINER_WEBHOOK_URL não configurado. Pulando acionamento."
           fi
@@ -252,30 +254,54 @@ jobs:
           echo "Validando implantação ao vivo em https://witiquetas.wrtec.com.br/version.json..."
           DEPLOY_SUCCESS=false
           EXPECTED_SHA="${{ github.sha }}"
+          START_SECS=$(date +%s)
+          FIRST_SUCCESS_TIME=""
 
-          for i in $(seq 1 12); do
+          for i in $(seq 1 30); do
             VERSION_RESPONSE=$(curl -s --max-time 5 https://witiquetas.wrtec.com.br/version.json || echo "")
             LIVE_COMMIT=$(echo "$VERSION_RESPONSE" | grep -o '"commit":"[^"]*"' | cut -d'"' -f4 || echo "")
-            echo "Tentativa $i: SHA ao vivo = '$LIVE_COMMIT' (Esperado: '$EXPECTED_SHA')"
-            
+            NOW_SECS=$(date +%s)
+            ELAPSED_SECS=$((NOW_SECS - START_SECS))
+
             if [ "$LIVE_COMMIT" = "$EXPECTED_SHA" ]; then
-              echo "Deploy confirmado ao vivo com sucesso! SHA $LIVE_COMMIT ativo."
+              FIRST_SUCCESS_TIME=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+              echo "Tentativa $i/30 ($ELAPSED_SECS s): SHA ao vivo retornado é o esperado: '$LIVE_COMMIT'. Deploy confirmado!"
+              echo "========================================================"
+              echo "RELATÓRIO DE MÉTRICAS DO DEPLOY PORTAINER:"
+              echo "  Timestamp Webhook:            ${webhook_timestamp:-Desconhecido}"
+              echo "  Timestamp Primeira Resposta:  $FIRST_SUCCESS_TIME"
+              echo "  Tempo Total de Convergência:  $ELAPSED_SECS segundos"
+              echo "========================================================"
               DEPLOY_SUCCESS=true
               break
+            elif [ -z "$LIVE_COMMIT" ]; then
+              echo "Tentativa $i/30 ($ELAPSED_SECS s): Endpoint indisponível ou resposta vazia (troca de container Portainer em andamento). Aguardando..."
+            else
+              echo "Tentativa $i/30 ($ELAPSED_SECS s): SHA ao vivo é '$LIVE_COMMIT' (aguardando convergência para '$EXPECTED_SHA')..."
             fi
+
             sleep 5
           done
 
           if [ "$DEPLOY_SUCCESS" != "true" ]; then
-            echo "ALERTA CRÍTICO: Produção ao vivo não atualizou para o SHA $EXPECTED_SHA a tempo!"
-            PREV_DIGEST="${{ steps.pre_stable.outputs.prev_front_digest }}"
-            if [ -n "$PREV_DIGEST" ]; then
-              echo "Executando AUTO-ROLLBACK automático para o digest estável anterior: $PREV_DIGEST..."
-              docker buildx imagetools create -t ghcr.io/wittemberg/witiquetas-frontend:stable "$PREV_DIGEST"
-              if [ -n "${{ secrets.PORTAINER_WEBHOOK_URL }}" ]; then
-                curl -s -X POST "${{ secrets.PORTAINER_WEBHOOK_URL }}" || true
-              fi
-              echo "Auto-rollback executado."
+            echo "ALERTA CRÍTICO: Produção ao vivo não atualizou para o SHA $EXPECTED_SHA em 150 segundos!"
+            PREV_FRONT_DIGEST="${{ steps.pre_stable.outputs.prev_front_digest }}"
+            PREV_BACK_DIGEST="${{ steps.pre_stable.outputs.prev_back_digest }}"
+
+            if [ -n "$PREV_FRONT_DIGEST" ]; then
+              echo "Executando AUTO-ROLLBACK automático do Frontend para digest anterior: $PREV_FRONT_DIGEST..."
+              docker buildx imagetools create -t ghcr.io/wittemberg/witiquetas-frontend:stable "$PREV_FRONT_DIGEST" || true
             fi
+
+            if [ -n "$PREV_BACK_DIGEST" ]; then
+              echo "Executando AUTO-ROLLBACK automático do Backend para digest anterior: $PREV_BACK_DIGEST..."
+              docker buildx imagetools create -t ghcr.io/wittemberg/witiquetas-backend:stable "$PREV_BACK_DIGEST" || true
+            fi
+
+            if [ -n "${{ secrets.PORTAINER_WEBHOOK_URL }}" ]; then
+              echo "Acionando webhook do Portainer para aplicar auto-rollback..."
+              curl -s -X POST "${{ secrets.PORTAINER_WEBHOOK_URL }}" || true
+            fi
+            echo "Auto-rollback executado com sucesso."
             exit 1
           fi

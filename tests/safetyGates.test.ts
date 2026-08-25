@@ -63,3 +63,17 @@ test('4. CSS SIZE GUARD & CRITICAL FILE AUDIT: Proteção Contra Redução Abrup
   const gitIgnore = fs.readFileSync(gitIgnorePath, 'utf8');
   assert.ok(gitIgnore.includes('.recovery/'), '.gitignore deve ignorar a pasta .recovery/');
 });
+
+test('5. CI DEPLOY GUARD: Janela de Polling de 150s (30x5s), 3 Estados e Auto-Rollback Dual-Stack', () => {
+  const workflowPath = path.resolve('.github/workflows/docker.yml');
+  assert.ok(fs.existsSync(workflowPath), 'docker.yml deve existir');
+
+  const workflowContent = fs.readFileSync(workflowPath, 'utf8');
+  assert.ok(workflowContent.includes('seq 1 30'), 'Guard deve realizar 30 tentativas');
+  assert.ok(workflowContent.includes('sleep 5'), 'Guard deve pausar 5s entre tentativas');
+  assert.ok(workflowContent.includes('150 segundos'), 'Guard deve declarar a janela total de 150 segundos');
+  assert.ok(workflowContent.includes('RELATÓRIO DE MÉTRICAS DO DEPLOY PORTAINER'), 'Guard deve incluir relatório de métricas de convergência');
+  assert.ok(workflowContent.includes('prev_front_digest'), 'Guard deve re-apontar frontend stable em caso de falha');
+  assert.ok(workflowContent.includes('prev_back_digest'), 'Guard deve re-apontar backend stable em caso de falha');
+});
+

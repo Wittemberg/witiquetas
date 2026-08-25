@@ -4,6 +4,10 @@ import {
   templateRepository,
   MismatchedVersionError,
 } from '../repositories/templateRepository';
+import {
+  presenceRepository,
+  ActiveEditingSessionError,
+} from '../repositories/presenceRepository';
 import type { CreateTemplateDTO, UpdateTemplateDTO, RenameTemplateDTO } from '@witiquetas/contracts';
 
 const router = Router();
@@ -37,6 +41,74 @@ router.get('/', async (req: Request, res: Response) => {
 });
 
 /**
+ * GET /api/templates/:id/presence
+ * Retorna sessões ativas do modelo
+ */
+router.get('/:id/presence', async (req: Request, res: Response) => {
+  try {
+    const companyId = getCompanyId(req);
+    const active = await presenceRepository.getActiveSessions(req.params.id, companyId);
+    res.json({ total: active.length, sessions: active });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Erro ao buscar presença.', message: err.message });
+  }
+});
+
+/**
+ * POST /api/templates/:id/presence/heartbeat
+ * Registra ou atualiza heartbeat de uma sessão de edição
+ */
+router.post('/:id/presence/heartbeat', async (req: Request, res: Response) => {
+  try {
+    const companyId = getCompanyId(req);
+    const { sessionId, userIdentifier, os, browser, deviceName } = req.body || {};
+
+    if (!sessionId) {
+      return res.status(400).json({ error: 'sessionId é obrigatório.' });
+    }
+
+    const session = await presenceRepository.registerOrHeartbeatSession({
+      modelId: req.params.id,
+      companyId,
+      sessionId,
+      userIdentifier: userIdentifier || 'Sessão de Edição',
+      os,
+      browser,
+      deviceName,
+    });
+
+    res.json({ success: true, session });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Erro no heartbeat de presença.', message: err.message });
+  }
+});
+
+/**
+ * DELETE /api/templates/:id/presence/leave
+ * Encerra sessão de edição ao fechar/navegar
+ */
+router.delete('/:id/presence/leave', async (req: Request, res: Response) => {
+  try {
+    const companyId = getCompanyId(req);
+    const { sessionId } = req.body || {};
+
+    if (!sessionId) {
+      return res.status(400).json({ error: 'sessionId é obrigatório.' });
+    }
+
+    await presenceRepository.leaveSession({
+      modelId: req.params.id,
+      companyId,
+      sessionId,
+    });
+
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Erro ao encerrar sessão de presença.', message: err.message });
+  }
+});
+
+/**
  * GET /api/templates/:id
  * Retorna o modelo completo incluindo document_schema
  */
@@ -46,7 +118,11 @@ router.get('/:id', async (req: Request, res: Response) => {
     const template = await templateRepository.getTemplateById(req.params.id, companyId);
 
     if (!template) {
-      return res.status(404).json({ error: 'Modelo de etiqueta não encontrado.' });
+      return res.status(404).json({
+        code: 'MODEL_NOT_FOUND',
+        error: 'MODELO_NÃO_ENCONTRADO',
+        message: 'Modelo de etiqueta não encontrado.',
+      });
     }
 
     res.json(template);
@@ -88,9 +164,9 @@ router.post('/', async (req: Request, res: Response) => {
  * Atualizar modelo com suporte a Optimistic Locking (expectedVersion -> HTTP 409 Conflict)
  */
 router.put('/:id', async (req: Request, res: Response) => {
+  const body = req.body as UpdateTemplateDTO;
   try {
     const companyId = getCompanyId(req);
-    const body = req.body as UpdateTemplateDTO;
 
     if (body.document) {
       const validation = LabelDocumentSchema.safeParse(body.document);
@@ -107,14 +183,20 @@ router.put('/:id', async (req: Request, res: Response) => {
   } catch (err: any) {
     if (err instanceof MismatchedVersionError) {
       return res.status(409).json({
+        code: 'MODEL_VERSION_CONFLICT',
         error: 'CONFLITO DE VERSÃO (Optimistic Locking)',
         message:
-          'Este modelo foi alterado em outra sessão. Recarregue o modelo antes de salvar novamente.',
+          'Este modelo foi alterado em outro local enquanto você o editava.',
         currentVersion: err.currentVersion,
+        expectedVersion: body.expectedVersion,
       });
     }
     if (err.message.includes('não encontrado')) {
-      return res.status(404).json({ error: err.message });
+      return res.status(404).json({
+        code: 'MODEL_NOT_FOUND',
+        error: 'MODELO_NÃO_ENCONTRADO',
+        message: 'Este modelo não existe mais no servidor.',
+      });
     }
     res.status(500).json({ error: 'Erro ao atualizar modelo.', message: err.message });
   }
@@ -131,7 +213,11 @@ router.post('/:id/duplicate', async (req: Request, res: Response) => {
     res.status(201).json(duplicated);
   } catch (err: any) {
     if (err.message.includes('não encontrado')) {
-      return res.status(404).json({ error: err.message });
+      return res.status(404).json({
+        code: 'MODEL_NOT_FOUND',
+        error: 'MODELO_NÃO_ENCONTRADO',
+        message: err.message,
+      });
     }
     res.status(500).json({ error: 'Erro ao duplicar modelo.', message: err.message });
   }
@@ -158,7 +244,11 @@ router.patch('/:id/name', async (req: Request, res: Response) => {
     res.json(updated);
   } catch (err: any) {
     if (err.message.includes('não encontrado')) {
-      return res.status(404).json({ error: err.message });
+      return res.status(404).json({
+        code: 'MODEL_NOT_FOUND',
+        error: 'MODELO_NÃO_ENCONTRADO',
+        message: err.message,
+      });
     }
     res.status(500).json({ error: 'Erro ao renomear modelo.', message: err.message });
   }
@@ -166,7 +256,7 @@ router.patch('/:id/name', async (req: Request, res: Response) => {
 
 /**
  * DELETE /api/templates/:id
- * Soft Delete do modelo (deleted_at = NOW())
+ * Soft Delete do modelo (deleted_at = NOW()) com bloqueio contra sessões ativas em edição
  */
 router.delete('/:id', async (req: Request, res: Response) => {
   try {
@@ -174,6 +264,21 @@ router.delete('/:id', async (req: Request, res: Response) => {
     await templateRepository.deleteTemplate(req.params.id, companyId);
     res.status(200).json({ success: true, message: 'Modelo removido com sucesso.' });
   } catch (err: any) {
+    if (err instanceof ActiveEditingSessionError) {
+      return res.status(409).json({
+        code: 'MODEL_EDITING_ACTIVE',
+        error: 'MODELO_EM_EDIÇÃO',
+        message: 'Este modelo está sendo editado no momento por outra sessão.',
+        activeSessions: err.activeSessions,
+      });
+    }
+    if (err.message.includes('não encontrado')) {
+      return res.status(404).json({
+        code: 'MODEL_NOT_FOUND',
+        error: 'MODELO_NÃO_ENCONTRADO',
+        message: err.message,
+      });
+    }
     res.status(500).json({ error: 'Erro ao remover modelo.', message: err.message });
   }
 });

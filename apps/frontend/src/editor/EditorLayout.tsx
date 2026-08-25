@@ -42,7 +42,9 @@ import {
   Loader2
 } from 'lucide-react';
 
-interface EditorLayoutProps {
+import { getTabSessionIdSync, resolveTabSessionId } from './sessionUtils.js';
+
+export interface EditorLayoutProps {
   onBackToDashboard?: () => void;
   theme?: 'light' | 'dark';
   onToggleTheme?: () => void;
@@ -69,6 +71,12 @@ export default function EditorLayout({
     isDirty,
     saveStatus,
     saveDocumentToBackend,
+    conflictInfo,
+    currentTemplateId,
+    resolveConflictSaveAsCopy,
+    resolveConflictReloadRemote,
+    resolveConflictContinueEditing,
+    resolveDeletedSaveAsNew,
     snapToGrid,
     setSnapToGrid,
     showSafeArea,
@@ -99,6 +107,65 @@ export default function EditorLayout({
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [isViewMenuOpen, setIsViewMenuOpen] = useState(false);
   const [isUnsavedExitModalOpen, setIsUnsavedExitModalOpen] = useState(false);
+  const [isConflictModalOpen, setIsConflictModalOpen] = useState(false);
+  const [isDeletedModalOpen, setIsDeletedModalOpen] = useState(false);
+  const [isReloadConfirmOpen, setIsReloadConfirmOpen] = useState(false);
+
+  // Heartbeat de Presença de Edição (15s)
+  useEffect(() => {
+    if (!currentTemplateId) return;
+
+    let isMounted = true;
+    let intervalId: any = null;
+    let currentSid = '';
+
+    let browser = 'Browser';
+    let os = 'Windows';
+    if (typeof navigator !== 'undefined') {
+      const ua = navigator.userAgent;
+      if (ua.includes('Firefox')) browser = 'Firefox';
+      else if (ua.includes('Edg/')) browser = 'Edge';
+      else if (ua.includes('OPR/') || ua.includes('Opera')) browser = 'Opera';
+      else if (ua.includes('Chrome')) browser = 'Chrome';
+      else if (ua.includes('Safari')) browser = 'Safari';
+
+      if (ua.includes('Macintosh') || ua.includes('Mac OS')) os = 'macOS';
+      else if (ua.includes('Linux')) os = 'Linux';
+      else if (ua.includes('Windows')) os = 'Windows';
+    }
+
+    resolveTabSessionId().then((sessionInfo) => {
+      if (!isMounted) return;
+      currentSid = sessionInfo.sessionId;
+
+      const userIdentifier = `${browser} • ${os} • Sessão ${currentSid.substring(0, 6).toUpperCase()}`;
+
+      const runHeartbeat = () => {
+        import('../services/templatesApi.js').then(({ templatesApi }) => {
+          if (!isMounted) return;
+          templatesApi.sendHeartbeat(currentTemplateId, {
+            sessionId: currentSid,
+            userIdentifier,
+            os,
+            browser,
+          }).catch(() => {});
+        });
+      };
+
+      runHeartbeat();
+      intervalId = setInterval(runHeartbeat, 15000);
+    });
+
+    return () => {
+      isMounted = false;
+      if (intervalId) clearInterval(intervalId);
+      if (currentSid) {
+        import('../services/templatesApi.js').then(({ templatesApi }) => {
+          templatesApi.leavePresence(currentTemplateId, currentSid);
+        });
+      }
+    };
+  }, [currentTemplateId]);
 
   // Escuta de Atalhos Globais do Teclado (Isolamento Estrito com isEditingTextInput)
   useEffect(() => {
@@ -111,13 +178,29 @@ export default function EditorLayout({
         // Apenas Ctrl+S é permitido durante edição de campo
         if (isCtrlOrCmd && (e.key === 's' || e.key === 'S')) {
           e.preventDefault();
-          saveDocumentToBackend();
+          if (saveStatus === 'conflict') {
+            setIsConflictModalOpen(true);
+          } else if (saveStatus === 'deleted') {
+            setIsDeletedModalOpen(true);
+          } else {
+            saveDocumentToBackend();
+          }
         }
         return;
       }
 
       // Atalhos do Canvas quando nenhum input de texto estiver focado
       if (isCtrlOrCmd) {
+        if (e.key === 's' || e.key === 'S') {
+          e.preventDefault();
+          if (saveStatus === 'conflict') {
+            setIsConflictModalOpen(true);
+          } else if (saveStatus === 'deleted') {
+            setIsDeletedModalOpen(true);
+          } else {
+            saveDocumentToBackend();
+          }
+        }
         if (e.key === 'z' || e.key === 'Z') {
           e.preventDefault();
           if (e.shiftKey) redo();
@@ -267,22 +350,64 @@ export default function EditorLayout({
             </div>
           )}
 
-          {/* Indicador e Ação Explícita de Salvamento (Item 223, 224, 225) */}
+          {/* Indicador e Ação Explícita de Salvamento */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-            <div className="save-status-indicator">
-              <div className={`save-status-dot ${saveStatus === 'unsaved' ? 'unsaved' : saveStatus === 'error' ? 'unsaved' : 'saved'}`} />
-              <span style={{ fontSize: '0.72rem', color: saveStatus === 'unsaved' ? 'var(--status-warning)' : saveStatus === 'error' ? 'var(--status-danger)' : 'var(--status-success)' }}>
+            <div
+              className="save-status-indicator"
+              style={{
+                cursor: saveStatus === 'conflict' || saveStatus === 'deleted' || saveStatus === 'error' ? 'pointer' : 'default',
+              }}
+              onClick={() => {
+                if (saveStatus === 'conflict') setIsConflictModalOpen(true);
+                else if (saveStatus === 'deleted') setIsDeletedModalOpen(true);
+                else if (saveStatus === 'error') saveDocumentToBackend();
+              }}
+              title={
+                saveStatus === 'conflict'
+                  ? 'Conflito de versão detectado. Clique para ver detalhes e opções de resolução.'
+                  : saveStatus === 'deleted'
+                  ? 'Este modelo foi removido no servidor. Clique para opções de recuperação.'
+                  : saveStatus === 'error'
+                  ? 'Erro ao salvar. Clique para tentar novamente.'
+                  : undefined
+              }
+            >
+              <div
+                className={`save-status-dot ${
+                  saveStatus === 'unsaved'
+                    ? 'unsaved'
+                    : saveStatus === 'error' || saveStatus === 'conflict' || saveStatus === 'deleted'
+                    ? 'unsaved'
+                    : 'saved'
+                }`}
+              />
+              <span
+                style={{
+                  fontSize: '0.72rem',
+                  fontWeight: saveStatus === 'conflict' || saveStatus === 'deleted' ? 700 : 400,
+                  color:
+                    saveStatus === 'unsaved'
+                      ? 'var(--status-warning)'
+                      : saveStatus === 'error' || saveStatus === 'conflict' || saveStatus === 'deleted'
+                      ? 'var(--status-danger)'
+                      : 'var(--status-success)',
+                }}
+              >
                 {saveStatus === 'saving'
                   ? 'Salvando...'
                   : saveStatus === 'unsaved'
                   ? 'Não salvo'
                   : saveStatus === 'error'
                   ? 'Erro ao salvar'
+                  : saveStatus === 'conflict'
+                  ? 'Conflito de versão'
+                  : saveStatus === 'deleted'
+                  ? 'Modelo removido'
                   : 'Salvo'}
               </span>
             </div>
 
-            {(saveStatus === 'unsaved' || saveStatus === 'error') && (
+            {saveStatus === 'unsaved' && (
               <button
                 className="btn"
                 style={{
@@ -300,8 +425,31 @@ export default function EditorLayout({
                 onClick={() => saveDocumentToBackend()}
                 title="Salvar modelo no servidor (Ctrl+S)"
               >
-                {saveStatus === 'saving' ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
-                <span>{saveStatus === 'error' ? 'Tentar novamente' : 'Salvar'}</span>
+                <Save size={12} />
+                <span>Salvar</span>
+              </button>
+            )}
+
+            {saveStatus === 'conflict' && (
+              <button
+                className="btn"
+                style={{
+                  padding: '0.2rem 0.55rem',
+                  fontSize: '0.72rem',
+                  fontWeight: 700,
+                  background: 'var(--status-warning)',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '4px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.3rem',
+                }}
+                onClick={() => setIsConflictModalOpen(true)}
+                title="Ver opções de resolução do conflito"
+              >
+                <AlertTriangle size={12} />
+                <span>Resolver</span>
               </button>
             )}
           </div>
@@ -703,6 +851,157 @@ export default function EditorLayout({
                 }}
               >
                 Salvar e Sair
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Conflito de Versão */}
+      {(isConflictModalOpen || saveStatus === 'conflict') && (
+        <div className="wizard-modal-overlay">
+          <div className="wizard-modal-content" style={{ maxWidth: '480px', padding: '1.5rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
+              <AlertTriangle size={20} color="var(--status-warning)" />
+              <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>
+                Conflito de Versão Detectado
+              </h3>
+            </div>
+            <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: '1rem', lineHeight: 1.5 }}>
+              Este modelo foi alterado em outro local enquanto você o editava. A versão disponível no servidor é mais recente que a versão usada para iniciar esta edição.
+            </p>
+            <p style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--status-success)', marginBottom: '1.25rem' }}>
+              ✓ Suas alterações locais foram totalmente preservadas.
+            </p>
+
+            {conflictInfo && (
+              <div
+                style={{
+                  background: 'var(--bg-secondary)',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: '6px',
+                  padding: '0.75rem',
+                  fontSize: '0.75rem',
+                  color: 'var(--text-primary)',
+                  marginBottom: '1.25rem',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.35rem',
+                }}
+              >
+                <div><strong>Versão local em edição:</strong> v{conflictInfo.expectedVersion || 1}</div>
+                <div><strong>Versão no servidor:</strong> v{conflictInfo.currentVersion || 2}</div>
+                {conflictInfo.updatedAt && (
+                  <div><strong>Data da alteração remota:</strong> {new Date(conflictInfo.updatedAt).toLocaleString('pt-BR')}</div>
+                )}
+              </div>
+            )}
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <button
+                className="btn btn-primary"
+                onClick={async () => {
+                  if (isDirty) {
+                    setIsReloadConfirmOpen(true);
+                  } else {
+                    await resolveConflictReloadRemote();
+                    setIsConflictModalOpen(false);
+                  }
+                }}
+              >
+                Carregar versão mais recente do servidor
+              </button>
+
+              <button
+                className="btn"
+                style={{ background: 'var(--accent-blue)', color: '#ffffff' }}
+                onClick={async () => {
+                  const ok = await resolveConflictSaveAsCopy();
+                  if (ok) setIsConflictModalOpen(false);
+                }}
+              >
+                Salvar minhas alterações como cópia
+              </button>
+
+              <button
+                className="btn"
+                onClick={() => {
+                  resolveConflictContinueEditing();
+                  setIsConflictModalOpen(false);
+                }}
+              >
+                Continuar editando localmente
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Confirmação de Sobrescrita do Trabalho Local ao Carregar Versão Remota */}
+      {isReloadConfirmOpen && (
+        <div className="wizard-modal-overlay" style={{ zIndex: 1100 }}>
+          <div className="wizard-modal-content" style={{ maxWidth: '400px', padding: '1.5rem' }}>
+            <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '0.5rem' }}>
+              Descartar alterações locais?
+            </h3>
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '1.25rem', lineHeight: 1.5 }}>
+              Você possui alterações locais não salvas. Ao carregar a versão mais recente do servidor, o trabalho local atual será descartado e substituído pelo modelo remoto.
+            </p>
+            <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+              <button className="btn" onClick={() => setIsReloadConfirmOpen(false)}>
+                Cancelar
+              </button>
+              <button
+                className="btn btn-primary"
+                style={{ background: 'var(--status-danger)', borderColor: 'var(--status-danger)' }}
+                onClick={async () => {
+                  setIsReloadConfirmOpen(false);
+                  await resolveConflictReloadRemote();
+                  setIsConflictModalOpen(false);
+                }}
+              >
+                Sim, descartar e recarregar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Modelo Removido no Servidor */}
+      {(isDeletedModalOpen || saveStatus === 'deleted') && (
+        <div className="wizard-modal-overlay">
+          <div className="wizard-modal-content" style={{ maxWidth: '440px', padding: '1.5rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
+              <AlertTriangle size={20} color="var(--status-danger)" />
+              <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>
+                Modelo Não Encontrado no Servidor
+              </h3>
+            </div>
+            <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: '1rem', lineHeight: 1.5 }}>
+              Este modelo não existe mais no servidor (pode ter sido excluído por outro usuário).
+            </p>
+            <p style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--status-success)', marginBottom: '1.25rem' }}>
+              ✓ Suas alterações locais continuam disponíveis no canvas.
+            </p>
+
+            <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+              <button
+                className="btn"
+                onClick={() => {
+                  setIsDeletedModalOpen(false);
+                  onBackToDashboard?.();
+                }}
+              >
+                Voltar para Meus Modelos
+              </button>
+              <button
+                className="btn btn-primary"
+                onClick={async () => {
+                  const ok = await resolveDeletedSaveAsNew();
+                  if (ok) setIsDeletedModalOpen(false);
+                }}
+              >
+                Salvar como novo modelo
               </button>
             </div>
           </div>

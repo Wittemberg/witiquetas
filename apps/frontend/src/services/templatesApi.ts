@@ -130,7 +130,50 @@ export const templatesApi = {
 
     if (!res.ok) {
       const errData = await res.json().catch(() => ({}));
-      throw new ApiError(res.status, errData.error || 'Falha ao remover modelo.', errData);
+      throw new ApiError(res.status, errData.message || errData.error || 'Falha ao remover modelo.', errData);
     }
+  },
+
+  /**
+   * Enviar heartbeat de presença de edição
+   */
+  async sendHeartbeat(
+    id: string,
+    payload: { sessionId: string; userIdentifier: string; os?: string; browser?: string; deviceName?: string }
+  ): Promise<any> {
+    const res = await fetch(`${API_BASE}/${id}/presence/heartbeat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new ApiError(res.status, errData.error || 'Falha no heartbeat.', errData);
+    }
+    return res.json();
+  },
+
+  /**
+   * Notificar saída da presença de edição
+   */
+  async leavePresence(id: string, sessionId: string): Promise<void> {
+    await fetch(`${API_BASE}/${id}/presence/leave`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId }),
+    }).catch(() => {});
+  },
+
+  /**
+   * Buscar presença ativa do modelo
+   */
+  async getPresence(id: string): Promise<any> {
+    const res = await fetch(`${API_BASE}/${id}/presence`);
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new ApiError(res.status, errData.error || 'Falha ao buscar presença.', errData);
+    }
+    return res.json();
   },
 };

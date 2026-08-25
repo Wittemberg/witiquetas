@@ -280,7 +280,9 @@ interface EditorState {
   previewScenario: 'normal' | 'promo' | 'custom'; // Cenário de teste (Item 285)
   mockProductData: Record<string, string>;
   isDirty: boolean;
-  saveStatus: 'saved' | 'unsaved' | 'saving' | 'error';
+  saveStatus: 'saved' | 'unsaved' | 'saving' | 'error' | 'conflict' | 'deleted';
+  conflictInfo: { expectedVersion?: number; currentVersion?: number; updatedAt?: string } | null;
+  editingSessionId: string | null;
   currentTemplateId: string | null;
   currentTemplateVersion: number | null;
 
@@ -304,7 +306,11 @@ interface EditorState {
   createNewDocument: (params: CreateNewDocumentParams) => void;
   updateDimensions: (widthMm: number, heightMm: number, dpi: 203 | 300 | 600) => void;
   saveDocumentToBackend: () => Promise<boolean>;
-  setSaveStatus: (status: 'saved' | 'unsaved' | 'saving' | 'error') => void;
+  setSaveStatus: (status: 'saved' | 'unsaved' | 'saving' | 'error' | 'conflict' | 'deleted') => void;
+  resolveConflictSaveAsCopy: () => Promise<boolean>;
+  resolveConflictReloadRemote: () => Promise<boolean>;
+  resolveConflictContinueEditing: () => void;
+  resolveDeletedSaveAsNew: () => Promise<boolean>;
   
   // Seleção
   setSelectedElementId: (id: string | null) => void;
@@ -380,6 +386,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   mockProductData: { ...MOCK_PRODUCT_DATA },
   isDirty: false,
   saveStatus: 'saved',
+  conflictInfo: null,
+  editingSessionId: null,
   currentTemplateId: null,
   currentTemplateVersion: null,
 
@@ -1117,8 +1125,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }
   },
 
-  markSaved: () => set({ isDirty: false, saveStatus: 'saved' }),
-
   saveDocumentToBackend: async () => {
     const { document, currentTemplateId, currentTemplateVersion } = get();
     set({ saveStatus: 'saving' });
@@ -1138,6 +1144,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           currentTemplateVersion: updated.version,
           saveStatus: 'saved',
           isDirty: false,
+          conflictInfo: null,
         });
       } else {
         const created = await templatesApi.createTemplate({
@@ -1151,14 +1158,131 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           currentTemplateVersion: created.version,
           saveStatus: 'saved',
           isDirty: false,
+          conflictInfo: null,
         });
       }
       return true;
     } catch (err: any) {
       console.error('[EditorStore] Falha no salvamento no backend:', err);
-      // REGRA: Em caso de erro (ex: 409 Conflito ou indisponibilidade de rede),
-      // mantém o documento aberto e as alterações vivas em memória local sem descartar nada
-      set({ saveStatus: 'error' });
+      if (err?.data?.code === 'MODEL_VERSION_CONFLICT' || err?.status === 409) {
+        set({
+          saveStatus: 'conflict',
+          isDirty: true,
+          conflictInfo: {
+            expectedVersion: err.data?.expectedVersion || currentTemplateVersion || 1,
+            currentVersion: err.data?.currentVersion || 2,
+            updatedAt: err.data?.updatedAt || new Date().toISOString(),
+          },
+        });
+      } else if (err?.data?.code === 'MODEL_NOT_FOUND' || err?.status === 404) {
+        set({
+          saveStatus: 'deleted',
+          isDirty: true,
+          conflictInfo: null,
+        });
+      } else {
+        set({
+          saveStatus: 'error',
+          isDirty: true,
+          conflictInfo: null,
+        });
+      }
+      return false;
+    }
+  },
+
+  resolveConflictSaveAsCopy: async () => {
+    const { document } = get();
+    const copyTitle = `${document.title || 'Etiqueta'} — Cópia em conflito`;
+    const localDocCopy: LabelDocument = JSON.parse(JSON.stringify(document));
+    localDocCopy.title = copyTitle;
+
+    try {
+      const { templatesApi } = await import('../services/templatesApi.js');
+      const created = await templatesApi.createTemplate({
+        title: copyTitle,
+        name: copyTitle,
+        scope: 'COMPANY',
+        document: localDocCopy,
+      });
+
+      set({
+        document: localDocCopy,
+        currentTemplateId: created.id,
+        currentTemplateVersion: created.version,
+        saveStatus: 'saved',
+        isDirty: false,
+        conflictInfo: null,
+        history: [localDocCopy],
+        historyIndex: 0,
+      });
+      return true;
+    } catch (err) {
+      console.error('[EditorStore] Erro ao salvar como cópia em conflito:', err);
+      return false;
+    }
+  },
+
+  resolveConflictReloadRemote: async () => {
+    const { currentTemplateId } = get();
+    if (!currentTemplateId) return false;
+
+    try {
+      const { templatesApi } = await import('../services/templatesApi.js');
+      const remote = await templatesApi.getTemplateById(currentTemplateId);
+      const normalized = normalizeDocumentGeometry(remote.document);
+
+      set({
+        document: normalized,
+        currentTemplateVersion: remote.version,
+        saveStatus: 'saved',
+        isDirty: false,
+        conflictInfo: null,
+        history: [normalized],
+        historyIndex: 0,
+      });
+      return true;
+    } catch (err) {
+      console.error('[EditorStore] Erro ao carregar versão remota:', err);
+      return false;
+    }
+  },
+
+  resolveConflictContinueEditing: () => {
+    set({
+      saveStatus: 'conflict',
+      isDirty: true,
+    });
+  },
+
+  resolveDeletedSaveAsNew: async () => {
+    const { document } = get();
+    const newTitle = `${document.title || 'Etiqueta'} (Novo)`;
+    const localDocCopy: LabelDocument = JSON.parse(JSON.stringify(document));
+    localDocCopy.title = newTitle;
+
+    try {
+      const { templatesApi } = await import('../services/templatesApi.js');
+      const created = await templatesApi.createTemplate({
+        title: newTitle,
+        name: newTitle,
+        scope: 'COMPANY',
+        document: localDocCopy,
+      });
+
+      set({
+        document: localDocCopy,
+        currentTemplateId: created.id,
+        currentTemplateVersion: created.version,
+        saveStatus: 'saved',
+        isDirty: false,
+        conflictInfo: null,
+        history: [localDocCopy],
+        historyIndex: 0,
+      });
+      return true;
+    } catch (err) {
+      console.error('[EditorStore] Erro ao salvar como novo após exclusão remota:', err);
       return false;
     }
   },

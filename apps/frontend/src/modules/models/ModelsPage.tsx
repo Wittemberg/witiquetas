@@ -74,6 +74,8 @@ export const ModelsPage: React.FC<ModelsPageProps> = ({ onOpenModel, onCreateNew
     }
   };
 
+  const [blockedSessions, setBlockedSessions] = useState<any[] | null>(null);
+
   const handleConfirmDelete = async () => {
     if (!deleteTarget) return;
     setActionLoading(true);
@@ -82,7 +84,11 @@ export const ModelsPage: React.FC<ModelsPageProps> = ({ onOpenModel, onCreateNew
       setDeleteTarget(null);
       await fetchTemplates(searchQuery);
     } catch (err: any) {
-      alert(`Falha ao excluir modelo: ${err.message}`);
+      if (err?.data?.code === 'MODEL_EDITING_ACTIVE' || err?.data?.activeSessions) {
+        setBlockedSessions(err.data.activeSessions || []);
+      } else {
+        alert(`Falha ao excluir modelo: ${err.message}`);
+      }
     } finally {
       setActionLoading(false);
     }
@@ -293,7 +299,7 @@ export const ModelsPage: React.FC<ModelsPageProps> = ({ onOpenModel, onCreateNew
         />
       )}
 
-      {deleteTarget && (
+      {deleteTarget && !blockedSessions && (
         <DeleteModelModal
           isOpen={!!deleteTarget}
           modelTitle={deleteTarget.title}
@@ -301,6 +307,57 @@ export const ModelsPage: React.FC<ModelsPageProps> = ({ onOpenModel, onCreateNew
           onClose={() => setDeleteTarget(null)}
           isLoading={actionLoading}
         />
+      )}
+
+      {/* Modal de Exclusão Bloqueada por Sessão Ativa */}
+      {blockedSessions && (
+        <div className="wizard-modal-overlay">
+          <div className="wizard-modal-content" style={{ maxWidth: '460px', padding: '1.5rem' }}>
+            <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '0.5rem' }}>
+              Este modelo está sendo editado no momento
+            </h3>
+            <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: '1rem', lineHeight: 1.5 }}>
+              Para evitar perda de trabalho, a exclusão foi bloqueada porque há sessão(ões) ativa(s) editando este modelo:
+            </p>
+
+            <div
+              style={{
+                background: 'var(--bg-secondary)',
+                border: '1px solid var(--border-color)',
+                borderRadius: '6px',
+                padding: '0.75rem',
+                fontSize: '0.78rem',
+                color: 'var(--text-primary)',
+                marginBottom: '1.25rem',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.4rem',
+                maxHeight: '160px',
+                overflowY: 'auto',
+              }}
+            >
+              {blockedSessions.map((s, idx) => (
+                <div key={idx} style={{ paddingBottom: '0.25rem', borderBottom: idx < blockedSessions.length - 1 ? '1px solid var(--border-color)' : 'none' }}>
+                  <div><strong>Identificação:</strong> {s.userIdentifier || 'Sessão de Edição'}</div>
+                  {s.browser && <div><strong>Navegador / Sistema:</strong> {s.browser} {s.os ? `(${s.os})` : ''}</div>}
+                  {s.lastSeenAt && <div><strong>Última atividade:</strong> {new Date(s.lastSeenAt).toLocaleTimeString('pt-BR')}</div>}
+                </div>
+              ))}
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <button
+                className="btn btn-primary"
+                onClick={() => {
+                  setBlockedSessions(null);
+                  setDeleteTarget(null);
+                }}
+              >
+                Entendi
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -6,6 +6,7 @@ import type {
   CreateTemplateDTO,
   UpdateTemplateDTO,
 } from '@witiquetas/contracts';
+import { presenceRepository, ActiveEditingSessionError } from './presenceRepository';
 
 export class MismatchedVersionError extends Error {
   currentVersion: number;
@@ -461,25 +462,46 @@ export const templateRepository = {
   },
 
   /**
-   * Soft Delete do modelo (deleted_at = NOW())
+   * Soft Delete do modelo (deleted_at = NOW()) com bloqueio atômico contra sessões em edição
    */
   async deleteTemplate(id: string, companyId: string): Promise<void> {
+    const active = await presenceRepository.getActiveSessions(id, companyId);
+    if (active.length > 0) {
+      throw new ActiveEditingSessionError(active);
+    }
+
     if (!pgPool) {
       if (isProduction) {
         throw new Error('FAIL-CLOSED: Conexão PostgreSQL indisponível em ambiente de produção.');
       }
       const existing = memoryStore.get(id);
-      if (existing && (existing.companyId === companyId || companyId === 'comp-default')) {
-        memoryStore.delete(id);
+      if (!existing || (existing.companyId !== companyId && companyId !== 'comp-default')) {
+        throw new Error(`Modelo "${id}" não encontrado ou já excluído.`);
       }
+      memoryStore.delete(id);
       return;
     }
 
-    await pgPool.query(
-      `UPDATE label_templates
+    const res = await pgPool.query(
+      `UPDATE label_templates t
        SET deleted_at = NOW()
-       WHERE id = $1 AND company_id = $2 AND deleted_at IS NULL`,
+       WHERE t.id = $1 AND t.company_id = $2 AND t.deleted_at IS NULL
+         AND NOT EXISTS (
+           SELECT 1 FROM editing_sessions s
+           WHERE s.company_id = t.company_id
+             AND s.model_id = t.id
+             AND s.last_seen_at >= NOW() - INTERVAL '45 seconds'
+         )
+       RETURNING t.id`,
       [id, companyId]
     );
+
+    if (res.rows.length === 0) {
+      const freshActive = await presenceRepository.getActiveSessions(id, companyId);
+      if (freshActive.length > 0) {
+        throw new ActiveEditingSessionError(freshActive);
+      }
+      throw new Error(`Modelo "${id}" não encontrado ou já excluído.`);
+    }
   },
 };

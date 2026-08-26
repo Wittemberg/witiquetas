@@ -56,10 +56,31 @@ interface VersionResponse {
   timestamp: string;
 }
 
+const parseHash = (hashStr: string) => {
+  const clean = (hashStr || '').replace(/^#/, '');
+  if (!clean) return { module: 'home', templateId: null };
+
+  if (clean.startsWith('editor/')) {
+    const id = clean.substring(7);
+    return { module: 'editor', templateId: id || null };
+  }
+  if (clean.startsWith('editor?template=')) {
+    const id = clean.split('template=')[1];
+    return { module: 'editor', templateId: id || null };
+  }
+  if (clean === 'editor') {
+    return { module: 'editor', templateId: null };
+  }
+  return { module: clean, templateId: null };
+};
+
 export default function App() {
   const [currentModule, setCurrentModule] = useState<string>(() => {
-    const hash = window.location.hash.replace('#', '');
-    return hash || 'home';
+    const parsed = parseHash(window.location.hash);
+    if (parsed.module === 'editor' && parsed.templateId) {
+      return `editor/${parsed.templateId}`;
+    }
+    return parsed.module || 'home';
   });
 
   const [health, setHealth] = useState<HealthResponse | null>(null);
@@ -90,6 +111,34 @@ export default function App() {
       window.location.hash = currentModule;
     }
   }, [currentModule]);
+
+  // Sincronizar modelo pela rota de hash (#editor/:templateId) para duplicação de aba/F5
+  useEffect(() => {
+    const handleHashSync = async () => {
+      const parsed = parseHash(window.location.hash);
+      if (parsed.module === 'editor' && parsed.templateId) {
+        const store = useEditorStore.getState();
+        if (store.currentTemplateId !== parsed.templateId) {
+          try {
+            const template = await templatesApi.getTemplateById(parsed.templateId);
+            store.setDocument(template.document, template.id, template.version);
+            setCurrentModule(`editor/${parsed.templateId}`);
+          } catch (err: any) {
+            console.error('[App] Erro ao carregar modelo da rota:', err);
+          }
+        }
+      } else if (parsed.module === 'editor' && !parsed.templateId) {
+        const store = useEditorStore.getState();
+        if (store.currentTemplateId) {
+          setCurrentModule(`editor/${store.currentTemplateId}`);
+        }
+      }
+    };
+
+    handleHashSync();
+    window.addEventListener('hashchange', handleHashSync);
+    return () => window.removeEventListener('hashchange', handleHashSync);
+  }, []);
 
   const toggleTheme = () => {
     setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
@@ -132,7 +181,7 @@ export default function App() {
     try {
       const template = await templatesApi.getTemplateById(id);
       useEditorStore.getState().setDocument(template.document, template.id, template.version);
-      setCurrentModule('editor');
+      setCurrentModule(`editor/${id}`);
     } catch (err: any) {
       alert(`Erro ao abrir o modelo: ${err.message}`);
     }
@@ -142,7 +191,8 @@ export default function App() {
   const minioStatus = health?.services?.minio;
 
   const renderModuleContent = () => {
-    switch (currentModule) {
+    const activeModule = currentModule.startsWith('editor') ? 'editor' : currentModule;
+    switch (activeModule) {
       case 'models':
         return (
           <ModelsPage
@@ -506,8 +556,9 @@ export default function App() {
         isOpen={isWizardOpen}
         onClose={() => setIsWizardOpen(false)}
         onSuccess={() => {
+          const createdId = useEditorStore.getState().currentTemplateId;
           setIsWizardOpen(false);
-          setCurrentModule('editor');
+          setCurrentModule(createdId ? `editor/${createdId}` : 'editor');
         }}
       />
 

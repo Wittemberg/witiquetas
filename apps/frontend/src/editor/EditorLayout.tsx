@@ -113,10 +113,20 @@ export default function EditorLayout({
   const [isReloadConfirmOpen, setIsReloadConfirmOpen] = useState(false);
   const [isSavingCopy, setIsSavingCopy] = useState(false);
 
+  const openConflictModal = () => {
+    setIsConflictModalOpen(true);
+    setIsReloadConfirmOpen(false);
+  };
+
+  const closeConflictModal = () => {
+    setIsConflictModalOpen(false);
+    setIsReloadConfirmOpen(false);
+  };
+
   // Abrir modal de conflito automaticamente quando saveStatus alternar para conflict
   useEffect(() => {
     if (saveStatus === 'conflict') {
-      setIsConflictModalOpen(true);
+      openConflictModal();
     }
   }, [saveStatus]);
 
@@ -188,7 +198,7 @@ export default function EditorLayout({
         if (isCtrlOrCmd && (e.key === 's' || e.key === 'S')) {
           e.preventDefault();
           if (saveStatus === 'conflict') {
-            setIsConflictModalOpen(true);
+            openConflictModal();
           } else if (saveStatus === 'deleted') {
             setIsDeletedModalOpen(true);
           } else {
@@ -203,7 +213,7 @@ export default function EditorLayout({
         if (e.key === 's' || e.key === 'S') {
           e.preventDefault();
           if (saveStatus === 'conflict') {
-            setIsConflictModalOpen(true);
+            openConflictModal();
           } else if (saveStatus === 'deleted') {
             setIsDeletedModalOpen(true);
           } else {
@@ -367,7 +377,7 @@ export default function EditorLayout({
                 cursor: saveStatus === 'conflict' || saveStatus === 'deleted' || saveStatus === 'error' ? 'pointer' : 'default',
               }}
               onClick={() => {
-                if (saveStatus === 'conflict') setIsConflictModalOpen(true);
+                if (saveStatus === 'conflict') openConflictModal();
                 else if (saveStatus === 'deleted') setIsDeletedModalOpen(true);
                 else if (saveStatus === 'error') saveDocumentToBackend();
               }}
@@ -453,11 +463,11 @@ export default function EditorLayout({
                   alignItems: 'center',
                   gap: '0.3rem',
                 }}
-                onClick={() => setIsConflictModalOpen(true)}
-                title="Ver opções de resolução do conflito"
+                onClick={openConflictModal}
+                title="Este modelo possui alterações concorrentes. Clique para resolver."
               >
                 <AlertTriangle size={12} />
-                <span>Resolver</span>
+                <span>Conflito</span>
               </button>
             )}
           </div>
@@ -910,10 +920,15 @@ export default function EditorLayout({
                 className="btn btn-primary"
                 onClick={async () => {
                   if (isDirty) {
+                    setIsConflictModalOpen(false);
                     setIsReloadConfirmOpen(true);
                   } else {
-                    await resolveConflictReloadRemote();
-                    setIsConflictModalOpen(false);
+                    const success = await resolveConflictReloadRemote();
+                    if (!success) {
+                      alert('Não foi possível carregar a versão mais recente. Tente novamente.');
+                    } else {
+                      closeConflictModal();
+                    }
                   }
                 }}
               >
@@ -924,8 +939,13 @@ export default function EditorLayout({
                 className="btn"
                 style={{ background: 'var(--accent-blue)', color: '#ffffff' }}
                 onClick={async () => {
-                  const ok = await resolveConflictSaveAsCopy();
-                  if (ok) setIsConflictModalOpen(false);
+                  setIsSavingCopy(true);
+                  try {
+                    const ok = await resolveConflictSaveAsCopy();
+                    if (ok) closeConflictModal();
+                  } finally {
+                    setIsSavingCopy(false);
+                  }
                 }}
               >
                 Salvar minhas alterações como cópia
@@ -935,7 +955,7 @@ export default function EditorLayout({
                 className="btn"
                 onClick={() => {
                   resolveConflictContinueEditing();
-                  setIsConflictModalOpen(false);
+                  closeConflictModal();
                 }}
               >
                 Continuar editando localmente
@@ -956,7 +976,13 @@ export default function EditorLayout({
               Você possui alterações locais não salvas. Ao carregar a versão mais recente do servidor, o trabalho local atual será descartado e substituído pelo modelo remoto.
             </p>
             <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
-              <button className="btn" onClick={() => setIsReloadConfirmOpen(false)}>
+              <button
+                className="btn"
+                onClick={() => {
+                  setIsReloadConfirmOpen(false);
+                  setIsConflictModalOpen(true);
+                }}
+              >
                 Cancelar
               </button>
               <button
@@ -964,8 +990,12 @@ export default function EditorLayout({
                 style={{ background: 'var(--status-danger)', borderColor: 'var(--status-danger)' }}
                 onClick={async () => {
                   setIsReloadConfirmOpen(false);
-                  await resolveConflictReloadRemote();
-                  setIsConflictModalOpen(false);
+                  const success = await resolveConflictReloadRemote();
+                  if (!success) {
+                    alert('Não foi possível carregar a versão mais recente. Tente novamente.');
+                  } else {
+                    closeConflictModal();
+                  }
                 }}
               >
                 Sim, descartar e recarregar

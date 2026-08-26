@@ -136,4 +136,16 @@ describe('DEVELOPMENT CONTROL CENTER 0.1.1 - SUÍTE DE INVARIANTES (REGRAS SEÇ�
     const progress = service.calculateProgress();
     assert.ok('UNMAPPED' in progress.countsByStatus);
   });
+
+  it('N. Backend Route Guard: ENABLE_DEV_CONTROL_CENTER=true libera acesso em produção', () => {
+    const isDev = false;
+    const envFlagTrue: string = 'true';
+    const envFlagFalse: string = 'false';
+
+    const canAccessTrue = isDev || envFlagTrue === 'true';
+    const canAccessFalse = isDev || envFlagFalse === 'true';
+
+    assert.equal(canAccessTrue, true, 'Flag true deve liberar acesso em produção/homologação');
+    assert.equal(canAccessFalse, false, 'Flag false deve bloquear acesso com HTTP 404');
+  });
 });

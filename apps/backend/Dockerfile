@@ -44,6 +44,7 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 ENV PORT=3000
+ENV ENABLE_DEV_CONTROL_CENTER=true
 
 # Copia a estrutura completa compilada com as node_modules hoisted do monorepo
 COPY --from=builder /app ./

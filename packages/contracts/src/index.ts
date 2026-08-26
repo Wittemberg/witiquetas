@@ -451,5 +451,4 @@ export interface CreateImageLibraryItemDTO {
 // UTILITÁRIOS DE CODIFICAÇÃO TÉRMICA (WINDOWS-1252 / UTF-8 / ASCII)
 // ==========================================
 export * from './encoding.js';
-
-
+export * from './development.js';

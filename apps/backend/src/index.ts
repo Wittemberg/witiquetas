@@ -152,10 +152,14 @@ import printersRouter from './routes/printers';
 import printJobsRouter from './routes/printJobs';
 import qrcodesRouter from './routes/qrcodes';
 import authRouter from './routes/auth';
+import developmentControlRouter from './routes/developmentControl.js';
 
 // Suporta tanto rotas diretas quanto rotas com prefixo /api (conforme Traefik/Nginx)
 app.use('/auth', authRouter);
 app.use('/api/auth', authRouter);
+
+app.use('/development-control', developmentControlRouter);
+app.use('/api/development-control', developmentControlRouter);
 
 app.use('/templates', templatesRouter);
 app.use('/api/templates', templatesRouter);

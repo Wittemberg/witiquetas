@@ -1,0 +1,10 @@
+{
+  "projectId": "witiquetas",
+  "name": "Witiquetas",
+  "description": "Plataforma multinicho para criação, integração, gerenciamento e impressão de etiquetas térmicas industriais e comerciais, independente de ERP e linguagem de impressão.",
+  "currentPhase": "3.5",
+  "mvpTarget": "Fase 0 a 3.5 (Editor Confiável, Model Lifecycle, Data Binding, Compiladores PPLA/PPLB, Agente Local, Shell Respondivo e Concorrência Segura)",
+  "roadmapVersion": 1,
+  "lastReviewedAt": "2026-08-26T15:30:00Z",
+  "environment": "development"
+}

@@ -25,6 +25,7 @@ import { ensurePreRbacSession } from './auth/session.js';
 import { ApplicationShell } from './shell/ApplicationShell.js';
 import { ModelsPage } from './modules/models/ModelsPage.js';
 import { PlaceholderModulePage } from './modules/common/PlaceholderModulePage.js';
+import { DevControlPage } from './modules/devcontrol/DevControlPage.js';
 import { templatesApi } from './services/templatesApi.js';
 import { useEditorStore } from './editor/useEditorStore.js';
 
@@ -267,6 +268,13 @@ export default function App() {
             title="Administração"
             icon={Settings}
             description="Gerencie configurações e recursos da sua organização."
+            onGoHome={() => setCurrentModule('home')}
+          />
+        );
+
+      case 'development':
+        return (
+          <DevControlPage
             onGoHome={() => setCurrentModule('home')}
           />
         );

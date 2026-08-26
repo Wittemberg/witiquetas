@@ -10,7 +10,9 @@ import {
   Settings,
   ChevronLeft,
   Tag,
+  Gauge,
 } from 'lucide-react';
+import { isDevControlCenterEnabled } from '../services/devControlApi.js';
 
 export interface NavItem {
   id: string;
@@ -20,7 +22,7 @@ export interface NavItem {
   path: string;
 }
 
-export const NAV_ITEMS: NavItem[] = [
+export const BASE_NAV_ITEMS: NavItem[] = [
   {
     id: 'home',
     label: 'Início',
@@ -78,6 +80,22 @@ export const NAV_ITEMS: NavItem[] = [
     path: '/admin',
   },
 ];
+
+export const getNavItems = (): NavItem[] => {
+  const items = [...BASE_NAV_ITEMS];
+  if (isDevControlCenterEnabled()) {
+    items.push({
+      id: 'development',
+      label: 'Desenvolvimento',
+      icon: Gauge,
+      description: 'Development Control Center',
+      path: '#development',
+    });
+  }
+  return items;
+};
+
+export const NAV_ITEMS = getNavItems();
 
 interface SidebarProps {
   currentModule: string;
@@ -151,7 +169,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
 
         <nav className="sidebar-nav">
-          {NAV_ITEMS.map((item) => {
+          {getNavItems().map((item) => {
             const isActive = currentModule === item.id;
             const IconComponent = item.icon;
             return (

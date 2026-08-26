@@ -1,0 +1,95 @@
+{
+  "checkpoints": [
+    {
+      "sha": "c337bbfa6662c185fc60e37c352a8d44721b05cd",
+      "shortSha": "c337bbf",
+      "date": "2026-08-26T17:25:40Z",
+      "phase": "3.5",
+      "patch": "3.2.8.4",
+      "title": "ci(workflow): adicionar suporte a workflow_dispatch e estabilização de toolbar",
+      "type": "INFRA",
+      "capabilities": ["cap-toolbar-geometry-stabilization", "cap-docker-cicd"],
+      "testsPassed": true,
+      "deployed": true,
+      "manualValidation": true
+    },
+    {
+      "sha": "70553f92702a8b5feeb12c1a4061351877ac83c5",
+      "shortSha": "70553f9",
+      "date": "2026-08-26T14:12:00Z",
+      "phase": "3.5",
+      "patch": "3.2.8.4",
+      "title": "fix(editor): estabilizar largura do status na toolbar",
+      "type": "UX",
+      "capabilities": ["cap-toolbar-geometry-stabilization"],
+      "testsPassed": true,
+      "deployed": true,
+      "manualValidation": true
+    },
+    {
+      "sha": "9dce9b46870a7d2333c65ab9b41cbce3980aa72e",
+      "shortSha": "9dce9b4",
+      "date": "2026-08-26T11:55:00Z",
+      "phase": "3.5",
+      "patch": "3.2.8.3",
+      "title": "fix(concurrency): corrigir resolução e contexto de abas",
+      "type": "FIX",
+      "capabilities": ["cap-concurrency-presence"],
+      "testsPassed": true,
+      "deployed": true,
+      "manualValidation": true
+    },
+    {
+      "sha": "412597eb3d3e9c5f8df241857904791d24efefbf",
+      "shortSha": "412597e",
+      "date": "2026-08-26T11:46:00Z",
+      "phase": "3.5",
+      "patch": "3.2.8.2",
+      "title": "fix(concurrency): corrigir resolução de conflitos e modais",
+      "type": "FIX",
+      "capabilities": ["cap-concurrency-presence"],
+      "testsPassed": true,
+      "deployed": true,
+      "manualValidation": true
+    },
+    {
+      "sha": "27b006ad94a08157777174db26e952aa1c6ca1e2",
+      "shortSha": "27b006a",
+      "date": "2026-08-26T11:00:00Z",
+      "phase": "3.5",
+      "patch": "3.2.8.1",
+      "title": "fix(editor): corrigir runtime do modal de conflito",
+      "type": "HOTFIX",
+      "capabilities": ["cap-concurrency-presence"],
+      "testsPassed": true,
+      "deployed": true,
+      "manualValidation": true
+    },
+    {
+      "sha": "31c972a91262d9894e6b219cf41d2dfddfbb2041",
+      "shortSha": "31c972a",
+      "date": "2026-08-26T10:00:00Z",
+      "phase": "3.5",
+      "patch": "3.2.8",
+      "title": "fix(ci): ampliar janela de validação do deploy Portainer",
+      "type": "INFRA",
+      "capabilities": ["cap-docker-cicd"],
+      "testsPassed": true,
+      "deployed": true,
+      "manualValidation": true
+    },
+    {
+      "sha": "5efc230fa392ef4fa3097b69335a9603cb5d8b76",
+      "shortSha": "5efc230",
+      "date": "2026-08-26T09:00:00Z",
+      "phase": "3.5",
+      "patch": "3.2.8",
+      "title": "feat(models): adicionar presença de edição e resolução de conflitos",
+      "type": "FEATURE",
+      "capabilities": ["cap-concurrency-presence"],
+      "testsPassed": true,
+      "deployed": true,
+      "manualValidation": true
+    }
+  ]
+}

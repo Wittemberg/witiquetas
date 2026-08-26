@@ -1,0 +1,421 @@
+{
+  "phases": [
+    {
+      "id": "phase-0",
+      "code": "0",
+      "name": "Fase 0 — Fundação e Validação de Conectividade",
+      "description": "Base executável monorepo, containers Docker, backend Node.js/PostgreSQL/MinIO, CI/CD GitHub Actions e Portainer.",
+      "status": "FROZEN",
+      "capabilities": [
+        {
+          "id": "cap-monorepo-setup",
+          "name": "Arquitetura Monorepo e Workspace Node/TypeScript",
+          "description": "Estruturação dos apps e pacotes compartilhados (contracts, label-schema, printer-core, printer-ppla, printer-pplb).",
+          "module": "foundation",
+          "weight": 8,
+          "mvp": true,
+          "status": "FROZEN",
+          "manualValidation": true,
+          "physicalValidation": false,
+          "frozen": true,
+          "evidence": ["packages/contracts", "packages/label-schema", "packages/printer-core"],
+          "dependencies": [],
+          "notes": ["Estrutura base mantida intacta desde a Fase 0."]
+        },
+        {
+          "id": "cap-docker-cicd",
+          "name": "Containers Docker, GHCR, GitHub Actions e Portainer CD",
+          "description": "Esteira CI/CD zero-rebuild com promoção imutável candidate -> production/stable e auto-rollback.",
+          "module": "deployment-cicd",
+          "weight": 10,
+          "mvp": true,
+          "status": "FROZEN",
+          "manualValidation": true,
+          "physicalValidation": false,
+          "frozen": true,
+          "evidence": [".github/workflows/docker.yml", "apps/backend/Dockerfile", "apps/frontend/Dockerfile"],
+          "dependencies": ["cap-monorepo-setup"],
+          "notes": ["Validação continua e automatizada via webhook e auto-rollback guard em 150s."]
+        },
+        {
+          "id": "cap-infra-storage-db",
+          "name": "Infraestrutura de Banco PostgreSQL e Storage MinIO/S3",
+          "description": "Fail-Closed PostgreSQL para metadados/modelos e MinIO para imagens com rotas de health check /api/health.",
+          "module": "foundation",
+          "weight": 8,
+          "mvp": true,
+          "status": "FROZEN",
+          "manualValidation": true,
+          "physicalValidation": false,
+          "frozen": true,
+          "evidence": ["apps/backend/src/db.ts", "apps/backend/src/index.ts"],
+          "dependencies": ["cap-monorepo-setup"],
+          "notes": ["Health checks e estatísticas operacionais em tempo real."]
+        }
+      ]
+    },
+    {
+      "id": "phase-1",
+      "code": "1",
+      "name": "Fase 1 — Editor Visual e Schema Abstrato",
+      "description": "Interface visual para montagem de etiquetas térmicas independente de linguagem física com serialização LabelDocument v1.",
+      "status": "FROZEN",
+      "capabilities": [
+        {
+          "id": "cap-canvas-core",
+          "name": "Canvas Interativo com Zoom, Grid, Snap e Bounds Clamping",
+          "description": "Área de trabalho física com dimensões reais em mm, DPI, rotação, zoom responsivo e travamento nas bordas.",
+          "module": "editor-core",
+          "weight": 12,
+          "mvp": true,
+          "status": "FROZEN",
+          "manualValidation": true,
+          "physicalValidation": false,
+          "frozen": true,
+          "evidence": ["apps/frontend/src/editor/CanvasArea.tsx", "apps/frontend/src/editor/bounds.ts"],
+          "dependencies": ["cap-monorepo-setup"],
+          "notes": ["Congelado para proteger manipulação geométrica do canvas."]
+        },
+        {
+          "id": "cap-visual-elements",
+          "name": "Componentes Visuais (Price, Line, Text, Barcode, QRCode)",
+          "description": "Elementos visuais canônicos do schema abstrato com renderização vetorial e suporte a second line scale.",
+          "module": "elements",
+          "weight": 10,
+          "mvp": true,
+          "status": "FROZEN",
+          "manualValidation": true,
+          "physicalValidation": false,
+          "frozen": true,
+          "evidence": ["apps/frontend/src/editor/components/PriceElement.tsx", "apps/frontend/src/editor/components/LineElement.tsx"],
+          "dependencies": ["cap-canvas-core"],
+          "notes": ["Componentes Price, Line e Multiselect formalmente congelados."]
+        },
+        {
+          "id": "cap-undo-redo-state",
+          "name": "Gestão de Estado Reativa e Histórico Undo/Redo",
+          "description": "Editor store desacoplada com imutabilidade e pilha de desfazer/refazer.",
+          "module": "editor-core",
+          "weight": 8,
+          "mvp": true,
+          "status": "FROZEN",
+          "manualValidation": true,
+          "physicalValidation": false,
+          "frozen": true,
+          "evidence": ["apps/frontend/src/editor/useEditorStore.ts"],
+          "dependencies": ["cap-canvas-core"],
+          "notes": ["Store desacoplada de presenças e histórico."]
+        }
+      ]
+    },
+    {
+      "id": "phase-2",
+      "code": "2",
+      "name": "Fase 2 — Compiladores PPLA/PPLB e Preprocessador Legado",
+      "description": "Motor de compilação RAW de baixo nível para impressoras Argox/PPLA/PPLB, parser de macros ERP e Round-Trip Diff Zero.",
+      "status": "HOMOLOGATED",
+      "capabilities": [
+        {
+          "id": "cap-pplb-compiler",
+          "name": "Compilador PPLB com Mapeamento de Fontes e Métricas Físicas",
+          "description": "Geração nativa de comandos PPLB (Q, q, N, N, B, A) com conversão exata dotsToMm e mmToDots.",
+          "module": "compilers",
+          "weight": 12,
+          "mvp": true,
+          "status": "FROZEN",
+          "manualValidation": true,
+          "physicalValidation": true,
+          "frozen": true,
+          "evidence": ["packages/printer-pplb"],
+          "dependencies": ["cap-monorepo-setup"],
+          "notes": ["Suíte de 61 testes automatizados (Golden Tests PPLB) aprovada 100%."]
+        },
+        {
+          "id": "cap-ppla-compiler",
+          "name": "Compilador PPLA Base",
+          "description": "Geração nativa de comandos PPLA para impressoras térmicas legadas Argox OS-214.",
+          "module": "compilers",
+          "weight": 8,
+          "mvp": true,
+          "status": "HOMOLOGATED",
+          "manualValidation": true,
+          "physicalValidation": true,
+          "frozen": true,
+          "evidence": ["packages/printer-ppla"],
+          "dependencies": ["cap-monorepo-setup"],
+          "notes": ["Suporte a PPLA base homologado em bancada."]
+        },
+        {
+          "id": "cap-legacy-importer",
+          "name": "Importador e Preprocessador com Preservação de Comentários (Round-Trip)",
+          "description": "Parsing de templates PPLB legados com suporte a condicionais inline/multilinha ([[SE]], [[SENAO]], [[FIMSE]]) e diff zero.",
+          "module": "importers",
+          "weight": 10,
+          "mvp": true,
+          "status": "FROZEN",
+          "manualValidation": true,
+          "physicalValidation": true,
+          "frozen": true,
+          "evidence": ["packages/printer-pplb/src/importer.ts"],
+          "dependencies": ["cap-pplb-compiler"],
+          "notes": ["Testes Golden Model 16-ARGOX REGRA - ATACADO.txt 100% homologados."]
+        }
+      ]
+    },
+    {
+      "id": "phase-3",
+      "code": "3",
+      "name": "Fase 3 — Agente Local de Impressão (Daemon Rust)",
+      "description": "Daemon nativo em Rust para comunicação direta com impressoras térmicas locais via RAW TCP, USB e Spooler de impressão.",
+      "status": "HOMOLOGATED",
+      "capabilities": [
+        {
+          "id": "cap-agent-core-rust",
+          "name": "Daemon Nativo em Rust (x64 PE Executable)",
+          "description": "Agente executável headless compilado em Rust com suporte a comunicação assíncrona Tokio, TLS e RAW TCP.",
+          "module": "agent",
+          "weight": 12,
+          "mvp": true,
+          "status": "FROZEN",
+          "manualValidation": true,
+          "physicalValidation": true,
+          "frozen": true,
+          "evidence": ["apps/agent-core", "apps/backend/src/routes/agents.ts"],
+          "dependencies": ["cap-monorepo-setup"],
+          "notes": ["Compilação Windows x64 automatizada no CI e distribuída via GET /api/agents/download/windows-x64."]
+        },
+        {
+          "id": "cap-agent-pairing",
+          "name": "Protocolo de Pareamento de Agentes e Heartbeat",
+          "description": "Pareamento seguro de estaca de trabalho por código de 6 dígitos e heartbeat contínuo.",
+          "module": "agent",
+          "weight": 8,
+          "mvp": true,
+          "status": "HOMOLOGATED",
+          "manualValidation": true,
+          "physicalValidation": true,
+          "frozen": false,
+          "evidence": ["apps/frontend/src/agent/PairAgentModal.tsx"],
+          "dependencies": ["cap-agent-core-rust"],
+          "notes": ["Modal de pareamento operacional na interface."]
+        }
+      ]
+    },
+    {
+      "id": "phase-3-5",
+      "code": "3.5",
+      "name": "Fase 3.5 — Hardening de Produto, UX, Application Shell e Concorrência",
+      "description": "Consolidação de UX multinicho, Application Shell moderno, Ciclo de Vida de Modelos (Meus Modelos), Concorrência Atômica com Presença e Invariância Geométrica da Toolbar.",
+      "status": "HOMOLOGATED",
+      "capabilities": [
+        {
+          "id": "cap-app-shell-ux",
+          "name": "Application Shell Moderno e Navegação Sidebar",
+          "description": "Shell responsivo com Sidebar recolhível (localStorage), Drawer mobile, GlobalHeader unificado e tokens de design.",
+          "module": "app-shell",
+          "weight": 10,
+          "mvp": true,
+          "status": "FROZEN",
+          "manualValidation": true,
+          "physicalValidation": false,
+          "frozen": true,
+          "evidence": ["apps/frontend/src/shell/ApplicationShell.tsx", "apps/frontend/src/shell/Sidebar.tsx"],
+          "dependencies": ["cap-canvas-core"],
+          "notes": ["Consolidação de UX formalizada em docs/product/PRODUCT-UX-CONSOLIDATION.md."]
+        },
+        {
+          "id": "cap-model-lifecycle-db",
+          "name": "Ciclo de Vida do Modelo em PostgreSQL (Meus Modelos)",
+          "description": "Persistência em banco relacional, listagem, busca, renomear, duplicar no backend e soft-delete.",
+          "module": "model-lifecycle",
+          "weight": 10,
+          "mvp": true,
+          "status": "FROZEN",
+          "manualValidation": true,
+          "physicalValidation": false,
+          "frozen": true,
+          "evidence": ["apps/frontend/src/modules/models/ModelsPage.tsx", "apps/backend/src/repositories/templateRepository.ts"],
+          "dependencies": ["cap-infra-storage-db"],
+          "notes": ["Operações de CRUD de modelos 100% homologadas com Fail-Closed."]
+        },
+        {
+          "id": "cap-concurrency-presence",
+          "name": "Concorrência Atômica, Heartbeat de Presença e Lock Otimista (HTTP 409)",
+          "description": "Proteção contra sobrescrita simultânea, heartbeat a cada 15s com expiração em 45s, detecção de sessão por aba (UUID-B) e modal de resolução de conflito com Save As Copy.",
+          "module": "concurrency",
+          "weight": 12,
+          "mvp": true,
+          "status": "FROZEN",
+          "manualValidation": true,
+          "physicalValidation": false,
+          "frozen": true,
+          "evidence": ["apps/backend/src/repositories/presenceRepository.ts", "apps/frontend/src/editor/__tests__/patch3283.test.ts"],
+          "dependencies": ["cap-model-lifecycle-db"],
+          "notes": ["Homologação manual concluída e validada em produção no PATCH 3.2.8.3."]
+        },
+        {
+          "id": "cap-toolbar-geometry-stabilization",
+          "name": "Estabilização Geométrica do Status na Toolbar",
+          "description": "Invariância visual com container fixo de 140px (save-status-container), impedindo layout shift em qualquer troca de estado (Salvo, Não salvo, Salvando..., Conflito, Removido, Erro).",
+          "module": "app-shell",
+          "weight": 8,
+          "mvp": true,
+          "status": "FROZEN",
+          "manualValidation": true,
+          "physicalValidation": false,
+          "frozen": true,
+          "evidence": ["apps/frontend/src/editor/EditorLayout.tsx", "apps/frontend/src/editor/__tests__/patch3284.test.ts"],
+          "dependencies": ["cap-app-shell-ux"],
+          "notes": ["Homologado no PATCH 3.2.8.4. Zero deslocamento no botão Imprimir."]
+        },
+        {
+          "id": "cap-development-control-center-backend",
+          "name": "Development Control Center 0.1 — Domínio e Backend API",
+          "description": "Estrutura de dados versionada do roadmap, cálculos desacoplados de métricas (MVP Readiness vs Full Roadmap), auditoria de saúde e rotas protegidas por ambiente.",
+          "module": "admin",
+          "weight": 8,
+          "mvp": false,
+          "status": "VALIDATION",
+          "manualValidation": true,
+          "physicalValidation": false,
+          "frozen": false,
+          "evidence": ["docs/development-control", "apps/backend/src/routes/developmentControl.ts"],
+          "dependencies": ["cap-infra-storage-db"],
+          "notes": ["Módulo interno de visibilidade sistêmica do produto."]
+        },
+        {
+          "id": "cap-development-control-center-frontend",
+          "name": "Development Control Center 0.1 — Interface Visual de Governança",
+          "description": "Painel interno com Hero de progresso, timeline de fases, grid de módulos, lista de componentes congelados e gap para MVP.",
+          "module": "admin",
+          "weight": 8,
+          "mvp": false,
+          "status": "VALIDATION",
+          "manualValidation": true,
+          "physicalValidation": false,
+          "frozen": false,
+          "evidence": ["apps/frontend/src/modules/devcontrol/DevControlPage.tsx"],
+          "dependencies": ["cap-development-control-center-backend"],
+          "notes": ["Interface restrita aos ambientes de desenvolvimento e homologação."]
+        }
+      ]
+    },
+    {
+      "id": "phase-4",
+      "code": "4",
+      "name": "Fase 4 — Central de Impressão Universal, RBAC e Multi-Tenancy",
+      "description": "Plataforma comercial para envio de impressões em massa por operadores, gestão de permissões (RBAC) e isolamento multiempresa.",
+      "status": "PLANNED",
+      "capabilities": [
+        {
+          "id": "cap-universal-print-center",
+          "name": "Central de Impressão Universal (Universal Print Center)",
+          "description": "Busca contextual única, grid com colunas dinâmicas segundo os dados do modelo e disparo em lote para impressoras físicas.",
+          "module": "print-center",
+          "weight": 14,
+          "mvp": true,
+          "status": "PLANNED",
+          "manualValidation": false,
+          "physicalValidation": false,
+          "frozen": false,
+          "evidence": [],
+          "dependencies": ["cap-pplb-compiler", "cap-agent-core-rust"],
+          "notes": ["Requisito essencial para MVP comercial de operadores."]
+        },
+        {
+          "id": "cap-rbac-multi-tenant",
+          "name": "Governança Multi-Tenant e Autenticação RBAC",
+          "description": "Isolamento estrito entre empresas (Tenants), perfis (Administrador, Designer, Operador) e validação de tokens JWT.",
+          "module": "auth-rbac",
+          "weight": 12,
+          "mvp": true,
+          "status": "PLANNED",
+          "manualValidation": false,
+          "physicalValidation": false,
+          "frozen": false,
+          "evidence": [],
+          "dependencies": ["cap-infra-storage-db"],
+          "notes": ["Garante a separação completa entre clientes e filiais."]
+        },
+        {
+          "id": "cap-licensing-billing",
+          "name": "Gestão de Licenças e Limite de Dispositivos",
+          "description": "Controle de vigência de licenças, limite de impressoras cadastradas e modo de demonstração (Trial).",
+          "module": "licensing",
+          "weight": 8,
+          "mvp": false,
+          "status": "PLANNED",
+          "manualValidation": false,
+          "physicalValidation": false,
+          "frozen": false,
+          "evidence": [],
+          "dependencies": ["cap-rbac-multi-tenant"],
+          "notes": ["Módulo de bilhetagem e limites comerciais."]
+        }
+      ]
+    },
+    {
+      "id": "phase-5",
+      "code": "5",
+      "name": "Fase 5 — Novas Linguagens (ZPL, EPL) e Catálogo de Impressoras",
+      "description": "Expansão de compiladores nativos para suporte a impressoras Zebra (ZPL/EPL) e Elgin.",
+      "status": "PLANNED",
+      "capabilities": [
+        {
+          "id": "cap-zpl-compiler",
+          "name": "Compilador Zebra ZPL II",
+          "description": "Gerador nativo de comandos ZPL II com suporte a fontes nativas, Barcodes e rotinas de ajuste de densidade.",
+          "module": "compilers",
+          "weight": 10,
+          "mvp": false,
+          "status": "PLANNED",
+          "manualValidation": false,
+          "physicalValidation": false,
+          "frozen": false,
+          "evidence": [],
+          "dependencies": ["cap-pplb-compiler"],
+          "notes": ["Segunda linguagem principal solicitada por clientes industriais."]
+        },
+        {
+          "id": "cap-printer-kb",
+          "name": "Printer Language Knowledge Base & Catálogo de Modelos",
+          "description": "Base de conhecimento técnica parametrizada por fabricante e modelo de impressora.",
+          "module": "printers",
+          "weight": 6,
+          "mvp": false,
+          "status": "PLANNED",
+          "manualValidation": false,
+          "physicalValidation": false,
+          "frozen": false,
+          "evidence": [],
+          "dependencies": [],
+          "notes": ["Base de suporte para mapeamento de resoluções e drivers."]
+        }
+      ]
+    },
+    {
+      "id": "phase-6",
+      "code": "6",
+      "name": "Fase 6 — Integrações Nativas com ERPs e Contrato Público",
+      "description": "SDK de integração pública via API REST/Webhooks e catálogo universal de campos ERP.",
+      "status": "PLANNED",
+      "capabilities": [
+        {
+          "id": "cap-erp-integration-sdk",
+          "name": "SDK de Integração ERP e Contrato OpenAPI / Webhooks",
+          "description": "Interface formal para que software houses conectem ERPs parceiros diretamente à Central de Impressão Witiquetas.",
+          "module": "integrations",
+          "weight": 10,
+          "mvp": false,
+          "status": "PLANNED",
+          "manualValidation": false,
+          "physicalValidation": false,
+          "frozen": false,
+          "evidence": [],
+          "dependencies": ["cap-universal-print-center"],
+          "notes": ["Especificação pública para parceiros de tecnologia."]
+        }
+      ]
+    }
+  ]
+}

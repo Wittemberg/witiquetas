@@ -2,9 +2,9 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { presenceRepository } from '../../../../backend/src/repositories/presenceRepository.js';
-import { templateRepository } from '../../../../backend/src/repositories/templateRepository.js';
-import { getTabSessionIdSync, resetInMemSessionForTest, resolveTabSessionId } from '../sessionUtils.js';
+import { presenceRepository } from '../../../../backend/dist/repositories/presenceRepository.js';
+import { templateRepository } from '../../../../backend/dist/repositories/templateRepository.js';
+import { getTabSessionIdSync, resetInMemSessionForTest, resolveTabSessionId } from '../sessionUtils.ts';
 
 describe('FASE 3.5 — PATCH 3.2.8 SUITE DE TESTES (CONCORRÊNCIA, PRESENÇA E UX DE CONFLITOS - REGRAS A-Z)', () => {
   const companyTenantA = 'comp-tenant-a';
@@ -34,8 +34,16 @@ describe('FASE 3.5 — PATCH 3.2.8 SUITE DE TESTES (CONCORRÊNCIA, PRESENÇA E U
       // Simular a inicialização da Aba B duplicada pelo navegador partindo do MESMO sessionStorage e window.name clonados
       resetInMemSessionForTest();
 
+      const chanA = new BroadcastChannel('witiquetas_presence_channel');
+      chanA.onmessage = (evt) => {
+        if (evt.data?.type === 'PING_CLAIM' && evt.data?.sessionId === 'UUID-A') {
+          chanA.postMessage({ type: 'PONG_TAKEN', sessionId: 'UUID-A', senderTabId: 'witiquetas_tab_ORIGINAL' });
+        }
+      };
+
       // Ao resolver com colisão ativa no BroadcastChannel, Aba B deve detectar a colisão e gerar UUID-B
-      const infoB = await resolveTabSessionId(mockStorage, 'witiquetas_tab_ORIGINAL', 10);
+      const infoB = await resolveTabSessionId(mockStorage, 'witiquetas_tab_ORIGINAL', 150);
+      chanA.close();
 
       assert.notEqual(infoA.sessionId, infoB.sessionId, 'Aba duplicada DEVE gerar um novo sessionId (UUID-B != UUID-A)');
       assert.notEqual(infoA.tabId, infoB.tabId, 'Aba duplicada DEVE gerar um novo tabId');
@@ -333,7 +341,7 @@ describe('FASE 3.5 — PATCH 3.2.8 SUITE DE TESTES (CONCORRÊNCIA, PRESENÇA E U
       const storeContent = fs.readFileSync(storePath, 'utf-8');
 
       assert.ok(storeContent.includes('resolveConflictSaveAsCopy'), 'useEditorStore possui a ação resolveConflictSaveAsCopy');
-      assert.ok(storeContent.includes('Cópia em conflito'), 'Gera o título derivado de cópia');
+      assert.ok(storeContent.includes('generateCopyTitle'), 'Gera o título derivado de cópia via helper generateCopyTitle');
     });
 
     it('K & Q: Modelo removido remoto retorna MODEL_NOT_FOUND e Salvar como novo persiste o documento LOCAL', () => {
@@ -415,12 +423,12 @@ describe('FASE 3.5 — PATCH 3.2.8 SUITE DE TESTES (CONCORRÊNCIA, PRESENÇA E U
       const layoutContent = fs.readFileSync(layoutPath, 'utf-8');
 
       // 1. Verificar import estrito de AlertTriangle
-      const lucideImportMatch = layoutContent.match(/import\s*\{([\s\S]*?)\}\s*from\s*['"]lucide-react['"]/);
+      const lucideImportMatch = layoutContent.match(/import\s*\{([^}]*)\}\s*from\s*['"]lucide-react['"]/);
       assert.ok(lucideImportMatch, 'EditorLayout deve importar de lucide-react');
 
       const importedSymbols = lucideImportMatch[1]
         .split(',')
-        .map((s) => s.trim().split(' as ')[0].trim())
+        .flatMap((s) => s.trim().split(' as ').map((x) => x.trim()))
         .filter(Boolean);
 
       assert.ok(importedSymbols.includes('AlertTriangle'), 'AlertTriangle DEVE estar na lista de imports do lucide-react');

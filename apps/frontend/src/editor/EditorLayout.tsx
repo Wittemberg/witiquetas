@@ -111,6 +111,14 @@ export default function EditorLayout({
   const [isConflictModalOpen, setIsConflictModalOpen] = useState(false);
   const [isDeletedModalOpen, setIsDeletedModalOpen] = useState(false);
   const [isReloadConfirmOpen, setIsReloadConfirmOpen] = useState(false);
+  const [isSavingCopy, setIsSavingCopy] = useState(false);
+
+  // Abrir modal de conflito automaticamente quando saveStatus alternar para conflict
+  useEffect(() => {
+    if (saveStatus === 'conflict') {
+      setIsConflictModalOpen(true);
+    }
+  }, [saveStatus]);
 
   // Heartbeat de Presença de Edição (15s)
   useEffect(() => {
@@ -149,7 +157,7 @@ export default function EditorLayout({
             userIdentifier,
             os,
             browser,
-          }).catch(() => {});
+          }).catch(() => { });
         });
       };
 
@@ -367,20 +375,19 @@ export default function EditorLayout({
                 saveStatus === 'conflict'
                   ? 'Conflito de versão detectado. Clique para ver detalhes e opções de resolução.'
                   : saveStatus === 'deleted'
-                  ? 'Este modelo foi removido no servidor. Clique para opções de recuperação.'
-                  : saveStatus === 'error'
-                  ? 'Erro ao salvar. Clique para tentar novamente.'
-                  : undefined
+                    ? 'Este modelo foi removido no servidor. Clique para opções de recuperação.'
+                    : saveStatus === 'error'
+                      ? 'Erro ao salvar. Clique para tentar novamente.'
+                      : undefined
               }
             >
               <div
-                className={`save-status-dot ${
-                  saveStatus === 'unsaved'
+                className={`save-status-dot ${saveStatus === 'unsaved'
                     ? 'unsaved'
                     : saveStatus === 'error' || saveStatus === 'conflict' || saveStatus === 'deleted'
-                    ? 'unsaved'
-                    : 'saved'
-                }`}
+                      ? 'unsaved'
+                      : 'saved'
+                  }`}
               />
               <span
                 style={{
@@ -390,21 +397,21 @@ export default function EditorLayout({
                     saveStatus === 'unsaved'
                       ? 'var(--status-warning)'
                       : saveStatus === 'error' || saveStatus === 'conflict' || saveStatus === 'deleted'
-                      ? 'var(--status-danger)'
-                      : 'var(--status-success)',
+                        ? 'var(--status-danger)'
+                        : 'var(--status-success)',
                 }}
               >
                 {saveStatus === 'saving'
                   ? 'Salvando...'
                   : saveStatus === 'unsaved'
-                  ? 'Não salvo'
-                  : saveStatus === 'error'
-                  ? 'Erro ao salvar'
-                  : saveStatus === 'conflict'
-                  ? 'Conflito de versão'
-                  : saveStatus === 'deleted'
-                  ? 'Modelo removido'
-                  : 'Salvo'}
+                    ? 'Não salvo'
+                    : saveStatus === 'error'
+                      ? 'Erro ao salvar'
+                      : saveStatus === 'conflict'
+                        ? 'Conflito de versão'
+                        : saveStatus === 'deleted'
+                          ? 'Modelo removido'
+                          : 'Salvo'}
               </span>
             </div>
 
@@ -859,7 +866,7 @@ export default function EditorLayout({
       )}
 
       {/* Modal de Conflito de Versão */}
-      {(isConflictModalOpen || saveStatus === 'conflict') && (
+      {isConflictModalOpen && !isReloadConfirmOpen && (
         <div className="wizard-modal-overlay">
           <div className="wizard-modal-content" style={{ maxWidth: '480px', padding: '1.5rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
@@ -939,7 +946,7 @@ export default function EditorLayout({
       )}
 
       {/* Modal de Confirmação de Sobrescrita do Trabalho Local ao Carregar Versão Remota */}
-      {isReloadConfirmOpen && (
+      {isReloadConfirmOpen && !isConflictModalOpen && (
         <div className="wizard-modal-overlay" style={{ zIndex: 1100 }}>
           <div className="wizard-modal-content" style={{ maxWidth: '400px', padding: '1.5rem' }}>
             <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '0.5rem' }}>

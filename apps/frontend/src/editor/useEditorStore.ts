@@ -1,12 +1,12 @@
 import { create } from 'zustand';
 import {
-  LabelDocument,
-  LabelElement,
-  ElementType,
+  type LabelDocument,
+  type LabelElement,
+  type ElementType,
   calculateOrientation,
 } from '@witiquetas/label-schema';
-import { QRCodeLibraryItemDTO, PrinterDTO } from '@witiquetas/contracts';
-import { normalizeElementGeometry, normalizeDocumentGeometry, constrainElementToLabel, constrainGroupMovement, validateDocumentBounds, SAFE_AREA_MARGIN_MM } from './bounds';
+import { type QRCodeLibraryItemDTO, type PrinterDTO } from '@witiquetas/contracts';
+import { normalizeElementGeometry, normalizeDocumentGeometry, constrainElementToLabel, constrainGroupMovement, validateDocumentBounds, SAFE_AREA_MARGIN_MM } from './bounds.ts';
 
 // Converter Milímetros ➔ Pixels com base no DPI (ex: 203 DPI = ~8 dots/mm)
 export function mmToPx(mm: number, dpi: number = 203): number {
@@ -24,6 +24,32 @@ export function formatDimensionBR(mm?: number | null): string {
   const val = Number(mm);
   const rounded = Number.isInteger(val) ? val.toString() : val.toFixed(2).replace(/\.?0+$/, '').replace('.', ',');
   return `${rounded} mm`;
+}
+
+// Helper para títulos de cópia (evita acúmulo de - Cópia - Cópia)
+export function generateCopyTitle(title: string): string {
+  const cleanTitle = (title || 'Etiqueta').trim();
+  const copyPattern = /\s*(?:-|—|–)\s*Cópia(?: em conflito)?(?:\s*\((\d+)\))?/gi;
+  let matches: RegExpExecArray | null;
+  let maxNumber = 0;
+  let hasCopy = false;
+
+  while ((matches = copyPattern.exec(cleanTitle)) !== null) {
+    hasCopy = true;
+    if (matches[1]) {
+      maxNumber = Math.max(maxNumber, parseInt(matches[1], 10));
+    }
+  }
+
+  const baseTitle = cleanTitle.replace(/\s*(?:-|—|–)\s*Cópia(?: em conflito)?(?:\s*\(\d+\))?/gi, '').trim() || 'Etiqueta';
+
+  if (!hasCopy) {
+    return `${baseTitle} - Cópia`;
+  }
+  if (maxNumber > 0) {
+    return `${baseTitle} - Cópia (${maxNumber + 1})`;
+  }
+  return `${baseTitle} - Cópia (2)`;
 }
 
 // Verificador central de foco em campos de texto (Item 242-245, 265)
@@ -1193,7 +1219,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   resolveConflictSaveAsCopy: async () => {
     const { document } = get();
-    const copyTitle = `${document.title || 'Etiqueta'} — Cópia em conflito`;
+    const copyTitle = generateCopyTitle(document.title || 'Etiqueta');
     const localDocCopy: LabelDocument = JSON.parse(JSON.stringify(document));
     localDocCopy.title = copyTitle;
 

@@ -6,6 +6,7 @@ export interface SessionInfo {
 
 let currentActiveSessionInfo: SessionInfo | null = null;
 let presenceChannel: BroadcastChannel | null = null;
+const claimedSessionIds = new Set<string>();
 
 export function setupPresenceBroadcastListener(onConflict?: (claimedSid: string) => void): void {
   if (typeof BroadcastChannel === 'undefined' || presenceChannel) return;
@@ -14,13 +15,13 @@ export function setupPresenceBroadcastListener(onConflict?: (claimedSid: string)
     presenceChannel = new BroadcastChannel('witiquetas_presence_channel');
     presenceChannel.onmessage = (event) => {
       const data = event.data;
-      if (!data || !currentActiveSessionInfo) return;
+      if (!data) return;
 
-      if (data.type === 'PING_CLAIM' && data.sessionId === currentActiveSessionInfo.sessionId) {
+      if (data.type === 'PING_CLAIM' && (claimedSessionIds.has(data.sessionId) || currentActiveSessionInfo?.sessionId === data.sessionId)) {
         presenceChannel?.postMessage({
           type: 'PONG_TAKEN',
-          sessionId: currentActiveSessionInfo.sessionId,
-          senderTabId: currentActiveSessionInfo.tabId,
+          sessionId: data.sessionId,
+          senderTabId: currentActiveSessionInfo?.tabId || 'active-tab',
         });
         if (onConflict) onConflict(data.sessionId);
       }
@@ -126,6 +127,8 @@ export async function resolveTabSessionId(
     } catch {}
   }
 
+  claimedSessionIds.add(finalSid);
+
   currentActiveSessionInfo = {
     sessionId: finalSid,
     tabId: finalTabId,
@@ -150,10 +153,13 @@ export function getTabSessionIdSync(storageOverride?: Storage, winNameOverride?:
   return sid;
 }
 
-export function resetInMemSessionForTest() {
+export function resetInMemSessionForTest(keepChannel = false) {
   currentActiveSessionInfo = null;
-  if (presenceChannel) {
-    presenceChannel.close();
-    presenceChannel = null;
+  if (!keepChannel) {
+    claimedSessionIds.clear();
+    if (presenceChannel) {
+      presenceChannel.close();
+      presenceChannel = null;
+    }
   }
 }

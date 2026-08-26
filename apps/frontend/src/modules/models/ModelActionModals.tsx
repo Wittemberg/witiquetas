@@ -66,7 +66,7 @@ export const RenameModelModal: React.FC<RenameModalProps> = ({
         </div>
 
         <form onSubmit={handleSubmit}>
-          <div className="wizard-body" style={{ padding: '1.25rem 0', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+          <div className="wizard-body" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
             <label style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-primary)' }}>
               Nome do modelo
             </label>
@@ -175,7 +175,7 @@ export const DeleteModelModal: React.FC<DeleteModalProps> = ({
           </button>
         </div>
 
-        <div className="wizard-body" style={{ padding: '1.25rem 0', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+        <div className="wizard-body" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
           <p style={{ fontSize: '0.925rem', color: 'var(--text-primary)', lineHeight: 1.5 }}>
             Tem certeza que deseja excluir:
           </p>

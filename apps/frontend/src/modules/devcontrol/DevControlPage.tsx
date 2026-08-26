@@ -1,16 +1,18 @@
 import React, { useEffect, useState } from 'react';
 import {
-  Gauge,
   CheckCircle2,
   Lock,
-  Clock,
   ArrowLeft,
   Activity,
-  Layers,
   GitCommit,
-  Building2,
   RefreshCw,
   AlertTriangle,
+  Code,
+  Globe,
+  Server,
+  FileText,
+  Workflow,
+  Zap,
 } from 'lucide-react';
 import type {
   DevelopmentOverviewDTO,
@@ -28,7 +30,7 @@ export const DevControlPage: React.FC<DevControlPageProps> = ({ onGoHome }) => {
   const [data, setData] = useState<DevelopmentOverviewDTO | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'overview' | 'modules' | 'roadmap' | 'checkpoints' | 'frozen'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'modules' | 'frozen'>('overview');
 
   const fetchOverview = async () => {
     try {
@@ -49,10 +51,10 @@ export const DevControlPage: React.FC<DevControlPageProps> = ({ onGoHome }) => {
 
   if (loading) {
     return (
-      <div className="flex h-screen w-full items-center justify-center bg-slate-950 text-slate-100">
-        <div className="flex flex-col items-center gap-3">
-          <RefreshCw className="h-8 w-8 animate-spin text-blue-500" />
-          <p className="text-sm font-medium text-slate-400">Carregando governança do produto...</p>
+      <div className="dev-control-page">
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', gap: '1rem' }}>
+          <RefreshCw className="spin" style={{ width: 32, height: 32, color: 'var(--accent-blue)' }} />
+          <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', fontWeight: 500 }}>Carregando governança do produto...</p>
         </div>
       </div>
     );
@@ -60,320 +62,321 @@ export const DevControlPage: React.FC<DevControlPageProps> = ({ onGoHome }) => {
 
   if (error || !data) {
     return (
-      <div className="flex h-screen w-full flex-col items-center justify-center gap-4 bg-slate-950 px-4 text-slate-100">
-        <AlertTriangle className="h-12 w-12 text-amber-500" />
-        <h2 className="text-xl font-bold">Acesso Restrito ou Indisponível</h2>
-        <p className="max-w-md text-center text-sm text-slate-400">{error || 'Não foi possível carregar os dados.'}</p>
-        <button
-          onClick={onGoHome}
-          className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-500"
-        >
-          <ArrowLeft className="h-4 w-4" /> Voltar ao Início
-        </button>
+      <div className="dev-control-page">
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', gap: '1.25rem', textAlign: 'center' }}>
+          <AlertTriangle style={{ width: 48, height: 48, color: 'var(--status-warning)' }} />
+          <h2 style={{ fontSize: '1.25rem', fontWeight: 800 }}>Acesso Restrito ou Indisponível</h2>
+          <p style={{ maxWidth: 460, fontSize: '0.875rem', color: 'var(--text-muted)' }}>{error || 'Não foi possível carregar os dados.'}</p>
+          <button onClick={onGoHome} className="btn btn-primary">
+            <ArrowLeft style={{ width: 16, height: 16 }} /> Voltar ao Início
+          </button>
+        </div>
       </div>
     );
   }
 
-  const { project, progress, health, frozenComponents, modules, phases } = data;
+  const { project, progress, health, frozenComponents, modules } = data;
 
   const renderStatusBadge = (status: DevelopmentStatus) => {
-    const badgeMap: Record<DevelopmentStatus, { label: string; bg: string; text: string }> = {
-      FROZEN: { label: '🔒 Frozen', bg: 'bg-emerald-950/80 border-emerald-500/50', text: 'text-emerald-300' },
-      HOMOLOGATED: { label: '✓ Homologado', bg: 'bg-teal-950/80 border-teal-500/50', text: 'text-teal-300' },
-      VALIDATION: { label: '⚡ Em Validação', bg: 'bg-amber-950/80 border-amber-500/50', text: 'text-amber-300' },
-      IMPLEMENTED: { label: '⚙️ Implementado', bg: 'bg-blue-950/80 border-blue-500/50', text: 'text-blue-300' },
-      IN_PROGRESS: { label: '🔄 Em Dev', bg: 'bg-indigo-950/80 border-indigo-500/50', text: 'text-indigo-300' },
-      READY: { label: '📋 Pronto para Dev', bg: 'bg-purple-950/80 border-purple-500/50', text: 'text-purple-300' },
-      PLANNED: { label: '🗓️ Planejado', bg: 'bg-slate-900 border-slate-700', text: 'text-slate-400' },
-      BLOCKED: { label: '🚫 Bloqueado', bg: 'bg-rose-950/80 border-rose-500/50', text: 'text-rose-300' },
-      UNMAPPED: { label: '❓ Não Mapeado', bg: 'bg-slate-900 border-slate-700', text: 'text-slate-500' },
+    const badgeMap: Record<DevelopmentStatus, { label: string; className: string }> = {
+      FROZEN: { label: 'FROZEN', className: 'badge badge-success' },
+      HOMOLOGATED: { label: 'HOMOLOGADO', className: 'badge badge-success' },
+      VALIDATION: { label: 'EM VALIDAÇÃO', className: 'badge badge-warning' },
+      IMPLEMENTED: { label: 'IMPLEMENTADO', className: 'badge badge-info' },
+      IN_PROGRESS: { label: 'EM DEV', className: 'badge badge-info' },
+      READY: { label: 'PRONTO', className: 'badge badge-info' },
+      PLANNED: { label: 'PLANEJADO', className: 'badge' },
+      BLOCKED: { label: 'BLOQUEADO', className: 'badge badge-danger' },
+      UNMAPPED: { label: 'NÃO MAPEADO', className: 'badge' },
     };
 
     const cfg = badgeMap[status] || badgeMap.PLANNED;
-    return (
-      <span className={`inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-semibold ${cfg.bg} ${cfg.text}`}>
-        {cfg.label}
-      </span>
-    );
+    return <span className={cfg.className}>{cfg.label}</span>;
   };
 
   const renderHealthBadge = (status: ProjectHealthStatus) => {
-    const map: Record<ProjectHealthStatus, { label: string; color: string }> = {
-      HEALTHY: { label: 'Saudável', color: 'text-emerald-400 bg-emerald-950/60 border-emerald-800' },
-      ATTENTION: { label: 'Atenção', color: 'text-amber-400 bg-amber-950/60 border-amber-800' },
-      BLOCKED: { label: 'Crítico', color: 'text-rose-400 bg-rose-950/60 border-rose-800' },
-      UNKNOWN: { label: 'Desconhecido', color: 'text-slate-400 bg-slate-900 border-slate-800' },
+    const map: Record<ProjectHealthStatus, { label: string; className: string }> = {
+      HEALTHY: { label: 'Saudável', className: 'badge badge-success' },
+      ATTENTION: { label: 'Atenção', className: 'badge badge-warning' },
+      BLOCKED: { label: 'Crítico', className: 'badge badge-danger' },
+      UNKNOWN: { label: 'Desconhecido', className: 'badge' },
     };
     const c = map[status] || map.UNKNOWN;
-    return (
-      <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold ${c.color}`}>
-        <span className="h-1.5 w-1.5 rounded-full bg-current" />
-        {c.label}
-      </span>
-    );
+    return <span className={c.className}>{c.label}</span>;
   };
 
+  const getDimensionIcon = (key: string) => {
+    switch (key) {
+      case 'architecture': return <Code style={{ width: 18, height: 18, color: 'var(--accent-blue)' }} />;
+      case 'testSuite': return <CheckCircle2 style={{ width: 18, height: 18, color: 'var(--status-success)' }} />;
+      case 'frontendBuild': return <Globe style={{ width: 18, height: 18, color: 'var(--accent-cyan)' }} />;
+      case 'backendApi': return <Server style={{ width: 18, height: 18, color: 'var(--accent-purple)' }} />;
+      case 'ciCd': return <Workflow style={{ width: 18, height: 18, color: 'var(--status-warning)' }} />;
+      case 'documentation': return <FileText style={{ width: 18, height: 18, color: 'var(--text-secondary)' }} />;
+      default: return <Activity style={{ width: 18, height: 18, color: 'var(--accent-blue)' }} />;
+    }
+  };
+
+  const remainingMvpPoints = progress.mvp.totalWeight - progress.mvp.homologatedWeight;
+  const shortCommit = project.shortCommit || (project.commit ? project.commit.substring(0, 7) : 'f72f178');
+
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100">
-      {/* Header */}
-      <header className="sticky top-0 z-10 border-b border-slate-800 bg-slate-950/90 backdrop-blur-md">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
-          <div className="flex items-center gap-3">
-            <button
-              onClick={onGoHome}
-              className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-800 hover:text-white"
-              title="Voltar"
-            >
-              <ArrowLeft className="h-5 w-5" />
+    <div className="dev-control-page">
+      <div className="dev-control-container">
+        {/* Header */}
+        <header className="dev-control-header">
+          <div className="dev-control-header-left">
+            <button onClick={onGoHome} className="dev-control-back-btn" title="Voltar ao Início">
+              <ArrowLeft style={{ width: 18, height: 18 }} />
             </button>
-            <div className="flex items-center gap-2">
-              <div className="rounded-lg bg-blue-600/20 p-2 text-blue-400 border border-blue-500/30">
-                <Gauge className="h-5 w-5" />
+            <div className="dev-control-title-group">
+              <div className="dev-control-title-row">
+                <h1 className="dev-control-title">Development Control Center</h1>
+                <span className="dev-control-badge-homologation">HOMOLOGAÇÃO</span>
               </div>
-              <div>
-                <h1 className="text-lg font-bold tracking-tight text-white">{project.name}</h1>
-                <p className="text-xs text-slate-400">Development Control Center 0.1.1</p>
-              </div>
+              <p className="dev-control-subtitle">Governança técnica e evolução do Witiquetas</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            <span className="rounded-md border border-slate-800 bg-slate-900 px-3 py-1 text-xs text-slate-300">
-              Ambiente: <strong className="text-blue-400">{project.environment.toUpperCase()}</strong>
-            </span>
-            <span className="rounded-md border border-emerald-800/60 bg-emerald-950/40 px-3 py-1 text-xs text-emerald-400">
-              Fase: <strong>{data.currentPhase.name}</strong>
-            </span>
+          <div className="dev-control-header-meta">
+            <div className="dev-control-meta-pill">
+              Fase atual: <strong>Fase 3.5 — Hardening de Produto, UX, Application Shell e Concorrência</strong>
+            </div>
+            <div className="dev-control-meta-pill">
+              Ambiente: <strong>{project.environment ? project.environment.toUpperCase() : 'DEVELOPMENT'}</strong>
+            </div>
           </div>
-        </div>
-      </header>
+        </header>
 
-      {/* Main Content */}
-      <main className="mx-auto max-w-7xl px-6 py-8">
-        {/* Executive Hero */}
-        <section className="mb-8 rounded-2xl border border-slate-800 bg-gradient-to-b from-slate-900 to-slate-950 p-6 shadow-xl">
-          <div className="mb-6 flex items-center justify-between">
+        {/* Executive Cards (3 cards) */}
+        <section className="dev-control-exec-grid">
+          {/* Card 1: Prontidão do MVP */}
+          <div className="dev-control-exec-card">
             <div>
-              <h2 className="text-xl font-bold text-white">Fotografia de Progresso Sistêmico</h2>
-              <p className="text-sm text-slate-400">Visão desacoplada de pesos de capacidades (MVP vs Full Roadmap)</p>
-            </div>
-            {renderHealthBadge(health.overall)}
-          </div>
-
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-            {/* MVP Progress Box */}
-            <div className="rounded-xl border border-blue-900/40 bg-blue-950/20 p-5 backdrop-blur-sm">
-              <div className="mb-3 flex items-center justify-between">
-                <span className="text-xs font-semibold uppercase tracking-wider text-blue-400">Pronto para MVP Comercial</span>
-                <span className="text-xs font-mono text-slate-400">
-                  Impl: {progress.mvp.implementedWeight}/{progress.mvp.totalWeight} | Homolog: {progress.mvp.homologatedWeight}/{progress.mvp.totalWeight} peso
-                </span>
+              <div className="dev-control-exec-card-title">PRONTIDÃO DO MVP</div>
+              <div className="dev-control-exec-card-value-row">
+                <span className="dev-control-exec-card-value">{progress.mvp.readinessPercent}%</span>
+                <span className="dev-control-exec-card-subvalue">{remainingMvpPoints} pontos restantes</span>
               </div>
-              <div className="mb-2 flex items-baseline justify-between">
-                <span className="text-3xl font-extrabold tracking-tight text-white">{progress.mvp.readinessPercent}%</span>
-                <span className="text-xs text-blue-300 font-medium">Readiness Homologada</span>
-              </div>
-              <div className="mb-2 h-3 w-full overflow-hidden rounded-full bg-slate-800 p-0.5">
+              <div className="dev-control-progress-track">
                 <div
-                  className="h-full rounded-full bg-gradient-to-r from-blue-600 via-indigo-500 to-emerald-400 transition-all duration-500"
+                  className="dev-control-progress-fill dev-control-progress-fill-primary"
                   style={{ width: `${progress.mvp.readinessPercent}%` }}
                 />
               </div>
-              <div className="flex justify-between text-xs text-slate-400">
-                <span>Implementação: <strong className="text-slate-200">{progress.mvp.implementationPercent}%</strong></span>
-                <span>Pendente p/ MVP: <strong className="text-amber-400">{progress.mvp.totalWeight - progress.mvp.homologatedWeight} peso</strong></span>
-              </div>
             </div>
-
-            {/* Full Roadmap Progress Box */}
-            <div className="rounded-xl border border-purple-900/40 bg-purple-950/20 p-5 backdrop-blur-sm">
-              <div className="mb-3 flex items-center justify-between">
-                <span className="text-xs font-semibold uppercase tracking-wider text-purple-400">Roadmap Completo do Produto</span>
-                <span className="text-xs font-mono text-slate-400">
-                  Impl: {progress.fullRoadmap.implementedWeight}/{progress.fullRoadmap.totalWeight} | Homolog: {progress.fullRoadmap.homologatedWeight}/{progress.fullRoadmap.totalWeight} peso
-                </span>
-              </div>
-              <div className="mb-2 flex items-baseline justify-between">
-                <span className="text-3xl font-extrabold tracking-tight text-white">{progress.fullRoadmap.readinessPercent}%</span>
-                <span className="text-xs text-purple-300 font-medium">Conclusão Homologada</span>
-              </div>
-              <div className="mb-2 h-3 w-full overflow-hidden rounded-full bg-slate-800 p-0.5">
-                <div
-                  className="h-full rounded-full bg-gradient-to-r from-purple-600 via-indigo-500 to-teal-400 transition-all duration-500"
-                  style={{ width: `${progress.fullRoadmap.readinessPercent}%` }}
-                />
-              </div>
-              <div className="flex justify-between text-xs text-slate-400">
-                <span>Implementação: <strong className="text-slate-200">{progress.fullRoadmap.implementationPercent}%</strong></span>
-                <span>Total Capacidades: <strong className="text-slate-200">{progress.totalCapabilities}</strong></span>
-              </div>
+            <div className="dev-control-exec-card-footer">
+              <span>Barra: <strong>{progress.mvp.homologatedWeight} / {progress.mvp.totalWeight}</strong></span>
+              <span>Peso Homologado</span>
             </div>
           </div>
 
-          {/* Counts Grid */}
-          <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
-            <div className="rounded-lg border border-slate-800 bg-slate-900/60 p-3 text-center">
-              <span className="text-xs text-slate-400">Frozen</span>
-              <p className="text-lg font-bold text-emerald-400">{progress.countsByStatus.FROZEN}</p>
+          {/* Card 2: Roadmap Implementado */}
+          <div className="dev-control-exec-card">
+            <div>
+              <div className="dev-control-exec-card-title">ROADMAP IMPLEMENTADO</div>
+              <div className="dev-control-exec-card-value-row">
+                <span className="dev-control-exec-card-value">{progress.fullRoadmap.implementationPercent}%</span>
+                <span className="dev-control-exec-card-subvalue" style={{ color: 'var(--accent-purple)' }}>Visão Sistêmica</span>
+              </div>
+              <div className="dev-control-progress-track">
+                <div
+                  className="dev-control-progress-fill dev-control-progress-fill-purple"
+                  style={{ width: `${progress.fullRoadmap.implementationPercent}%` }}
+                />
+              </div>
             </div>
-            <div className="rounded-lg border border-slate-800 bg-slate-900/60 p-3 text-center">
-              <span className="text-xs text-slate-400">Homologated</span>
-              <p className="text-lg font-bold text-teal-400">{progress.countsByStatus.HOMOLOGATED}</p>
+            <div className="dev-control-exec-card-footer">
+              <span>Barra: <strong>{progress.fullRoadmap.implementedWeight} / {progress.fullRoadmap.totalWeight}</strong></span>
+              <span>Peso Implementado</span>
             </div>
-            <div className="rounded-lg border border-slate-800 bg-slate-900/60 p-3 text-center">
-              <span className="text-xs text-slate-400">Validation</span>
-              <p className="text-lg font-bold text-amber-400">{progress.countsByStatus.VALIDATION}</p>
+          </div>
+
+          {/* Card 3: Roadmap Homologado */}
+          <div className="dev-control-exec-card">
+            <div>
+              <div className="dev-control-exec-card-title">ROADMAP HOMOLOGADO</div>
+              <div className="dev-control-exec-card-value-row">
+                <span className="dev-control-exec-card-value">{progress.fullRoadmap.readinessPercent}%</span>
+                <span className="dev-control-exec-card-subvalue" style={{ color: 'var(--status-success)' }}>Conclusão Global</span>
+              </div>
+              <div className="dev-control-progress-track">
+                <div
+                  className="dev-control-progress-fill dev-control-progress-fill-emerald"
+                  style={{ width: `${progress.fullRoadmap.readinessPercent}%` }}
+                />
+              </div>
             </div>
-            <div className="rounded-lg border border-slate-800 bg-slate-900/60 p-3 text-center">
-              <span className="text-xs text-slate-400">Implemented</span>
-              <p className="text-lg font-bold text-blue-400">{progress.countsByStatus.IMPLEMENTED}</p>
-            </div>
-            <div className="rounded-lg border border-slate-800 bg-slate-900/60 p-3 text-center">
-              <span className="text-xs text-slate-400">In Progress</span>
-              <p className="text-lg font-bold text-indigo-400">{progress.countsByStatus.IN_PROGRESS}</p>
-            </div>
-            <div className="rounded-lg border border-slate-800 bg-slate-900/60 p-3 text-center">
-              <span className="text-xs text-slate-400">Planned</span>
-              <p className="text-lg font-bold text-slate-300">{progress.countsByStatus.PLANNED}</p>
-            </div>
-            <div className="rounded-lg border border-slate-800 bg-slate-900/60 p-3 text-center">
-              <span className="text-xs text-slate-400">Blocked</span>
-              <p className="text-lg font-bold text-rose-400">{progress.countsByStatus.BLOCKED}</p>
+            <div className="dev-control-exec-card-footer">
+              <span>Barra: <strong>{progress.fullRoadmap.homologatedWeight} / {progress.fullRoadmap.totalWeight}</strong></span>
+              <span>Peso Homologado</span>
             </div>
           </div>
         </section>
 
-        {/* Tab Navigation */}
-        <div className="mb-6 flex border-b border-slate-800">
+        {/* Checkpoint Visual Compact Bar */}
+        <section className="dev-control-checkpoint-bar">
+          <div className="dev-control-checkpoint-item">
+            <GitCommit style={{ width: 16, height: 16, color: 'var(--accent-blue)' }} />
+            <span className="dev-control-checkpoint-label">Último checkpoint:</span>
+            <span className="dev-control-checkpoint-value" style={{ fontFamily: 'var(--font-mono)' }}>{shortCommit}</span>
+          </div>
+          <div className="dev-control-checkpoint-item">
+            <Activity style={{ width: 16, height: 16, color: 'var(--status-success)' }} />
+            <span className="dev-control-checkpoint-label">Fase atual:</span>
+            <span className="dev-control-checkpoint-value">3.5</span>
+          </div>
+          <div className="dev-control-checkpoint-item">
+            <Zap style={{ width: 16, height: 16, color: 'var(--status-warning)' }} />
+            <span className="dev-control-checkpoint-label">Próximo marco do MVP:</span>
+            <span className="dev-control-checkpoint-value">Central de Impressão Universal</span>
+          </div>
+        </section>
+
+        {/* Status Grid */}
+        <section className="dev-control-status-grid">
+          <div className="dev-control-status-pill">
+            <span className="dev-control-status-pill-label">Frozen</span>
+            <span className="dev-control-status-pill-count" style={{ color: 'var(--status-success)' }}>{progress.countsByStatus.FROZEN}</span>
+          </div>
+          <div className="dev-control-status-pill">
+            <span className="dev-control-status-pill-label">Homologated</span>
+            <span className="dev-control-status-pill-count" style={{ color: 'var(--accent-cyan)' }}>{progress.countsByStatus.HOMOLOGATED}</span>
+          </div>
+          <div className="dev-control-status-pill">
+            <span className="dev-control-status-pill-label">Validation</span>
+            <span className="dev-control-status-pill-count" style={{ color: 'var(--status-warning)' }}>{progress.countsByStatus.VALIDATION}</span>
+          </div>
+          <div className="dev-control-status-pill">
+            <span className="dev-control-status-pill-label">Implemented</span>
+            <span className="dev-control-status-pill-count" style={{ color: 'var(--accent-blue)' }}>{progress.countsByStatus.IMPLEMENTED}</span>
+          </div>
+          <div className="dev-control-status-pill">
+            <span className="dev-control-status-pill-label">In Progress</span>
+            <span className="dev-control-status-pill-count" style={{ color: 'var(--accent-purple)' }}>{progress.countsByStatus.IN_PROGRESS}</span>
+          </div>
+          <div className="dev-control-status-pill">
+            <span className="dev-control-status-pill-label">Planned</span>
+            <span className="dev-control-status-pill-count" style={{ color: 'var(--text-muted)' }}>{progress.countsByStatus.PLANNED}</span>
+          </div>
+          <div className="dev-control-status-pill">
+            <span className="dev-control-status-pill-label">Blocked</span>
+            <span className="dev-control-status-pill-count" style={{ color: 'var(--status-danger)' }}>{progress.countsByStatus.BLOCKED}</span>
+          </div>
+        </section>
+
+        {/* Navigation Tabs */}
+        <nav className="dev-control-tab-nav">
           <button
             onClick={() => setActiveTab('overview')}
-            className={`border-b-2 px-4 py-3 text-sm font-semibold transition ${
-              activeTab === 'overview' ? 'border-blue-500 text-blue-400' : 'border-transparent text-slate-400 hover:text-slate-200'
-            }`}
+            className={`dev-control-tab-button ${activeTab === 'overview' ? 'active' : ''}`}
           >
             Visão Geral & Saúde
           </button>
           <button
             onClick={() => setActiveTab('modules')}
-            className={`border-b-2 px-4 py-3 text-sm font-semibold transition ${
-              activeTab === 'modules' ? 'border-blue-500 text-blue-400' : 'border-transparent text-slate-400 hover:text-slate-200'
-            }`}
+            className={`dev-control-tab-button ${activeTab === 'modules' ? 'active' : ''}`}
           >
             Módulos do Sistema ({modules.length})
           </button>
           <button
             onClick={() => setActiveTab('frozen')}
-            className={`border-b-2 px-4 py-3 text-sm font-semibold transition ${
-              activeTab === 'frozen' ? 'border-blue-500 text-blue-400' : 'border-transparent text-slate-400 hover:text-slate-200'
-            }`}
+            className={`dev-control-tab-button ${activeTab === 'frozen' ? 'active' : ''}`}
           >
             Componentes Congelados ({frozenComponents.length})
           </button>
-        </div>
+        </nav>
 
-        {/* Tab Contents */}
+        {/* Tab 1: Visão Geral & Saúde */}
         {activeTab === 'overview' && (
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-            {/* Health Overview */}
-            <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-6 lg:col-span-2">
-              <h3 className="mb-4 text-base font-bold text-white flex items-center gap-2">
-                <Activity className="h-5 w-5 text-blue-400" /> Saúde Sistêmica do Produto
-              </h3>
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                {Object.entries(health.dimensions).map(([key, dim]) => (
-                  <div key={key} className="rounded-lg border border-slate-800/80 bg-slate-950/40 p-3.5">
-                    <div className="mb-1.5 flex items-center justify-between">
-                      <span className="text-xs font-semibold text-slate-200">{dim.name}</span>
-                      {renderHealthBadge(dim.status)}
-                    </div>
-                    <p className="text-xs text-slate-400 leading-relaxed">{dim.details}</p>
+          <section className="dev-control-health-grid">
+            {Object.entries(health.dimensions).map(([key, dim]) => (
+              <div key={key} className="dev-control-health-card">
+                <div className="dev-control-health-card-header">
+                  <div className="dev-control-health-card-title">
+                    {getDimensionIcon(key)}
+                    <span>{dim.name}</span>
                   </div>
-                ))}
+                  {renderHealthBadge(dim.status)}
+                </div>
+                <p className="dev-control-health-card-desc">{dim.details}</p>
               </div>
-            </div>
-
-            {/* Frozen Summary */}
-            <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-6">
-              <h3 className="mb-4 text-base font-bold text-white flex items-center gap-2">
-                <Lock className="h-5 w-5 text-emerald-400" /> Componentes Congelados
-              </h3>
-              <div className="space-y-3">
-                {frozenComponents.map((fc) => (
-                  <div key={fc.id} className="rounded-lg border border-emerald-900/30 bg-emerald-950/20 p-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-emerald-300">{fc.name}</span>
-                      <span className="text-[10px] font-mono text-emerald-500">Patch {fc.frozenSincePatch}</span>
-                    </div>
-                    <p className="mt-1 text-xs text-slate-400">{fc.description}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
+            ))}
+          </section>
         )}
 
+        {/* Tab 2: Módulos do Sistema */}
         {activeTab === 'modules' && (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <section className="dev-control-modules-grid">
             {modules.map((mod: DevelopmentModuleProgress) => (
-              <div key={mod.id} className="rounded-xl border border-slate-800 bg-slate-900/60 p-5">
-                <div className="mb-2 flex items-center justify-between">
-                  <h4 className="text-sm font-bold text-white">{mod.name}</h4>
-                  {renderStatusBadge(mod.status)}
+              <div key={mod.id} className="dev-control-module-card">
+                <div>
+                  <div className="dev-control-module-header">
+                    <h3 className="dev-control-module-name">{mod.name}</h3>
+                    {renderStatusBadge(mod.status)}
+                  </div>
+                  <p className="dev-control-module-desc">{mod.description}</p>
                 </div>
-                <p className="mb-4 text-xs text-slate-400 h-10 overflow-hidden text-ellipsis">{mod.description}</p>
 
-                <div className="space-y-2">
+                <div className="dev-control-module-progress-row">
                   <div>
-                    <div className="flex justify-between text-xs mb-1 text-slate-300">
+                    <div className="dev-control-module-progress-info">
                       <span>Implementação</span>
-                      <span>{mod.implementationPercent}%</span>
+                      <strong>{mod.implementationPercent}%</strong>
                     </div>
-                    <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
-                      <div className="h-full bg-blue-500" style={{ width: `${mod.implementationPercent}%` }} />
+                    <div className="dev-control-progress-track" style={{ height: 6, marginTop: 4, marginBottom: 0 }}>
+                      <div
+                        className="dev-control-progress-fill dev-control-progress-fill-primary"
+                        style={{ width: `${mod.implementationPercent}%` }}
+                      />
                     </div>
                   </div>
+
                   <div>
-                    <div className="flex justify-between text-xs mb-1 text-slate-300">
+                    <div className="dev-control-module-progress-info">
                       <span>Homologação</span>
-                      <span>{mod.homologationPercent}%</span>
+                      <strong>{mod.homologationPercent}%</strong>
                     </div>
-                    <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
-                      <div className="h-full bg-teal-400" style={{ width: `${mod.homologationPercent}%` }} />
+                    <div className="dev-control-progress-track" style={{ height: 6, marginTop: 4, marginBottom: 0 }}>
+                      <div
+                        className="dev-control-progress-fill dev-control-progress-fill-emerald"
+                        style={{ width: `${mod.homologationPercent}%` }}
+                      />
                     </div>
                   </div>
                 </div>
 
-                <div className="mt-4 pt-3 border-t border-slate-800 flex justify-between text-[11px] text-slate-500 font-mono">
-                  <span>Caps: {mod.implementedCapabilities}/{mod.totalCapabilities}</span>
-                  <span>Peso: {mod.implementedWeight}/{mod.totalWeight}</span>
+                <div className="dev-control-module-footer">
+                  <span>Caps: <strong>{mod.implementedCapabilities} / {mod.totalCapabilities}</strong></span>
+                  <span>Peso: <strong>{mod.implementedWeight} / {mod.totalWeight}</strong></span>
                 </div>
               </div>
             ))}
-          </div>
+          </section>
         )}
 
+        {/* Tab 3: Componentes Congelados */}
         {activeTab === 'frozen' && (
-          <div className="space-y-4">
+          <section className="dev-control-frozen-grid">
             {frozenComponents.map((fc) => (
-              <div key={fc.id} className="rounded-xl border border-emerald-900/40 bg-emerald-950/20 p-5">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <Lock className="h-5 w-5 text-emerald-400" />
-                    <h4 className="text-base font-bold text-white">{fc.name}</h4>
+              <div key={fc.id} className="dev-control-frozen-card">
+                <div className="dev-control-frozen-header">
+                  <div className="dev-control-frozen-title">
+                    <Lock style={{ width: 18, height: 18, color: 'var(--status-success)' }} />
+                    <span>{fc.name}</span>
                   </div>
-                  <span className="rounded-md border border-emerald-800 bg-emerald-950 px-3 py-1 text-xs font-mono text-emerald-300">
-                    Congelado no Patch {fc.frozenSincePatch}
-                  </span>
+                  <span className="dev-control-frozen-patch-badge">PATCH {fc.frozenSincePatch}</span>
                 </div>
-                <p className="text-sm text-slate-300 mb-2">{fc.description}</p>
-                <div className="text-xs text-slate-400 bg-slate-900/60 p-3 rounded-lg border border-slate-800">
-                  <strong className="text-emerald-400">Motivo da Proteção:</strong> {fc.reason}
+                <p className="dev-control-frozen-desc">{fc.description}</p>
+                <div className="dev-control-frozen-reason-box">
+                  <strong>MOTIVO DA PROTEÇÃO:</strong>
+                  <span>{fc.reason}</span>
                 </div>
               </div>
             ))}
-          </div>
+          </section>
         )}
-      </main>
+      </div>
     </div>
   );
 };

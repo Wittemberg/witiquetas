@@ -369,11 +369,29 @@ export default function EditorLayout({
             </div>
           )}
 
-          {/* Indicador e Ação Explícita de Salvamento */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+          {/* Container Fixo de Status de Salvamento (Invariância Geométrica) */}
+          <div
+            className="save-status-container"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.4rem',
+              width: '140px',
+              minWidth: '140px',
+              maxWidth: '140px',
+              justifyContent: 'flex-start',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              boxSizing: 'border-box',
+              flexShrink: 0,
+            }}
+          >
             <div
               className="save-status-indicator"
               style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.35rem',
                 cursor: saveStatus === 'conflict' || saveStatus === 'deleted' || saveStatus === 'error' ? 'pointer' : 'default',
               }}
               onClick={() => {
@@ -383,21 +401,22 @@ export default function EditorLayout({
               }}
               title={
                 saveStatus === 'conflict'
-                  ? 'Conflito de versão detectado. Clique para ver detalhes e opções de resolução.'
+                  ? 'Conflito de versão — clique para ver detalhes e opções de resolução.'
                   : saveStatus === 'deleted'
-                    ? 'Este modelo foi removido no servidor. Clique para opções de recuperação.'
+                    ? 'Modelo removido no servidor. Clique para opções de recuperação.'
                     : saveStatus === 'error'
                       ? 'Erro ao salvar. Clique para tentar novamente.'
                       : undefined
               }
             >
               <div
-                className={`save-status-dot ${saveStatus === 'unsaved'
+                className={`save-status-dot ${
+                  saveStatus === 'unsaved'
                     ? 'unsaved'
                     : saveStatus === 'error' || saveStatus === 'conflict' || saveStatus === 'deleted'
                       ? 'unsaved'
                       : 'saved'
-                  }`}
+                }`}
               />
               <span
                 style={{
@@ -416,11 +435,11 @@ export default function EditorLayout({
                   : saveStatus === 'unsaved'
                     ? 'Não salvo'
                     : saveStatus === 'error'
-                      ? 'Erro ao salvar'
+                      ? 'Erro'
                       : saveStatus === 'conflict'
-                        ? 'Conflito de versão'
+                        ? 'Conflito'
                         : saveStatus === 'deleted'
-                          ? 'Modelo removido'
+                          ? 'Removido'
                           : 'Salvo'}
               </span>
             </div>
@@ -429,8 +448,8 @@ export default function EditorLayout({
               <button
                 className="btn"
                 style={{
-                  padding: '0.2rem 0.55rem',
-                  fontSize: '0.72rem',
+                  padding: '0.18rem 0.45rem',
+                  fontSize: '0.7rem',
                   fontWeight: 700,
                   background: 'var(--accent-blue)',
                   color: '#ffffff',
@@ -438,12 +457,13 @@ export default function EditorLayout({
                   borderRadius: '4px',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '0.3rem',
+                  gap: '0.25rem',
+                  flexShrink: 0,
                 }}
                 onClick={() => saveDocumentToBackend()}
                 title="Salvar modelo no servidor (Ctrl+S)"
               >
-                <Save size={12} />
+                <Save size={11} />
                 <span>Salvar</span>
               </button>
             )}
@@ -452,8 +472,8 @@ export default function EditorLayout({
               <button
                 className="btn"
                 style={{
-                  padding: '0.2rem 0.55rem',
-                  fontSize: '0.72rem',
+                  padding: '0.18rem 0.45rem',
+                  fontSize: '0.7rem',
                   fontWeight: 700,
                   background: 'var(--status-warning)',
                   color: '#ffffff',
@@ -461,13 +481,14 @@ export default function EditorLayout({
                   borderRadius: '4px',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '0.3rem',
+                  gap: '0.25rem',
+                  flexShrink: 0,
                 }}
                 onClick={openConflictModal}
                 title="Este modelo possui alterações concorrentes. Clique para resolver."
               >
-                <AlertTriangle size={12} />
-                <span>Conflito</span>
+                <AlertTriangle size={11} />
+                <span>Resolver</span>
               </button>
             )}
           </div>

@@ -11,6 +11,7 @@ COPY packages/printer-core ./packages/printer-core
 COPY packages/printer-ppla ./packages/printer-ppla
 COPY packages/printer-pplb ./packages/printer-pplb
 COPY apps/backend ./apps/backend
+COPY docs/development-control ./docs/development-control
 
 # Instala dependências e compila os pacotes e a aplicação
 RUN npm install

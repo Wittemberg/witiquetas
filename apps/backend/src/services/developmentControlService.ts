@@ -13,10 +13,26 @@ import type {
   DevelopmentStatus,
 } from '@witiquetas/contracts';
 
-const DATA_DIR = path.resolve(process.cwd(), 'docs/development-control');
+function getDataDir(): string {
+  const candidates = [
+    path.resolve(process.cwd(), 'docs/development-control'),
+    path.resolve(process.cwd(), '../docs/development-control'),
+    path.resolve(process.cwd(), '../../docs/development-control'),
+    path.resolve(process.cwd(), 'apps/backend/docs/development-control'),
+    '/app/docs/development-control',
+    '/app/apps/backend/docs/development-control',
+  ];
+  for (const candidate of candidates) {
+    if (fs.existsSync(path.join(candidate, 'project.json'))) {
+      return candidate;
+    }
+  }
+  return candidates[0];
+}
 
 function loadJsonFile<T>(filename: string): T {
-  const filePath = path.join(DATA_DIR, filename);
+  const dataDir = getDataDir();
+  const filePath = path.join(dataDir, filename);
   if (!fs.existsSync(filePath)) {
     throw new Error(`Arquivo de controle de desenvolvimento não encontrado: ${filePath}`);
   }

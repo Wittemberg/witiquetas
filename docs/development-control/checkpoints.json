@@ -1,6 +1,19 @@
 {
   "checkpoints": [
     {
+      "sha": "ade52df1e6482d8a1904913008a312c50e5ed927",
+      "shortSha": "ade52df",
+      "date": "2026-08-27T12:00:00Z",
+      "phase": "4",
+      "patch": "4.1.2",
+      "title": "fix(print-center): aplicar visual system canônico à Central",
+      "type": "HOTFIX",
+      "capabilities": ["cap-universal-print-center"],
+      "testsPassed": true,
+      "deployed": false,
+      "manualValidation": true
+    },
+    {
       "sha": "6723b230da7ad8974ee193e938ff06684b9c7f48",
       "shortSha": "6723b23",
       "date": "2026-08-27T11:30:00Z",

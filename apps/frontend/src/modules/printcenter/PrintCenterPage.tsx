@@ -15,7 +15,6 @@ import {
 } from 'lucide-react';
 import {
   getRequiredIntegrationFields,
-  MOCK_PRODUCT_DATA,
   resolveFieldValue,
 } from '@witiquetas/label-schema';
 import type {
@@ -205,7 +204,7 @@ export const PrintCenterPage: React.FC = () => {
     loadInitialData();
   }, [loadInitialData]);
 
-  // Carregar documento completo do modelo selecionado
+  // Carregar documento completo do modelo selecionado (Hotfix 4.1.1: getTemplateById)
   useEffect(() => {
     if (!selectedTemplateId) {
       setSelectedTemplate(null);
@@ -242,7 +241,7 @@ export const PrintCenterPage: React.FC = () => {
 
   // Status do Agente associado à impressora
   const agentStatus = useMemo(() => {
-    if (!selectedPrinter) return { online: false, text: 'Nenhuma Impressora' };
+    if (!selectedPrinter) return { online: false, text: 'Offline' };
     if (selectedPrinter.protocol === 'RAW_TCP') {
       const hasHost = !!selectedPrinter.host?.trim();
       return { online: hasHost, text: hasHost ? 'RAW TCP Online' : 'IP Não Configurado' };
@@ -251,9 +250,9 @@ export const PrintCenterPage: React.FC = () => {
       return { online: true, text: 'Dispositivo Direto' };
     }
     const agent = agentsMap.get(selectedPrinter.agentId);
-    if (!agent) return { online: false, text: 'Agent Não Encontrado' };
+    if (!agent) return { online: false, text: 'Offline' };
     const isOnline = agent.status === 'ONLINE';
-    return { online: isOnline, text: isOnline ? `Agent ${agent.machineName} (Online)` : `Agent ${agent.machineName} (Offline)` };
+    return { online: isOnline, text: isOnline ? 'Online' : 'Offline' };
   }, [selectedPrinter, agentsMap]);
 
   // Alternar Seleção de Registro Individual
@@ -400,106 +399,106 @@ export const PrintCenterPage: React.FC = () => {
   };
 
   return (
-    <div className="print-center-page p-6 max-w-7xl mx-auto space-y-6 text-gray-100 font-sans">
+    <div className="print-center-page">
       {/* CABEÇALHO DO MÓDULO */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-gray-800 pb-4 gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-100 flex items-center gap-2">
-            <Printer className="w-7 h-7 text-indigo-400" />
+      <div className="print-center-header">
+        <div className="print-center-title-container">
+          <h1>
+            <Printer className="print-center-icon-blue" style={{ width: '1.75rem', height: '1.75rem' }} />
             Central de Impressão Universal
           </h1>
-          <p className="text-sm text-gray-400 mt-1">
+          <p>
             Selecione registros, modelo e impressora para disparar etiquetas industriais em lote.
           </p>
         </div>
         <button
           onClick={loadInitialData}
           disabled={loadingInitial}
-          className="px-3 py-1.5 text-xs font-medium bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg border border-gray-700 flex items-center gap-1.5 transition"
+          className="print-center-btn print-center-btn-secondary"
         >
-          <RefreshCw className={`w-3.5 h-3.5 ${loadingInitial ? 'animate-spin' : ''}`} />
+          <RefreshCw style={{ width: '0.875rem', height: '0.875rem' }} className={loadingInitial ? 'animate-spin' : ''} />
           Atualizar Dados
         </button>
       </div>
 
       {/* BANNER DE ERRO SE EXISTIR */}
       {errorMessage && (
-        <div className="bg-red-950/50 border border-red-500/50 p-4 rounded-xl text-red-300 text-sm flex items-start gap-3">
-          <AlertTriangle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
-          <div className="flex-1">
-            <h4 className="font-semibold text-red-200">Aviso da Central</h4>
-            <p className="mt-0.5">{errorMessage}</p>
+        <div className="print-center-alert-banner">
+          <AlertTriangle style={{ width: '1.25rem', height: '1.25rem', flexShrink: 0, marginTop: '0.125rem' }} />
+          <div style={{ flex: 1 }}>
+            <h4 style={{ margin: 0, fontWeight: 600 }}>Aviso da Central</h4>
+            <p style={{ margin: '0.25rem 0 0 0' }}>{errorMessage}</p>
           </div>
           <button
             onClick={() => setErrorMessage(null)}
-            className="text-red-400 hover:text-red-200"
+            style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer' }}
           >
-            <X className="w-4 h-4" />
+            <X style={{ width: '1rem', height: '1rem' }} />
           </button>
         </div>
       )}
 
       {/* FEEDBACK DE SUCESSO DE BATCH CRIADO */}
       {batchResult ? (
-        <div className="bg-emerald-950/40 border border-emerald-500/50 p-6 rounded-xl space-y-4">
-          <div className="flex items-center gap-3">
-            <CheckCircle2 className="w-8 h-8 text-emerald-400 flex-shrink-0" />
+        <div className="print-center-success-banner">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <CheckCircle2 style={{ width: '2rem', height: '2rem', color: 'var(--status-success)', flexShrink: 0 }} />
             <div>
-              <h3 className="text-lg font-bold text-emerald-200">
+              <h3 style={{ margin: 0, fontSize: '1.125rem', fontWeight: 700, color: 'var(--text-primary)' }}>
                 Lote de Impressão Enviado com Sucesso!
               </h3>
-              <p className="text-xs text-emerald-400">
-                ID do Lote: <span className="font-mono text-gray-200 font-bold">{batchResult.id}</span>
+              <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                ID do Lote: <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--text-primary)' }}>{batchResult.id}</span>
               </p>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-gray-900/60 p-4 rounded-lg border border-emerald-900/60 text-xs">
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '1rem', background: 'var(--bg-input)', padding: '1rem', borderRadius: '0.5rem', border: '1px solid var(--border-color)' }}>
             <div>
-              <span className="text-gray-400 block">Total Registros:</span>
-              <span className="text-base font-bold text-gray-200">{batchResult.totalRecords}</span>
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block' }}>Total Registros:</span>
+              <span style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)' }}>{batchResult.totalRecords}</span>
             </div>
             <div>
-              <span className="text-gray-400 block">Total Etiquetas:</span>
-              <span className="text-base font-bold text-indigo-300">{batchResult.totalLabels}</span>
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block' }}>Total Etiquetas:</span>
+              <span style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--accent-blue)' }}>{batchResult.totalLabels}</span>
             </div>
             <div>
-              <span className="text-gray-400 block">Status Atual:</span>
-              <span className="inline-block px-2 py-0.5 text-[11px] font-semibold bg-indigo-900/60 text-indigo-300 rounded-full mt-0.5">
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block' }}>Status Atual:</span>
+              <span className="print-center-badge print-center-badge-online" style={{ marginTop: '0.25rem' }}>
                 {batchResult.status}
               </span>
             </div>
             <div>
-              <span className="text-gray-400 block">Criado em:</span>
-              <span className="text-gray-300">{new Date(batchResult.createdAt).toLocaleTimeString()}</span>
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block' }}>Criado em:</span>
+              <span style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>{new Date(batchResult.createdAt).toLocaleTimeString()}</span>
             </div>
           </div>
 
-          <div className="flex items-center justify-end gap-3 pt-2">
+          <div style={{ display: 'flex', justifySelf: 'end', alignSelf: 'end' }}>
             <button
               onClick={handleNewPrintJob}
-              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-sm rounded-lg shadow transition flex items-center gap-2"
+              className="print-center-btn print-center-btn-primary"
             >
-              <Send className="w-4 h-4" />
+              <Send style={{ width: '1rem', height: '1rem' }} />
               Nova Impressão
             </button>
           </div>
         </div>
       ) : (
         /* CORPO DA CENTRAL (SELEÇÃO, BUSCA, GRID E PREVIEW) */
-        <div className="space-y-6">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
           {/* BARRA SUPERIOR DE SELEÇÃO: MODELO, ORIGEM, IMPRESSORA & AGENT */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-gray-900/70 p-4 rounded-xl border border-gray-800 shadow-sm">
+          <div className="print-center-config-card">
             {/* 1. SELEÇÃO DE MODELO */}
-            <div>
-              <label className="block text-xs font-semibold text-gray-400 mb-1 flex items-center gap-1.5">
-                <FileText className="w-3.5 h-3.5 text-indigo-400" />
+            <div className="print-center-field-group">
+              <label className="print-center-label">
+                <FileText style={{ width: '0.875rem', height: '0.875rem' }} className="print-center-icon-blue" />
                 Modelo de Etiqueta
               </label>
               <select
                 value={selectedTemplateId}
                 onChange={(e) => setSelectedTemplateId(e.target.value)}
-                className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-gray-100 font-medium focus:border-indigo-500 focus:outline-none"
+                className="print-center-select"
               >
                 {templateSummaries.length === 0 ? (
                   <option value="">Nenhum modelo cadastrado</option>
@@ -514,15 +513,12 @@ export const PrintCenterPage: React.FC = () => {
             </div>
 
             {/* 2. ORIGEM DE DADOS / FONTE */}
-            <div>
-              <label className="block text-xs font-semibold text-gray-400 mb-1 flex items-center gap-1.5">
-                <Database className="w-3.5 h-3.5 text-indigo-400" />
+            <div className="print-center-field-group">
+              <label className="print-center-label">
+                <Database style={{ width: '0.875rem', height: '0.875rem' }} className="print-center-icon-blue" />
                 Origem de Dados
               </label>
-              <select
-                defaultValue="mock-catalog"
-                className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-gray-100 font-medium focus:border-indigo-500 focus:outline-none"
-              >
+              <select defaultValue="mock-catalog" className="print-center-select">
                 <option value="mock-catalog">Catálogo Varejo / Integração Mock (Disponível)</option>
                 <option value="erp-connector" disabled>
                   Conector ERP Externo (Fase Futura)
@@ -531,31 +527,25 @@ export const PrintCenterPage: React.FC = () => {
             </div>
 
             {/* 3. SELEÇÃO DE IMPRESSORA E STATUS DO AGENT */}
-            <div>
-              <div className="flex justify-between items-center mb-1">
-                <label className="text-xs font-semibold text-gray-400 flex items-center gap-1.5">
-                  <Printer className="w-3.5 h-3.5 text-indigo-400" />
+            <div className="print-center-field-group">
+              <div className="print-center-label-row">
+                <label className="print-center-label">
+                  <Printer style={{ width: '0.875rem', height: '0.875rem' }} className="print-center-icon-blue" />
                   Impressora Destino
                 </label>
                 <span
-                  className={`text-[11px] font-semibold px-2 py-0.5 rounded-full flex items-center gap-1 ${
-                    agentStatus.online
-                      ? 'bg-emerald-950 text-emerald-400 border border-emerald-800'
-                      : 'bg-red-950 text-red-400 border border-red-800'
+                  className={`print-center-badge ${
+                    agentStatus.online ? 'print-center-badge-online' : 'print-center-badge-offline'
                   }`}
                 >
-                  <span
-                    className={`w-1.5 h-1.5 rounded-full ${
-                      agentStatus.online ? 'bg-emerald-400 animate-pulse' : 'bg-red-400'
-                    }`}
-                  />
+                  <span className="print-center-badge-dot" />
                   {agentStatus.text}
                 </span>
               </div>
               <select
                 value={selectedPrinterId}
                 onChange={(e) => setSelectedPrinterId(e.target.value)}
-                className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-gray-100 font-medium focus:border-indigo-500 focus:outline-none"
+                className="print-center-select"
               >
                 {printers.length === 0 ? (
                   <option value="">Nenhuma impressora cadastrada</option>
@@ -571,43 +561,44 @@ export const PrintCenterPage: React.FC = () => {
           </div>
 
           {/* CONTROLES DA TABELA: BUSCA E AÇÕES EM LOTE */}
-          <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-4 bg-gray-900/40 p-4 rounded-xl border border-gray-800">
+          <div className="print-center-toolbar">
             {/* CAMPO DE BUSCA */}
-            <div className="relative flex-1">
-              <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <div className="print-center-search-wrapper">
+              <Search className="print-center-search-icon" />
               <input
                 type="text"
                 placeholder="Buscar por código, descrição, EAN ou chave..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-gray-100 focus:border-indigo-500 focus:outline-none"
+                className="print-center-input print-center-search-input"
               />
             </div>
 
             {/* AÇÕES EM LOTE */}
-            <div className="flex items-center gap-3">
+            <div className="print-center-batch-controls">
               <button
                 onClick={handleToggleSelectAll}
-                className="px-3 py-2 text-xs font-semibold bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-200 rounded-lg transition flex items-center gap-1.5"
+                className="print-center-btn print-center-btn-secondary"
               >
-                <CheckSquare className="w-4 h-4 text-indigo-400" />
+                <CheckSquare style={{ width: '1rem', height: '1rem' }} className="print-center-icon-blue" />
                 Selecionar Filtrados
               </button>
 
-              <div className="flex items-center gap-1 bg-gray-800 border border-gray-700 p-1 rounded-lg">
-                <span className="text-xs text-gray-400 pl-2 font-medium">Qtd Lote:</span>
+              <div className="print-center-batch-quantity-group">
+                <span className="print-center-batch-quantity-label">Qtd. lote:</span>
                 <input
                   type="number"
                   min={1}
                   max={999}
                   value={batchQuantityInput}
                   onChange={(e) => setBatchQuantityInput(parseInt(e.target.value, 10) || 1)}
-                  className="w-16 px-2 py-1 bg-gray-900 border border-gray-700 rounded text-center text-xs font-bold text-gray-100 focus:outline-none"
+                  className="print-center-batch-quantity-input"
                 />
                 <button
                   onClick={handleApplyBatchQuantity}
                   disabled={selectedIds.size === 0}
-                  className="px-2.5 py-1 text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded transition"
+                  className="print-center-btn print-center-btn-primary"
+                  style={{ padding: '0.25rem 0.625rem', fontSize: '0.75rem' }}
                 >
                   Aplicar
                 </button>
@@ -616,9 +607,9 @@ export const PrintCenterPage: React.FC = () => {
           </div>
 
           {/* LAYOUT GRID DINÂMICO + PAINEL LATERAL DE PREVIEW */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* GRID PRINCIPAL (2/3 DAS COLUNAS) */}
-            <div className="lg:col-span-2">
+          <div className="print-center-content-grid">
+            {/* GRID PRINCIPAL (70% DA LARGURA) */}
+            <div>
               <PrintCenterGrid
                 records={records}
                 requiredFields={requiredFields}
@@ -634,27 +625,27 @@ export const PrintCenterPage: React.FC = () => {
               />
             </div>
 
-            {/* PAINEL DE PREVIEW CONTEXTUAL E RESUMO DE DISPARO (1/3 DA LARGURA) */}
-            <div className="space-y-4">
+            {/* PAINEL DE PREVIEW CONTEXTUAL E RESUMO DE DISPARO (30% DA LARGURA) */}
+            <div className="print-center-sidebar-column">
               {/* CARD DE PREVIEW DA ETIQUETA COM REGISTRO ATIVO */}
-              <div className="bg-gray-900/70 border border-gray-800 p-4 rounded-xl space-y-3">
-                <div className="flex items-center justify-between border-b border-gray-800 pb-2">
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-gray-300 flex items-center gap-1.5">
-                    <Eye className="w-4 h-4 text-indigo-400" />
+              <div className="print-center-card">
+                <div className="print-center-card-header">
+                  <h3 className="print-center-card-title">
+                    <Eye style={{ width: '1rem', height: '1rem' }} className="print-center-icon-blue" />
                     Prévia Contextual
                   </h3>
-                  <span className="text-[11px] text-gray-400 truncate max-w-[150px]">
+                  <span style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', maxWidth: '140px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {activeRecord ? activeRecord.data['retail.description'] || activeRecord.id : 'Nenhum'}
                   </span>
                 </div>
 
                 {/* CONTAINER SIMULADO DE RENDERIZAÇÃO DE PREVIEW */}
-                <div className="bg-white text-black p-4 rounded-lg shadow-inner min-h-[140px] flex flex-col justify-between border border-gray-300">
+                <div className="print-center-preview-box">
                   <div>
-                    <div className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">
+                    <div style={{ fontSize: '0.625rem', color: '#666666', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                       {selectedTemplate?.title || 'Modelo Selecionado'}
                     </div>
-                    <div className="text-sm font-extrabold text-gray-900 mt-1 line-clamp-2">
+                    <div style={{ fontSize: '0.875rem', fontWeight: 800, color: '#111111', marginTop: '0.25rem', lineHeight: 1.2 }}>
                       {activeRecord
                         ? resolveFieldValue('retail.description', activeRecord.data) ||
                           resolveFieldValue('produto.descricao', activeRecord.data) ||
@@ -663,48 +654,50 @@ export const PrintCenterPage: React.FC = () => {
                     </div>
                   </div>
 
-                  <div className="flex justify-between items-end border-t border-gray-200 pt-2 mt-2">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', borderTop: '1px solid #e5e5e5', paddingTop: '0.5rem', marginTop: '0.5rem' }}>
                     <div>
-                      <div className="text-[10px] font-mono text-gray-600">
+                      <div style={{ fontSize: '0.625rem', fontFamily: 'var(--font-mono)', color: '#444444' }}>
                         CÓD: {activeRecord ? activeRecord.data['retail.code'] || activeRecord.id : '000000'}
                       </div>
-                      <div className="text-[10px] font-mono text-gray-600">
+                      <div style={{ fontSize: '0.625rem', fontFamily: 'var(--font-mono)', color: '#444444' }}>
                         EAN: {activeRecord ? activeRecord.data['retail.ean'] || '7890000000000' : '-'}
                       </div>
                     </div>
-                    <div className="text-right">
-                      <div className="text-[9px] text-gray-500 font-bold uppercase">Preço R$</div>
-                      <div className="text-xl font-black text-gray-900 leading-none">
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontSize: '0.5625rem', color: '#666666', fontWeight: 700, textTransform: 'uppercase' }}>Preço R$</div>
+                      <div style={{ fontSize: '1.25rem', fontWeight: 900, color: '#000000', lineHeight: 1 }}>
                         {activeRecord ? activeRecord.data['retail.price'] || '0.00' : '0.00'}
                       </div>
                     </div>
                   </div>
                 </div>
 
-                <p className="text-[11px] text-gray-500 text-center">
+                <p style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', textAlign: 'center', margin: 0 }}>
                   A prévia utiliza dados em tempo real do registro selecionado sem alterar o modelo.
                 </p>
               </div>
 
               {/* CARD DE AÇÃO DE DISPARO */}
-              <div className="bg-gray-900/70 border border-gray-800 p-5 rounded-xl space-y-4">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-gray-300 flex items-center gap-1.5 border-b border-gray-800 pb-2">
-                  <Layers className="w-4 h-4 text-indigo-400" />
-                  Resumo da Seleção
-                </h3>
+              <div className="print-center-card">
+                <div className="print-center-card-header">
+                  <h3 className="print-center-card-title">
+                    <Layers style={{ width: '1rem', height: '1rem' }} className="print-center-icon-blue" />
+                    Resumo da Seleção
+                  </h3>
+                </div>
 
-                <div className="space-y-2 text-xs">
-                  <div className="flex justify-between text-gray-400">
+                <div className="print-center-summary-list">
+                  <div className="print-center-summary-item">
                     <span>Registros Selecionados:</span>
-                    <span className="font-bold text-gray-200">{totalSelectedRecords}</span>
+                    <span className="print-center-summary-value">{totalSelectedRecords}</span>
                   </div>
-                  <div className="flex justify-between text-gray-400">
+                  <div className="print-center-summary-item">
                     <span>Total de Etiquetas:</span>
-                    <span className="font-bold text-indigo-400 text-sm">{totalSelectedLabels}</span>
+                    <span className="print-center-summary-value-accent">{totalSelectedLabels}</span>
                   </div>
-                  <div className="flex justify-between text-gray-400">
+                  <div className="print-center-summary-item">
                     <span>Linguagem de Impressão:</span>
-                    <span className="font-semibold text-gray-300">
+                    <span className="print-center-summary-value">
                       {selectedTemplate?.printerLanguage || 'PPLB'}
                     </span>
                   </div>
@@ -713,14 +706,15 @@ export const PrintCenterPage: React.FC = () => {
                 <button
                   disabled={!isPrintButtonEnabled}
                   onClick={() => setIsConfirmModalOpen(true)}
-                  className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 disabled:bg-gray-800 disabled:text-gray-500 disabled:cursor-not-allowed text-white font-bold text-sm rounded-xl shadow-lg transition flex items-center justify-center gap-2"
+                  className="print-center-btn print-center-btn-primary"
+                  style={{ width: '100%', padding: '0.75rem 1rem', fontSize: '0.875rem', fontWeight: 700 }}
                 >
-                  <Send className="w-4 h-4" />
+                  <Send style={{ width: '1rem', height: '1rem' }} />
                   Imprimir Seleção ({totalSelectedLabels} etiquetas)
                 </button>
 
                 {!agentStatus.online && (
-                  <p className="text-[11px] text-red-400 text-center font-medium">
+                  <p style={{ fontSize: '0.6875rem', color: 'var(--status-danger)', textAlign: 'center', fontWeight: 500, margin: 0 }}>
                     A impressora selecionada ou seu Agente está offline. Conecte o hardware para habilitar a impressão.
                   </p>
                 )}
@@ -732,63 +726,63 @@ export const PrintCenterPage: React.FC = () => {
 
       {/* MODAL COMPACTO DE CONFIRMAÇÃO DE DISPARO */}
       {isConfirmModalOpen && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-gray-900 border border-gray-700 rounded-xl p-6 max-w-md w-full shadow-2xl space-y-4 animate-in fade-in zoom-in duration-150">
-            <div className="flex justify-between items-center border-b border-gray-800 pb-3">
-              <h3 className="text-base font-bold text-gray-100 flex items-center gap-2">
-                <Printer className="w-5 h-5 text-indigo-400" />
+        <div className="print-center-modal-overlay">
+          <div className="print-center-modal-card">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
+              <h3 style={{ fontSize: '1rem', fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Printer style={{ width: '1.25rem', height: '1.25rem' }} className="print-center-icon-blue" />
                 Confirmar Impressão em Lote
               </h3>
               <button
                 onClick={() => setIsConfirmModalOpen(false)}
-                className="text-gray-400 hover:text-gray-200"
+                style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
               >
-                <X className="w-5 h-5" />
+                <X style={{ width: '1.25rem', height: '1.25rem' }} />
               </button>
             </div>
 
-            <div className="space-y-3 text-xs bg-gray-800/50 p-4 rounded-lg border border-gray-700/60">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', fontSize: '0.8125rem', background: 'var(--bg-input)', padding: '1rem', borderRadius: '0.5rem', border: '1px solid var(--border-color)' }}>
               <div>
-                <span className="text-gray-400 block font-medium">Modelo de Etiqueta:</span>
-                <span className="text-sm font-bold text-gray-100">{selectedTemplate?.title}</span>
+                <span style={{ color: 'var(--text-muted)', display: 'block', fontWeight: 500 }}>Modelo de Etiqueta:</span>
+                <span style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-primary)' }}>{selectedTemplate?.title}</span>
               </div>
               <div>
-                <span className="text-gray-400 block font-medium">Impressora Destino:</span>
-                <span className="text-sm font-bold text-gray-100">{selectedPrinter?.name}</span>
+                <span style={{ color: 'var(--text-muted)', display: 'block', fontWeight: 500 }}>Impressora Destino:</span>
+                <span style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-primary)' }}>{selectedPrinter?.name}</span>
               </div>
-              <div className="grid grid-cols-2 gap-2 pt-2 border-t border-gray-700/60">
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid var(--border-color)' }}>
                 <div>
-                  <span className="text-gray-400 block font-medium">Registros:</span>
-                  <span className="text-base font-bold text-gray-200">{totalSelectedRecords}</span>
+                  <span style={{ color: 'var(--text-muted)', display: 'block', fontWeight: 500 }}>Registros:</span>
+                  <span style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)' }}>{totalSelectedRecords}</span>
                 </div>
                 <div>
-                  <span className="text-gray-400 block font-medium">Total Etiquetas:</span>
-                  <span className="text-base font-bold text-indigo-400">{totalSelectedLabels}</span>
+                  <span style={{ color: 'var(--text-muted)', display: 'block', fontWeight: 500 }}>Total Etiquetas:</span>
+                  <span style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--accent-blue)' }}>{totalSelectedLabels}</span>
                 </div>
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-3 pt-2">
+            <div style={{ display: 'flex', justifySelf: 'end', alignSelf: 'end', gap: '0.75rem', paddingTop: '0.5rem' }}>
               <button
                 onClick={() => setIsConfirmModalOpen(false)}
                 disabled={isSubmitting}
-                className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 font-semibold text-xs rounded-lg border border-gray-700 transition"
+                className="print-center-btn print-center-btn-secondary"
               >
                 Cancelar
               </button>
               <button
                 onClick={handleConfirmPrintBatch}
                 disabled={isSubmitting}
-                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-lg shadow transition flex items-center gap-1.5"
+                className="print-center-btn print-center-btn-primary"
               >
                 {isSubmitting ? (
                   <>
-                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    <RefreshCw style={{ width: '1rem', height: '1rem' }} className="animate-spin" />
                     Enviando Lote...
                   </>
                 ) : (
                   <>
-                    <Send className="w-4 h-4" />
+                    <Send style={{ width: '1rem', height: '1rem' }} />
                     Enviar para Impressão
                   </>
                 )}

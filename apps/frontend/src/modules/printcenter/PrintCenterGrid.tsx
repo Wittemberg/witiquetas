@@ -108,58 +108,59 @@ export const PrintCenterGrid: React.FC<PrintCenterGridProps> = ({
 
   if (loading) {
     return (
-      <div className="print-center-grid-container p-8 text-center text-gray-400">
-        <div className="animate-spin inline-block w-8 h-8 border-4 border-current border-t-transparent text-indigo-500 rounded-full mb-3" />
-        <p className="text-sm font-medium">Carregando registros do catálogo...</p>
+      <div className="print-center-card" style={{ textAlign: 'center', padding: '2rem' }}>
+        <p style={{ margin: 0, fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+          Carregando registros do catálogo...
+        </p>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="print-center-grid-container p-6 bg-red-900/20 border border-red-500/40 rounded-lg text-red-300 flex items-center gap-3">
-        <AlertCircle className="w-6 h-6 text-red-400 flex-shrink-0" />
+      <div className="print-center-alert-banner">
+        <AlertCircle style={{ width: '1.25rem', height: '1.25rem', flexShrink: 0 }} />
         <div>
-          <h4 className="font-semibold text-sm">Erro ao carregar dados</h4>
-          <p className="text-xs text-red-400 mt-0.5">{error}</p>
+          <h4 style={{ margin: 0, fontWeight: 600 }}>Erro ao carregar dados</h4>
+          <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.8125rem' }}>{error}</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="print-center-grid-wrapper overflow-x-auto border border-gray-700/60 rounded-xl bg-gray-900/50 shadow-inner">
-      <table className="w-full text-left border-collapse text-sm text-gray-200">
+    <div className="print-center-table-wrapper">
+      <table className="print-center-table">
         <thead>
-          <tr className="bg-gray-800/80 border-b border-gray-700/80 text-xs font-semibold uppercase tracking-wider text-gray-400">
-            <th className="py-3 px-4 w-12 text-center">
+          <tr>
+            <th style={{ width: '3rem', textAlign: 'center' }}>
               <input
                 type="checkbox"
                 checked={allFilteredSelected}
                 onChange={onToggleSelectAll}
-                className="w-4 h-4 rounded border-gray-600 text-indigo-600 focus:ring-indigo-500 bg-gray-700 cursor-pointer"
+                className="print-center-checkbox"
                 title="Selecionar todos os filtrados"
               />
             </th>
             {effectiveColumns.map((colKey) => (
-              <th key={colKey} className="py-3 px-4 font-medium">
-                {formatColumnHeader(colKey)}
-              </th>
+              <th key={colKey}>{formatColumnHeader(colKey)}</th>
             ))}
-            <th className="py-3 px-4 w-32 text-center font-medium">Qtd Etiquetas</th>
+            <th style={{ width: '7.5rem', textAlign: 'center' }}>Qtd Etiquetas</th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-gray-800/60">
+        <tbody>
           {filteredRecords.length === 0 ? (
             <tr>
               <td
                 colSpan={effectiveColumns.length + 2}
-                className="py-10 text-center text-gray-500"
+                style={{ textAlign: 'center', padding: '2.5rem 1rem', color: 'var(--text-muted)' }}
               >
-                <FileText className="w-10 h-10 mx-auto text-gray-600 mb-2 opacity-50" />
-                <p className="text-base font-medium text-gray-400">Nenhum registro encontrado</p>
+                <FileText style={{ width: '2.5rem', height: '2.5rem', margin: '0 auto 0.5rem auto', opacity: 0.5 }} />
+                <p style={{ margin: 0, fontWeight: 500, color: 'var(--text-secondary)' }}>
+                  Nenhum registro encontrado
+                </p>
                 {searchQuery && (
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.75rem' }}>
                     Tente ajustar o termo de busca &quot;{searchQuery}&quot;
                   </p>
                 )}
@@ -171,38 +172,39 @@ export const PrintCenterGrid: React.FC<PrintCenterGridProps> = ({
               const isActive = activeRecordId === record.id;
               const qty = quantities[record.id] ?? 1;
 
+              const rowClassName = [
+                isActive ? 'print-center-row-active' : '',
+                isSelected ? 'print-center-row-selected' : '',
+              ]
+                .filter(Boolean)
+                .join(' ');
+
               return (
                 <tr
                   key={record.id}
                   onClick={() => onSelectRecord(record.id)}
-                  className={`transition-colors cursor-pointer ${
-                    isActive
-                      ? 'bg-indigo-950/40 border-l-4 border-l-indigo-500'
-                      : isSelected
-                      ? 'bg-gray-800/40 hover:bg-gray-800/70'
-                      : 'hover:bg-gray-800/30'
-                  }`}
+                  className={rowClassName}
                 >
                   <td
-                    className="py-3 px-4 text-center"
+                    style={{ textAlign: 'center' }}
                     onClick={(e) => e.stopPropagation()}
                   >
                     <input
                       type="checkbox"
                       checked={isSelected}
                       onChange={() => onToggleSelect(record.id)}
-                      className="w-4 h-4 rounded border-gray-600 text-indigo-600 focus:ring-indigo-500 bg-gray-700 cursor-pointer"
+                      className="print-center-checkbox"
                     />
                   </td>
                   {effectiveColumns.map((colKey) => (
-                    <td key={colKey} className="py-3 px-4 text-gray-200 font-normal truncate max-w-xs">
+                    <td key={colKey} style={{ maxWidth: '240px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {record.data[colKey] !== undefined && record.data[colKey] !== ''
                         ? record.data[colKey]
                         : '-'}
                     </td>
                   ))}
                   <td
-                    className="py-3 px-4 text-center"
+                    style={{ textAlign: 'center' }}
                     onClick={(e) => e.stopPropagation()}
                   >
                     <input
@@ -212,7 +214,7 @@ export const PrintCenterGrid: React.FC<PrintCenterGridProps> = ({
                       step={1}
                       value={qty}
                       onChange={(e) => handleQuantityInputChange(record.id, e)}
-                      className="w-20 px-2 py-1 bg-gray-800 border border-gray-600 rounded text-center text-sm font-semibold text-gray-100 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none"
+                      className="print-center-qty-input"
                     />
                   </td>
                 </tr>

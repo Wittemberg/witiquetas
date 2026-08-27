@@ -3060,3 +3060,488 @@ body {
   margin-right: 0.35rem;
 }
 
+/* ==========================================================================
+   CENTRAL DE IMPRESSÃO UNIVERSAL (FASE 4.1) — CANONICAL DESIGN SYSTEM CSS
+   ========================================================================== */
+
+.print-center-page {
+  padding: 1.5rem;
+  max-width: 1600px;
+  margin: 0 auto;
+  font-family: var(--font-sans);
+  color: var(--text-primary);
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  box-sizing: border-box;
+}
+
+.print-center-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 1rem;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.print-center-title-container h1 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.print-center-title-container p {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  margin: 0.25rem 0 0 0;
+}
+
+.print-center-icon-blue {
+  color: var(--accent-blue);
+}
+
+.print-center-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  border-radius: 0.5rem;
+  border: 1px solid var(--border-color);
+  background: var(--bg-card);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all 0.15s ease-in-out;
+  font-family: var(--font-sans);
+}
+
+.print-center-btn:hover:not(:disabled) {
+  background: var(--bg-card-hover);
+  border-color: var(--border-color-glow);
+}
+
+.print-center-btn-primary {
+  background: var(--accent-blue);
+  color: #ffffff;
+  border-color: var(--accent-blue);
+}
+
+.print-center-btn-primary:hover:not(:disabled) {
+  background: var(--accent-blue-hover);
+  border-color: var(--accent-blue-hover);
+}
+
+.print-center-btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: var(--bg-card);
+  color: var(--text-muted);
+  border-color: var(--border-color);
+}
+
+.print-center-btn-secondary {
+  background: var(--bg-card);
+  color: var(--text-secondary);
+}
+
+/* Alert Banner */
+.print-center-alert-banner {
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  padding: 1rem;
+  border-radius: 0.75rem;
+  color: #fca5a5;
+  font-size: 0.875rem;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.print-center-success-banner {
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.4);
+  padding: 1.5rem;
+  border-radius: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/* Config Grid Superior (3 Colunas) */
+.print-center-config-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 0.75rem;
+  padding: 1rem 1.25rem;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.25rem;
+  box-shadow: var(--shadow-sm);
+}
+
+@media (max-width: 1200px) {
+  .print-center-config-card {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .print-center-config-card {
+    grid-template-columns: 1fr;
+  }
+}
+
+.print-center-field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.print-center-label-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.print-center-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.print-center-select,
+.print-center-input {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  background: var(--bg-input);
+  border: 1px solid var(--border-color);
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  box-sizing: border-box;
+  transition: border-color 0.15s ease;
+}
+
+.print-center-select:focus,
+.print-center-input:focus {
+  outline: none;
+  border-color: var(--accent-blue);
+  box-shadow: 0 0 0 2px var(--border-color-glow);
+}
+
+/* Badges de Status da Impressora */
+.print-center-badge {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  padding: 0.125rem 0.5rem;
+  border-radius: 9999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  white-space: nowrap;
+}
+
+.print-center-badge-online {
+  background: rgba(16, 185, 129, 0.15);
+  color: var(--status-success);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.print-center-badge-offline {
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--status-danger);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.print-center-badge-dot {
+  width: 0.375rem;
+  height: 0.375rem;
+  border-radius: 50%;
+}
+
+.print-center-badge-online .print-center-badge-dot {
+  background-color: var(--status-success);
+}
+
+.print-center-badge-offline .print-center-badge-dot {
+  background-color: var(--status-danger);
+}
+
+/* Toolbar de Busca e Ações em Lote */
+.print-center-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  background: var(--bg-card);
+  padding: 0.875rem 1.25rem;
+  border-radius: 0.75rem;
+  border: 1px solid var(--border-color);
+  flex-wrap: wrap;
+}
+
+.print-center-search-wrapper {
+  position: relative;
+  flex: 1;
+  min-width: 260px;
+}
+
+.print-center-search-icon {
+  position: absolute;
+  left: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+  width: 1rem;
+  height: 1rem;
+}
+
+.print-center-search-input {
+  padding-left: 2.25rem;
+}
+
+.print-center-batch-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.print-center-batch-quantity-group {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  background: var(--bg-input);
+  border: 1px solid var(--border-color);
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.5rem;
+}
+
+.print-center-batch-quantity-label {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.print-center-batch-quantity-input {
+  width: 3.5rem;
+  padding: 0.25rem;
+  text-align: center;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 0.25rem;
+  color: var(--text-primary);
+}
+
+/* Content Layout (70% Grid / 30% Preview Sidebar) */
+.print-center-content-grid {
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  gap: 1.5rem;
+  align-items: start;
+}
+
+@media (max-width: 1280px) {
+  .print-center-content-grid {
+    grid-template-columns: 1fr 300px;
+  }
+}
+
+@media (max-width: 1024px) {
+  .print-center-content-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Tabela e Grid */
+.print-center-table-wrapper {
+  overflow-x: auto;
+  border: 1px solid var(--border-color);
+  border-radius: 0.75rem;
+  background: var(--bg-card);
+  box-shadow: var(--shadow-sm);
+}
+
+.print-center-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 0.875rem;
+  color: var(--text-primary);
+}
+
+.print-center-table th {
+  background: var(--header-bg);
+  border-bottom: 1px solid var(--border-color);
+  padding: 0.75rem 1rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+}
+
+.print-center-table td {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--border-color);
+  font-weight: 400;
+  vertical-align: middle;
+}
+
+.print-center-table tr {
+  transition: background-color 0.12s ease;
+  cursor: pointer;
+}
+
+.print-center-table tr:hover {
+  background: var(--bg-card-hover);
+}
+
+.print-center-table tr.print-center-row-active {
+  background: var(--bg-card-active);
+  border-left: 4px solid var(--accent-blue);
+}
+
+.print-center-table tr.print-center-row-selected {
+  background: rgba(59, 130, 246, 0.08);
+}
+
+.print-center-checkbox {
+  width: 1rem;
+  height: 1rem;
+  cursor: pointer;
+  accent-color: var(--accent-blue);
+}
+
+.print-center-qty-input {
+  width: 4.5rem;
+  padding: 0.25rem 0.5rem;
+  text-align: center;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  background: var(--bg-input);
+  border: 1px solid var(--border-color);
+  border-radius: 0.25rem;
+  color: var(--text-primary);
+}
+
+.print-center-qty-input:focus {
+  outline: none;
+  border-color: var(--accent-blue);
+}
+
+/* Sidebar Columns: Cards de Prévia Contextual e Resumo */
+.print-center-sidebar-column {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.print-center-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 0.75rem;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  box-shadow: var(--shadow-sm);
+}
+
+.print-center-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 0.5rem;
+}
+
+.print-center-card-title {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  margin: 0;
+}
+
+.print-center-preview-box {
+  background: #ffffff;
+  color: #000000;
+  padding: 1rem;
+  border-radius: 0.5rem;
+  border: 1px solid var(--border-color);
+  min-height: 130px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  box-shadow: var(--shadow-sm);
+}
+
+.print-center-summary-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  font-size: 0.8125rem;
+}
+
+.print-center-summary-item {
+  display: flex;
+  justify-content: space-between;
+  color: var(--text-secondary);
+}
+
+.print-center-summary-value {
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.print-center-summary-value-accent {
+  font-weight: 700;
+  color: var(--accent-blue);
+  font-size: 1rem;
+}
+
+/* Modais */
+.print-center-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.print-center-modal-card {
+  background: var(--modal-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 0.75rem;
+  padding: 1.5rem;
+  max-width: 440px;
+  width: 100%;
+  box-shadow: var(--shadow-elevated);
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  color: var(--text-primary);
+}

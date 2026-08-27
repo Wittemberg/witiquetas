@@ -150,8 +150,8 @@ test('FRONTEND L, M, N & O: Preview contextual, agent status, envio em lote e cÃ
 
 test('FRONTEND P: Layout nÃ£o possui overflow horizontal grave ou quebra de Application Shell', () => {
   assert.ok(
-    printCenterGridContent.includes('overflow-x-auto'),
-    'PrintCenterGrid wrapper deve ter overflow-x-auto para responsividade de colunas'
+    printCenterGridContent.includes('print-center-table-wrapper'),
+    'PrintCenterGrid wrapper deve utilizar container print-center-table-wrapper com overflow-x auto'
   );
 });
 

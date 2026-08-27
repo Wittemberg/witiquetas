@@ -30,7 +30,7 @@ export const DevControlPage: React.FC<DevControlPageProps> = ({ onGoHome }) => {
   const [data, setData] = useState<DevelopmentOverviewDTO | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'overview' | 'modules' | 'frozen'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'modules' | 'frozen' | 'niches'>('overview');
 
   const fetchOverview = async () => {
     try {
@@ -285,6 +285,12 @@ export const DevControlPage: React.FC<DevControlPageProps> = ({ onGoHome }) => {
           >
             Componentes Congelados ({frozenComponents.length})
           </button>
+          <button
+            onClick={() => setActiveTab('niches')}
+            className={`dev-control-tab-button ${activeTab === 'niches' ? 'active' : ''}`}
+          >
+            Cobertura Multi-Nicho (7 Perfis)
+          </button>
         </nav>
 
         {/* Tab 1: Visão Geral & Saúde */}
@@ -374,6 +380,63 @@ export const DevControlPage: React.FC<DevControlPageProps> = ({ onGoHome }) => {
                 </div>
               </div>
             ))}
+          </section>
+        )}
+        {/* Tab 4: Cobertura Multi-Nicho (Niche Validation Matrix) */}
+        {activeTab === 'niches' && (
+          <section className="dev-control-module-card" style={{ padding: '1.5rem' }}>
+            <div style={{ marginBottom: '1rem' }}>
+              <h3 className="dev-control-module-name" style={{ fontSize: '1.1rem' }}>Matriz de Homologação Multi-Nicho (Niche Validation Matrix)</h3>
+              <p className="dev-control-module-desc">
+                Witiquetas é uma plataforma multinicho de etiquetas térmicas. O perfil Varejo/Supermercado é a baseline inicial homologada. Cada nicho possui validação independente nas 5 dimensões do produto.
+              </p>
+            </div>
+
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem', color: 'var(--text-primary)', textAlign: 'left' }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid var(--border-color)', background: 'var(--header-bg)' }}>
+                    <th style={{ padding: '0.75rem 1rem' }}>Perfil Operacional</th>
+                    <th style={{ padding: '0.75rem 1rem' }}>Status Geral</th>
+                    <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>Editor</th>
+                    <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>Preview</th>
+                    <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>Binding</th>
+                    <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>Compiler</th>
+                    <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>Print Center</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[
+                    { code: 'retail', name: 'Retail / Supermercado (Varejo)', status: 'BASELINE EXISTENTE', editor: true, preview: true, binding: true, compiler: true, printCenter: true, note: 'Homologado em bancada (PPLA/PPLB/DataBinding)' },
+                    { code: 'hospital', name: 'Hospitalar (Identificação & Paciente)', status: 'PLANNED', editor: false, preview: false, binding: false, compiler: false, printCenter: false, note: 'Sem elemento Preço. Paciente, Atendimento, Leito' },
+                    { code: 'laboratory', name: 'Laboratório Clínico (CLSI AUTO12)', status: 'PLANNED', editor: false, preview: false, binding: false, compiler: false, printCenter: false, note: 'Amostras, Código do Tubo, 50.8x25.4mm' },
+                    { code: 'logistics', name: 'Logística / Armazém (GS1 / SSCC)', status: 'PLANNED', editor: false, preview: false, binding: false, compiler: false, printCenter: false, note: 'GS1-128, SSCC (AI 00), GTIN, Lote, Destino' },
+                    { code: 'industry', name: 'Indústria / Produção (OP & Serial)', status: 'PLANNED', editor: false, preview: false, binding: false, compiler: false, printCenter: false, note: 'Ordem de produção, Serial, Máquina, Operador' },
+                    { code: 'food', name: 'Alimentação / Perecíveis', status: 'PLANNED', editor: false, preview: false, binding: false, compiler: false, printCenter: false, note: 'Validade, Rastreabilidade, Ingredientes, Tabela' },
+                    { code: 'pharmacy', name: 'Farmácia / Medicamentos (DataMatrix)', status: 'PLANNED', editor: false, preview: false, binding: false, compiler: false, printCenter: false, note: 'DataMatrix 2D, Dosagem, Via, Horário' },
+                  ].map((row) => (
+                    <tr key={row.code} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                      <td style={{ padding: '0.75rem 1rem' }}>
+                        <div style={{ fontWeight: 700 }}>{row.name}</div>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{row.note}</div>
+                      </td>
+                      <td style={{ padding: '0.75rem 1rem' }}>
+                        <span className={`dev-control-badge ${row.status === 'BASELINE EXISTENTE' ? 'dev-control-badge-frozen' : 'dev-control-badge-planned'}`}>
+                          {row.status}
+                        </span>
+                      </td>
+                      {[row.editor, row.preview, row.binding, row.compiler, row.printCenter].map((val, idx) => (
+                        <td key={idx} style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>
+                          <span style={{ fontSize: '1.1rem', color: val ? 'var(--status-success)' : 'var(--text-muted)' }}>
+                            {val ? '☑' : '☐'}
+                          </span>
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </section>
         )}
       </div>

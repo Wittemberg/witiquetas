@@ -148,6 +148,7 @@ export class DevelopmentControlService {
       printers: { name: 'Impressoras & Dispositivos', description: 'Knowledge base e cadastro de hardware' },
       integrations: { name: 'Integrações & SDK', description: 'Mapeamento ERP e contratos OpenAPI' },
       admin: { name: 'Administração & DevControl', description: 'Painel de controle e governança interna' },
+      multiniche: { name: 'Perfis Multi-Nicho', description: 'Comportamento contextual por nicho (Varejo, Hospitalar, Laboratório, Logística, Indústria, Alimentação, Farmácia)' },
       'auth-rbac': { name: 'Autenticação & RBAC', description: 'Governança multi-tenant e permissões' },
       licensing: { name: 'Licenciamento', description: 'Gestão de limites e módulos comerciais' },
       'deployment-cicd': { name: 'Esteira CI/CD', description: 'GitHub Actions, GHCR e Portainer CD' },

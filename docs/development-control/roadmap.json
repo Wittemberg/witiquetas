@@ -18,9 +18,15 @@
           "manualValidation": true,
           "physicalValidation": false,
           "frozen": true,
-          "evidence": ["packages/contracts", "packages/label-schema", "packages/printer-core"],
+          "evidence": [
+            "packages/contracts",
+            "packages/label-schema",
+            "packages/printer-core"
+          ],
           "dependencies": [],
-          "notes": ["Estrutura base mantida intacta desde a Fase 0."]
+          "notes": [
+            "Estrutura base mantida intacta desde a Fase 0."
+          ]
         },
         {
           "id": "cap-docker-cicd",
@@ -33,9 +39,17 @@
           "manualValidation": true,
           "physicalValidation": false,
           "frozen": true,
-          "evidence": [".github/workflows/docker.yml", "apps/backend/Dockerfile", "apps/frontend/Dockerfile"],
-          "dependencies": ["cap-monorepo-setup"],
-          "notes": ["Validação continua e automatizada via webhook e auto-rollback guard em 150s."]
+          "evidence": [
+            ".github/workflows/docker.yml",
+            "apps/backend/Dockerfile",
+            "apps/frontend/Dockerfile"
+          ],
+          "dependencies": [
+            "cap-monorepo-setup"
+          ],
+          "notes": [
+            "Validação continua e automatizada via webhook e auto-rollback guard em 150s."
+          ]
         },
         {
           "id": "cap-infra-storage-db",
@@ -48,9 +62,16 @@
           "manualValidation": true,
           "physicalValidation": false,
           "frozen": true,
-          "evidence": ["apps/backend/src/db.ts", "apps/backend/src/index.ts"],
-          "dependencies": ["cap-monorepo-setup"],
-          "notes": ["Health checks e estatísticas operacionais em tempo real."]
+          "evidence": [
+            "apps/backend/src/db.ts",
+            "apps/backend/src/index.ts"
+          ],
+          "dependencies": [
+            "cap-monorepo-setup"
+          ],
+          "notes": [
+            "Health checks e estatísticas operacionais em tempo real."
+          ]
         }
       ]
     },
@@ -72,9 +93,16 @@
           "manualValidation": true,
           "physicalValidation": false,
           "frozen": true,
-          "evidence": ["apps/frontend/src/editor/CanvasArea.tsx", "apps/frontend/src/editor/bounds.ts"],
-          "dependencies": ["cap-monorepo-setup"],
-          "notes": ["Congelado para proteger manipulação geométrica do canvas."]
+          "evidence": [
+            "apps/frontend/src/editor/CanvasArea.tsx",
+            "apps/frontend/src/editor/bounds.ts"
+          ],
+          "dependencies": [
+            "cap-monorepo-setup"
+          ],
+          "notes": [
+            "Congelado para proteger manipulação geométrica do canvas."
+          ]
         },
         {
           "id": "cap-visual-elements",
@@ -87,9 +115,16 @@
           "manualValidation": true,
           "physicalValidation": false,
           "frozen": true,
-          "evidence": ["apps/frontend/src/editor/components/PriceElement.tsx", "apps/frontend/src/editor/components/LineElement.tsx"],
-          "dependencies": ["cap-canvas-core"],
-          "notes": ["Componentes Price, Line e Multiselect formalmente congelados."]
+          "evidence": [
+            "apps/frontend/src/editor/components/PriceElement.tsx",
+            "apps/frontend/src/editor/components/LineElement.tsx"
+          ],
+          "dependencies": [
+            "cap-canvas-core"
+          ],
+          "notes": [
+            "Componentes Price, Line e Multiselect formalmente congelados."
+          ]
         },
         {
           "id": "cap-undo-redo-state",
@@ -102,9 +137,15 @@
           "manualValidation": true,
           "physicalValidation": false,
           "frozen": true,
-          "evidence": ["apps/frontend/src/editor/useEditorStore.ts"],
-          "dependencies": ["cap-canvas-core"],
-          "notes": ["Store desacoplada de presenças e histórico."]
+          "evidence": [
+            "apps/frontend/src/editor/useEditorStore.ts"
+          ],
+          "dependencies": [
+            "cap-canvas-core"
+          ],
+          "notes": [
+            "Store desacoplada de presenças e histórico."
+          ]
         }
       ]
     },
@@ -126,9 +167,15 @@
           "manualValidation": true,
           "physicalValidation": true,
           "frozen": true,
-          "evidence": ["packages/printer-pplb"],
-          "dependencies": ["cap-monorepo-setup"],
-          "notes": ["Suíte de 61 testes automatizados (Golden Tests PPLB) aprovada 100%."]
+          "evidence": [
+            "packages/printer-pplb"
+          ],
+          "dependencies": [
+            "cap-monorepo-setup"
+          ],
+          "notes": [
+            "Suíte de 61 testes automatizados (Golden Tests PPLB) aprovada 100%."
+          ]
         },
         {
           "id": "cap-ppla-compiler",
@@ -141,9 +188,15 @@
           "manualValidation": true,
           "physicalValidation": true,
           "frozen": true,
-          "evidence": ["packages/printer-ppla"],
-          "dependencies": ["cap-monorepo-setup"],
-          "notes": ["Suporte a PPLA base homologado em bancada."]
+          "evidence": [
+            "packages/printer-ppla"
+          ],
+          "dependencies": [
+            "cap-monorepo-setup"
+          ],
+          "notes": [
+            "Suporte a PPLA base homologado em bancada."
+          ]
         },
         {
           "id": "cap-legacy-importer",
@@ -156,9 +209,15 @@
           "manualValidation": true,
           "physicalValidation": true,
           "frozen": true,
-          "evidence": ["packages/printer-pplb/src/importer.ts"],
-          "dependencies": ["cap-pplb-compiler"],
-          "notes": ["Testes Golden Model 16-ARGOX REGRA - ATACADO.txt 100% homologados."]
+          "evidence": [
+            "packages/printer-pplb/src/importer.ts"
+          ],
+          "dependencies": [
+            "cap-pplb-compiler"
+          ],
+          "notes": [
+            "Testes Golden Model 16-ARGOX REGRA - ATACADO.txt 100% homologados."
+          ]
         }
       ]
     },
@@ -180,9 +239,16 @@
           "manualValidation": true,
           "physicalValidation": true,
           "frozen": true,
-          "evidence": ["apps/agent-core", "apps/backend/src/routes/agents.ts"],
-          "dependencies": ["cap-monorepo-setup"],
-          "notes": ["Compilação Windows x64 automatizada no CI e distribuída via GET /api/agents/download/windows-x64."]
+          "evidence": [
+            "apps/agent-core",
+            "apps/backend/src/routes/agents.ts"
+          ],
+          "dependencies": [
+            "cap-monorepo-setup"
+          ],
+          "notes": [
+            "Compilação Windows x64 automatizada no CI e distribuída via GET /api/agents/download/windows-x64."
+          ]
         },
         {
           "id": "cap-agent-pairing",
@@ -195,9 +261,15 @@
           "manualValidation": true,
           "physicalValidation": true,
           "frozen": false,
-          "evidence": ["apps/frontend/src/agent/PairAgentModal.tsx"],
-          "dependencies": ["cap-agent-core-rust"],
-          "notes": ["Modal de pareamento operacional na interface."]
+          "evidence": [
+            "apps/frontend/src/agent/PairAgentModal.tsx"
+          ],
+          "dependencies": [
+            "cap-agent-core-rust"
+          ],
+          "notes": [
+            "Modal de pareamento operacional na interface."
+          ]
         }
       ]
     },
@@ -219,9 +291,16 @@
           "manualValidation": true,
           "physicalValidation": false,
           "frozen": true,
-          "evidence": ["apps/frontend/src/shell/ApplicationShell.tsx", "apps/frontend/src/shell/Sidebar.tsx"],
-          "dependencies": ["cap-canvas-core"],
-          "notes": ["Consolidação de UX formalizada em docs/product/PRODUCT-UX-CONSOLIDATION.md."]
+          "evidence": [
+            "apps/frontend/src/shell/ApplicationShell.tsx",
+            "apps/frontend/src/shell/Sidebar.tsx"
+          ],
+          "dependencies": [
+            "cap-canvas-core"
+          ],
+          "notes": [
+            "Consolidação de UX formalizada em docs/product/PRODUCT-UX-CONSOLIDATION.md."
+          ]
         },
         {
           "id": "cap-model-lifecycle-db",
@@ -234,9 +313,16 @@
           "manualValidation": true,
           "physicalValidation": false,
           "frozen": true,
-          "evidence": ["apps/frontend/src/modules/models/ModelsPage.tsx", "apps/backend/src/repositories/templateRepository.ts"],
-          "dependencies": ["cap-infra-storage-db"],
-          "notes": ["Operações de CRUD de modelos 100% homologadas com Fail-Closed."]
+          "evidence": [
+            "apps/frontend/src/modules/models/ModelsPage.tsx",
+            "apps/backend/src/repositories/templateRepository.ts"
+          ],
+          "dependencies": [
+            "cap-infra-storage-db"
+          ],
+          "notes": [
+            "Operações de CRUD de modelos 100% homologadas com Fail-Closed."
+          ]
         },
         {
           "id": "cap-concurrency-presence",
@@ -249,9 +335,16 @@
           "manualValidation": true,
           "physicalValidation": false,
           "frozen": true,
-          "evidence": ["apps/backend/src/repositories/presenceRepository.ts", "apps/frontend/src/editor/__tests__/patch3283.test.ts"],
-          "dependencies": ["cap-model-lifecycle-db"],
-          "notes": ["Homologação manual concluída e validada em produção no PATCH 3.2.8.3."]
+          "evidence": [
+            "apps/backend/src/repositories/presenceRepository.ts",
+            "apps/frontend/src/editor/__tests__/patch3283.test.ts"
+          ],
+          "dependencies": [
+            "cap-model-lifecycle-db"
+          ],
+          "notes": [
+            "Homologação manual concluída e validada em produção no PATCH 3.2.8.3."
+          ]
         },
         {
           "id": "cap-toolbar-geometry-stabilization",
@@ -264,9 +357,16 @@
           "manualValidation": true,
           "physicalValidation": false,
           "frozen": true,
-          "evidence": ["apps/frontend/src/editor/EditorLayout.tsx", "apps/frontend/src/editor/__tests__/patch3284.test.ts"],
-          "dependencies": ["cap-app-shell-ux"],
-          "notes": ["Homologado no PATCH 3.2.8.4. Zero deslocamento no botão Imprimir."]
+          "evidence": [
+            "apps/frontend/src/editor/EditorLayout.tsx",
+            "apps/frontend/src/editor/__tests__/patch3284.test.ts"
+          ],
+          "dependencies": [
+            "cap-app-shell-ux"
+          ],
+          "notes": [
+            "Homologado no PATCH 3.2.8.4. Zero deslocamento no botão Imprimir."
+          ]
         },
         {
           "id": "cap-development-control-center-backend",
@@ -279,9 +379,16 @@
           "manualValidation": true,
           "physicalValidation": false,
           "frozen": false,
-          "evidence": ["docs/development-control", "apps/backend/src/routes/developmentControl.ts"],
-          "dependencies": ["cap-infra-storage-db"],
-          "notes": ["Módulo interno de visibilidade sistêmica do produto."]
+          "evidence": [
+            "docs/development-control",
+            "apps/backend/src/routes/developmentControl.ts"
+          ],
+          "dependencies": [
+            "cap-infra-storage-db"
+          ],
+          "notes": [
+            "Módulo interno de visibilidade sistêmica do produto."
+          ]
         },
         {
           "id": "cap-development-control-center-frontend",
@@ -294,23 +401,29 @@
           "manualValidation": true,
           "physicalValidation": false,
           "frozen": false,
-          "evidence": ["apps/frontend/src/modules/devcontrol/DevControlPage.tsx"],
-          "dependencies": ["cap-development-control-center-backend"],
-          "notes": ["Interface restrita aos ambientes de desenvolvimento e homologação."]
+          "evidence": [
+            "apps/frontend/src/modules/devcontrol/DevControlPage.tsx"
+          ],
+          "dependencies": [
+            "cap-development-control-center-backend"
+          ],
+          "notes": [
+            "Interface restrita aos ambientes de desenvolvimento e homologação."
+          ]
         }
       ]
     },
     {
       "id": "phase-4",
       "code": "4",
-      "name": "Fase 4 — Central de Impressão Universal, RBAC e Multi-Tenancy",
-      "description": "Plataforma comercial para envio de impressões em massa por operadores, gestão de permissões (RBAC) e isolamento multiempresa.",
+      "name": "Fase 4 — Central de Impressão Universal, Perfis Multi-Nicho, RBAC e Multi-Tenancy",
+      "description": "Plataforma comercial para envio de impressões em massa por operadores, perfis operacionais multinicho, gestão de permissões (RBAC) e isolamento multiempresa.",
       "status": "IN_PROGRESS",
       "capabilities": [
         {
           "id": "cap-universal-print-center",
           "name": "Central de Impressão Universal (Universal Print Center)",
-          "description": "Busca contextual única, grid com colunas dinâmicas segundo os dados do modelo e disparo em lote para impressoras físicas.",
+          "description": "Busca contextual única, grid com colunas dinâmicas adaptáveis por perfil/nicho ativo e disparo em lote para impressoras físicas.",
           "module": "print-center",
           "weight": 14,
           "mvp": true,
@@ -319,8 +432,14 @@
           "physicalValidation": false,
           "frozen": false,
           "evidence": [],
-          "dependencies": ["cap-pplb-compiler", "cap-agent-core-rust"],
-          "notes": ["Requisito essencial para MVP comercial de operadores."]
+          "dependencies": [
+            "cap-pplb-compiler",
+            "cap-agent-core-rust"
+          ],
+          "notes": [
+            "Requisito essencial para MVP comercial de operadores.",
+            "A Central não possui dataset ou grid fixado exclusivamente em varejo, adaptando origem de dados, colunas, busca, preview e identificação ao perfil ativo (Varejo, Hospitalar, Laboratório, Logística, Indústria, Alimentação, Farmácia)."
+          ]
         },
         {
           "id": "cap-rbac-multi-tenant",
@@ -334,8 +453,12 @@
           "physicalValidation": false,
           "frozen": false,
           "evidence": [],
-          "dependencies": ["cap-infra-storage-db"],
-          "notes": ["Garante a separação completa entre clientes e filiais."]
+          "dependencies": [
+            "cap-infra-storage-db"
+          ],
+          "notes": [
+            "Garante a separação completa entre clientes e filiais."
+          ]
         },
         {
           "id": "cap-licensing-billing",
@@ -349,8 +472,108 @@
           "physicalValidation": false,
           "frozen": false,
           "evidence": [],
-          "dependencies": ["cap-rbac-multi-tenant"],
-          "notes": ["Módulo de bilhetagem e limites comerciais."]
+          "dependencies": [
+            "cap-rbac-multi-tenant"
+          ],
+          "notes": [
+            "Módulo de bilhetagem e limites comerciais."
+          ]
+        },
+        {
+          "id": "cap-multiniche-profiles",
+          "name": "Perfis Operacionais Multi-Nicho",
+          "description": "Sistema responsável por definir comportamento contextual da plataforma por nicho, incluindo elementos padrão, campos de integração, datasets, templates iniciais, configuração da Central de Impressão e regras de apresentação.",
+          "module": "multiniche",
+          "weight": 10,
+          "mvp": true,
+          "status": "PLANNED",
+          "manualValidation": false,
+          "physicalValidation": false,
+          "frozen": false,
+          "evidence": [],
+          "dependencies": [
+            "cap-universal-print-center"
+          ],
+          "notes": [
+            "Definição e suporte aos 7 perfis operacionais (Varejo, Hospitalar, Laboratório Clínico, Logística/Distribuição, Indústria/Produção, Alimentação/Perecíveis, Farmácia/Medicamentos).",
+            "Varejo é a baseline existente homologada. Os demais perfis adaptam campos de integração, colunas da Central e datasets de homologação."
+          ]
+        },
+        {
+          "id": "cap-logo-element",
+          "name": "Elemento de Logomarca / Imagem Monocromática",
+          "description": "Elemento visual destinado a logomarcas e símbolos gráficos compatíveis com impressão térmica.",
+          "module": "elements",
+          "weight": 8,
+          "mvp": false,
+          "status": "PLANNED",
+          "manualValidation": false,
+          "physicalValidation": false,
+          "frozen": false,
+          "evidence": [],
+          "dependencies": [
+            "cap-canvas-core"
+          ],
+          "notes": [
+            "Elemento multinicho para logomarcas institucionais, selos e símbolos gráficos com conversão monocromática e dither térmico."
+          ]
+        },
+        {
+          "id": "cap-element-transformations",
+          "name": "Transformações Geométricas dos Elementos",
+          "description": "Rotação canônica (0°, 90°, 180°, 270°) e transformações geométricas para todos os elementos suportados no Editor, Preview, Compiladores, Importadores e Exportadores.",
+          "module": "editor-core",
+          "weight": 10,
+          "mvp": true,
+          "status": "PLANNED",
+          "manualValidation": false,
+          "physicalValidation": false,
+          "frozen": false,
+          "evidence": [],
+          "dependencies": [
+            "cap-canvas-core"
+          ],
+          "notes": [
+            "Garante 0°, 90°, 180° e 270° em todos os compiladores (PPLA/PPLB/ZPL) e preview visual com giro canônico para a esquerda."
+          ]
+        },
+        {
+          "id": "cap-shape-element",
+          "name": "Elemento Unificado Linha / Moldura (Shape)",
+          "description": "Abstração única para elementos geométricos simples (moldura com opção de usar como linha), preservando retrocompatibilidade total com LineElement e RectangleElement.",
+          "module": "elements",
+          "weight": 6,
+          "mvp": false,
+          "status": "PLANNED",
+          "manualValidation": false,
+          "physicalValidation": false,
+          "frozen": false,
+          "evidence": [],
+          "dependencies": [
+            "cap-visual-elements"
+          ],
+          "notes": [
+            "Abstração unificada Shape preservando LineElement e RectangleElement no schema sem quebrar retrocompatibilidade."
+          ]
+        },
+        {
+          "id": "cap-editor-toolbar-compactness",
+          "name": "Compactação da Toolbar do Editor (UX Compactness 2)",
+          "description": "Otimização da largura da toolbar do Editor ao abrir o painel lateral, removendo botões redundantes e movendo configurações secundárias para o menu Opções.",
+          "module": "app-shell",
+          "weight": 6,
+          "mvp": true,
+          "status": "PLANNED",
+          "manualValidation": false,
+          "physicalValidation": false,
+          "frozen": false,
+          "evidence": [],
+          "dependencies": [
+            "cap-app-shell-ux"
+          ],
+          "notes": [
+            "Remove botões \"Dados de Integração\" e tema da toolbar do Editor, concentrando toggles no menu Opções para eliminar overflow horizontal."
+          ]
         }
       ]
     },
@@ -373,8 +596,12 @@
           "physicalValidation": false,
           "frozen": false,
           "evidence": [],
-          "dependencies": ["cap-pplb-compiler"],
-          "notes": ["Segunda linguagem principal solicitada por clientes industriais."]
+          "dependencies": [
+            "cap-pplb-compiler"
+          ],
+          "notes": [
+            "Segunda linguagem principal solicitada por clientes industriais."
+          ]
         },
         {
           "id": "cap-printer-kb",
@@ -389,7 +616,9 @@
           "frozen": false,
           "evidence": [],
           "dependencies": [],
-          "notes": ["Base de suporte para mapeamento de resoluções e drivers."]
+          "notes": [
+            "Base de suporte para mapeamento de resoluções e drivers."
+          ]
         }
       ]
     },
@@ -412,8 +641,12 @@
           "physicalValidation": false,
           "frozen": false,
           "evidence": [],
-          "dependencies": ["cap-universal-print-center"],
-          "notes": ["Especificação pública para parceiros de tecnologia."]
+          "dependencies": [
+            "cap-universal-print-center"
+          ],
+          "notes": [
+            "Especificação pública para parceiros de tecnologia."
+          ]
         }
       ]
     }

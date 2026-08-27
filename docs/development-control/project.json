@@ -1,10 +1,10 @@
 {
   "projectId": "witiquetas",
   "name": "Witiquetas",
-  "description": "Plataforma multinicho para criação, integração, gerenciamento e impressão de etiquetas térmicas industriais e comerciais, independente de ERP e linguagem de impressão.",
+  "description": "Plataforma multinicho para criação, integração, gerenciamento e impressão de etiquetas térmicas industriais e comerciais, independente de ERP e linguagem de impressão. Os elementos, dados padrão, templates, campos de integração, previews e fluxos da Central de Impressão variam de acordo com o contexto operacional do nicho. O perfil Varejo/Supermercado é a baseline inicial e não o modelo universal único da aplicação.",
   "currentPhase": "4",
-  "mvpTarget": "Fase 0 a 3.5 (Editor Confiável, Model Lifecycle, Data Binding, Compiladores PPLA/PPLB, Agente Local, Shell Respondivo e Concorrência Segura)",
-  "roadmapVersion": 1,
-  "lastReviewedAt": "2026-08-27T09:00:00Z",
+  "mvpTarget": "Fase 0 a Fase 4 (Editor Confiável, Model Lifecycle, Data Binding, Compiladores PPLA/PPLB, Agente Local, Shell Responsivo, Concorrência Segura, Central de Impressão Universal e Perfis Multi-Nicho Básicos)",
+  "roadmapVersion": 2,
+  "lastReviewedAt": "2026-08-27T13:00:00Z",
   "environment": "development"
 }

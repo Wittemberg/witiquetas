@@ -35,6 +35,18 @@ test('FRONTEND A: Rota #print-center substitui PlaceholderModulePage por PrintCe
   );
 });
 
+test('HOTFIX 4.1.1: PrintCenterPage chama canonicamente templatesApi.getTemplateById e previne TypeError', () => {
+  const content = fs.readFileSync(printCenterPagePath, 'utf8');
+  assert.ok(
+    !content.includes('templatesApi.getTemplate('),
+    'PrintCenterPage NÃO deve conter o método inexistente templatesApi.getTemplate('
+  );
+  assert.ok(
+    content.includes('getTemplateById('),
+    'PrintCenterPage deve chamar canonicamente getTemplateById('
+  );
+});
+
 test('FRONTEND B, C & D: getRequiredIntegrationFields extrai bindings determinísticos e remove duplicidades', () => {
   const mockDocument = {
     schemaVersion: 1,

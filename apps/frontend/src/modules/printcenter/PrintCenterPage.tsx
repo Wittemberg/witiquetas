@@ -213,7 +213,7 @@ export const PrintCenterPage: React.FC = () => {
     }
     let isMounted = true;
     templatesApi
-      .getTemplate(selectedTemplateId)
+      .getTemplateById(selectedTemplateId)
       .then((fullTpl) => {
         if (isMounted) {
           setSelectedTemplate(fullTpl);

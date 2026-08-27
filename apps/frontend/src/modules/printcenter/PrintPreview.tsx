@@ -57,7 +57,7 @@ function KonvaQRCodePreview({
   const [image] = useImage(qrDataUrl);
 
   return (
-    <Group x={xPx} y={yPx} width={wPx} height={hPx}>
+    <Group x={xPx} y={yPx} width={wPx} height={hPx} rotation={elem.rotation || 0}>
       {image ? (
         <KonvaImage image={image} width={wPx} height={hPx} />
       ) : (
@@ -136,7 +136,7 @@ function SingleElementPreview({
         });
 
         return (
-          <Group key={textElem.id} x={xPx} y={yPx} width={wPx} height={hPx}>
+          <Group key={textElem.id} x={xPx} y={yPx} width={wPx} height={hPx} rotation={textElem.rotation || 0}>
             {textElem.reversePrint && (
               <Rect width={wPx} height={hPx} fill={textElem.color || '#000000'} cornerRadius={1} />
             )}
@@ -147,7 +147,7 @@ function SingleElementPreview({
 
       if (textElem.reversePrint) {
         return (
-          <Group key={textElem.id} x={xPx} y={yPx} width={wPx} height={hPx}>
+          <Group key={textElem.id} x={xPx} y={yPx} width={wPx} height={hPx} rotation={textElem.rotation || 0}>
             <Rect width={wPx} height={hPx} fill={textElem.color || '#000000'} cornerRadius={1} />
             <Text
               width={wPx}
@@ -182,6 +182,7 @@ function SingleElementPreview({
           verticalAlign={textElem.verticalAlignment || 'top'}
           wrap={textElem.wrap || 'word'}
           fill={textElem.color || '#000000'}
+          rotation={textElem.rotation || 0}
         />
       );
     }
@@ -201,7 +202,7 @@ function SingleElementPreview({
       const metrics = getPriceRenderMetrics(priceElem, dpi, rawValueStr);
 
       return (
-        <Group key={priceElem.id} x={xPx} y={yPx} width={wPx} height={hPx}>
+        <Group key={priceElem.id} x={xPx} y={yPx} width={wPx} height={hPx} rotation={priceElem.rotation || 0}>
           {metrics.prefix && (
             <Text
               text={metrics.prefix}
@@ -277,7 +278,7 @@ function SingleElementPreview({
       if (currentRun) barRuns.push(currentRun);
 
       return (
-        <Group key={barcodeElem.id} x={xPx} y={yPx} width={wPx} height={hPx}>
+        <Group key={barcodeElem.id} x={xPx} y={yPx} width={wPx} height={hPx} rotation={barcodeElem.rotation || 0}>
           {barRuns.map((run, i) => (
             <Rect
               key={i}
@@ -322,17 +323,15 @@ function SingleElementPreview({
     }
 
     case 'line': {
-      const lineElem = elem as LineElement;
-      const points = [0, 0, wPx, hPx];
+      const lineElem = elem as any;
       return (
-        <Line
-          key={lineElem.id}
-          x={xPx}
-          y={yPx}
-          points={points}
-          stroke={lineElem.color || '#000000'}
-          strokeWidth={mmToPx(lineElem.thicknessMm || 0.5, dpi)}
-        />
+        <Group key={lineElem.id} x={xPx} y={yPx} width={wPx} height={Math.max(10, mmToPx(lineElem.strokeWidth || 0.5, dpi))} rotation={lineElem.rotation || 0}>
+          <Line
+            points={[0, 0, wPx, 0]}
+            stroke={lineElem.color || '#000000'}
+            strokeWidth={mmToPx(lineElem.strokeWidth || lineElem.thicknessMm || 0.5, dpi)}
+          />
+        </Group>
       );
     }
 
@@ -347,8 +346,9 @@ function SingleElementPreview({
           height={hPx}
           fill={rectElem.fill || 'transparent'}
           stroke={rectElem.stroke || '#000000'}
-          strokeWidth={mmToPx(rectElem.strokeWidthMm || 0.5, dpi)}
+          strokeWidth={mmToPx(rectElem.strokeWidthMm || rectElem.strokeWidth || 0.5, dpi)}
           cornerRadius={mmToPx(rectElem.cornerRadiusMm || 0, dpi)}
+          rotation={rectElem.rotation || 0}
         />
       );
     }

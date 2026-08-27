@@ -60,7 +60,7 @@ describe('FASE 3.5 — PATCH 3.2.8.2 SUITE DE TESTES (CORREÇÕES DE CONCORRÊNC
     });
 
     it('TESTE I: Clicar no indicador de conflito na toolbar reabre o modal', () => {
-      assert.ok(layoutContent.includes('onClick={() => setIsConflictModalOpen(true)}'), 'Clique no indicador de conflito reabre o modal de resolução');
+      assert.ok(layoutContent.includes('onClick={() => setIsConflictModalOpen(true)}') || layoutContent.includes('onClick={openConflictModal}'), 'Clique no indicador de conflito reabre o modal de resolução');
     });
 
     it('TESTE J & TESTE K: Ctrl+S e Salvar durante conflito não chamam PUT automaticamente e reabrem modal', () => {

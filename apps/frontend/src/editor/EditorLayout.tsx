@@ -494,29 +494,8 @@ export default function EditorLayout({
           </div>
         </div>
 
-        {/* Lado Direito: Ações Globais Essenciais (Desfazer, Zoom, Guias [▦], Dados, Tema, Imprimir) */}
+        {/* Lado Direito: Ações Globais Essenciais (Desfazer, Zoom, Opções [▦], Imprimir) */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          {/* Seletor 'Visualizar como' (Itens 5 e 6 da especificacao UX) */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-            <select
-              className="inspector-select"
-              style={{
-                padding: '0.2rem 0.5rem',
-                fontSize: '0.72rem',
-                height: '28px',
-                background: 'var(--bg-card)',
-                minWidth: '110px',
-                fontWeight: 600,
-              }}
-              value={previewScenario}
-              onChange={(e) => setPreviewScenario(e.target.value as any)}
-              title="Simula diferentes condições dos dados para conferir como a etiqueta será impressa."
-            >
-              <option value="normal">Visualizar como: Normal</option>
-              <option value="promo">Visualizar como: Promoção</option>
-            </select>
-          </div>
-
           {/* Desfazer / Refazer */}
           <div style={{ display: 'flex', gap: '0.2rem' }}>
             <button className="btn" style={{ padding: '0.35rem' }} onClick={undo} title="Desfazer (Ctrl+Z)">
@@ -557,7 +536,7 @@ export default function EditorLayout({
 
           <div style={{ width: '1px', height: '18px', background: 'var(--border-color)' }} />
 
-          {/* Menu Suspenso de Visualização & Guias [▦] (Item 222, 286) */}
+          {/* Menu Suspenso de Opções & Visualização [▦] */}
           <div style={{ position: 'relative' }}>
             <button
               className={`btn ${isViewMenuOpen ? 'btn-primary' : ''}`}
@@ -566,7 +545,7 @@ export default function EditorLayout({
               title="Opções de Visualização, Grade e Margens"
             >
               <Grid size={13} />
-              <span>Guias</span>
+              <span>Opções</span>
             </button>
 
             {isViewMenuOpen && (
@@ -589,10 +568,10 @@ export default function EditorLayout({
                 }}
               >
                 <div style={{ fontSize: '0.7rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-                  Visualização & Guias
+                  VISUALIZAÇÃO & OPÇÕES
                 </div>
 
-                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.78rem', cursor: 'pointer' }} title="Exibe de forma transparente os elementos ocultos pelas Regras de Exibição para permitir sua edição. Eles não serão impressos neste cenário.">
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.78rem', cursor: 'pointer' }}>
                   <input
                     type="checkbox"
                     checked={snapToGrid}
@@ -621,7 +600,7 @@ export default function EditorLayout({
 
                 <div style={{ height: '1px', background: 'var(--border-color)', margin: '0.2rem 0' }} />
 
-                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.78rem', cursor: 'pointer' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.78rem', cursor: 'pointer' }} title="Exibe de forma transparente os elementos ocultos pelas Regras de Exibição para permitir sua edição. Eles não serão impressos neste cenário.">
                   <input
                     type="checkbox"
                     checked={showGhostConditionalElements}
@@ -629,27 +608,20 @@ export default function EditorLayout({
                   />
                   <span>Mostrar elementos ocultos</span>
                 </label>
+
+                <div style={{ height: '1px', background: 'var(--border-color)', margin: '0.2rem 0' }} />
+
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.78rem', cursor: 'pointer' }} title="Alternar dados de teste da integração">
+                  <input
+                    type="checkbox"
+                    checked={showPreviewData}
+                    onChange={(e) => setShowPreviewData(e.target.checked)}
+                  />
+                  <span>Dados de Integração</span>
+                </label>
               </div>
             )}
           </div>
-
-          {/* Alternador Discreto de Dados: Exemplo / ERP */}
-          <button
-            className={`btn ${showPreviewData ? 'btn-primary' : ''}`}
-            style={{ padding: '0.35rem 0.6rem', fontSize: '0.75rem' }}
-            onClick={() => setShowPreviewData(!showPreviewData)}
-            title="Alternar dados de teste da integração"
-          >
-            {showPreviewData ? <Eye size={13} /> : <EyeOff size={13} />}
-            <span>Dados de Integração</span>
-          </button>
-
-          {/* Alternância de Tema */}
-          {onToggleTheme && (
-            <button className="btn-theme-toggle" onClick={onToggleTheme} title="Alternar Modo Escuro / Claro">
-              {theme === 'dark' ? <Sun size={15} color="#f59e0b" /> : <Moon size={15} color="#3b82f6" />}
-            </button>
-          )}
 
           {/* Botão de Ação Primária: Imprimir */}
           <button

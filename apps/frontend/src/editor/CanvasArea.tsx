@@ -285,6 +285,7 @@ function KonvaQRCode({
       y={yPx}
       width={wPx}
       height={hPx}
+      rotation={normalizeRotation(elem.rotation || 0)}
       draggable={!elem.locked}
       onClick={onClick}
       onTap={onClick}
@@ -666,6 +667,7 @@ export default function CanvasArea() {
                 y={yPx}
                 width={wPx}
                 height={hPx}
+                rotation={normalizeRotation(textElem.rotation || 0)}
                 draggable={!textElem.locked}
                 onClick={handleClick}
                 onTap={handleClick}
@@ -696,6 +698,7 @@ export default function CanvasArea() {
                 y={yPx}
                 width={wPx}
                 height={hPx}
+                rotation={normalizeRotation(textElem.rotation || 0)}
                 draggable={!textElem.locked}
                 onClick={handleClick}
                 onTap={handleClick}
@@ -748,6 +751,7 @@ export default function CanvasArea() {
               ellipsis={!!textElem.singleLine}
               fill={textElem.color || '#000000'}
               scaleX={textElem.scaleX || 1}
+              rotation={normalizeRotation(textElem.rotation || 0)}
               draggable={!textElem.locked}
               onClick={handleClick}
               onTap={handleClick}
@@ -775,6 +779,7 @@ export default function CanvasArea() {
             y={yPx}
             width={wPx}
             height={hPx}
+            rotation={normalizeRotation(priceElem.rotation || 0)}
             draggable={!priceElem.locked}
             onClick={handleClick}
             onTap={handleClick}
@@ -864,6 +869,7 @@ export default function CanvasArea() {
             y={yPx}
             width={wPx}
             height={hPx}
+            rotation={normalizeRotation(barcodeElem.rotation || 0)}
             draggable={!barcodeElem.locked}
             onClick={handleClick}
             onTap={handleClick}
@@ -935,6 +941,7 @@ export default function CanvasArea() {
             stroke={elem.strokeColor || '#000000'}
             strokeWidth={elem.strokeWidth || 1}
             cornerRadius={elem.cornerRadius || 0}
+            rotation={normalizeRotation(elem.rotation || 0)}
             draggable={!elem.locked}
             onClick={handleClick}
             onTap={handleClick}
@@ -948,22 +955,28 @@ export default function CanvasArea() {
       case 'line': {
         const lineElem = elem as any;
         return (
-          <Line
+          <Group
             key={lineElem.id}
             id={lineElem.id}
             x={xPx}
             y={yPx}
-            points={[0, 0, wPx, 0]}
-            stroke={lineElem.color || '#000000'}
-            strokeWidth={lineElem.strokeWidth || 1}
+            width={wPx}
+            height={Math.max(10, lineElem.strokeWidth || 1)}
             rotation={normalizeRotation(lineElem.rotation || 0)}
             draggable={!lineElem.locked}
             onClick={handleClick}
             onTap={handleClick}
+            onDblClick={() => setSelectedElementId(lineElem.id)}
             onContextMenu={handleContextMenu}
             onDragEnd={handleDragEnd}
             onTransformEnd={handleTransformEnd}
-          />
+          >
+            <Line
+              points={[0, 0, wPx, 0]}
+              stroke={lineElem.color || '#000000'}
+              strokeWidth={lineElem.strokeWidth || 1}
+            />
+          </Group>
         );
       }
 

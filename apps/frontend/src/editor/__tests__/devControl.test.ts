@@ -15,8 +15,8 @@ describe('DEVELOPMENT CONTROL CENTER 0.1.1 - TESTES DE INTEGRIDADE E CONTRATOS F
     assert.ok(overview.progress.fullRoadmap.implementationPercent > 0);
 
     // Soma de pesos bate com fullRoadmap.totalWeight
-    assert.equal(overview.progress.fullRoadmap.totalWeight, 222);
-    assert.equal(overview.progress.mvp.totalWeight, 172);
+    assert.equal(overview.progress.fullRoadmap.totalWeight, 262);
+    assert.equal(overview.progress.mvp.totalWeight, 198);
   });
 
   it('2. Status Canônicos: Todos os enums estão previstos e validados', () => {

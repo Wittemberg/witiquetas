@@ -1,0 +1,13 @@
+CHECKPOINT PRÉ-COMMIT — PACOTE 4.2 (CR-P0-EDITOR-TOOLBAR-ROTATION)
+Data/Hora: 2026-08-27T14:03:00-03:00
+
+HEAD: 568d82065c4f08c6a2e3c3f6ddb3c1f8206200c1
+origin/main: 568d82065c4f08c6a2e3c3f6ddb3c1f8206200c1
+
+Escopo do Change Request:
+- Toolbar Compactness 2 (EditorLayout.tsx)
+- Rotação Canônica 0/90/180/270 em todos os elementos (CanvasArea.tsx, PropertyInspector.tsx, PrintPreview.tsx)
+- Suítes de Testes (tests/editorToolbarCompactness.test.ts, tests/elementRotation.test.ts, devControl.test.ts, patch3282.test.ts)
+- Development Control Center (docs/development-control/roadmap.json: cap-editor-toolbar-compactness & cap-element-transformations em IN_PROGRESS)
+
+Working tree estritamente auditado e sem arquivos inesperados.

@@ -57,6 +57,8 @@ export default function PropertyInspector() {
     setSnapToGrid,
     showSafeArea,
     setShowSafeArea,
+    previewScenario,
+    setPreviewScenario,
   } = useEditorStore();
 
   const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
@@ -562,6 +564,31 @@ export default function PropertyInspector() {
               />
               <span>Centavos reduzidos (Padrão Varejo - 60%)</span>
             </label>
+
+            {/* Modo de Visualização do Preço (Item 5 e 6 - Transferido da Toolbar) */}
+            <div style={{ marginTop: '0.6rem', paddingTop: '0.6rem', borderTop: '1px solid var(--border-color)' }}>
+              <label className="metric-label" style={{ fontWeight: 700, textTransform: 'uppercase', fontSize: '0.68rem', color: 'var(--text-muted)' }}>
+                Visualização do Preço
+              </label>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.35rem', marginTop: '0.3rem' }}>
+                <button
+                  type="button"
+                  className={`btn ${previewScenario === 'normal' ? 'btn-primary' : ''}`}
+                  style={{ justifyContent: 'center', padding: '0.35rem', fontSize: '0.72rem', fontWeight: 600 }}
+                  onClick={() => setPreviewScenario('normal')}
+                >
+                  Normal
+                </button>
+                <button
+                  type="button"
+                  className={`btn ${previewScenario === 'promo' ? 'btn-primary' : ''}`}
+                  style={{ justifyContent: 'center', padding: '0.35rem', fontSize: '0.72rem', fontWeight: 600 }}
+                  onClick={() => setPreviewScenario('promo')}
+                >
+                  Promoção
+                </button>
+              </div>
+            </div>
           </div>
         );
       })()}
@@ -948,17 +975,26 @@ export default function PropertyInspector() {
         {isAdvancedOpen && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', marginTop: '0.5rem', width: '100%', minWidth: 0 }}>
             <div>
-              <label className="metric-label">Rotação (Graus)</label>
-              <select
-                className="inspector-select"
-                value={elem.rotation || 0}
-                onChange={(e) => updateElement(elem.id, { rotation: parseInt(e.target.value) || 0 })}
-              >
-                <option value={0}>0° (Normal)</option>
-                <option value={90}>90° (Girar Direita)</option>
-                <option value={180}>180° (Invertido)</option>
-                <option value={270}>270° (Girar Esquerda)</option>
-              </select>
+              <label className="metric-label" style={{ fontWeight: 700, textTransform: 'uppercase', fontSize: '0.68rem', color: 'var(--text-muted)' }}>
+                Rotação (Canônica)
+              </label>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.25rem', marginTop: '0.3rem' }}>
+                {[0, 90, 180, 270].map((angle) => {
+                  const currentRotation = normalizeRotation(elem.rotation || 0);
+                  const isSelected = currentRotation === angle;
+                  return (
+                    <button
+                      key={angle}
+                      type="button"
+                      className={`btn ${isSelected ? 'btn-primary' : ''}`}
+                      style={{ justifyContent: 'center', padding: '0.35rem 0.2rem', fontSize: '0.72rem', fontWeight: 700 }}
+                      onClick={() => updateElement(elem.id, { rotation: angle })}
+                    >
+                      {angle}°
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
             {/* Configuração de Formato de Data/Hora (system.printDateTime - Item 10) */}

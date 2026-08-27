@@ -181,3 +181,45 @@ export function evaluateVisibilityRule(
       return true;
   }
 }
+
+/**
+ * Extrai determinística e unicamente todos os campos de integração utilizados pelo LabelDocument.
+ * Percorre elementos text, price, barcode, qrcode e regras de visibilidade, eliminando duplicidades.
+ */
+export function getRequiredIntegrationFields(document: any): string[] {
+  if (!document || !Array.isArray(document.elements)) return [];
+  const fieldsSet = new Set<string>();
+
+  for (const el of document.elements) {
+    if (!el) continue;
+    // Binding direto no elemento
+    if (el.binding) {
+      const src = el.binding.source;
+      const fieldId = el.binding.fieldId || el.binding.field;
+      if ((src === 'integration' || !src) && fieldId && typeof fieldId === 'string' && !fieldId.startsWith('system.')) {
+        fieldsSet.add(fieldId);
+      }
+    }
+    // Macros [[CAMPO]] em elementos de texto
+    if (el.type === 'text' && typeof el.content === 'string') {
+      const macroMatches = el.content.match(/\[\[([^\]]+)\]\]/g);
+      if (macroMatches) {
+        for (const match of macroMatches) {
+          const raw = match.replace(/^\[\[/, '').replace(/\]\]$/, '').split(',')[0].trim();
+          if (raw && !raw.startsWith('SE') && !raw.startsWith('system.') && !raw.includes('=')) {
+            fieldsSet.add(raw);
+          }
+        }
+      }
+    }
+    // Regra de visibilidade condicional
+    if (el.visibilityRule && el.visibilityRule.field) {
+      const vfield = String(el.visibilityRule.field).trim();
+      if (vfield && !vfield.startsWith('system.')) {
+        fieldsSet.add(vfield);
+      }
+    }
+  }
+
+  return Array.from(fieldsSet);
+}

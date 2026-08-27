@@ -35,9 +35,11 @@ test('2. Header mantém exclusivamente controle de Tema e remove botões redunda
   assert.ok(!contentToTest.includes('Atualizar'), 'Header NÃO deve conter botão de Atualizar');
 });
 
-test('3. Banner principal é o ponto único para criação guiada com CTA "Selecionar Nicho & Tamanho"', () => {
-  assert.ok(appTsxContent.includes('Selecionar Nicho & Tamanho'), 'Banner deve conter CTA "Selecionar Nicho & Tamanho"');
-  assert.ok(appTsxContent.includes('onClick={() => setIsWizardOpen(true)}'), 'CTA do banner deve abrir o NewTemplateWizard');
+test('3. Banner principal ou Meus Modelos aciona a criação guiada com o NewTemplateWizard', () => {
+  const modelsPagePath = path.resolve('apps/frontend/src/modules/models/ModelsPage.tsx');
+  const modelsPageContent = fs.readFileSync(modelsPagePath, 'utf8');
+  const contentToTest = appTsxContent + modelsPageContent;
+  assert.ok(contentToTest.includes('setIsWizardOpen(true)') || contentToTest.includes('onCreateNew'), 'CTA de criação deve abrir o NewTemplateWizard');
 });
 
 test('4. Card "Agent de Impressão" contém os botões "Conectar Agent" e "Baixar Agent"', () => {

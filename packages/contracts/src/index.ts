@@ -452,3 +452,46 @@ export interface CreateImageLibraryItemDTO {
 // ==========================================
 export * from './encoding.js';
 export * from './development.js';
+
+// ==========================================
+// CENTRAL DE IMPRESSÃO UNIVERSAL (FASE 4.1) & BATCH PRINTING
+// ==========================================
+export type PrintJobBatchStatus = 'QUEUED' | 'PROCESSING' | 'COMPLETED' | 'PARTIAL' | 'FAILED';
+
+export interface BatchPrintItemRequest {
+  sourceRecordId: string;
+  data: Record<string, unknown>;
+  quantity: number;
+}
+
+export interface BatchPrintRequestDTO {
+  templateId: string;
+  printerId: string;
+  items: BatchPrintItemRequest[];
+}
+
+export interface PrintJobBatchItemDTO {
+  id: string;
+  batchId: string;
+  printJobId?: string;
+  sourceRecordId: string;
+  resolvedData: Record<string, unknown>;
+  quantity: number;
+  status: PrintJobDeliveryStatus;
+  error?: string;
+}
+
+export interface PrintJobBatchDTO {
+  id: string;
+  companyId: string;
+  templateId: string;
+  printerId: string;
+  status: PrintJobBatchStatus;
+  totalRecords: number;
+  totalLabels: number;
+  completedJobs: number;
+  failedJobs: number;
+  createdAt: string;
+  finishedAt?: string;
+  items?: PrintJobBatchItemDTO[];
+}

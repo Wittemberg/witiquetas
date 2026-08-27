@@ -37,7 +37,12 @@ export async function resolve(specifier, context, nextResolve) {
       const parentPath = fileURLToPath(context.parentURL);
       const parentDir = path.dirname(parentPath);
       let targetPath = path.resolve(parentDir, specifier);
-      if (!fs.existsSync(targetPath)) {
+      if (targetPath.includes(path.join('backend', 'dist'))) {
+        const srcPath = targetPath.replace(path.join('backend', 'dist'), path.join('backend', 'src')).replace(/\.js$/, '.ts');
+        if (fs.existsSync(srcPath)) {
+          targetPath = srcPath;
+        }
+      } else if (!fs.existsSync(targetPath)) {
         if (specifier.endsWith('.js') && fs.existsSync(targetPath.slice(0, -3) + '.ts')) {
           targetPath = targetPath.slice(0, -3) + '.ts';
         } else if (fs.existsSync(targetPath + '.ts')) {

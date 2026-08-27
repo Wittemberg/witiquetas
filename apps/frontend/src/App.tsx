@@ -24,6 +24,7 @@ import PairAgentModal from './agent/PairAgentModal.js';
 import { ensurePreRbacSession } from './auth/session.js';
 import { ApplicationShell } from './shell/ApplicationShell.js';
 import { ModelsPage } from './modules/models/ModelsPage.js';
+import PrintCenterPage from './modules/printcenter/PrintCenterPage.js';
 import { PlaceholderModulePage } from './modules/common/PlaceholderModulePage.js';
 import { DevControlPage } from './modules/devcontrol/DevControlPage.js';
 import { templatesApi } from './services/templatesApi.js';
@@ -223,14 +224,7 @@ export default function App() {
         );
 
       case 'print-center':
-        return (
-          <PlaceholderModulePage
-            title="Central de Impressão"
-            icon={ListOrdered}
-            description="Gerencie filas, status e histórico de impressão."
-            onGoHome={() => setCurrentModule('home')}
-          />
-        );
+        return <PrintCenterPage />;
 
       case 'printers':
         return (

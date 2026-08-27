@@ -1,6 +1,32 @@
 {
   "checkpoints": [
     {
+      "sha": "6b571c96fe7fdd1a6e35079ded1b9cd8eeae2714",
+      "shortSha": "6b571c9",
+      "date": "2026-08-27T09:35:00Z",
+      "phase": "4",
+      "patch": "4.1.2",
+      "title": "feat(printcenter): implementação funcional da Central de Impressão Universal (Etapa 2)",
+      "type": "FEATURE",
+      "capabilities": ["cap-universal-print-center"],
+      "testsPassed": true,
+      "deployed": false,
+      "manualValidation": true
+    },
+    {
+      "sha": "6b571c96fe7fdd1a6e35079ded1b9cd8eeae2714",
+      "shortSha": "6b571c9",
+      "date": "2026-08-27T09:00:00Z",
+      "phase": "4",
+      "patch": "4.1.0",
+      "title": "docs(devcontrol): iniciar Fase 4 — Central de Impressão Universal (Diagnóstico, Contrato e Baseline)",
+      "type": "GOVERNANCE",
+      "capabilities": ["cap-universal-print-center"],
+      "testsPassed": true,
+      "deployed": false,
+      "manualValidation": true
+    },
+    {
       "sha": "c337bbfa6662c185fc60e37c352a8d44721b05cd",
       "shortSha": "c337bbf",
       "date": "2026-08-26T17:25:40Z",

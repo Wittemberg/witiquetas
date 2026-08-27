@@ -305,7 +305,7 @@
       "code": "4",
       "name": "Fase 4 — Central de Impressão Universal, RBAC e Multi-Tenancy",
       "description": "Plataforma comercial para envio de impressões em massa por operadores, gestão de permissões (RBAC) e isolamento multiempresa.",
-      "status": "PLANNED",
+      "status": "IN_PROGRESS",
       "capabilities": [
         {
           "id": "cap-universal-print-center",
@@ -314,7 +314,7 @@
           "module": "print-center",
           "weight": 14,
           "mvp": true,
-          "status": "PLANNED",
+          "status": "IN_PROGRESS",
           "manualValidation": false,
           "physicalValidation": false,
           "frozen": false,

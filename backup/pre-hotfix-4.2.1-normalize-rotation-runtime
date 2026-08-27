@@ -1,0 +1,8 @@
+CHECKPOINT PRÉ-HOTFIX 4.2.1 — RUNTIME NORMALIZEROTATION
+Data/Hora: 2026-08-27T14:48:30-03:00
+
+HEAD: 77d079da74af752d1db5abbda63dabdfd54600cb
+origin/main: 77d079da74af752d1db5abbda63dabdfd54600cb
+Working tree: clean
+
+Objetivo: Corrigir ReferenceError: normalizeRotation is not defined ao carregar o Editor em produção/runtime.

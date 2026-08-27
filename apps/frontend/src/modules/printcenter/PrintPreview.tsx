@@ -13,7 +13,7 @@ import type {
 } from '@witiquetas/label-schema';
 import { resolveFieldValue, evaluateVisibilityRule } from '@witiquetas/label-schema';
 import { mmToPx } from '../../editor/useEditorStore.js';
-import { getPriceRenderMetrics, computeTextLines } from '../../editor/bounds.js';
+import { getPriceRenderMetrics, computeTextLines, normalizeRotation } from '../../editor/bounds.js';
 import { generateBarcodeModules } from '../../editor/barcodeEngine.js';
 import { generateQRCodeDataUrl } from '../../editor/qrCodeGenerator.js';
 import { Eye, FileText, AlertCircle } from 'lucide-react';
@@ -57,7 +57,7 @@ function KonvaQRCodePreview({
   const [image] = useImage(qrDataUrl);
 
   return (
-    <Group x={xPx} y={yPx} width={wPx} height={hPx} rotation={elem.rotation || 0}>
+    <Group x={xPx} y={yPx} width={wPx} height={hPx} rotation={normalizeRotation(elem.rotation)}>
       {image ? (
         <KonvaImage image={image} width={wPx} height={hPx} />
       ) : (

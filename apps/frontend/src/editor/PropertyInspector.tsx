@@ -5,6 +5,7 @@ import { CANONICAL_FIELDS, TextElement, PriceElement, BarcodeElement, QrCodeElem
 import { CURATED_FONTS, getFontCompatibility } from './fontsCatalog';
 import { QRCodeLibraryItemDTO } from '@witiquetas/contracts';
 import { validateCheckDigit, BarcodeFormat } from './barcodeEngine';
+import { normalizeRotation } from './bounds';
 import {
   Trash2,
   Copy,

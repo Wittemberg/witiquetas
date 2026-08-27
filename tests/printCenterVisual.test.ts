@@ -102,8 +102,8 @@ test('VISUAL E, F & G: Grid, Preview e Resumo utilizam containers e cards dedica
     'Grid deve utilizar container print-center-table-wrapper'
   );
   assert.ok(
-    printCenterPageContent.includes('print-center-preview-box'),
-    'Preview contextual deve utilizar card/box próprio print-center-preview-box'
+    printCenterPageContent.includes('<PrintPreview'),
+    'Preview de impressão deve utilizar o componente dedicado <PrintPreview />'
   );
   assert.ok(
     printCenterPageContent.includes('Resumo da Seleção'),

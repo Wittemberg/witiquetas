@@ -31,6 +31,8 @@ import { printersApi } from '../../services/printersApi.js';
 import { agentsApi } from '../../services/agentsApi.js';
 import { build_api_url } from '../../config/api.js';
 
+import { PrintPreview } from './PrintPreview.js';
+
 // Base de Dados Sintética de Teste para Operação Comercial (Varejo, Hospitalar, Logística)
 const INITIAL_DATA_RECORDS: DataRecord[] = [
   {
@@ -204,7 +206,7 @@ export const PrintCenterPage: React.FC = () => {
     loadInitialData();
   }, [loadInitialData]);
 
-  // Carregar documento completo do modelo selecionado (Hotfix 4.1.1: getTemplateById)
+  // Carregar documento completo do modelo selecionado (Etapa 3: tratamento gracioso de modelo inexistente/removido)
   useEffect(() => {
     if (!selectedTemplateId) {
       setSelectedTemplate(null);
@@ -215,11 +217,27 @@ export const PrintCenterPage: React.FC = () => {
       .getTemplateById(selectedTemplateId)
       .then((fullTpl) => {
         if (isMounted) {
-          setSelectedTemplate(fullTpl);
+          if (fullTpl && fullTpl.document) {
+            setSelectedTemplate(fullTpl);
+          } else {
+            setSelectedTemplate(null);
+          }
         }
       })
       .catch((err) => {
-        console.error('Erro ao carregar detalhes do modelo:', err);
+        console.warn(`Modelo de etiqueta '${selectedTemplateId}' não encontrado:`, err);
+        if (isMounted) {
+          setSelectedTemplate(null);
+          setSelectedTemplateId('');
+          templatesApi.listTemplates().then((tpls) => {
+            if (isMounted) {
+              setTemplateSummaries(tpls);
+              if (tpls.length > 0) {
+                setSelectedTemplateId(tpls[0].id);
+              }
+            }
+          }).catch(() => {});
+        }
       });
     return () => {
       isMounted = false;
@@ -627,55 +645,13 @@ export const PrintCenterPage: React.FC = () => {
 
             {/* PAINEL DE PREVIEW CONTEXTUAL E RESUMO DE DISPARO (30% DA LARGURA) */}
             <div className="print-center-sidebar-column">
-              {/* CARD DE PREVIEW DA ETIQUETA COM REGISTRO ATIVO */}
-              <div className="print-center-card">
-                <div className="print-center-card-header">
-                  <h3 className="print-center-card-title">
-                    <Eye style={{ width: '1rem', height: '1rem' }} className="print-center-icon-blue" />
-                    Prévia Contextual
-                  </h3>
-                  <span style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', maxWidth: '140px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {activeRecord ? activeRecord.data['retail.description'] || activeRecord.id : 'Nenhum'}
-                  </span>
-                </div>
-
-                {/* CONTAINER SIMULADO DE RENDERIZAÇÃO DE PREVIEW */}
-                <div className="print-center-preview-box">
-                  <div>
-                    <div style={{ fontSize: '0.625rem', color: '#666666', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                      {selectedTemplate?.title || 'Modelo Selecionado'}
-                    </div>
-                    <div style={{ fontSize: '0.875rem', fontWeight: 800, color: '#111111', marginTop: '0.25rem', lineHeight: 1.2 }}>
-                      {activeRecord
-                        ? resolveFieldValue('retail.description', activeRecord.data) ||
-                          resolveFieldValue('produto.descricao', activeRecord.data) ||
-                          'PRODUTO SEM DESCRIÇÃO'
-                        : 'SELECIONE UM REGISTRO'}
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', borderTop: '1px solid #e5e5e5', paddingTop: '0.5rem', marginTop: '0.5rem' }}>
-                    <div>
-                      <div style={{ fontSize: '0.625rem', fontFamily: 'var(--font-mono)', color: '#444444' }}>
-                        CÓD: {activeRecord ? activeRecord.data['retail.code'] || activeRecord.id : '000000'}
-                      </div>
-                      <div style={{ fontSize: '0.625rem', fontFamily: 'var(--font-mono)', color: '#444444' }}>
-                        EAN: {activeRecord ? activeRecord.data['retail.ean'] || '7890000000000' : '-'}
-                      </div>
-                    </div>
-                    <div style={{ textAlign: 'right' }}>
-                      <div style={{ fontSize: '0.5625rem', color: '#666666', fontWeight: 700, textTransform: 'uppercase' }}>Preço R$</div>
-                      <div style={{ fontSize: '1.25rem', fontWeight: 900, color: '#000000', lineHeight: 1 }}>
-                        {activeRecord ? activeRecord.data['retail.price'] || '0.00' : '0.00'}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <p style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', textAlign: 'center', margin: 0 }}>
-                  A prévia utiliza dados em tempo real do registro selecionado sem alterar o modelo.
-                </p>
-              </div>
+              {/* COMPONENTE DE PREVIEW REAL DE IMPRESSÃO (REUTILIZA RENDERER HOMOLOGADO DO EDITOR) */}
+              <PrintPreview
+                document={selectedTemplate?.document || null}
+                data={(activeRecord?.data as Record<string, unknown>) || null}
+                modelName={selectedTemplate?.title}
+                printerLanguage={selectedTemplate?.printerLanguage || 'PPLB'}
+              />
 
               {/* CARD DE AÇÃO DE DISPARO */}
               <div className="print-center-card">

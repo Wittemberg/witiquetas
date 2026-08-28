@@ -577,8 +577,8 @@
           "module": "editor-core",
           "weight": 5,
           "mvp": false,
-          "status": "IMPLEMENTED",
-          "manualValidation": false,
+          "status": "HOMOLOGATED",
+          "manualValidation": true,
           "physicalValidation": false,
           "frozen": false,
           "evidence": [

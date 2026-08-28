@@ -11,7 +11,7 @@
       "capabilities": ["cap-layers-multiselect"],
       "testsPassed": true,
       "deployed": true,
-      "manualValidation": false
+      "manualValidation": true
     },
     {
       "sha": "6db5817382264a0d8bc45d2eab9f31f53a0190ad",

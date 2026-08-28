@@ -122,7 +122,7 @@ test('DCC INVARIANT E & F: homologatedWeight <= implementedWeight <= totalWeight
 
   assert.ok(homologatedWeight <= implementedWeight, 'homologatedWeight não pode ser maior que implementedWeight');
   assert.ok(implementedWeight <= totalWeight, 'implementedWeight não pode ser maior que totalWeight');
-  assert.equal(homologatedWeight, 146, 'homologatedWeight deve se manter intacto em 146');
+  assert.equal(homologatedWeight, 151, 'homologatedWeight deve refletir 151 com PACOTE 4.4 homologado');
   assert.equal(implementedWeight, 181, 'implementedWeight deve refletir 181 com PACOTE 4.4 (multiselect de camadas) implementado');
 });
 

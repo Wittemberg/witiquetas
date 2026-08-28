@@ -356,6 +356,24 @@ export default function EditorLayout({
             {formatDimensionBR(widthMm)} × {formatDimensionBR(heightMm)} ({dpi} DPI)
           </div>
 
+          {/* Badge de Nicho Operacional (PACOTE 4.5) */}
+          {(document?.nicheName || document?.nicheId) && (
+            <div
+              className="preview-dimension-badge"
+              style={{
+                fontSize: '0.7rem',
+                padding: '0.15rem 0.45rem',
+                background: 'rgba(16, 185, 129, 0.15)',
+                color: '#10b981',
+                border: '1px solid rgba(16, 185, 129, 0.3)',
+                fontWeight: 600,
+              }}
+              title={`Nicho Operacional: ${document.nicheName || document.nicheId}`}
+            >
+              {document.nicheName || document.nicheId}
+            </div>
+          )}
+
           {/* Tag de Formato Original / Round-Trip (Item 321) */}
           {document?.sourceFile && (
             <div

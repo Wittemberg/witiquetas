@@ -1,24 +1,19 @@
-import https from 'node:https';
+const https = require('https');
 
-function fetchJson(url) {
+function fetchHeader(url) {
   return new Promise((resolve) => {
-    https.get(url, { headers: { 'User-Agent': 'Node' } }, (res) => {
-      let data = '';
-      res.on('data', chunk => data += chunk);
-      res.on('end', () => {
-        try {
-          resolve(JSON.parse(data));
-        } catch (e) {
-          resolve(null);
-        }
-      });
-    }).on('error', () => resolve(null));
+    const req = https.request(url, { method: 'HEAD' }, (res) => {
+      resolve(res.headers);
+    });
+    req.on('error', () => resolve(null));
+    req.end();
   });
 }
 
 async function main() {
-  const runData = await fetchJson('https://api.github.com/repos/wittemberg/witiquetas/actions/runs/32731783462');
-  console.log('Run Conclusion:', runData?.conclusion);
+  console.log('Checking GHCR image metadata...');
+  const h1 = await fetchHeader('https://ghcr.io/v2/wittemberg/witiquetas-frontend/manifests/stable');
+  console.log('GHCR frontend :stable headers:', h1);
 }
 
 main();

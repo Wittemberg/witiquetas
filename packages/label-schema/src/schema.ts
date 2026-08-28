@@ -165,6 +165,8 @@ export const SourceFileMetadataSchema = z.object({
 export const LabelDocumentSchema = z.object({
   schemaVersion: z.number().int().positive(),
   title: z.string(),
+  nicheId: z.string().optional(),
+  nicheName: z.string().optional(),
   dimensions: LabelDimensionsSchema,
   elements: z.array(LabelElementSchema),
   sourceFile: SourceFileMetadataSchema.optional(),

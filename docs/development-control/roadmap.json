@@ -486,11 +486,13 @@
           "module": "multiniche",
           "weight": 10,
           "mvp": true,
-          "status": "PLANNED",
+          "status": "IMPLEMENTED",
           "manualValidation": false,
           "physicalValidation": false,
           "frozen": false,
-          "evidence": [],
+          "evidence": [
+            "tests/multiNicheProfiles.test.ts"
+          ],
           "dependencies": [
             "cap-universal-print-center"
           ],

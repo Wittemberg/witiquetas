@@ -1,6 +1,19 @@
 {
   "checkpoints": [
     {
+      "sha": "f08a6a81c47ea4aeac06e2329bcad46fcb99cbcf",
+      "shortSha": "f08a6a8",
+      "date": "2026-08-28T15:30:00Z",
+      "phase": "4",
+      "patch": "4.5.0",
+      "title": "feat(niche): implementar PACOTE 4.5 — Perfis Multi-Nicho + Modelos e Dados de Homologação",
+      "type": "FEATURE",
+      "capabilities": ["cap-multiniche-profiles"],
+      "testsPassed": true,
+      "deployed": true,
+      "manualValidation": false
+    },
+    {
       "sha": "d3827d86f7842c55fa8bc009363bc15eb27ad9a4",
       "shortSha": "d3827d8",
       "date": "2026-08-28T13:00:00Z",

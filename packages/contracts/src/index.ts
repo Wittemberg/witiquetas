@@ -23,7 +23,8 @@ export interface TemplateSummaryDTO {
   version: number;
   createdAt: string;
   updatedAt: string;
-  scope?: 'PLATFORM' | 'CUSTOMER' | 'COMPANY';
+  scope?: 'PLATFORM' | 'CUSTOMER' | 'COMPANY' | 'DEMO';
+  isSeed?: boolean;
 }
 
 /**

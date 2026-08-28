@@ -1,5 +1,10 @@
 import React, { useMemo } from 'react';
-import { CANONICAL_FIELDS, CanonicalFieldDefinition } from '@witiquetas/label-schema';
+import {
+  CANONICAL_FIELDS,
+  SYSTEM_FIELDS,
+  IntegrationFieldDefinition,
+  getIntegrationFieldsByNiche,
+} from '@witiquetas/label-schema';
 
 export interface FieldPickerProps {
   value: string;
@@ -12,7 +17,8 @@ export interface FieldPickerProps {
   style?: React.CSSProperties;
   title?: string;
   id?: string;
-  activeFields?: CanonicalFieldDefinition[];
+  nicheId?: string;
+  activeFields?: IntegrationFieldDefinition[];
 }
 
 export const FieldPicker: React.FC<FieldPickerProps> = ({
@@ -25,29 +31,15 @@ export const FieldPicker: React.FC<FieldPickerProps> = ({
   style,
   title,
   id,
+  nicheId,
   activeFields,
 }) => {
-  const fields = activeFields || CANONICAL_FIELDS;
+  const fields = useMemo(() => {
+    if (activeFields && activeFields.length > 0) return activeFields;
+    return getIntegrationFieldsByNiche(nicheId);
+  }, [activeFields, nicheId]);
 
-  const categoriesMap = useMemo(() => {
-    const map = new Map<string, CanonicalFieldDefinition[]>();
-    (fields || []).forEach((f) => {
-      const catKey = f.category || 'outros';
-      const existing = map.get(catKey) || [];
-      existing.push(f);
-      map.set(catKey, existing);
-    });
-    return map;
-  }, [fields]);
-
-  const integrationFields = fields.filter((f) =>
-    ['produto', 'empresa', 'promocao', 'varejo', 'hospital', 'logistica'].includes(f.category)
-  );
-  const systemFields = fields.filter((f) =>
-    ['sistema', 'impressao'].includes(f.category)
-  );
-
-  const isKnown = !value || fields.some((f) => f.key === value);
+  const isKnown = !value || fields.some((f) => f.id === value) || SYSTEM_FIELDS.some((f) => f.id === value);
 
   return (
     <div style={{ width: '100%', minWidth: 0, boxSizing: 'border-box' }}>
@@ -70,17 +62,17 @@ export const FieldPicker: React.FC<FieldPickerProps> = ({
         {!isKnown && <option value={value}>{value} (Campo Personalizado)</option>}
 
         <optgroup label="Campos da Integração">
-          {integrationFields.map((f) => (
-            <option key={f.key} value={f.key}>
-              {f.label} ({f.key})
+          {fields.map((f) => (
+            <option key={f.id} value={f.id}>
+              {f.label} ({f.id})
             </option>
           ))}
         </optgroup>
 
         <optgroup label="Campos do Sistema Witiquetas">
-          {systemFields.map((f) => (
-            <option key={f.key} value={f.key}>
-              {f.label} ({f.key})
+          {SYSTEM_FIELDS.map((f) => (
+            <option key={f.id} value={f.id}>
+              {f.label} ({f.id})
             </option>
           ))}
         </optgroup>

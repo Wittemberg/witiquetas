@@ -123,7 +123,7 @@ test('DCC INVARIANT E & F: homologatedWeight <= implementedWeight <= totalWeight
   assert.ok(homologatedWeight <= implementedWeight, 'homologatedWeight não pode ser maior que implementedWeight');
   assert.ok(implementedWeight <= totalWeight, 'implementedWeight não pode ser maior que totalWeight');
   assert.equal(homologatedWeight, 151, 'homologatedWeight deve refletir 151 com PACOTE 4.4 homologado');
-  assert.equal(implementedWeight, 181, 'implementedWeight deve refletir 181 com PACOTE 4.4 (multiselect de camadas) implementado');
+  assert.equal(implementedWeight, 191, 'implementedWeight deve refletir 191 com PACOTE 4.5 (cap-multiniche-profiles) implementado');
 });
 
 test('DCC INVARIANT H & I: Matriz de nichos possui IDs unicos, nomes e status validos', () => {

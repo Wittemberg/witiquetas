@@ -2,20 +2,18 @@ import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import {
   Printer,
   FileText,
-  Search,
-  CheckSquare,
   AlertTriangle,
   CheckCircle2,
   RefreshCw,
-  Eye,
   Send,
   X,
   Database,
-  Layers,
+  Filter,
 } from 'lucide-react';
 import {
   getRequiredIntegrationFields,
-  resolveFieldValue,
+  normalizeNicheId,
+  CANONICAL_NICHE_PROFILES,
 } from '@witiquetas/label-schema';
 import type {
   TemplateSummaryDTO,
@@ -30,10 +28,8 @@ import { templatesApi } from '../../services/templatesApi.js';
 import { printersApi } from '../../services/printersApi.js';
 import { agentsApi } from '../../services/agentsApi.js';
 import { build_api_url } from '../../config/api.js';
-
 import { PrintPreview } from './PrintPreview.js';
 
-// Base de Dados Sintética de Teste para Operação Comercial (Varejo, Hospitalar, Logística)
 const INITIAL_DATA_RECORDS: DataRecord[] = [
   {
     id: 'rec-1001',
@@ -86,63 +82,203 @@ const INITIAL_DATA_RECORDS: DataRecord[] = [
       'produto.ean': '7896006700011',
     },
   },
-  {
-    id: 'rec-1004',
-    data: {
-      'retail.code': '789126',
-      'retail.description': 'FEIJÃO CARIOCA KICALDO 1KG',
-      'retail.ean': '7896023400122',
-      'retail.price': '7.89',
-      'retail.promoPrice': '6.50',
-      'retail.unit': 'PCT',
-      'retail.brand': 'KICALDO',
-      'produto.codigo': '789126',
-      'produto.descricao': 'FEIJÃO CARIOCA KICALDO 1KG',
-      'produto.preco': '7.89',
-      'produto.promocao': '6.50',
-      'produto.ean': '7896023400122',
-    },
-  },
-  {
-    id: 'rec-1005',
-    data: {
-      'retail.code': '789127',
-      'retail.description': 'AÇÚCAR REFINADO UNIÃO 1KG',
-      'retail.ean': '7896012300054',
-      'retail.price': '4.59',
-      'retail.promoPrice': '3.99',
-      'retail.unit': 'PCT',
-      'retail.brand': 'UNIÃO',
-      'produto.codigo': '789127',
-      'produto.descricao': 'AÇÚCAR REFINADO UNIÃO 1KG',
-      'produto.preco': '4.59',
-      'produto.promocao': '3.99',
-      'produto.ean': '7896012300054',
-    },
-  },
-  {
-    id: 'rec-2001',
-    data: {
-      'hospital.patientName': 'MARIA DA SILVA SOUZA',
-      'hospital.medicalRecord': 'PAC-2026-8841',
-      'hospital.bed': 'LEITO 402-A',
-      'hospital.doctor': 'DRA. CARLA MENDES',
-      'hospital.bloodType': 'O POSITIVO (O+)',
-    },
-  },
-  {
-    id: 'rec-3001',
-    data: {
-      'logistics.orderNumber': 'PED-99482',
-      'logistics.trackingCode': 'BR884910293PT',
-      'logistics.recipient': 'JOÃO PEDRO OLIVEIRA',
-      'logistics.address': 'AV. PAULISTA, 1000 - APTO 42',
-      'logistics.weightKg': '12.50',
-    },
-  },
 ];
 
+export function getRecordsForNiche(nicheId: string): DataRecord[] {
+  const norm = normalizeNicheId(nicheId);
+  switch (norm) {
+    case 'hospital':
+      return [
+        {
+          id: 'rec-hosp-1',
+          data: {
+            'paciente.nome': 'MARIA APARECIDA SILVA',
+            'paciente.id': 'PAC-847291',
+            'paciente.dataNascimento': '14/03/1982',
+            'paciente.sexo': 'F',
+            'atendimento.id': 'ATD-2026-9041',
+            'atendimento.setor': 'ENFERMARIA',
+            'atendimento.leito': '304-B',
+            'hospital.nome': 'HOSPITAL SANTA CRUZ',
+          },
+        },
+        {
+          id: 'rec-hosp-2',
+          data: {
+            'paciente.nome': 'JOÃO PEDRO SANTOS',
+            'paciente.id': 'PAC-847292',
+            'paciente.dataNascimento': '22/11/1975',
+            'paciente.sexo': 'M',
+            'atendimento.id': 'ATD-2026-9042',
+            'atendimento.setor': 'UTI ADULTO',
+            'atendimento.leito': 'UTI-08',
+            'hospital.nome': 'HOSPITAL SANTA CRUZ',
+          },
+        },
+      ];
+
+    case 'laboratory':
+      return [
+        {
+          id: 'rec-lab-1',
+          data: {
+            'paciente.nome': 'JOÃO CARLOS PEREIRA',
+            'paciente.id': 'PAC-49102',
+            'coleta.id': 'COL-88412',
+            'coleta.dataHora': '28/08/2026 08:35',
+            'amostra.tipo': 'SORO / SANGUE TOTAL',
+            'exame.codigo': 'HEM-01',
+            'exame.nome': 'HEMOGRAMA COMPLETO',
+            'laboratorio.nome': 'LABORATÓRIO CENTRAL',
+          },
+        },
+        {
+          id: 'rec-lab-2',
+          data: {
+            'paciente.nome': 'MARIA FERNANDA LIMA',
+            'paciente.id': 'PAC-49103',
+            'coleta.id': 'COL-88413',
+            'coleta.dataHora': '28/08/2026 09:10',
+            'amostra.tipo': 'URINA ISOLADA',
+            'exame.codigo': 'EAS-02',
+            'exame.nome': 'URINA TIPO 1 (EAS)',
+            'laboratorio.nome': 'LABORATÓRIO CENTRAL',
+          },
+        },
+      ];
+
+    case 'logistics':
+      return [
+        {
+          id: 'rec-log-1',
+          data: {
+            'produto.descricao': 'CAIXA PRODUTO ACABADO',
+            'produto.gtin': '07891234567890',
+            'lote.numero': 'LT260828A',
+            'lote.validade': '28/02/2027',
+            'quantidade': '50',
+            'unidade': 'CX',
+            'sscc': '178912345678901234',
+            'destino': 'CENTRO DE DISTRIBUIÇÃO SP',
+            'origem': 'FÁBRICA MATRIZ',
+            'logistics.orderNumber': 'PED-99482',
+            'logistics.trackingCode': 'BR884910293PT',
+          },
+        },
+        {
+          id: 'rec-log-2',
+          data: {
+            'produto.descricao': 'PALETE COMPONENTES ELETRÔNICOS',
+            'produto.gtin': '07891234567891',
+            'lote.numero': 'LT260828B',
+            'lote.validade': '31/12/2027',
+            'quantidade': '120',
+            'unidade': 'PL',
+            'sscc': '178912345678901235',
+            'destino': 'UNIDADE CAMPINAS',
+            'origem': 'FÁBRICA MATRIZ',
+            'logistics.orderNumber': 'PED-99483',
+            'logistics.trackingCode': 'BR884910294PT',
+          },
+        },
+      ];
+
+    case 'industry':
+      return [
+        {
+          id: 'rec-ind-1',
+          data: {
+            'produto.codigo': 'PRD-8840',
+            'produto.descricao': 'PLACA ELETRÔNICA PRINCIPAL',
+            'lote.numero': 'LT-IND-2026',
+            'ordemProducao': 'OP-4491',
+            'dataFabricacao': '28/08/2026',
+            'dataValidade': '28/08/2031',
+            'operador': 'MARCOS SOUZA',
+            'linhaProducao': 'LINHA 02 - MONTAGEM',
+          },
+        },
+        {
+          id: 'rec-ind-2',
+          data: {
+            'produto.codigo': 'PRD-8841',
+            'produto.descricao': 'CHASSIS METÁLICO REFORÇADO',
+            'lote.numero': 'LT-IND-2027',
+            'ordemProducao': 'OP-4492',
+            'dataFabricacao': '28/08/2026',
+            'dataValidade': '28/08/2031',
+            'operador': 'ANA SILVA',
+            'linhaProducao': 'LINHA 01 - ESTAMPAGEM',
+          },
+        },
+      ];
+
+    case 'food':
+      return [
+        {
+          id: 'rec-food-1',
+          data: {
+            'produto.descricao': 'QUEIJO MUSSARELA FATIADO',
+            'lote.numero': 'LT-ALM-102',
+            'dataFabricacao': '28/08/2026',
+            'dataValidade': '15/09/2026',
+            'peso': '0.450 kg',
+            'preco': '18.90',
+            'ingredientes': 'Leite pasteurizado, fermento lácteo, sal e coalho.',
+          },
+        },
+        {
+          id: 'rec-food-2',
+          data: {
+            'produto.descricao': 'PRESUNTO COZIDO FATIADO',
+            'lote.numero': 'LT-ALM-103',
+            'dataFabricacao': '28/08/2026',
+            'dataValidade': '10/09/2026',
+            'peso': '0.300 kg',
+            'preco': '12.50',
+            'ingredientes': 'Carne suína, água, sal, condimentos e conservantes.',
+          },
+        },
+      ];
+
+    case 'pharmacy':
+      return [
+        {
+          id: 'rec-phar-1',
+          data: {
+            'medicamento.nome': 'AMOXICILINA 500MG',
+            'medicamento.principioAtivo': 'AMOXICILINA TRI-HIDRATADA',
+            'medicamento.lote': 'FAR-2026-X',
+            'medicamento.validade': '31/12/2027',
+            'medicamento.registro': 'MS 1.0043.0912',
+            'medicamento.codigo': '7896004701122',
+            'fabricante': 'FARMACÊUTICA BRASIL S.A.',
+          },
+        },
+        {
+          id: 'rec-phar-2',
+          data: {
+            'medicamento.nome': 'PARACETAMOL 750MG',
+            'medicamento.principioAtivo': 'PARACETAMOL',
+            'medicamento.lote': 'FAR-2026-Y',
+            'medicamento.validade': '30/06/2028',
+            'medicamento.registro': 'MS 1.0043.0913',
+            'medicamento.codigo': '7896004701123',
+            'fabricante': 'FARMACÊUTICA BRASIL S.A.',
+          },
+        },
+      ];
+
+    case 'retail':
+    default:
+      return INITIAL_DATA_RECORDS;
+  }
+}
+
 export const PrintCenterPage: React.FC = () => {
+  // Filtro de Nicho (PACOTE 4.5)
+  const [selectedNicheId, setSelectedNicheId] = useState<string>('retail');
+
   // Modelos e Seleção
   const [templateSummaries, setTemplateSummaries] = useState<TemplateSummaryDTO[]>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
@@ -153,8 +289,11 @@ export const PrintCenterPage: React.FC = () => {
   const [selectedPrinterId, setSelectedPrinterId] = useState<string>('');
   const [agentsMap, setAgentsMap] = useState<Map<string, AgentDTO>>(new Map());
 
-  // Registros e Grid
-  const [records] = useState<DataRecord[]>(INITIAL_DATA_RECORDS);
+  // Registros Ativos por Nicho
+  const records = useMemo(() => {
+    return getRecordsForNiche(selectedNicheId);
+  }, [selectedNicheId]);
+
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [quantities, setQuantities] = useState<Record<string, number>>({});
@@ -169,6 +308,33 @@ export const PrintCenterPage: React.FC = () => {
   const [batchResult, setBatchResult] = useState<PrintJobBatchDTO | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [loadingInitial, setLoadingInitial] = useState<boolean>(true);
+
+  // Modelos Filtrados pelo Nicho Selecionado
+  const filteredTemplateSummaries = useMemo(() => {
+    if (!selectedNicheId || selectedNicheId === 'all') return templateSummaries;
+    const norm = normalizeNicheId(selectedNicheId);
+    return templateSummaries.filter((t) => normalizeNicheId(t.nicheId || t.nicheName) === norm);
+  }, [templateSummaries, selectedNicheId]);
+
+  // REGRA DE INVALIDAÇÃO DE NICHO (Adendo 5):
+  // Trocar de nicho deve invalidar qualquer modelo selecionado incompatível!
+  useEffect(() => {
+    if (selectedNicheId && selectedNicheId !== 'all') {
+      const isCurrentValid = filteredTemplateSummaries.some((t) => t.id === selectedTemplateId);
+      if (!isCurrentValid) {
+        if (filteredTemplateSummaries.length > 0) {
+          setSelectedTemplateId(filteredTemplateSummaries[0].id);
+        } else {
+          setSelectedTemplateId('');
+          setSelectedTemplate(null);
+        }
+        // Limpar seleções de registros anteriores
+        setSelectedIds(new Set());
+        setQuantities({});
+        setActiveRecordId(null);
+      }
+    }
+  }, [selectedNicheId, filteredTemplateSummaries, selectedTemplateId]);
 
   // Carregamento Inicial de Modelos, Impressoras e Agentes
   const loadInitialData = useCallback(async () => {
@@ -206,7 +372,7 @@ export const PrintCenterPage: React.FC = () => {
     loadInitialData();
   }, [loadInitialData]);
 
-  // Carregar documento completo do modelo selecionado (Etapa 3: tratamento gracioso de modelo inexistente/removido)
+  // Carregar documento completo do modelo selecionado
   useEffect(() => {
     if (!selectedTemplateId) {
       setSelectedTemplate(null);
@@ -229,14 +395,6 @@ export const PrintCenterPage: React.FC = () => {
         if (isMounted) {
           setSelectedTemplate(null);
           setSelectedTemplateId('');
-          templatesApi.listTemplates().then((tpls) => {
-            if (isMounted) {
-              setTemplateSummaries(tpls);
-              if (tpls.length > 0) {
-                setSelectedTemplateId(tpls[0].id);
-              }
-            }
-          }).catch(() => {});
         }
       });
     return () => {
@@ -247,7 +405,7 @@ export const PrintCenterPage: React.FC = () => {
   // Extrair campos de integração usados pelo documento
   const requiredFields = useMemo(() => {
     if (!selectedTemplate || !selectedTemplate.document) {
-      return ['retail.code', 'retail.description', 'retail.price', 'retail.ean'];
+      return ['produto.codigo', 'produto.descricao', 'produto.preco', 'produto.ean'];
     }
     return getRequiredIntegrationFields(selectedTemplate.document);
   }, [selectedTemplate]);
@@ -307,7 +465,7 @@ export const PrintCenterPage: React.FC = () => {
     });
   }, [records, searchQuery]);
 
-  // Alterar Quantidade de um Registro Especifico
+  // Alterar Quantidade de um Registro Específico
   const handleChangeQuantity = useCallback((id: string, qty: number) => {
     const validQty = Math.max(1, Math.min(999, Math.floor(qty || 1)));
     setQuantities((prev) => ({
@@ -351,15 +509,22 @@ export const PrintCenterPage: React.FC = () => {
     return records[0] || null;
   }, [activeRecordId, records, selectedIds]);
 
-  // Validação para habilitar o botão de Envio
+  // Validação para habilitar o botão de Envio (Garante consistência de Nicho)
   const isPrintButtonEnabled = useMemo(() => {
-    if (!selectedTemplateId) return false;
+    if (!selectedTemplateId || !selectedTemplate) return false;
     if (!selectedPrinterId) return false;
     if (!agentStatus.online) return false;
     if (totalSelectedRecords < 1) return false;
     if (totalSelectedLabels < 1) return false;
+
+    // Trava de Segurança (Adendo 5): Impedir impressão se modelo for inconsistente com nicho ativo
+    if (selectedNicheId && selectedNicheId !== 'all') {
+      const tplNiche = normalizeNicheId(selectedTemplate.nicheId || selectedTemplate.nicheName);
+      if (tplNiche !== normalizeNicheId(selectedNicheId)) return false;
+    }
+
     return true;
-  }, [selectedTemplateId, selectedPrinterId, agentStatus.online, totalSelectedRecords, totalSelectedLabels]);
+  }, [selectedTemplateId, selectedTemplate, selectedPrinterId, agentStatus.online, totalSelectedRecords, totalSelectedLabels, selectedNicheId]);
 
   // Submeter Lote de Impressão ao Backend
   const handleConfirmPrintBatch = async () => {
@@ -423,10 +588,10 @@ export const PrintCenterPage: React.FC = () => {
         <div className="print-center-title-container">
           <h1>
             <Printer className="print-center-icon-blue" style={{ width: '1.75rem', height: '1.75rem' }} />
-            Central de Impressão Universal
+            Central de Impressão Universal Multi-Nicho
           </h1>
           <p>
-            Selecione registros, modelo e impressora para disparar etiquetas industriais em lote.
+            Selecione o nicho de operação, o modelo compatível e envie lotes de etiquetas com dados reais.
           </p>
         </div>
         <button
@@ -505,9 +670,29 @@ export const PrintCenterPage: React.FC = () => {
       ) : (
         /* CORPO DA CENTRAL (SELEÇÃO, BUSCA, GRID E PREVIEW) */
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-          {/* BARRA SUPERIOR DE SELEÇÃO: MODELO, ORIGEM, IMPRESSORA & AGENT */}
+          {/* BARRA SUPERIOR DE SELEÇÃO: NICHO, MODELO, ORIGEM, IMPRESSORA & AGENT */}
           <div className="print-center-config-card">
-            {/* 1. SELEÇÃO DE MODELO */}
+            {/* 0. SELEÇÃO DE NICHO OPERACIONAL (PACOTE 4.5) */}
+            <div className="print-center-field-group">
+              <label className="print-center-label">
+                <Filter style={{ width: '0.875rem', height: '0.875rem' }} className="print-center-icon-blue" />
+                Nicho Operacional
+              </label>
+              <select
+                value={selectedNicheId}
+                onChange={(e) => setSelectedNicheId(e.target.value)}
+                className="print-center-select"
+              >
+                {CANONICAL_NICHE_PROFILES.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+                <option value="all">Todos os Nichos</option>
+              </select>
+            </div>
+
+            {/* 1. SELEÇÃO DE MODELO (Filtrado pelo Nicho) */}
             <div className="print-center-field-group">
               <label className="print-center-label">
                 <FileText style={{ width: '0.875rem', height: '0.875rem' }} className="print-center-icon-blue" />
@@ -518,10 +703,10 @@ export const PrintCenterPage: React.FC = () => {
                 onChange={(e) => setSelectedTemplateId(e.target.value)}
                 className="print-center-select"
               >
-                {templateSummaries.length === 0 ? (
-                  <option value="">Nenhum modelo cadastrado</option>
+                {filteredTemplateSummaries.length === 0 ? (
+                  <option value="">Nenhum modelo para o nicho selecionado</option>
                 ) : (
-                  templateSummaries.map((t) => (
+                  filteredTemplateSummaries.map((t) => (
                     <option key={t.id} value={t.id}>
                       {t.title} ({t.widthMm}x{t.heightMm}mm - {t.printerLanguage})
                     </option>
@@ -537,10 +722,7 @@ export const PrintCenterPage: React.FC = () => {
                 Origem de Dados
               </label>
               <select defaultValue="mock-catalog" className="print-center-select">
-                <option value="mock-catalog">Catálogo Varejo / Integração Mock (Disponível)</option>
-                <option value="erp-connector" disabled>
-                  Conector ERP Externo (Fase Futura)
-                </option>
+                <option value="mock-catalog">Dados de Homologação ({CANONICAL_NICHE_PROFILES.find((p) => p.id === selectedNicheId)?.name || 'Multi-Nicho'})</option>
               </select>
             </div>
 
@@ -578,191 +760,39 @@ export const PrintCenterPage: React.FC = () => {
             </div>
           </div>
 
-          {/* CONTROLES DA TABELA: BUSCA E AÇÕES EM LOTE */}
-          <div className="print-center-toolbar">
-            {/* CAMPO DE BUSCA */}
-            <div className="print-center-search-wrapper">
-              <Search className="print-center-search-icon" />
-              <input
-                type="text"
-                placeholder="Buscar por código, descrição, EAN ou chave..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="print-center-input print-center-search-input"
-              />
-            </div>
-
-            {/* AÇÕES EM LOTE */}
-            <div className="print-center-batch-controls">
-              <button
-                onClick={handleToggleSelectAll}
-                className="print-center-btn print-center-btn-secondary"
-              >
-                <CheckSquare style={{ width: '1rem', height: '1rem' }} className="print-center-icon-blue" />
-                Selecionar Filtrados
-              </button>
-
-              <div className="print-center-batch-quantity-group">
-                <span className="print-center-batch-quantity-label">Qtd. lote:</span>
-                <input
-                  type="number"
-                  min={1}
-                  max={999}
-                  value={batchQuantityInput}
-                  onChange={(e) => setBatchQuantityInput(parseInt(e.target.value, 10) || 1)}
-                  className="print-center-batch-quantity-input"
-                />
-                <button
-                  onClick={handleApplyBatchQuantity}
-                  disabled={selectedIds.size === 0}
-                  className="print-center-btn print-center-btn-primary"
-                  style={{ padding: '0.25rem 0.625rem', fontSize: '0.75rem' }}
-                >
-                  Aplicar
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* LAYOUT GRID DINÂMICO + PAINEL LATERAL DE PREVIEW */}
-          <div className="print-center-content-grid">
-            {/* GRID PRINCIPAL (70% DA LARGURA) */}
-            <div>
+          {/* ÁREA PRINCIPAL DIVIDIDA: GRID DE REGISTROS (ESQUERDA) E PRÉVIA CONTEXTUAL (DIREITA) */}
+          <div className="print-center-main-grid">
+            {/* PAINEL ESQUERDO: BARRA DE FERRAMENTAS E TABELA DE DATAGRID */}
+            <div className="print-center-records-panel">
               <PrintCenterGrid
                 records={records}
                 requiredFields={requiredFields}
+                searchQuery={searchQuery}
+                onSearchChange={setSearchQuery}
                 selectedIds={selectedIds}
                 quantities={quantities}
-                activeRecordId={activeRecordId}
                 onToggleSelect={handleToggleSelect}
                 onToggleSelectAll={handleToggleSelectAll}
                 onChangeQuantity={handleChangeQuantity}
-                onSelectRecord={(id) => setActiveRecordId(id)}
-                searchQuery={searchQuery}
-                loading={loadingInitial}
+                batchQuantityInput={batchQuantityInput}
+                onBatchQuantityInputChange={setBatchQuantityInput}
+                onApplyBatchQuantity={handleApplyBatchQuantity}
+                activeRecordId={activeRecordId}
+                onSetActiveRecordId={setActiveRecordId}
               />
             </div>
 
-            {/* PAINEL DE PREVIEW CONTEXTUAL E RESUMO DE DISPARO (30% DA LARGURA) */}
-            <div className="print-center-sidebar-column">
-              {/* COMPONENTE DE PREVIEW REAL DE IMPRESSÃO (REUTILIZA RENDERER HOMOLOGADO DO EDITOR) */}
+            {/* PAINEL DIREITO: VISUALIZADOR DE PRÉVIA CONTEXTUAL E AÇÕES */}
+            <div className="print-center-preview-panel">
               <PrintPreview
                 document={selectedTemplate?.document || null}
-                data={(activeRecord?.data as Record<string, unknown>) || null}
-                modelName={selectedTemplate?.title}
-                printerLanguage={selectedTemplate?.printerLanguage || 'PPLB'}
+                activeRecord={activeRecord?.data || null}
+                totalSelectedRecords={totalSelectedRecords}
+                totalSelectedLabels={totalSelectedLabels}
+                selectedPrinterName={selectedPrinter?.name || 'Selecione a Impressora'}
+                isPrintEnabled={isPrintButtonEnabled}
+                onOpenConfirmModal={() => setIsConfirmModalOpen(true)}
               />
-
-              {/* CARD DE AÇÃO DE DISPARO */}
-              <div className="print-center-card">
-                <div className="print-center-card-header">
-                  <h3 className="print-center-card-title">
-                    <Layers style={{ width: '1rem', height: '1rem' }} className="print-center-icon-blue" />
-                    Resumo da Seleção
-                  </h3>
-                </div>
-
-                <div className="print-center-summary-list">
-                  <div className="print-center-summary-item">
-                    <span>Registros Selecionados:</span>
-                    <span className="print-center-summary-value">{totalSelectedRecords}</span>
-                  </div>
-                  <div className="print-center-summary-item">
-                    <span>Total de Etiquetas:</span>
-                    <span className="print-center-summary-value-accent">{totalSelectedLabels}</span>
-                  </div>
-                  <div className="print-center-summary-item">
-                    <span>Linguagem de Impressão:</span>
-                    <span className="print-center-summary-value">
-                      {selectedTemplate?.printerLanguage || 'PPLB'}
-                    </span>
-                  </div>
-                </div>
-
-                <button
-                  disabled={!isPrintButtonEnabled}
-                  onClick={() => setIsConfirmModalOpen(true)}
-                  className="print-center-btn print-center-btn-primary"
-                  style={{ width: '100%', padding: '0.75rem 1rem', fontSize: '0.875rem', fontWeight: 700 }}
-                >
-                  <Send style={{ width: '1rem', height: '1rem' }} />
-                  Imprimir Seleção ({totalSelectedLabels} etiquetas)
-                </button>
-
-                {!agentStatus.online && (
-                  <p style={{ fontSize: '0.6875rem', color: 'var(--status-danger)', textAlign: 'center', fontWeight: 500, margin: 0 }}>
-                    A impressora selecionada ou seu Agente está offline. Conecte o hardware para habilitar a impressão.
-                  </p>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL COMPACTO DE CONFIRMAÇÃO DE DISPARO */}
-      {isConfirmModalOpen && (
-        <div className="print-center-modal-overlay">
-          <div className="print-center-modal-card">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
-              <h3 style={{ fontSize: '1rem', fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <Printer style={{ width: '1.25rem', height: '1.25rem' }} className="print-center-icon-blue" />
-                Confirmar Impressão em Lote
-              </h3>
-              <button
-                onClick={() => setIsConfirmModalOpen(false)}
-                style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
-              >
-                <X style={{ width: '1.25rem', height: '1.25rem' }} />
-              </button>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', fontSize: '0.8125rem', background: 'var(--bg-input)', padding: '1rem', borderRadius: '0.5rem', border: '1px solid var(--border-color)' }}>
-              <div>
-                <span style={{ color: 'var(--text-muted)', display: 'block', fontWeight: 500 }}>Modelo de Etiqueta:</span>
-                <span style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-primary)' }}>{selectedTemplate?.title}</span>
-              </div>
-              <div>
-                <span style={{ color: 'var(--text-muted)', display: 'block', fontWeight: 500 }}>Impressora Destino:</span>
-                <span style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-primary)' }}>{selectedPrinter?.name}</span>
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid var(--border-color)' }}>
-                <div>
-                  <span style={{ color: 'var(--text-muted)', display: 'block', fontWeight: 500 }}>Registros:</span>
-                  <span style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)' }}>{totalSelectedRecords}</span>
-                </div>
-                <div>
-                  <span style={{ color: 'var(--text-muted)', display: 'block', fontWeight: 500 }}>Total Etiquetas:</span>
-                  <span style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--accent-blue)' }}>{totalSelectedLabels}</span>
-                </div>
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', justifySelf: 'end', alignSelf: 'end', gap: '0.75rem', paddingTop: '0.5rem' }}>
-              <button
-                onClick={() => setIsConfirmModalOpen(false)}
-                disabled={isSubmitting}
-                className="print-center-btn print-center-btn-secondary"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handleConfirmPrintBatch}
-                disabled={isSubmitting}
-                className="print-center-btn print-center-btn-primary"
-              >
-                {isSubmitting ? (
-                  <>
-                    <RefreshCw style={{ width: '1rem', height: '1rem' }} className="animate-spin" />
-                    Enviando Lote...
-                  </>
-                ) : (
-                  <>
-                    <Send style={{ width: '1rem', height: '1rem' }} />
-                    Enviar para Impressão
-                  </>
-                )}
-              </button>
             </div>
           </div>
         </div>
@@ -772,3 +802,4 @@ export const PrintCenterPage: React.FC = () => {
 };
 
 export default PrintCenterPage;
+

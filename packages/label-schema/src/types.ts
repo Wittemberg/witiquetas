@@ -171,6 +171,8 @@ export interface SourceFileMetadata {
 export interface LabelDocument {
   schemaVersion: number;
   title: string;
+  nicheId?: string;
+  nicheName?: string;
   dimensions: LabelDimensions;
   elements: LabelElement[];
   sourceFile?: SourceFileMetadata;

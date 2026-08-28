@@ -1,6 +1,19 @@
 {
   "checkpoints": [
     {
+      "sha": "3aff9e78087693ccb70171ef4f522118d7c2ecb6",
+      "shortSha": "3aff9e7",
+      "date": "2026-08-28T17:58:00Z",
+      "phase": "4",
+      "patch": "4.5.1",
+      "title": "fix(backend): HOTFIX P0 — restaurar build do backend em tsc",
+      "type": "HOTFIX",
+      "capabilities": ["cap-multiniche-profiles"],
+      "testsPassed": true,
+      "deployed": true,
+      "manualValidation": false
+    },
+    {
       "sha": "e4df990cb8c304d7e522fbef6dbb36dd3c9c693a",
       "shortSha": "e4df990",
       "date": "2026-08-28T17:35:00Z",

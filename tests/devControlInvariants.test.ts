@@ -72,7 +72,7 @@ test('DCC INVARIANT A & G: Soma de pesos total e MVP é matematicamente consiste
     }
   }
 
-  assert.equal(totalWeight, 262, 'Soma total de pesos deve ser exatamente 262 após inclusão do escopo multinicho e UX');
+  assert.equal(totalWeight, 267, 'Soma total de pesos deve ser exatamente 267 após inclusão do escopo multinicho, UX e multiselect de camadas');
   assert.equal(mvpTotalWeight, 198, 'Soma de pesos do MVP deve ser exatamente 198 (172 anterior + 26 novos P0/MVP)');
 });
 
@@ -123,7 +123,7 @@ test('DCC INVARIANT E & F: homologatedWeight <= implementedWeight <= totalWeight
   assert.ok(homologatedWeight <= implementedWeight, 'homologatedWeight não pode ser maior que implementedWeight');
   assert.ok(implementedWeight <= totalWeight, 'implementedWeight não pode ser maior que totalWeight');
   assert.equal(homologatedWeight, 146, 'homologatedWeight deve se manter intacto em 146');
-  assert.equal(implementedWeight, 176, 'implementedWeight deve refletir 176 com PACOTE 4.3 implementado');
+  assert.equal(implementedWeight, 181, 'implementedWeight deve refletir 181 com PACOTE 4.4 (multiselect de camadas) implementado');
 });
 
 test('DCC INVARIANT H & I: Matriz de nichos possui IDs unicos, nomes e status validos', () => {

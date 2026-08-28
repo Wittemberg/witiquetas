@@ -60,6 +60,7 @@ export default function EditorLayout({
     document,
     selectedElementIds,
     setSelectedElementId,
+    toggleSelectElement,
     zoom,
     setZoom,
     fitToScreen,
@@ -776,7 +777,10 @@ export default function EditorLayout({
                     <div
                       key={el.id}
                       className={`layer-compact-row ${isSelected ? 'active' : ''} ${hasFlag ? 'has-flag' : ''}`}
-                      onClick={() => setSelectedElementId(el.id)}
+                      onClick={(e) => {
+                        const isMulti = e.ctrlKey || e.metaKey;
+                        toggleSelectElement(el.id, isMulti);
+                      }}
                     >
                       <div className="layer-compact-left">
                         {getElementIcon(el.type)}

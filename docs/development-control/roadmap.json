@@ -571,6 +571,29 @@
           ]
         },
         {
+          "id": "cap-layers-multiselect",
+          "name": "Multiseleção via Lista de Camadas (UX Layers Multiselect)",
+          "description": "Permite selecionar múltiplos elementos na lista de Camadas utilizando Ctrl + Clique (Windows/Linux) e Cmd + Clique (macOS), mantendo sincronia 100% canônica com a seleção do Canvas.",
+          "module": "editor-core",
+          "weight": 5,
+          "mvp": false,
+          "status": "IMPLEMENTED",
+          "manualValidation": false,
+          "physicalValidation": false,
+          "frozen": false,
+          "evidence": [
+            "apps/frontend/src/editor/EditorLayout.tsx",
+            "apps/frontend/src/editor/useEditorStore.ts",
+            "tests/layersMultiselect.test.ts"
+          ],
+          "dependencies": [
+            "cap-canvas-core"
+          ],
+          "notes": [
+            "PACOTE 4.4: Adicionado suporte a Ctrl/Cmd+clique na lista de Camadas do Editor. Permite seleção determinística de elementos sobrepostos ou finos. Reutiliza estritamente o estado canônico único selectedElementIds sem criar estado paralelo."
+          ]
+        },
+        {
           "id": "cap-editor-toolbar-compactness",
           "name": "Compactação da Toolbar do Editor (UX Compactness 2)",
           "description": "Otimização da largura da toolbar do Editor ao abrir o painel lateral, removendo botões redundantes e movendo configurações secundárias para o menu Opções.",

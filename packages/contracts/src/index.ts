@@ -49,9 +49,13 @@ export interface CreateTemplateDTO {
 export interface UpdateTemplateDTO {
   name?: string;
   title?: string;
+  companyId?: string;
   description?: string;
+  nicheId?: string;
+  nicheName?: string;
   printerLanguage?: string;
   document?: LabelDocument;
+  version?: number;
   expectedVersion?: number; // Para Optimistic Locking (HTTP 409 Conflict se versão desatualizada)
 }
 

@@ -1,4 +1,4 @@
-import { pgPool, isProduction } from '../db.ts';
+import { pgPool, isProduction } from '../db.js';
 import type { LabelDocument } from '@witiquetas/label-schema';
 import { normalizeNicheId } from '@witiquetas/label-schema';
 import type {
@@ -7,7 +7,7 @@ import type {
   CreateTemplateDTO,
   UpdateTemplateDTO,
 } from '@witiquetas/contracts';
-import { presenceRepository, ActiveEditingSessionError } from './presenceRepository.ts';
+import { presenceRepository, ActiveEditingSessionError } from './presenceRepository.js';
 
 export class MismatchedVersionError extends Error {
   currentVersion: number;
@@ -400,9 +400,9 @@ export const templateRepository = {
   /**
    * Criar um novo modelo de etiqueta
    */
-  async createTemplate(dto: CreateTemplateDTO): Promise<TemplateDTO> {
-    const id = `tpl-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
-    const companyId = dto.companyId || 'comp-default';
+  async createTemplate(dto: CreateTemplateDTO, companyIdOverride?: string): Promise<TemplateDTO> {
+    const id = `tpl-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+    const companyId = companyIdOverride || dto.companyId || 'comp-default';
     const now = new Date().toISOString();
     const title = dto.name || dto.title || 'Novo Modelo de Etiqueta';
     const nicheId = dto.nicheId || normalizeNicheId(dto.nicheName);
@@ -470,13 +470,20 @@ export const templateRepository = {
   /**
    * Atualizar modelo com otimista locking (versão) e verificação de concorrência
    */
-  async updateTemplate(id: string, dto: UpdateTemplateDTO, sessionId?: string, userIdentifier?: string): Promise<TemplateDTO> {
-    const companyId = dto.companyId || 'comp-default';
+  async updateTemplate(
+    id: string,
+    dto: UpdateTemplateDTO,
+    companyIdOverride?: string,
+    sessionId?: string,
+    userIdentifier?: string
+  ): Promise<TemplateDTO> {
+    const companyId = companyIdOverride || dto.companyId || 'comp-default';
 
     if (sessionId) {
-      const activeSession = await presenceRepository.getActiveSession(modelIdKey(companyId, id));
-      if (activeSession && activeSession.sessionId !== sessionId) {
-        throw new ActiveEditingSessionError(activeSession.userIdentifier, activeSession.openedAt);
+      const activeSessions = await presenceRepository.getActiveSessions(id, companyId);
+      const otherSessions = activeSessions.filter((s) => s.sessionId !== sessionId);
+      if (otherSessions.length > 0) {
+        throw new ActiveEditingSessionError(otherSessions);
       }
     }
 
@@ -485,11 +492,12 @@ export const templateRepository = {
         throw new Error('FAIL-CLOSED: Conexão PostgreSQL indisponível em ambiente de produção.');
       }
       const existing = memoryStore.get(id);
-      if (!existing) {
+      if (!existing || (companyId !== 'comp-default' && existing.companyId !== companyId)) {
         throw new Error('Modelo não encontrado.');
       }
 
-      if (dto.version !== undefined && dto.version !== existing.version) {
+      const expectedVer = dto.expectedVersion ?? dto.version;
+      if (expectedVer !== undefined && expectedVer !== existing.version) {
         throw new MismatchedVersionError(existing.version);
       }
 
@@ -532,7 +540,8 @@ export const templateRepository = {
     }
 
     const currentVersion = Number(currentRes.rows[0].version);
-    if (dto.version !== undefined && dto.version !== currentVersion) {
+    const expectedVer = dto.expectedVersion ?? dto.version;
+    if (expectedVer !== undefined && expectedVer !== currentVersion) {
       throw new MismatchedVersionError(currentVersion);
     }
 
@@ -624,6 +633,63 @@ export const templateRepository = {
       [id, companyId]
     );
     return (res.rowCount ?? 0) > 0;
+  },
+
+  /**
+   * Duplicar modelo existente
+   */
+  async duplicateTemplate(id: string, companyId: string = 'comp-default'): Promise<TemplateDTO> {
+    const original = await this.getTemplateById(id, companyId);
+    if (!original) {
+      throw new Error(`Modelo '${id}' não encontrado para duplicação.`);
+    }
+
+    const title = `${original.title} - Cópia`;
+    const document: LabelDocument = {
+      ...JSON.parse(JSON.stringify(original.document)),
+      title,
+    };
+
+    return this.createTemplate(
+      {
+        name: title,
+        title,
+        companyId,
+        description: original.description,
+        nicheId: original.nicheId,
+        nicheName: original.nicheName,
+        scope: original.scope === 'DEMO' ? 'COMPANY' : original.scope,
+        printerLanguage: original.printerLanguage,
+        document,
+      },
+      companyId
+    );
+  },
+
+  /**
+   * Renomear modelo existente
+   */
+  async renameTemplate(id: string, newTitle: string, companyId: string = 'comp-default'): Promise<TemplateDTO> {
+    const original = await this.getTemplateById(id, companyId);
+    if (!original) {
+      throw new Error(`Modelo '${id}' não encontrado para renomear.`);
+    }
+
+    const document: LabelDocument = {
+      ...JSON.parse(JSON.stringify(original.document)),
+      title: newTitle,
+    };
+
+    return this.updateTemplate(
+      id,
+      {
+        name: newTitle,
+        title: newTitle,
+        companyId,
+        document,
+      },
+      companyId
+    );
   },
 };
 

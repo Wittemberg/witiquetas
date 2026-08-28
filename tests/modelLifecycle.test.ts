@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   templateRepository,
   MismatchedVersionError,
-} from '../apps/backend/src/repositories/templateRepository';
+} from '../apps/backend/dist/repositories/templateRepository.js';
 import type { LabelDocument } from '@witiquetas/label-schema';
 
 const sampleDoc: LabelDocument = {
@@ -20,9 +20,9 @@ test('1. Summary DTO não inclui document_schema nas listagens', async () => {
   const summaries = await templateRepository.listTemplates({ companyId });
   assert.ok(summaries.length > 0, 'Deve listar ao menos 1 resumo de modelo.');
 
-  const first = summaries[0];
-  assert.equal(first.title, 'Modelo Leve 1');
-  assert.equal((first as any).document, undefined, 'Summary DTO NUNCA deve incluir document_schema.');
+  const createdItem = summaries.find((s) => s.title === 'Modelo Leve 1');
+  assert.ok(createdItem, 'Modelo Leve 1 deve estar na listagem.');
+  assert.equal((createdItem as any).document, undefined, 'Summary DTO NUNCA deve incluir document_schema.');
 });
 
 test('2. Tenant Isolation: Empresa A não pode acessar nem alterar modelos da Empresa B', async () => {

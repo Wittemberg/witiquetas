@@ -1,4 +1,4 @@
-import { pgPool, isProduction } from '../db.ts';
+import { pgPool, isProduction } from '../db.js';
 
 export interface EditingSessionDTO {
   id: string;

@@ -12,7 +12,7 @@ import {
   resolveFieldValue,
 } from '@witiquetas/label-schema';
 
-import { templateRepository, getSeedTemplates } from '../apps/backend/src/repositories/templateRepository.ts';
+import { templateRepository, getSeedTemplates } from '../apps/backend/dist/repositories/templateRepository.js';
 
 describe('PACOTE 4.5 — Perfis Multi-Nicho + Modelos e Dados de Homologação', () => {
   // 1. Identificadores Canônicos Estreitos & Fallback Legado

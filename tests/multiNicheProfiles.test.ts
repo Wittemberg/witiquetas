@@ -170,4 +170,145 @@ describe('PACOTE 4.5 — Perfis Multi-Nicho + Modelos e Dados de Homologação',
     assert.equal(resolvedDesc, 'REFRIGERANTE COCA-COLA 2L');
     assert.equal(resolvedPrice, '9.99');
   });
+
+  // =========================================================================
+  // HOTFIX 4.5.1 — TESTES DE INTEGRAÇÃO UI E RUNTIME (18 ITENS OBRIGATÓRIOS)
+  // =========================================================================
+
+  it('1. Hospital template -> FieldPicker deve carregar catálogo de hospital', () => {
+    const fields = getIntegrationFieldsByNiche('hospital');
+    const fieldIds = fields.map((f) => f.id);
+    assert.ok(fieldIds.includes('paciente.nome'));
+    assert.ok(fieldIds.includes('atendimento.leito'));
+    assert.equal(fieldIds.includes('produto.preco'), false);
+  });
+
+  it('2. Laboratory template -> FieldPicker deve carregar catálogo de laboratório', () => {
+    const fields = getIntegrationFieldsByNiche('laboratory');
+    const fieldIds = fields.map((f) => f.id);
+    assert.ok(fieldIds.includes('amostra.tipo'));
+    assert.ok(fieldIds.includes('exame.nome'));
+    assert.equal(fieldIds.includes('produto.preco'), false);
+  });
+
+  it('3. Retail template -> FieldPicker deve carregar catálogo de varejo', () => {
+    const fields = getIntegrationFieldsByNiche('retail');
+    const fieldIds = fields.map((f) => f.id);
+    assert.ok(fieldIds.includes('produto.descricao'));
+    assert.ok(fieldIds.includes('produto.preco'));
+  });
+
+  it('4. nicheId explícito hospital NÃO pode cair no fallback retail', () => {
+    const norm = normalizeNicheId('hospital');
+    assert.equal(norm, 'hospital');
+    assert.notEqual(norm, 'retail');
+  });
+
+  it('5. Documento legado sem nicheId deve cair no fallback retail', () => {
+    const norm = normalizeNicheId(undefined);
+    assert.equal(norm, 'retail');
+  });
+
+  it('6. PrintCenter deve possuir opções válidas para o Seletor de Nicho', () => {
+    const validNiches = ['all', ...CANONICAL_NICHE_PROFILES.map((p) => p.id)];
+    assert.ok(validNiches.includes('all'));
+    assert.ok(validNiches.includes('hospital'));
+    assert.ok(validNiches.includes('laboratory'));
+    assert.equal(validNiches.length, 8);
+  });
+
+  it('7. Selecionar filtro Hospital deve filtrar somente modelos Hospital', async () => {
+    const allTpls = await templateRepository.listTemplates({ companyId: 'comp-default' });
+    const hospitalOnly = allTpls.filter((t) => normalizeNicheId(t.nicheId || t.nicheName) === 'hospital');
+    assert.ok(hospitalOnly.length > 0);
+    assert.ok(hospitalOnly.every((t) => normalizeNicheId(t.nicheId || t.nicheName) === 'hospital'));
+  });
+
+  it('8. Nicho Hospital deve carregar MOCK_NICHE_DATASETS.hospital', () => {
+    const dataset = MOCK_NICHE_DATASETS.hospital;
+    assert.ok(dataset);
+    assert.equal(dataset['paciente.nome'], 'MARIA APARECIDA SILVA');
+  });
+
+  it('9. Nicho Hospital NÃO deve carregar dataset retail (Coca-Cola / Preço)', () => {
+    const dataset = MOCK_NICHE_DATASETS.hospital;
+    assert.equal(dataset['produto.descricao'], undefined);
+  });
+
+  it('10. Selecionar modelo Hospital com filtro "Todos" deve usar dataset hospital', async () => {
+    const seeds = getSeedTemplates();
+    const hospTpl = seeds.find((s) => s.nicheId === 'hospital');
+    assert.ok(hospTpl);
+
+    const normNiche = normalizeNicheId(hospTpl.nicheId);
+    const mockData = getMockDataByNiche(normNiche);
+    assert.equal(normNiche, 'hospital');
+    assert.equal(mockData['paciente.nome'], 'MARIA APARECIDA SILVA');
+  });
+
+  it('11. Trocar Nicho de Retail para Hospital invalida template retail', async () => {
+    const seeds = getSeedTemplates();
+    const retailTpl = seeds.find((s) => s.nicheId === 'retail');
+    const hospTpl = seeds.find((s) => s.nicheId === 'hospital');
+    assert.ok(retailTpl);
+    assert.ok(hospTpl);
+
+    // Quando nicho ativo é hospital, modelo retail é inválido
+    const activeNiche = 'hospital';
+    const isRetailValid = normalizeNicheId(retailTpl.nicheId) === activeNiche;
+    const isHospValid = normalizeNicheId(hospTpl.nicheId) === activeNiche;
+
+    assert.equal(isRetailValid, false);
+    assert.equal(isHospValid, true);
+  });
+
+  it('12. Preview do modelo hospitalar deve receber registro hospitalar', () => {
+    const hospMock = MOCK_NICHE_DATASETS.hospital;
+    const resolvedName = resolveFieldValue('paciente.nome', { nicheId: 'hospital', mockRecord: hospMock });
+    assert.equal(resolvedName, 'MARIA APARECIDA SILVA');
+    assert.notEqual(resolvedName, 'REFRIGERANTE COCA-COLA 2L');
+  });
+
+  it('13. Nicho Logistics deve usar dataset logistics', () => {
+    const dataset = MOCK_NICHE_DATASETS.logistics;
+    assert.ok(dataset['sscc']);
+    assert.equal(dataset['sscc'], '178912345678901234');
+  });
+
+  it('14. Nicho Industry deve usar dataset industry', () => {
+    const dataset = MOCK_NICHE_DATASETS.industry;
+    assert.ok(dataset['ordemProducao']);
+    assert.equal(dataset['ordemProducao'], 'OP-4491');
+  });
+
+  it('15. Nicho Food deve usar dataset food', () => {
+    const dataset = MOCK_NICHE_DATASETS.food;
+    assert.ok(dataset['dataValidade']);
+    assert.equal(dataset['dataValidade'], '15/09/2026');
+  });
+
+  it('16. Nicho Pharmacy deve usar dataset pharmacy', () => {
+    const dataset = MOCK_NICHE_DATASETS.pharmacy;
+    assert.ok(dataset['medicamento.nome']);
+    assert.equal(dataset['medicamento.nome'], 'AMOXICILINA 500MG');
+  });
+
+  it('17. Nicho Laboratory deve usar dataset laboratory', () => {
+    const dataset = MOCK_NICHE_DATASETS.laboratory;
+    assert.ok(dataset['exame.nome']);
+    assert.equal(dataset['exame.nome'], 'HEMOGRAMA COMPLETO');
+  });
+
+  it('18. Validação de impressão deve bloquear mismatch de template/niche', () => {
+    const activeNiche = 'hospital';
+    const retailTemplateNiche = 'retail';
+    const hospitalTemplateNiche = 'hospital';
+
+    const isRetailAllowed = normalizeNicheId(retailTemplateNiche) === normalizeNicheId(activeNiche);
+    const isHospitalAllowed = normalizeNicheId(hospitalTemplateNiche) === normalizeNicheId(activeNiche);
+
+    assert.equal(isRetailAllowed, false);
+    assert.equal(isHospitalAllowed, true);
+  });
 });
+

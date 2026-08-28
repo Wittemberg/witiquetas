@@ -25,31 +25,65 @@ export interface PrintCenterGridProps {
  * Formata o nome do cabeçalho da coluna a partir da chave do campo (ex: "retail.description" -> "Descrição")
  */
 function formatColumnHeader(fieldId: string): string {
+  const fullMap: Record<string, string> = {
+    'paciente.nome': 'Paciente',
+    'paciente.id': 'Prontuário',
+    'paciente.dataNascimento': 'Data Nasc.',
+    'paciente.sexo': 'Sexo',
+    'atendimento.id': 'Atendimento',
+    'atendimento.setor': 'Setor',
+    'atendimento.leito': 'Leito',
+    'hospital.nome': 'Hospital',
+    'amostra.tipo': 'Tipo Amostra',
+    'exame.nome': 'Exame',
+    'laboratorio.nome': 'Laboratório',
+    'coleta.id': 'Coleta ID',
+    'sscc': 'SSCC',
+    'logistics.trackingCode': 'Rastreio',
+    'destino': 'Destino',
+    'origem': 'Origem',
+    'ordemProducao': 'Ordem Produção',
+    'lote.numero': 'Lote',
+    'linhaProducao': 'Linha',
+    'peso': 'Peso',
+    'dataValidade': 'Validade',
+    'medicamento.nome': 'Medicamento',
+    'medicamento.principioAtivo': 'Princípio Ativo',
+    'medicamento.registro': 'Reg. ANVISA',
+    'medicamento.lote': 'Lote Medicamento',
+    'fabricante': 'Fabricante',
+  };
+  if (fullMap[fieldId]) return fullMap[fieldId];
+
   const parts = fieldId.split('.');
   const rawKey = parts[parts.length - 1];
   const labelMap: Record<string, string> = {
+    nome: 'Nome',
+    id: 'ID',
+    dataNascimento: 'Data Nasc.',
+    sexo: 'Sexo',
+    setor: 'Setor',
+    leito: 'Leito',
+    tipo: 'Tipo',
     code: 'Código',
     codigo: 'Código',
     description: 'Descrição',
     descricao: 'Descrição',
     price: 'Preço',
     preco: 'Preço',
-    ean: 'EAN / Código de Barras',
+    ean: 'EAN',
     promoPrice: 'Preço Promo',
     promocao: 'Preço Promo',
     unit: 'Unidade',
     unidade: 'Unidade',
     brand: 'Marca',
-    patientName: 'Nome do Paciente',
-    medicalRecord: 'Prontuário',
-    bed: 'Leito',
-    doctor: 'Médico',
-    bloodType: 'Tipo Sangüíneo',
-    orderNumber: 'Pedido',
     trackingCode: 'Rastreio',
     recipient: 'Destinatário',
     address: 'Endereço',
     weightKg: 'Peso (kg)',
+    numero: 'Número',
+    registro: 'Registro',
+    fabricante: 'Fabricante',
   };
   return labelMap[rawKey] || rawKey.toUpperCase();
 }
@@ -79,13 +113,16 @@ export const PrintCenterGrid: React.FC<PrintCenterGridProps> = ({
     });
   }, [records, searchQuery]);
 
-  // Se o modelo não possui bindings de integração ou requiredFields está vazio, exibe colunas padrão
+  // Se o modelo não possui bindings de integração ou requiredFields está vazio, exibe colunas do registro ativo
   const effectiveColumns = React.useMemo(() => {
     if (requiredFields && requiredFields.length > 0) {
       return requiredFields;
     }
-    return ['retail.code', 'retail.description', 'retail.price', 'retail.ean'];
-  }, [requiredFields]);
+    if (records.length > 0 && records[0].data) {
+      return Object.keys(records[0].data).slice(0, 6);
+    }
+    return ['produto.codigo', 'produto.descricao', 'produto.preco', 'produto.ean'];
+  }, [requiredFields, records]);
 
   const allFilteredSelected =
     filteredRecords.length > 0 &&

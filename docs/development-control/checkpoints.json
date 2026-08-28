@@ -1,6 +1,19 @@
 {
   "checkpoints": [
     {
+      "sha": "3fc664bbe7a40df6eacbd2cd4889c15aa3bd8ec2",
+      "shortSha": "3fc664b",
+      "date": "2026-08-28T17:35:00Z",
+      "phase": "4",
+      "patch": "4.5.1",
+      "title": "fix(niche): HOTFIX 4.5.1 — UI/runtime multiniche integration",
+      "type": "HOTFIX",
+      "capabilities": ["cap-multiniche-profiles"],
+      "testsPassed": true,
+      "deployed": true,
+      "manualValidation": false
+    },
+    {
       "sha": "6358f3df9f7d4bb9f8b4d24177b9fb6c810eb0a6",
       "shortSha": "6358f3d",
       "date": "2026-08-28T15:30:00Z",

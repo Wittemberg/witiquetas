@@ -58,11 +58,15 @@ export default function PropertyInspector() {
     addQRCodeToLibrary,
     snapToGrid,
     setSnapToGrid,
+    gridSize,
+    setGridSize,
     showSafeArea,
     setShowSafeArea,
     previewScenario,
     setPreviewScenario,
   } = useEditorStore();
+
+  const activeNicheId = document?.nicheId || document?.nicheName;
 
   const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
   const [isQrLibraryOpen, setIsQrLibraryOpen] = useState(false);
@@ -286,6 +290,7 @@ export default function PropertyInspector() {
             
             <FieldPicker
               label="Campo da integração"
+              nicheId={activeNicheId}
               value={(elem as TextElement).field || ''}
               onChange={(val) => updateElement(elem.id, { field: val || undefined })}
             />
@@ -688,6 +693,7 @@ export default function PropertyInspector() {
 
           <FieldPicker
             label="Campo da integração (Opcional)"
+            nicheId={activeNicheId}
             allowStatic={true}
             staticLabel="-- URL / Conteúdo Fixo --"
             value={(elem as QrCodeElement).field || ''}
@@ -998,6 +1004,7 @@ export default function PropertyInspector() {
                 <div style={{ width: '100%', minWidth: 0 }}>
                   <FieldPicker
                     label="Campo"
+                    nicheId={activeNicheId}
                     allowStatic={false}
                     value={rule?.field || 'produto.promocao'}
                     onChange={(val) => updateElement(elem.id, { visibilityRule: { ...rule!, field: val } })}

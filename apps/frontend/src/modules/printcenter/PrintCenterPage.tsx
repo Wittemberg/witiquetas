@@ -276,8 +276,8 @@ export function getRecordsForNiche(nicheId: string): DataRecord[] {
 }
 
 export const PrintCenterPage: React.FC = () => {
-  // Filtro de Nicho (PACOTE 4.5)
-  const [selectedNicheId, setSelectedNicheId] = useState<string>('retail');
+  // Filtro de Nicho (PACOTE 4.5) - Padrão "all" para listar todos os modelos
+  const [selectedNicheId, setSelectedNicheId] = useState<string>('all');
 
   // Modelos e Seleção
   const [templateSummaries, setTemplateSummaries] = useState<TemplateSummaryDTO[]>([]);
@@ -289,10 +289,25 @@ export const PrintCenterPage: React.FC = () => {
   const [selectedPrinterId, setSelectedPrinterId] = useState<string>('');
   const [agentsMap, setAgentsMap] = useState<Map<string, AgentDTO>>(new Map());
 
+  // Nicho Efetivo (Se "all", usa o nicheId do modelo selecionado)
+  const effectiveNicheId = useMemo(() => {
+    if (selectedNicheId && selectedNicheId !== 'all') {
+      return normalizeNicheId(selectedNicheId);
+    }
+    if (selectedTemplate) {
+      return normalizeNicheId(
+        selectedTemplate.nicheId ||
+          selectedTemplate.nicheName ||
+          (selectedTemplate.document && selectedTemplate.document.nicheId)
+      );
+    }
+    return 'retail';
+  }, [selectedNicheId, selectedTemplate]);
+
   // Registros Ativos por Nicho
   const records = useMemo(() => {
-    return getRecordsForNiche(selectedNicheId);
-  }, [selectedNicheId]);
+    return getRecordsForNiche(effectiveNicheId);
+  }, [effectiveNicheId]);
 
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -317,7 +332,7 @@ export const PrintCenterPage: React.FC = () => {
   }, [templateSummaries, selectedNicheId]);
 
   // REGRA DE INVALIDAÇÃO DE NICHO (Adendo 5):
-  // Trocar de nicho deve invalidar qualquer modelo selecionado incompatível!
+  // Trocar de nicho invalida modelo incompatível e reseta dataset/seleções
   useEffect(() => {
     if (selectedNicheId && selectedNicheId !== 'all') {
       const isCurrentValid = filteredTemplateSummaries.some((t) => t.id === selectedTemplateId);
@@ -404,11 +419,12 @@ export const PrintCenterPage: React.FC = () => {
 
   // Extrair campos de integração usados pelo documento
   const requiredFields = useMemo(() => {
-    if (!selectedTemplate || !selectedTemplate.document) {
-      return ['produto.codigo', 'produto.descricao', 'produto.preco', 'produto.ean'];
+    if (selectedTemplate && selectedTemplate.document) {
+      const extracted = getRequiredIntegrationFields(selectedTemplate.document);
+      if (extracted.length > 0) return extracted;
     }
-    return getRequiredIntegrationFields(selectedTemplate.document);
-  }, [selectedTemplate]);
+    return getIntegrationFieldsByNiche(effectiveNicheId).slice(0, 5).map((f) => f.id);
+  }, [selectedTemplate, effectiveNicheId]);
 
   // Impressora Selecionada
   const selectedPrinter = useMemo(() => {
@@ -722,7 +738,7 @@ export const PrintCenterPage: React.FC = () => {
                 Origem de Dados
               </label>
               <select defaultValue="mock-catalog" className="print-center-select">
-                <option value="mock-catalog">Dados de Homologação ({CANONICAL_NICHE_PROFILES.find((p) => p.id === selectedNicheId)?.name || 'Multi-Nicho'})</option>
+                <option value="mock-catalog">Dados de Homologação ({CANONICAL_NICHE_PROFILES.find((p) => p.id === effectiveNicheId)?.name || 'Multi-Nicho'})</option>
               </select>
             </div>
 

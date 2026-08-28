@@ -14,6 +14,7 @@ import {
   getRequiredIntegrationFields,
   normalizeNicheId,
   CANONICAL_NICHE_PROFILES,
+  getIntegrationFieldsByNiche,
 } from '@witiquetas/label-schema';
 import type {
   TemplateSummaryDTO,

@@ -202,15 +202,19 @@ export const CANONICAL_NICHE_PROFILES: NicheProfile[] = [
 
 export function normalizeNicheId(nicheIdOrSlugOrName?: string): CanonicalNicheId {
   if (!nicheIdOrSlugOrName) return 'retail';
-  const lower = nicheIdOrSlugOrName.toLowerCase().trim();
+  const lower = nicheIdOrSlugOrName
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
 
-  if (lower === 'retail' || lower.includes('gondola') || lower.includes('supermercado') || lower.includes('varejo') || lower.includes('produto') || lower.includes('geral')) return 'retail';
-  if (lower === 'hospital' || lower.includes('hospitalar') || lower.includes('paciente') || lower.includes('leito')) return 'hospital';
-  if (lower === 'laboratory' || lower.includes('laboratorio') || lower.includes('specimen') || lower.includes('amostra')) return 'laboratory';
-  if (lower === 'logistics' || lower.includes('logistica') || lower.includes('expedicao') || lower.includes('armazem')) return 'logistics';
-  if (lower === 'industry' || lower.includes('industria') || lower.includes('producao')) return 'industry';
-  if (lower === 'food' || lower.includes('alimento') || lower.includes('perecivel') || lower.includes('restaurante')) return 'food';
-  if (lower === 'pharmacy' || lower.includes('farmacia') || lower.includes('medicamento') || lower.includes('drogaria')) return 'pharmacy';
+  if (lower.includes('hospital') || lower.includes('paciente') || lower.includes('leito') || lower.includes('prontuario')) return 'hospital';
+  if (lower.includes('laborator') || lower.includes('specimen') || lower.includes('amostra') || lower.includes('exame')) return 'laboratory';
+  if (lower.includes('logistic') || lower.includes('expedicao') || lower.includes('armazem') || lower.includes('volume')) return 'logistics';
+  if (lower.includes('industr') || lower.includes('producao') || lower.includes('fabrica')) return 'industry';
+  if (lower.includes('food') || lower.includes('alimento') || lower.includes('perecivel') || lower.includes('restaurante')) return 'food';
+  if (lower.includes('pharmac') || lower.includes('farmacia') || lower.includes('medicamento') || lower.includes('drogaria')) return 'pharmacy';
+  if (lower.startsWith('retail') || lower.includes('gondola') || lower.includes('supermercado') || lower.includes('varejo') || lower.includes('produto') || lower.includes('geral')) return 'retail';
 
   return 'retail';
 }

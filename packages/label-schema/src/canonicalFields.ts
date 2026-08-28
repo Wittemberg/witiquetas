@@ -1,3 +1,5 @@
+import { normalizeNicheId } from './niches.js';
+
 export interface IntegrationFieldDefinition {
   id: string;
   namespace: string;
@@ -115,13 +117,13 @@ export const SYSTEM_FIELDS: SystemFieldDefinition[] = [
 ];
 
 export function getIntegrationFieldsByNiche(nicheId?: string): IntegrationFieldDefinition[] {
-  const norm = (nicheId || '').toLowerCase();
-  if (norm === 'hospital' || norm.includes('hospital')) return DEFAULT_HOSPITAL_CATALOG;
-  if (norm === 'laboratory' || norm.includes('laboratorio')) return DEFAULT_LABORATORY_CATALOG;
-  if (norm === 'logistics' || norm.includes('logistica')) return DEFAULT_LOGISTICS_CATALOG;
-  if (norm === 'industry' || norm.includes('industria')) return DEFAULT_INDUSTRY_CATALOG;
-  if (norm === 'food' || norm.includes('alimento')) return DEFAULT_FOOD_CATALOG;
-  if (norm === 'pharmacy' || norm.includes('farmacia')) return DEFAULT_PHARMACY_CATALOG;
+  const norm = normalizeNicheId(nicheId);
+  if (norm === 'hospital') return DEFAULT_HOSPITAL_CATALOG;
+  if (norm === 'laboratory') return DEFAULT_LABORATORY_CATALOG;
+  if (norm === 'logistics') return DEFAULT_LOGISTICS_CATALOG;
+  if (norm === 'industry') return DEFAULT_INDUSTRY_CATALOG;
+  if (norm === 'food') return DEFAULT_FOOD_CATALOG;
+  if (norm === 'pharmacy') return DEFAULT_PHARMACY_CATALOG;
   return DEFAULT_RETAIL_CATALOG;
 }
 

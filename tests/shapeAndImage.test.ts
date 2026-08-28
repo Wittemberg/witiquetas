@@ -6,7 +6,7 @@ import { LabelDocumentSchema, ImageElementSchema, LineElementSchema, RectangleEl
 import type { LabelDocument, ImageElement, LineElement, RectangleElement } from '@witiquetas/label-schema';
 import { PPLBCompiler } from '../packages/printer-pplb/src/index.ts';
 import { PPLACompiler } from '../packages/printer-ppla/src/index.ts';
-import { ZPLCompiler } from '../packages/printer-core/src/zplCompiler.ts';
+import { ZPLCompiler } from '../packages/printer-core/dist/index.js';
 
 describe('PACOTE 4.3 — SHAPE + IMAGE/LOGO SUITE DE TESTES', () => {
 

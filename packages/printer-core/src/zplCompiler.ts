@@ -1,6 +1,6 @@
 import type { LabelDocument, LabelElement } from '@witiquetas/label-schema';
-import type { PrinterCompiler, PrinterLanguage, CompiledLabel, ValidationResult } from './types.ts';
-import { compilerRegistry } from './registry.ts';
+import type { PrinterCompiler, PrinterLanguage, CompiledLabel, ValidationResult } from './types.js';
+import { compilerRegistry } from './registry.js';
 
 export class ZPLCompiler implements PrinterCompiler {
   language: PrinterLanguage = 'ZPL';

@@ -1,6 +1,19 @@
 {
   "checkpoints": [
     {
+      "sha": "d3827d86f7842c55fa8bc009363bc15eb27ad9a4",
+      "shortSha": "d3827d8",
+      "date": "2026-08-28T13:00:00Z",
+      "phase": "4",
+      "patch": "4.4.0",
+      "title": "feat(editor): implementar multiseleção via lista de camadas com Ctrl/Cmd + clique (PACOTE 4.4)",
+      "type": "FEATURE",
+      "capabilities": ["cap-layers-multiselect"],
+      "testsPassed": true,
+      "deployed": true,
+      "manualValidation": false
+    },
+    {
       "sha": "6db5817382264a0d8bc45d2eab9f31f53a0190ad",
       "shortSha": "6db5817",
       "date": "2026-08-28T09:35:00Z",

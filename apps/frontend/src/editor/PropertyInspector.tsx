@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useEditorStore, formatDimensionBR } from './useEditorStore';
 import FieldPicker from './FieldPicker';
-import { CANONICAL_FIELDS, TextElement, PriceElement, BarcodeElement, QrCodeElement, RectangleElement, LineElement } from '@witiquetas/label-schema';
+import { CANONICAL_FIELDS, TextElement, PriceElement, BarcodeElement, QrCodeElement, RectangleElement, LineElement, ImageElement } from '@witiquetas/label-schema';
 import { CURATED_FONTS, getFontCompatibility } from './fontsCatalog';
 import { QRCodeLibraryItemDTO } from '@witiquetas/contracts';
 import { validateCheckDigit, BarcodeFormat } from './barcodeEngine';
@@ -36,7 +36,9 @@ import {
   Sliders,
   RotateCw,
   Eye,
-  EyeOff
+  EyeOff,
+  Upload,
+  Image as ImageIcon
 } from 'lucide-react';
 
 export default function PropertyInspector() {
@@ -871,6 +873,89 @@ export default function PropertyInspector() {
           </div>
         </div>
       )}
+
+      {/* =====================================================================
+         TIPO: IMAGEM / LOGO
+         ===================================================================== */}
+      {elem.type === 'image' && (() => {
+        const imgElem = elem as ImageElement;
+
+        const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+          const file = e.target.files?.[0];
+          if (!file) return;
+
+          const reader = new FileReader();
+          reader.onload = (evt) => {
+            const dataUrl = evt.target?.result as string;
+            if (!dataUrl) return;
+
+            const tempImg = new Image();
+            tempImg.onload = () => {
+              updateElement(elem.id, {
+                src: dataUrl,
+                source: file.name,
+                mimeType: file.type,
+                originalWidth: tempImg.naturalWidth,
+                originalHeight: tempImg.naturalHeight,
+              });
+            };
+            tempImg.src = dataUrl;
+          };
+          reader.readAsDataURL(file);
+        };
+
+        return (
+          <div className="inspector-section">
+            <div className="inspector-section-title">PROPRIEDADES DA IMAGEM</div>
+
+            <div>
+              <label className="metric-label">Arquivo de Imagem (PNG, JPG, SVG)</label>
+              <label
+                className="btn btn-primary"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.4rem',
+                  padding: '0.45rem',
+                  fontSize: '0.78rem',
+                  cursor: 'pointer',
+                  marginTop: '0.2rem',
+                }}
+              >
+                <Upload size={14} />
+                <span>Carregar Imagem Local</span>
+                <input
+                  type="file"
+                  accept="image/png, image/jpeg, image/jpg, image/svg+xml"
+                  onChange={handleFileChange}
+                  style={{ display: 'none' }}
+                />
+              </label>
+            </div>
+
+            {imgElem.source && (
+              <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', wordBreak: 'break-all', marginTop: '0.3rem' }}>
+                Arquivo: <strong>{imgElem.source}</strong>
+                {imgElem.originalWidth && imgElem.originalHeight && (
+                  <div>Resolução: {imgElem.originalWidth} × {imgElem.originalHeight} px</div>
+                )}
+              </div>
+            )}
+
+            <div style={{ marginTop: '0.4rem' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.75rem', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={imgElem.preserveAspectRatio !== false}
+                  onChange={(e) => updateElement(elem.id, { preserveAspectRatio: e.target.checked })}
+                />
+                <span>Preservar proporção</span>
+              </label>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* =====================================================================
          REGRAS DE EXIBIÇÃO CONDICIONAL (Texto, Preço e metadados legados - Itens 7 e 8)

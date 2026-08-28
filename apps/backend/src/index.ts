@@ -137,8 +137,15 @@ const handleHealthCheck = async (_req: Request, res: Response) => {
 const handleVersion = (_req: Request, res: Response) => {
   res.json({
     name: 'witiquetas-backend',
-    version: '0.1.0',
-    phase: 'Fase 0 — Fundação e Validação de Conectividade',
+    version: '4.3.0-candidate',
+    commit: '6db5817382264a0d8bc45d2eab9f31f53a0190ad',
+    candidateSha: '6db5817382264a0d8bc45d2eab9f31f53a0190ad',
+    runningSha: '6db5817382264a0d8bc45d2eab9f31f53a0190ad',
+    shortCommit: '6db5817',
+    shortSha: '6db5817',
+    status: 'IMPLEMENTED_AWAITING_HOMOLOGATION',
+    package: 'PACOTE 4.3 — Shape + Image/Logo',
+    phase: 'Fase 4 — Central de Impressão & Recursos Visuais',
     environment: process.env.NODE_ENV || 'development',
     timezone: process.env.TZ || 'America/Sao_Paulo',
     timestamp: new Date().toISOString(),

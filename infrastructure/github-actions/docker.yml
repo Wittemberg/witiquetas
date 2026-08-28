@@ -30,7 +30,12 @@ jobs:
           context: .
           file: apps/frontend/Dockerfile
           push: true
-          tags: ghcr.io/wittemberg/witiquetas-frontend:latest
+          build-args: |
+            GITHUB_SHA=${{ github.sha }}
+            SHORT_SHA=${{ github.sha }}
+          tags: |
+            ghcr.io/wittemberg/witiquetas-frontend:latest
+            ghcr.io/wittemberg/witiquetas-frontend:stable
 
       - name: Build e push backend
         uses: docker/build-push-action@v6
@@ -38,7 +43,12 @@ jobs:
           context: .
           file: apps/backend/Dockerfile
           push: true
-          tags: ghcr.io/wittemberg/witiquetas-backend:latest
+          build-args: |
+            GITHUB_SHA=${{ github.sha }}
+            SHORT_SHA=${{ github.sha }}
+          tags: |
+            ghcr.io/wittemberg/witiquetas-backend:latest
+            ghcr.io/wittemberg/witiquetas-backend:stable
 
       - name: Forçar redeploy no Portainer
         run: |

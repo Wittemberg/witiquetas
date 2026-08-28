@@ -127,6 +127,11 @@ export interface RectangleElement extends BaseElement {
 export interface ImageElement extends BaseElement {
   type: 'image';
   src: string;
+  source?: string;
+  mimeType?: string;
+  originalWidth?: number;
+  originalHeight?: number;
+  preserveAspectRatio?: boolean;
   fit?: 'contain' | 'cover' | 'fill';
 }
 

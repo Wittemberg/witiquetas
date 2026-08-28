@@ -10,6 +10,7 @@ import type {
   QrCodeElement,
   LineElement,
   RectangleElement,
+  ImageElement,
 } from '@witiquetas/label-schema';
 import { resolveFieldValue, evaluateVisibilityRule } from '@witiquetas/label-schema';
 import { mmToPx } from '../../editor/useEditorStore.js';
@@ -62,6 +63,34 @@ function KonvaQRCodePreview({
         <KonvaImage image={image} width={wPx} height={hPx} />
       ) : (
         <Rect width={wPx} height={hPx} fill="#f1f5f9" stroke="#000000" strokeWidth={1} />
+      )}
+    </Group>
+  );
+}
+
+// Subcomponente Imagem Read-Only para Prévia
+function KonvaImagePreview({
+  elem,
+  xPx,
+  yPx,
+  wPx,
+  hPx,
+}: {
+  elem: ImageElement;
+  xPx: number;
+  yPx: number;
+  wPx: number;
+  hPx: number;
+}) {
+  const imgSrc = elem.src || elem.source || '';
+  const [image] = useImage(imgSrc);
+
+  return (
+    <Group x={xPx} y={yPx} width={wPx} height={hPx} rotation={normalizeRotation(elem.rotation)}>
+      {image ? (
+        <KonvaImage image={image} width={wPx} height={hPx} />
+      ) : (
+        <Rect width={wPx} height={hPx} fill="#f1f5f9" stroke="#cbd5e1" strokeWidth={1} />
       )}
     </Group>
   );
@@ -349,6 +378,19 @@ function SingleElementPreview({
           strokeWidth={mmToPx(rectElem.strokeWidthMm || rectElem.strokeWidth || 0.5, dpi)}
           cornerRadius={mmToPx(rectElem.cornerRadiusMm || 0, dpi)}
           rotation={rectElem.rotation || 0}
+        />
+      );
+    }
+
+    case 'image': {
+      return (
+        <KonvaImagePreview
+          key={elem.id}
+          elem={elem as ImageElement}
+          xPx={xPx}
+          yPx={yPx}
+          wPx={wPx}
+          hPx={hPx}
         />
       );
     }

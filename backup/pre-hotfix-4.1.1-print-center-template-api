@@ -1,0 +1,6 @@
+CHECKPOINT: pre-hotfix-4.1.1-print-center-template-api
+TIMESTAMP: 2026-08-27
+HEAD: 6723b230da7ad8974ee193e938ff06684b9c7f48
+ORIGIN/MAIN: 6723b230da7ad8974ee193e938ff06684b9c7f48
+BRANCH: main
+STATUS: Aplicando Hotfix 4.1.1 — Substituição da chamada inválida templatesApi.getTemplate por templatesApi.getTemplateById

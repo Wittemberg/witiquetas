@@ -506,16 +506,25 @@
           "module": "elements",
           "weight": 8,
           "mvp": false,
-          "status": "PLANNED",
+          "status": "IMPLEMENTED",
           "manualValidation": false,
           "physicalValidation": false,
           "frozen": false,
-          "evidence": [],
+          "evidence": [
+            "packages/label-schema/src/types.ts",
+            "packages/printer-pplb/src/index.ts",
+            "packages/printer-ppla/src/index.ts",
+            "packages/printer-core/src/zplCompiler.ts",
+            "apps/frontend/src/editor/CanvasArea.tsx",
+            "apps/frontend/src/editor/PropertyInspector.tsx",
+            "apps/frontend/src/modules/printcenter/PrintPreview.tsx",
+            "tests/shapeAndImage.test.ts"
+          ],
           "dependencies": [
             "cap-canvas-core"
           ],
           "notes": [
-            "Elemento multinicho para logomarcas institucionais, selos e símbolos gráficos com conversão monocromática e dither térmico."
+            "Pacote 4.3 (Ajuste P0): Implementação do ImageElement com upload local (PNG/JPG/JPEG/SVG), drag, resize com proporção preservada, rotações 0/90/180/270°, undo/redo e preview. Mapeamento de capability dos compiladores: PPLB, PPLA e ZPL possuem validação e compile() que falham explicitamente interrompendo a geração de código quando há ImageElement visível, sem ignorar silenciosamente nem gerar comandos parciais. Imagens ocultas (visible=false) não bloqueiam compilação."
           ]
         },
         {
@@ -544,16 +553,21 @@
           "module": "elements",
           "weight": 6,
           "mvp": false,
-          "status": "PLANNED",
+          "status": "IMPLEMENTED",
           "manualValidation": false,
           "physicalValidation": false,
           "frozen": false,
-          "evidence": [],
+          "evidence": [
+            "apps/frontend/src/editor/EditorLayout.tsx",
+            "apps/frontend/src/editor/PropertyInspector.tsx",
+            "apps/frontend/src/editor/CanvasArea.tsx",
+            "tests/shapeAndImage.test.ts"
+          ],
           "dependencies": [
             "cap-visual-elements"
           ],
           "notes": [
-            "Abstração unificada Shape preservando LineElement e RectangleElement no schema sem quebrar retrocompatibilidade."
+            "Pacote 4.3: Abstração de UI Forma na toolbar unificando Linha e Retângulo em popover compacto. Preserva 100% da retrocompatibilidade com modelos legados e schemas sem migração destrutiva."
           ]
         },
         {

@@ -1,6 +1,19 @@
 {
   "checkpoints": [
     {
+      "sha": "6db5817382264a0d8bc45d2eab9f31f53a0190ad",
+      "shortSha": "6db5817",
+      "date": "2026-08-28T09:35:00Z",
+      "phase": "4",
+      "patch": "4.3.0",
+      "title": "feat(editor): publicar candidato de homologação para PACOTE 4.3 — Shape + Imagem/Logo",
+      "type": "FEATURE",
+      "capabilities": ["cap-shape-element", "cap-logo-element"],
+      "testsPassed": true,
+      "deployed": true,
+      "manualValidation": false
+    },
+    {
       "sha": "703364c33ec3f3d328f2ba7f73108ab1e1edd990",
       "shortSha": "703364c",
       "date": "2026-08-27T12:30:00Z",

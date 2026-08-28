@@ -112,6 +112,7 @@ export default function EditorLayout({
   const [isDeletedModalOpen, setIsDeletedModalOpen] = useState(false);
   const [isReloadConfirmOpen, setIsReloadConfirmOpen] = useState(false);
   const [isSavingCopy, setIsSavingCopy] = useState(false);
+  const [isShapePopoverOpen, setIsShapePopoverOpen] = useState(false);
 
   const openConflictModal = () => {
     setIsConflictModalOpen(true);
@@ -312,6 +313,8 @@ export default function EditorLayout({
         return <Square size={13} color="var(--status-warning)" />;
       case 'line':
         return <Minus size={13} color="var(--accent-purple)" />;
+      case 'image':
+        return <ImageIcon size={13} color="var(--accent-blue)" />;
       default:
         return <Layers size={13} />;
     }
@@ -694,13 +697,64 @@ export default function EditorLayout({
                   <QrCode size={16} color="var(--status-success)" />
                   <span>QR Code</span>
                 </button>
-                <button className="creation-tool-btn" onClick={() => addElement('rectangle')}>
-                  <Square size={16} color="var(--status-warning)" />
-                  <span>Moldura</span>
-                </button>
-                <button className="creation-tool-btn" onClick={() => addElement('line')}>
-                  <Minus size={16} color="var(--accent-purple)" />
-                  <span>Linha</span>
+                <div style={{ position: 'relative' }}>
+                  <button
+                    className={`creation-tool-btn ${isShapePopoverOpen ? 'active' : ''}`}
+                    onClick={() => setIsShapePopoverOpen(!isShapePopoverOpen)}
+                    style={{ width: '100%' }}
+                    title="Adicionar Linha ou Retângulo"
+                  >
+                    <Square size={16} color="var(--status-warning)" />
+                    <span>Forma</span>
+                  </button>
+
+                  {isShapePopoverOpen && (
+                    <div
+                      style={{
+                        position: 'absolute',
+                        top: '100%',
+                        left: 0,
+                        marginTop: '4px',
+                        background: 'var(--bg-card)',
+                        border: '1px solid var(--border-color)',
+                        borderRadius: '6px',
+                        padding: '0.4rem',
+                        boxShadow: 'var(--shadow-elevated)',
+                        zIndex: 60,
+                        display: 'flex',
+                        gap: '0.4rem',
+                        minWidth: '160px',
+                      }}
+                    >
+                      <button
+                        className="btn"
+                        style={{ flex: 1, justifyContent: 'center', fontSize: '0.75rem', padding: '0.35rem 0.5rem' }}
+                        onClick={() => {
+                          addElement('line');
+                          setIsShapePopoverOpen(false);
+                        }}
+                      >
+                        <Minus size={14} color="var(--accent-purple)" />
+                        <span>Linha</span>
+                      </button>
+                      <button
+                        className="btn"
+                        style={{ flex: 1, justifyContent: 'center', fontSize: '0.75rem', padding: '0.35rem 0.5rem' }}
+                        onClick={() => {
+                          addElement('rectangle');
+                          setIsShapePopoverOpen(false);
+                        }}
+                      >
+                        <Square size={14} color="var(--status-warning)" />
+                        <span>Retângulo</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                <button className="creation-tool-btn" onClick={() => addElement('image')}>
+                  <ImageIcon size={16} color="var(--accent-blue)" />
+                  <span>Imagem</span>
                 </button>
               </div>
             </div>

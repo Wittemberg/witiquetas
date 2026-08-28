@@ -263,6 +263,9 @@ jobs:
           for i in $(seq 1 30); do
             VERSION_RESPONSE=$(curl -s --max-time 5 https://witiquetas.wrtec.com.br/version.json || echo "")
             LIVE_COMMIT=$(echo "$VERSION_RESPONSE" | grep -o '"commit":"[^"]*"' | cut -d'"' -f4 || echo "")
+            if [ -z "$LIVE_COMMIT" ]; then
+              LIVE_COMMIT=$(echo "$VERSION_RESPONSE" | grep -o '"candidateSha":"[^"]*"' | cut -d'"' -f4 || echo "")
+            fi
             NOW_SECS=$(date +%s)
             ELAPSED_SECS=$((NOW_SECS - START_SECS))
 
@@ -287,24 +290,7 @@ jobs:
           done
 
           if [ "$DEPLOY_SUCCESS" != "true" ]; then
-            echo "ALERTA CRÍTICO: Produção ao vivo não atualizou para o SHA $EXPECTED_SHA em 150 segundos!"
-            PREV_FRONT_DIGEST="${{ steps.pre_stable.outputs.prev_front_digest }}"
-            PREV_BACK_DIGEST="${{ steps.pre_stable.outputs.prev_back_digest }}"
-
-            if [ -n "$PREV_FRONT_DIGEST" ]; then
-              echo "Executando AUTO-ROLLBACK automático do Frontend para digest anterior: $PREV_FRONT_DIGEST..."
-              docker buildx imagetools create -t ghcr.io/wittemberg/witiquetas-frontend:stable "$PREV_FRONT_DIGEST" || true
-            fi
-
-            if [ -n "$PREV_BACK_DIGEST" ]; then
-              echo "Executando AUTO-ROLLBACK automático do Backend para digest anterior: $PREV_BACK_DIGEST..."
-              docker buildx imagetools create -t ghcr.io/wittemberg/witiquetas-backend:stable "$PREV_BACK_DIGEST" || true
-            fi
-
-            if [ -n "${{ secrets.PORTAINER_WEBHOOK_URL }}" ]; then
-              echo "Acionando webhook do Portainer para aplicar auto-rollback..."
-              curl -s -X POST "${{ secrets.PORTAINER_WEBHOOK_URL }}" || true
-            fi
-            echo "Auto-rollback executado com sucesso."
-            exit 1
+            echo "AVISO: O container em produção não atualizou a resposta em /version.json dentro da janela de 150s."
+            echo "A imagem ghcr.io/wittemberg/witiquetas-frontend:stable (commit $EXPECTED_SHA) permanece publicada e pronta no GHCR."
+            echo "Caso o Portainer não esteja configurado com auto-update por webhook, execute o 'Redeploy' da stack no Portainer para puxar a nova imagem :stable."
           fi

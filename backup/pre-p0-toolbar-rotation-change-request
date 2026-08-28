@@ -1,0 +1,19 @@
+CHECKPOINT: pre-p0-toolbar-rotation-change-request
+CHANGE REQUEST ID: CR-P0-EDITOR-TOOLBAR-ROTATION
+TIMESTAMP: 2026-08-27
+HEAD: 568d82065c4f08c6a2e3c3f6ddb3c1f8206200c1
+ORIGIN/MAIN: 568d82065c4f08c6a2e3c3f6ddb3c1f8206200c1
+CAPABILITIES AETAS:
+- cap-editor-toolbar-compactness (IN_PROGRESS)
+- cap-element-transformations (IN_PROGRESS)
+COMPONENTES FROZEN AFETADOS EM MODO CHANGE REQUEST TEMPORÁRIO:
+- editor-toolbar
+- canvas-area
+- price-element
+- line-element
+- multiselect-tool
+- barcode-element
+- qrcode-element
+- rectangle-element
+- text-element
+OBJETIVO: Estabilização geométrica da Toolbar do Editor (compactness 2) e implementação da Rotação Canônica (0°, 90°, 180°, 270°) em todos os elementos.

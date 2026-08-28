@@ -381,6 +381,10 @@ export class LegacyCompiler {
         return `X${xDots},${yDots},${thick},${endX},${endY}`;
       }
 
+      case 'image': {
+        return `// ERRO: Este modelo contém uma imagem, mas a linguagem PPLB selecionada ainda não possui suporte a bitmap.`;
+      }
+
       default:
         return `// Elemento não suportado nativamente em PPLB: ${elem.type}`;
     }
@@ -425,6 +429,10 @@ export class LegacyCompiler {
         const lenDots = String(mmToDots(l.width, dpi)).padStart(4, '0');
         const thickDots = String(l.strokeWidth || 1).padStart(4, '0');
         return `${orientation}X11000${yStr}${xStr}L${lenDots}${thickDots}`;
+      }
+
+      case 'image': {
+        return `// ERRO: Este modelo contém uma imagem, mas a linguagem PPLA selecionada ainda não possui suporte a bitmap.`;
       }
 
       case 'text':

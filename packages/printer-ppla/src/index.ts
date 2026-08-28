@@ -16,6 +16,10 @@ export class PPLACompiler implements PrinterCompiler {
       warnings.push('A etiqueta não contém nenhum elemento visual.');
     }
 
+    if (document.elements && document.elements.some((elem) => elem.type === 'image' && elem.visible !== false)) {
+      errors.push('Este modelo contém uma imagem, mas a linguagem PPLA selecionada ainda não possui suporte a bitmap.');
+    }
+
     return {
       valid: errors.length === 0,
       errors,
@@ -24,6 +28,11 @@ export class PPLACompiler implements PrinterCompiler {
   }
 
   compile(document: LabelDocument, data: Record<string, string> = {}): CompiledLabel {
+    const validation = this.validate(document);
+    if (!validation.valid) {
+      throw new Error(validation.errors.join(' '));
+    }
+
     const warnings: string[] = [];
     const dpi = document.dimensions.dpi || 203;
     const dotsPerMm = dpi / 25.4; // ~8 dots/mm em 203 DPI
@@ -36,6 +45,8 @@ export class PPLACompiler implements PrinterCompiler {
     lines.push('H10'); // Temperatura da cabeça de impressão
 
     document.elements.forEach((elem: LabelElement) => {
+      if (elem.visible === false) return;
+
       const xDots = Math.round(elem.x * dotsPerMm);
       const yDots = Math.round(elem.y * dotsPerMm);
       const wDots = Math.round(elem.width * dotsPerMm);
@@ -76,6 +87,10 @@ export class PPLACompiler implements PrinterCompiler {
         case 'line': {
           lines.push(`X110000${yStr}${xStr}0002${wDots.toString().padStart(4, '0')}`);
           break;
+        }
+
+        case 'image': {
+          throw new Error('Este modelo contém uma imagem, mas a linguagem PPLA selecionada ainda não possui suporte a bitmap.');
         }
 
         default:

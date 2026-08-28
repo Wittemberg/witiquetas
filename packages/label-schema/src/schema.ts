@@ -133,6 +133,11 @@ export const RectangleElementSchema = BaseElementSchema.extend({
 export const ImageElementSchema = BaseElementSchema.extend({
   type: z.literal('image'),
   src: z.string(),
+  source: z.string().optional(),
+  mimeType: z.string().optional(),
+  originalWidth: z.number().positive().optional(),
+  originalHeight: z.number().positive().optional(),
+  preserveAspectRatio: z.boolean().optional(),
   fit: z.enum(['contain', 'cover', 'fill']).optional(),
 });
 

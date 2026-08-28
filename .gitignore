@@ -12,6 +12,8 @@ dist/
 build/
 **/build/
 .cache/
+*.tsbuildinfo
+**/*.tsbuildinfo
 
 # Variáveis de ambiente e segredos
 .env

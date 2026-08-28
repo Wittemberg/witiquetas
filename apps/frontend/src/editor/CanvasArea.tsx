@@ -9,7 +9,7 @@ import {
   evaluateVisibilityRule,
   resolveFieldValue,
 } from './useEditorStore';
-import { LabelElement, QrCodeElement, TextElement, BarcodeElement, PriceElement } from '@witiquetas/label-schema';
+import { LabelElement, QrCodeElement, TextElement, BarcodeElement, PriceElement, ImageElement } from '@witiquetas/label-schema';
 import { generateQRCodeDataUrl } from './qrCodeGenerator';
 import { generateBarcodeModules } from './barcodeEngine';
 import { getElementBoundingBox, getPriceRenderMetrics, constrainGroupMovement, applyMagneticRotationSnap, normalizeElementGeometry, normalizeRotation, SAFE_AREA_MARGIN_MM, computeTextLines } from './bounds';
@@ -309,6 +309,59 @@ function KonvaQRCode({
           stroke="#000000"
           strokeWidth={1}
         />
+      )}
+    </Group>
+  );
+}
+
+// Subcomponente de Imagem / Logomarca Local
+function KonvaImageElement({
+  elem,
+  xPx,
+  yPx,
+  wPx,
+  hPx,
+  onDragEnd,
+  onTransformEnd,
+  onClick,
+  onDblClick,
+  onContextMenu,
+}: {
+  elem: ImageElement;
+  xPx: number;
+  yPx: number;
+  wPx: number;
+  hPx: number;
+  onDragEnd: (e: any) => void;
+  onTransformEnd: (e: any) => void;
+  onClick: (e: any) => void;
+  onDblClick: (e: any) => void;
+  onContextMenu: (e: any) => void;
+}) {
+  const imgSrc = elem.src || elem.source || '';
+  const [image] = useImage(imgSrc);
+
+  return (
+    <Group
+      key={elem.id}
+      id={elem.id}
+      x={xPx}
+      y={yPx}
+      width={wPx}
+      height={hPx}
+      rotation={normalizeRotation(elem.rotation || 0)}
+      draggable={!elem.locked}
+      onClick={onClick}
+      onTap={onClick}
+      onDblClick={onDblClick}
+      onContextMenu={onContextMenu}
+      onDragEnd={onDragEnd}
+      onTransformEnd={onTransformEnd}
+    >
+      {image ? (
+        <KonvaImage image={image} width={wPx} height={hPx} />
+      ) : (
+        <Rect width={wPx} height={hPx} fill="#f1f5f9" stroke="#94a3b8" strokeWidth={1} dash={[4, 4]} />
       )}
     </Group>
   );
@@ -977,6 +1030,24 @@ export default function CanvasArea() {
               strokeWidth={lineElem.strokeWidth || 1}
             />
           </Group>
+        );
+      }
+
+      case 'image': {
+        return (
+          <KonvaImageElement
+            key={elem.id}
+            elem={elem as ImageElement}
+            xPx={xPx}
+            yPx={yPx}
+            wPx={wPx}
+            hPx={hPx}
+            onClick={handleClick}
+            onDblClick={() => setSelectedElementId(elem.id)}
+            onContextMenu={handleContextMenu}
+            onDragEnd={handleDragEnd}
+            onTransformEnd={handleTransformEnd}
+          />
         );
       }
 

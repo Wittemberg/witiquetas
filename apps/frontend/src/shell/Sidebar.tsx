@@ -17,7 +17,7 @@ import { isDevControlCenterEnabled } from '../services/devControlApi.js';
 export interface NavItem {
   id: string;
   label: string;
-  icon: React.ComponentType<{ className?: string; size?: number }>;
+  icon: React.ComponentType<any>;
   description: string;
   path: string;
 }

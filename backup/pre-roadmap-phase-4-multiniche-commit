@@ -1,0 +1,13 @@
+CHECKPOINT: pre-roadmap-phase-4-multiniche-commit
+TIMESTAMP: 2026-08-27
+HEAD: 4514e8ca09ee0082cee312d61336bc92f5a0afd1
+ORIGIN/MAIN: 4514e8ca09ee0082cee312d61336bc92f5a0afd1
+BRANCH: main
+GIT STATUS: Changes staged/unstaged for authorized files
+FILES TO COMMIT:
+- docs/development-control/project.json
+- docs/development-control/roadmap.json
+- apps/backend/src/services/developmentControlService.ts
+- apps/frontend/src/modules/devcontrol/DevControlPage.tsx
+- tests/devControlInvariants.test.ts
+OBJETIVO: Publicação controlada do escopo multinicho e governança do Development Control Center.

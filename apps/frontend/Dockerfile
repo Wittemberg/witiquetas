@@ -41,7 +41,7 @@ WORKDIR /app/apps/frontend
 RUN npm run build
 
 # Gerar version.json imutável durante o build
-RUN echo "{\"commit\":\"${GITHUB_SHA}\",\"shortCommit\":\"${SHORT_SHA}\",\"builtAt\":\"${BUILT_AT}\",\"imageTag\":\"production-${GITHUB_SHA}\"}" > /app/apps/frontend/dist/version.json
+RUN echo "{\"name\":\"witiquetas-frontend\",\"version\":\"4.3.0-candidate\",\"commit\":\"${GITHUB_SHA}\",\"candidateSha\":\"${GITHUB_SHA}\",\"runningSha\":\"${GITHUB_SHA}\",\"shortCommit\":\"${SHORT_SHA}\",\"shortSha\":\"${SHORT_SHA}\",\"builtAt\":\"${BUILT_AT}\",\"status\":\"IMPLEMENTED_AWAITING_HOMOLOGATION\",\"package\":\"PACOTE 4.3 — Shape + Image/Logo\"}" > /app/apps/frontend/dist/version.json
 
 # Estágio 2: Nginx para servir arquivos estáticos
 FROM nginx:alpine AS runner

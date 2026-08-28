@@ -1,6 +1,19 @@
 {
   "checkpoints": [
     {
+      "sha": "e16f369f688029fa2bb97fcdb6db763ee3ceebc7",
+      "shortSha": "e16f369",
+      "date": "2026-08-28T18:49:00Z",
+      "phase": "4",
+      "patch": "4.5.2",
+      "title": "fix(frontend): HOTFIX 4.5.2 — frontend runtime crash getIntegrationFieldsByNiche import",
+      "type": "HOTFIX",
+      "capabilities": ["cap-multiniche-profiles"],
+      "testsPassed": true,
+      "deployed": true,
+      "manualValidation": false
+    },
+    {
       "sha": "3aff9e78087693ccb70171ef4f522118d7c2ecb6",
       "shortSha": "3aff9e7",
       "date": "2026-08-28T17:58:00Z",

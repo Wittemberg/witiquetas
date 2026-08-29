@@ -233,6 +233,19 @@
       "testsPassed": true,
       "deployed": true,
       "manualValidation": true
+    },
+    {
+      "sha": "99d0d0322df149b56f8f5eaedaeed8d28e75db74",
+      "shortSha": "99d0d03",
+      "date": "2026-08-29T18:41:00Z",
+      "phase": "4.5",
+      "patch": "4.5.3",
+      "title": "fix(multiniche): HOTFIX 4.5.3 - restauração integral do catálogo de 11 nichos, 66 tamanhos e toolbox especializada",
+      "type": "HOTFIX",
+      "capabilities": ["cap-multiniche-profiles"],
+      "testsPassed": true,
+      "deployed": true,
+      "manualValidation": false
     }
   ]
 }

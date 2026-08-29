@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import {
   getRequiredIntegrationFields,
+  normalizeOperationalProfileId,
   normalizeNicheId,
   CANONICAL_NICHE_PROFILES,
   getIntegrationFieldsByNiche,

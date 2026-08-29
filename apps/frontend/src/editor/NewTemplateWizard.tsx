@@ -29,7 +29,13 @@ import {
   Wine,
   Leaf,
   FileCheck,
-  Maximize2
+  Maximize2,
+  ShoppingCart,
+  Barcode,
+  Activity,
+  FlaskConical,
+  Droplet,
+  Archive
 } from 'lucide-react';
 
 interface WizardProps {
@@ -61,28 +67,32 @@ export default function NewTemplateWizard({ isOpen, onClose, onSuccess }: Wizard
   // Ícones por nicho
   const getNicheIcon = (iconName: string) => {
     switch (iconName) {
+      case 'ShoppingCart':
       case 'Store':
-        return <Store size={18} />;
-      case 'Pill':
-        return <Pill size={18} />;
-      case 'ShoppingBag':
-        return <ShoppingBag size={18} />;
+        return <ShoppingCart size={18} />;
+      case 'Barcode':
+        return <Barcode size={18} />;
       case 'Truck':
         return <Truck size={18} />;
-      case 'Shirt':
-        return <Shirt size={18} />;
+      case 'Pill':
+        return <Pill size={18} />;
+      case 'Activity':
+        return <Activity size={18} />;
+      case 'FlaskConical':
+        return <FlaskConical size={18} />;
+      case 'Droplet':
+        return <Droplet size={18} />;
+      case 'Sparkles':
       case 'Gem':
-        return <Gem size={18} />;
+        return <Sparkles size={18} />;
+      case 'Tag':
+      case 'Shirt':
+        return <Tag size={18} />;
+      case 'Archive':
       case 'Package':
-        return <Package size={18} />;
-      case 'Wrench':
-        return <Wrench size={18} />;
-      case 'Wine':
-        return <Wine size={18} />;
-      case 'Leaf':
-        return <Leaf size={18} />;
-      case 'FileCheck':
-        return <FileCheck size={18} />;
+        return <Archive size={18} />;
+      case 'Layers':
+        return <Layers size={18} />;
       default:
         return <Tag size={18} />;
     }

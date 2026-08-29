@@ -1,4 +1,4 @@
-import { normalizeNicheId } from './niches.js';
+import { normalizeOperationalProfileId, normalizeNicheId } from './niches.js';
 
 export interface IntegrationFieldDefinition {
   id: string;
@@ -117,7 +117,7 @@ export const SYSTEM_FIELDS: SystemFieldDefinition[] = [
 ];
 
 export function getIntegrationFieldsByNiche(nicheId?: string): IntegrationFieldDefinition[] {
-  const norm = normalizeNicheId(nicheId);
+  const norm = normalizeOperationalProfileId(nicheId);
   if (norm === 'hospital') return DEFAULT_HOSPITAL_CATALOG;
   if (norm === 'laboratory') return DEFAULT_LABORATORY_CATALOG;
   if (norm === 'logistics') return DEFAULT_LOGISTICS_CATALOG;

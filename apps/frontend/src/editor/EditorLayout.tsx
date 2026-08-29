@@ -5,6 +5,7 @@ import PropertyInspector from './PropertyInspector';
 import NewTemplateWizard from './NewTemplateWizard';
 import CompileModal from './CompileModal';
 import ImportModal from './ImportModal';
+import { getNicheToolboxConfig, NicheToolItem } from '@witiquetas/label-schema';
 import {
   Sparkles,
   Printer,
@@ -40,7 +41,32 @@ import {
   Save,
   AlertCircle,
   AlertTriangle,
-  Loader2
+  Loader2,
+  User,
+  Bed,
+  Droplet,
+  Pill,
+  TestTube,
+  Package,
+  Truck,
+  Archive,
+  Hash,
+  Calendar,
+  FileText,
+  MapPin,
+  Award,
+  Box,
+  Clock,
+  UserCheck,
+  Building,
+  FileCode,
+  Heart,
+  ShieldCheck,
+  Bookmark,
+  Palette,
+  Scale,
+  ChevronDown,
+  Tag
 } from 'lucide-react';
 
 import { getTabSessionIdSync, resolveTabSessionId } from './sessionUtils.js';
@@ -114,6 +140,88 @@ export default function EditorLayout({
   const [isReloadConfirmOpen, setIsReloadConfirmOpen] = useState(false);
   const [isSavingCopy, setIsSavingCopy] = useState(false);
   const [isShapePopoverOpen, setIsShapePopoverOpen] = useState(false);
+  const [isMoreToolsOpen, setIsMoreToolsOpen] = useState(false);
+
+  const activeNicheId = document?.nicheId || document?.nicheName || 'gondola-supermercado';
+  const toolboxConfig = React.useMemo(() => {
+    return getNicheToolboxConfig(activeNicheId);
+  }, [activeNicheId]);
+
+  const getToolIcon = (iconName: string) => {
+    switch (iconName) {
+      case 'Type': case 'Text': return <Type size={16} color="var(--accent-blue)" />;
+      case 'DollarSign': return <DollarSign size={16} color="#dc2626" />;
+      case 'Tag': return <Tag size={16} color="#e11d48" />;
+      case 'Barcode': return <Barcode size={16} color="var(--accent-cyan)" />;
+      case 'QrCode': return <QrCode size={16} color="var(--status-success)" />;
+      case 'Square': return <Square size={16} color="var(--status-warning)" />;
+      case 'Image': return <ImageIcon size={16} color="var(--accent-blue)" />;
+      case 'User': return <User size={16} color="var(--accent-purple)" />;
+      case 'Bed': return <Bed size={16} color="var(--accent-cyan)" />;
+      case 'Droplet': return <Droplet size={16} color="#dc2626" />;
+      case 'Pill': return <Pill size={16} color="var(--status-warning)" />;
+      case 'TestTube': return <TestTube size={16} color="var(--accent-purple)" />;
+      case 'Package': return <Package size={16} color="var(--accent-blue)" />;
+      case 'Truck': return <Truck size={16} color="var(--accent-cyan)" />;
+      case 'Sparkles': return <Sparkles size={16} color="var(--status-warning)" />;
+      case 'Archive': return <Archive size={16} color="var(--text-secondary)" />;
+      case 'Hash': return <Hash size={16} color="var(--accent-blue)" />;
+      case 'Calendar': return <Calendar size={16} color="var(--status-success)" />;
+      case 'FileText': return <FileText size={16} color="var(--text-secondary)" />;
+      case 'MapPin': return <MapPin size={16} color="#e11d48" />;
+      case 'Award': return <Award size={16} color="var(--accent-purple)" />;
+      case 'Box': return <Box size={16} color="var(--accent-blue)" />;
+      case 'Clock': return <Clock size={16} color="var(--status-success)" />;
+      case 'UserCheck': return <UserCheck size={16} color="var(--accent-purple)" />;
+      case 'Building': return <Building size={16} color="var(--text-secondary)" />;
+      case 'FileCode': return <FileCode size={16} color="var(--accent-blue)" />;
+      case 'Heart': return <Heart size={16} color="#e11d48" />;
+      case 'ShieldCheck': return <ShieldCheck size={16} color="var(--status-success)" />;
+      case 'Bookmark': return <Bookmark size={16} color="var(--status-warning)" />;
+      case 'Palette': return <Palette size={16} color="var(--accent-purple)" />;
+      case 'Scale': return <Scale size={16} color="var(--accent-blue)" />;
+      default: return <Type size={16} color="var(--accent-blue)" />;
+    }
+  };
+
+  const handleToolClick = (tool: NicheToolItem) => {
+    if (tool.toolId === 'shape') {
+      setIsShapePopoverOpen(!isShapePopoverOpen);
+      return;
+    }
+    if (tool.toolId === 'image') {
+      addElement('image');
+      return;
+    }
+    if (tool.toolId === 'qrcode') {
+      addElement('qrcode');
+      return;
+    }
+    if (tool.toolId === 'price') {
+      addElement('price', tool.defaultProperties);
+      return;
+    }
+    if (tool.toolId === 'promotional-price') {
+      addElement('price', { isPromotional: true, ...tool.defaultProperties });
+      return;
+    }
+    if (tool.elementType === 'barcode') {
+      addElement('barcode', {
+        name: tool.label,
+        field: tool.bindingPreset?.fieldId,
+        binding: tool.bindingPreset ? { source: tool.bindingPreset.source, fieldId: tool.bindingPreset.fieldId!, namespace: tool.bindingPreset.namespace } : undefined,
+        ...tool.defaultProperties,
+      });
+      return;
+    }
+    addElement('text', {
+      name: tool.label,
+      text: tool.label,
+      field: tool.bindingPreset?.fieldId,
+      binding: tool.bindingPreset ? { source: tool.bindingPreset.source, fieldId: tool.bindingPreset.fieldId!, namespace: tool.bindingPreset.namespace } : undefined,
+      ...tool.defaultProperties,
+    });
+  };
 
   const openConflictModal = () => {
     setIsConflictModalOpen(true);
@@ -696,43 +804,105 @@ export default function EditorLayout({
               </button>
             </div>
 
-            {/* Paleta de Criação de Elementos (Grid 2 Colunas Aprovado) */}
+            {/* Paleta de Criação de Elementos (Grid Contextual por Nicho) */}
             <div>
-              <label className="metric-label" style={{ marginBottom: '0.4rem' }}>Adicionar à Etiqueta</label>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+                <label className="metric-label">Adicionar à Etiqueta</label>
+              </div>
+
               <div className="creation-palette-grid">
-                <button className="creation-tool-btn" onClick={() => addElement('text')}>
-                  <Type size={16} color="var(--accent-blue)" />
-                  <span>Texto</span>
-                </button>
-                <button className="creation-tool-btn" onClick={() => addElement('price')}>
-                  <DollarSign size={16} color="#dc2626" />
-                  <span>Preço</span>
-                </button>
-                <button className="creation-tool-btn" onClick={() => addElement('barcode')}>
-                  <Barcode size={16} color="var(--accent-cyan)" />
-                  <span>Código Barras</span>
-                </button>
-                <button className="creation-tool-btn" onClick={() => addElement('qrcode')}>
-                  <QrCode size={16} color="var(--status-success)" />
-                  <span>QR Code</span>
-                </button>
-                <div style={{ position: 'relative' }}>
+                {toolboxConfig.recommendedTools.map((tool) => {
+                  if (tool.toolId === 'shape') {
+                    return (
+                      <div key={tool.toolId} style={{ position: 'relative' }}>
+                        <button
+                          className={`creation-tool-btn ${isShapePopoverOpen ? 'active' : ''}`}
+                          onClick={() => setIsShapePopoverOpen(!isShapePopoverOpen)}
+                          style={{ width: '100%' }}
+                          title="Adicionar Linha ou Retângulo"
+                        >
+                          <Square size={16} color="var(--status-warning)" />
+                          <span>{tool.label}</span>
+                        </button>
+
+                        {isShapePopoverOpen && (
+                          <div
+                            style={{
+                              position: 'absolute',
+                              top: '100%',
+                              left: 0,
+                              marginTop: '4px',
+                              background: 'var(--bg-card)',
+                              border: '1px solid var(--border-color)',
+                              borderRadius: '6px',
+                              padding: '0.4rem',
+                              boxShadow: 'var(--shadow-elevated)',
+                              zIndex: 60,
+                              display: 'flex',
+                              gap: '0.4rem',
+                              minWidth: '160px',
+                            }}
+                          >
+                            <button
+                              className="btn"
+                              style={{ flex: 1, justifyContent: 'center', fontSize: '0.75rem', padding: '0.35rem 0.5rem' }}
+                              onClick={() => {
+                                addElement('line');
+                                setIsShapePopoverOpen(false);
+                              }}
+                            >
+                              <Minus size={14} color="var(--accent-purple)" />
+                              <span>Linha</span>
+                            </button>
+                            <button
+                              className="btn"
+                              style={{ flex: 1, justifyContent: 'center', fontSize: '0.75rem', padding: '0.35rem 0.5rem' }}
+                              onClick={() => {
+                                addElement('rectangle');
+                                setIsShapePopoverOpen(false);
+                              }}
+                            >
+                              <Square size={14} color="var(--status-warning)" />
+                              <span>Retângulo</span>
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <button
+                      key={tool.toolId}
+                      className="creation-tool-btn"
+                      onClick={() => handleToolClick(tool)}
+                      title={tool.description || tool.label}
+                    >
+                      {getToolIcon(tool.iconName)}
+                      <span>{tool.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {toolboxConfig.availableTools.length > 0 && (
+                <div style={{ marginTop: '0.5rem', position: 'relative' }}>
                   <button
-                    className={`creation-tool-btn ${isShapePopoverOpen ? 'active' : ''}`}
-                    onClick={() => setIsShapePopoverOpen(!isShapePopoverOpen)}
-                    style={{ width: '100%' }}
-                    title="Adicionar Linha ou Retângulo"
+                    className="btn"
+                    style={{ width: '100%', fontSize: '0.75rem', padding: '0.3rem 0.5rem', justifyContent: 'space-between' }}
+                    onClick={() => setIsMoreToolsOpen(!isMoreToolsOpen)}
                   >
-                    <Square size={16} color="var(--status-warning)" />
-                    <span>Forma</span>
+                    <span>Mais elementos ({toolboxConfig.availableTools.length})</span>
+                    <ChevronDown size={14} style={{ transform: isMoreToolsOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
                   </button>
 
-                  {isShapePopoverOpen && (
+                  {isMoreToolsOpen && (
                     <div
                       style={{
                         position: 'absolute',
                         top: '100%',
                         left: 0,
+                        right: 0,
                         marginTop: '4px',
                         background: 'var(--bg-card)',
                         border: '1px solid var(--border-color)',
@@ -740,42 +910,30 @@ export default function EditorLayout({
                         padding: '0.4rem',
                         boxShadow: 'var(--shadow-elevated)',
                         zIndex: 60,
-                        display: 'flex',
+                        display: 'grid',
+                        gridTemplateColumns: '1fr 1fr',
                         gap: '0.4rem',
-                        minWidth: '160px',
                       }}
                     >
-                      <button
-                        className="btn"
-                        style={{ flex: 1, justifyContent: 'center', fontSize: '0.75rem', padding: '0.35rem 0.5rem' }}
-                        onClick={() => {
-                          addElement('line');
-                          setIsShapePopoverOpen(false);
-                        }}
-                      >
-                        <Minus size={14} color="var(--accent-purple)" />
-                        <span>Linha</span>
-                      </button>
-                      <button
-                        className="btn"
-                        style={{ flex: 1, justifyContent: 'center', fontSize: '0.75rem', padding: '0.35rem 0.5rem' }}
-                        onClick={() => {
-                          addElement('rectangle');
-                          setIsShapePopoverOpen(false);
-                        }}
-                      >
-                        <Square size={14} color="var(--status-warning)" />
-                        <span>Retângulo</span>
-                      </button>
+                      {toolboxConfig.availableTools.map((tool) => (
+                        <button
+                          key={tool.toolId}
+                          className="creation-tool-btn"
+                          style={{ padding: '0.35rem 0.4rem', fontSize: '0.72rem' }}
+                          onClick={() => {
+                            handleToolClick(tool);
+                            setIsMoreToolsOpen(false);
+                          }}
+                          title={tool.description || tool.label}
+                        >
+                          {getToolIcon(tool.iconName)}
+                          <span>{tool.label}</span>
+                        </button>
+                      ))}
                     </div>
                   )}
                 </div>
-
-                <button className="creation-tool-btn" onClick={() => addElement('image')}>
-                  <ImageIcon size={16} color="var(--accent-blue)" />
-                  <span>Imagem</span>
-                </button>
-              </div>
+              )}
             </div>
 
             {/* Lista de Camadas Compacta */}

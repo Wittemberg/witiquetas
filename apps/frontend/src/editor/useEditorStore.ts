@@ -364,7 +364,7 @@ interface EditorState {
   addQRCodeToLibrary: (item: QRCodeLibraryItemDTO) => void;
 
   // CRUD de Elementos
-  addElement: (type: ElementType) => void;
+  addElement: (type: ElementType, overrides?: Partial<LabelElement>) => void;
   updateElement: (id: string, patch: Partial<LabelElement>) => void;
   updateSelectedElements: (patch: Partial<LabelElement>) => void;
   removeElement: (id: string) => void;
@@ -633,7 +633,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setQRCodeLibrary: (items) => set({ qrCodeLibrary: items }),
   addQRCodeToLibrary: (item) => set((state) => ({ qrCodeLibrary: [item, ...state.qrCodeLibrary] })),
 
-  addElement: (type) => {
+  addElement: (type, overrides) => {
     const { document, pushHistory } = get();
     const newId = `elem-${Date.now()}`;
     let newElem: LabelElement;
@@ -764,6 +764,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         break;
       default:
         return;
+    }
+
+    if (overrides) {
+      newElem = { ...newElem, ...overrides };
     }
 
     newElem = constrainElementToLabel(newElem, document.dimensions);

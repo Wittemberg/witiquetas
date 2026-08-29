@@ -621,6 +621,11 @@ export const templateRepository = {
    * Deletar modelo (Soft delete)
    */
   async deleteTemplate(id: string, companyId: string): Promise<boolean> {
+    const activeSessions = await presenceRepository.getActiveSessions(id, companyId);
+    if (activeSessions.length > 0) {
+      throw new ActiveEditingSessionError(activeSessions);
+    }
+
     if (!pgPool) {
       if (isProduction) {
         throw new Error('FAIL-CLOSED: Conexão PostgreSQL indisponível em ambiente de produção.');

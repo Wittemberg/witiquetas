@@ -804,13 +804,13 @@ export default function EditorLayout({
               </button>
             </div>
 
-            {/* Paleta de Criação de Elementos (Grid Contextual por Nicho) */}
+            {/* Paleta de Criação de Elementos (Lista Compacta por Nicho) */}
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
                 <label className="metric-label">Adicionar à Etiqueta</label>
               </div>
 
-              <div className="creation-palette-grid">
+              <div className="creation-palette-list">
                 {toolboxConfig.recommendedTools.map((tool) => {
                   if (tool.toolId === 'shape') {
                     return (
@@ -886,10 +886,19 @@ export default function EditorLayout({
               </div>
 
               {toolboxConfig.availableTools.length > 0 && (
-                <div style={{ marginTop: '0.5rem', position: 'relative' }}>
+                <div style={{ marginTop: '0.4rem' }}>
                   <button
                     className="btn"
-                    style={{ width: '100%', fontSize: '0.75rem', padding: '0.3rem 0.5rem', justifyContent: 'space-between' }}
+                    style={{
+                      width: '100%',
+                      fontSize: '0.75rem',
+                      padding: '0.35rem 0.5rem',
+                      justifyContent: 'space-between',
+                      background: 'transparent',
+                      border: '1px solid var(--border-color)',
+                      borderRadius: '6px',
+                      color: 'var(--text-muted)',
+                    }}
                     onClick={() => setIsMoreToolsOpen(!isMoreToolsOpen)}
                   >
                     <span>Mais elementos ({toolboxConfig.availableTools.length})</span>
@@ -897,33 +906,12 @@ export default function EditorLayout({
                   </button>
 
                   {isMoreToolsOpen && (
-                    <div
-                      style={{
-                        position: 'absolute',
-                        top: '100%',
-                        left: 0,
-                        right: 0,
-                        marginTop: '4px',
-                        background: 'var(--bg-card)',
-                        border: '1px solid var(--border-color)',
-                        borderRadius: '6px',
-                        padding: '0.4rem',
-                        boxShadow: 'var(--shadow-elevated)',
-                        zIndex: 60,
-                        display: 'grid',
-                        gridTemplateColumns: '1fr 1fr',
-                        gap: '0.4rem',
-                      }}
-                    >
+                    <div className="creation-palette-list" style={{ marginTop: '0.3rem' }}>
                       {toolboxConfig.availableTools.map((tool) => (
                         <button
                           key={tool.toolId}
                           className="creation-tool-btn"
-                          style={{ padding: '0.35rem 0.4rem', fontSize: '0.72rem' }}
-                          onClick={() => {
-                            handleToolClick(tool);
-                            setIsMoreToolsOpen(false);
-                          }}
+                          onClick={() => handleToolClick(tool)}
                           title={tool.description || tool.label}
                         >
                           {getToolIcon(tool.iconName)}

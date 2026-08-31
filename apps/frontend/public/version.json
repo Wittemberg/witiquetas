@@ -1,12 +1,12 @@
 {
   "name": "witiquetas-frontend",
-  "version": "4.3.0-candidate",
-  "commit": "6db5817382264a0d8bc45d2eab9f31f53a0190ad",
-  "candidateSha": "6db5817382264a0d8bc45d2eab9f31f53a0190ad",
-  "runningSha": "6db5817382264a0d8bc45d2eab9f31f53a0190ad",
-  "shortCommit": "6db5817",
-  "shortSha": "6db5817",
+  "version": "4.5.4-candidate",
+  "commit": "107741c22bca678cf7eb6ff84cb1c3fa1bcbe1d5",
+  "candidateSha": "107741c22bca678cf7eb6ff84cb1c3fa1bcbe1d5",
+  "runningSha": "107741c22bca678cf7eb6ff84cb1c3fa1bcbe1d5",
+  "shortCommit": "107741c",
+  "shortSha": "107741c",
   "status": "IMPLEMENTED_AWAITING_HOMOLOGATION",
-  "package": "PACOTE 4.3 — Shape + Image/Logo",
-  "timestamp": "2026-08-28T09:35:00Z"
+  "package": "HOTFIX 4.5.4 — Toolbox Compacta Completa em Lista + Fluxo Vertical Natural",
+  "timestamp": "2026-08-31T11:47:00Z"
 }

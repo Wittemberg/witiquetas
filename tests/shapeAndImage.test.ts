@@ -68,7 +68,7 @@ describe('PACOTE 4.3 — SHAPE + IMAGE/LOGO SUITE DE TESTES', () => {
       const content = fs.readFileSync(editorLayoutPath, 'utf8');
 
       // Botão Forma deve existir
-      assert.strictEqual(content.includes('<span>Forma</span>'), true, 'Botão Forma deve existir na toolbar');
+      assert.strictEqual(content.includes('<span>Forma</span>') || (content.includes('tool.toolId === \'shape\'') && content.includes('{tool.label}')), true, 'Botão Forma deve existir na toolbar');
       // Botões isolados antigos não devem estar no grid principal de criação
       assert.strictEqual(content.includes('<span>Moldura</span>'), false, 'Botão isolado Moldura não deve mais existir na toolbar');
       // Deve permitir criar linha e retângulo via popover

@@ -1,6 +1,19 @@
 {
   "checkpoints": [
     {
+      "sha": "107741c22bca678cf7eb6ff84cb1c3fa1bcbe1d5",
+      "shortSha": "107741c",
+      "date": "2026-08-31T11:47:00Z",
+      "phase": "4",
+      "patch": "4.5.4",
+      "title": "fix(editor): HOTFIX UX 4.5.4 — Toolbox Compacta Completa em Lista + Fluxo Vertical Natural",
+      "type": "HOTFIX",
+      "capabilities": ["cap-compact-toolbox-flow"],
+      "testsPassed": true,
+      "deployed": true,
+      "manualValidation": false
+    },
+    {
       "sha": "e16f369f688029fa2bb97fcdb6db763ee3ceebc7",
       "shortSha": "e16f369",
       "date": "2026-08-28T18:49:00Z",

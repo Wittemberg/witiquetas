@@ -160,37 +160,53 @@ body {
   padding: 0;
   overflow: hidden;
   border-right: none;
-}
-
-/* Grade de Criação de Elementos */
-.creation-palette-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.4rem;
+}/* Lista Compacta de Criação de Elementos */
+.creation-palette-grid,
+.creation-palette-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
 }
 
 .creation-tool-btn {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
-  justify-content: center;
-  gap: 0.35rem;
-  padding: 0.65rem 0.4rem;
-  border-radius: 8px;
-  border: 1px solid var(--border-color);
-  background: var(--bg-card);
+  justify-content: flex-start;
+  gap: 8px;
+  min-height: 32px;
+  height: 34px;
+  width: 100%;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: transparent;
   color: var(--text-primary);
   cursor: pointer;
-  font-size: 0.72rem;
-  font-weight: 600;
+  font-size: 0.78rem;
+  font-weight: 500;
   transition: all 0.15s ease;
-  text-align: center;
+  text-align: left;
+}
+
+.creation-tool-btn span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 0.78rem;
+  font-weight: 500;
 }
 
 .creation-tool-btn:hover {
   background: var(--bg-card-hover);
+  border-color: var(--border-color);
+  transform: none;
+}
+
+.creation-tool-btn.active {
+  background: var(--bg-card-active);
   border-color: var(--accent-blue);
-  transform: translateY(-1px);
+  color: var(--accent-blue);
 }
 
 /* Camadas Compactas (Uma Linha por Elemento) */

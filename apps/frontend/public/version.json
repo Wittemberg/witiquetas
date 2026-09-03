@@ -1,12 +1,12 @@
 {
   "name": "witiquetas-frontend",
-  "version": "4.5.5-candidate",
-  "commit": "e103cb478bc3895e628469d41d2fdf21f7c8ec23",
-  "candidateSha": "e103cb478bc3895e628469d41d2fdf21f7c8ec23",
-  "runningSha": "e103cb478bc3895e628469d41d2fdf21f7c8ec23",
-  "shortCommit": "e103cb4",
-  "shortSha": "e103cb4",
+  "version": "4.5.5.1-candidate",
+  "commit": "86eeb97ace58310d471e769958eed65028a2c3d4",
+  "candidateSha": "86eeb97ace58310d471e769958eed65028a2c3d4",
+  "runningSha": "86eeb97ace58310d471e769958eed65028a2c3d4",
+  "shortCommit": "86eeb97",
+  "shortSha": "86eeb97",
   "status": "IMPLEMENTED_AWAITING_HOMOLOGATION",
-  "package": "PACOTE 4.5.5 — Estabilização de Elementos Antes da Fase de Administração",
-  "timestamp": "2026-09-03T15:00:00Z"
+  "package": "HOTFIX 4.5.5.1 — Data Tipada e Data de Impressão Acessível",
+  "timestamp": "2026-09-03T16:50:00Z"
 }

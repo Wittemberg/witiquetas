@@ -1,6 +1,23 @@
 {
   "checkpoints": [
     {
+      "sha": "86eeb97ace58310d471e769958eed65028a2c3d4",
+      "shortSha": "86eeb97",
+      "date": "2026-09-03T16:50:00Z",
+      "phase": "4",
+      "patch": "4.5.5.1",
+      "title": "fix(editor): HOTFIX 4.5.5.1 — data tipada e data de impressao acessivel",
+      "type": "HOTFIX",
+      "capabilities": [
+        "cap-typed-expiration-date",
+        "cap-system-print-date"
+      ],
+      "testsPassed": true,
+      "deployed": true,
+      "manualValidation": false,
+      "homologated": false
+    },
+    {
       "sha": "e103cb478bc3895e628469d41d2fdf21f7c8ec23",
       "shortSha": "e103cb4",
       "date": "2026-09-03T15:00:00Z",

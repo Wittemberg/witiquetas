@@ -4,6 +4,7 @@ import {
   SYSTEM_FIELDS,
   IntegrationFieldDefinition,
   getIntegrationFieldsByNiche,
+  getFieldDefinition,
 } from '@witiquetas/label-schema';
 
 export interface FieldPickerProps {
@@ -39,7 +40,12 @@ export const FieldPicker: React.FC<FieldPickerProps> = ({
     return getIntegrationFieldsByNiche(nicheId);
   }, [activeFields, nicheId]);
 
-  const isKnown = !value || fields.some((f) => f.id === value) || SYSTEM_FIELDS.some((f) => f.id === value);
+  const knownExtra = useMemo(() => {
+    if (!value || fields.some((f) => f.id === value) || SYSTEM_FIELDS.some((f) => f.id === value)) return null;
+    return getFieldDefinition(value);
+  }, [value, fields]);
+
+  const isKnown = !value || fields.some((f) => f.id === value) || SYSTEM_FIELDS.some((f) => f.id === value) || Boolean(knownExtra);
 
   return (
     <div style={{ width: '100%', minWidth: 0, boxSizing: 'border-box' }}>
@@ -59,6 +65,7 @@ export const FieldPicker: React.FC<FieldPickerProps> = ({
         onChange={(e) => onChange(e.target.value)}
       >
         {allowStatic && <option value="">{staticLabel}</option>}
+        {knownExtra && <option value={value}>{knownExtra.label} ({value})</option>}
         {!isKnown && <option value={value}>{value} (Campo Personalizado)</option>}
 
         <optgroup label="Campos da Integração">

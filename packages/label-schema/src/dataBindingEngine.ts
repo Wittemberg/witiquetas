@@ -1,5 +1,6 @@
 import {
   type ElementBinding,
+  getFieldDefinition,
 } from './canonicalFields.js';
 import type { VisibilityRule, LabelDocument } from './types.js';
 import { normalizeOperationalProfileId, normalizeNicheId, type CanonicalNicheId } from './niches.js';
@@ -24,6 +25,8 @@ export const MOCK_NICHE_DATASETS: Record<CanonicalNicheId, Record<string, string
     'retail.ean': '7894900011517',
     'retail.unit': 'UN',
     'retail.brand': 'COCA-COLA',
+    'lote.numero': 'LOT-2026-08',
+    'lote.validade': '2026-08-28',
     'empresa.nomeFantasia': 'SUPERMERCADO WR',
   },
   hospital: {
@@ -244,21 +247,50 @@ export function resolveFieldValue(
   };
 
   // Resolução de datas de sistema
+  const now = getTimeObj();
+  const dd = String(now.getDate()).padStart(2, '0');
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const yyyy = String(now.getFullYear());
+  const hh = String(now.getHours()).padStart(2, '0');
+  const min = String(now.getMinutes()).padStart(2, '0');
+  const fallbackDate = `${dd}/${mm}/${yyyy}`;
+  const fallbackDateTime = `${fallbackDate} ${hh}:${min}`;
+  const fallbackTime = `${hh}:${min}`;
+
   if (fieldId === 'system.printDateTime') {
-    return dataMap['system.printDateTime'] || getTimeObj().toLocaleString('pt-BR');
+    const raw = dataMap['system.printDateTime'] || fallbackDateTime;
+    const fmt = (typeof bindingOrField === 'object' && bindingOrField?.format) ? bindingOrField.format : undefined;
+    if (fmt === 'date' || fmt === 'DD/MM/YYYY' || fmt === 'DD/MM/YY' || fmt === 'YYYY-MM-DD') {
+      return formatDateValue(raw, fmt);
+    }
+    if (fmt === 'time') {
+      return raw.includes(' ') ? raw.split(' ')[1] : fallbackTime;
+    }
+    return raw;
   }
   if (fieldId === 'system.printDate') {
-    const raw = dataMap['system.printDate'] || getTimeObj().toLocaleDateString('pt-BR');
+    const raw = dataMap['system.printDate'] || fallbackDate;
     const fmt = (typeof bindingOrField === 'object' && bindingOrField?.format) ? bindingOrField.format : undefined;
-    return formatDateValue(raw, fmt);
+    return formatDateValue(raw, fmt || 'DD/MM/YYYY');
   }
   if (fieldId === 'system.printTime') {
-    return dataMap['system.printTime'] || getTimeObj().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    return dataMap['system.printTime'] || fallbackTime;
   }
 
   // Resolução do dicionário de dados
   if (dataMap[fieldId] !== undefined) {
-    return dataMap[fieldId];
+    const val = dataMap[fieldId];
+    const fmt = (typeof bindingOrField === 'object' && bindingOrField?.format) ? bindingOrField.format : undefined;
+    const fieldDef = getFieldDefinition(fieldId);
+    const isDate =
+      (fieldDef && 'type' in fieldDef && (fieldDef as any).type === 'date') ||
+      (fieldDef && 'format' in fieldDef && (fieldDef as any).format === 'date') ||
+      fieldId.includes('validade') ||
+      fieldId.includes('expiration');
+    if (fmt || isDate) {
+      return formatDateValue(val, fmt || 'DD/MM/YYYY');
+    }
+    return val;
   }
 
   // Fallbacks de Aliases Legados

@@ -205,6 +205,21 @@ export default function EditorLayout({
       addElement('price', { isPromotional: true, ...tool.defaultProperties });
       return;
     }
+    if (tool.toolId === 'date') {
+      addElement('text', {
+        name: 'Data',
+        text: 'Data de Impressão',
+        field: 'system.printDate',
+        binding: {
+          source: 'system',
+          fieldId: 'system.printDate',
+          namespace: 'system',
+        },
+        format: 'DD/MM/YYYY',
+        ...tool.defaultProperties,
+      });
+      return;
+    }
     if (tool.elementType === 'barcode') {
       addElement('barcode', {
         name: tool.label,

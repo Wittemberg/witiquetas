@@ -38,6 +38,8 @@ export const DEFAULT_RETAIL_CATALOG: IntegrationFieldDefinition[] = [
   { id: 'produto.sku', namespace: 'produto', label: 'SKU / Código Interno', category: 'Produto', type: 'code', example: 'SKU-789123', searchable: true, printable: true },
   { id: 'produto.unidade', namespace: 'produto', label: 'Unidade Comercial', category: 'Produto', example: 'UN', searchable: false, printable: true },
   { id: 'produto.marca', namespace: 'produto', label: 'Marca / Fabricante', category: 'Produto', example: 'COCA-COLA', searchable: true, printable: true },
+  { id: 'lote.numero', namespace: 'lote', label: 'Lote / Partida', category: 'Rastreabilidade', type: 'code', example: 'LT260828', searchable: true, printable: true },
+  { id: 'lote.validade', namespace: 'lote', label: 'Validade', category: 'Rastreabilidade', type: 'date', example: '28/08/2026', searchable: false, printable: true },
   { id: 'retail.description', namespace: 'retail', label: 'Descrição (Retail)', category: 'Produto Varejo', example: 'REFRIGERANTE COCA-COLA 2L' },
   { id: 'retail.price', namespace: 'retail', label: 'Preço (Retail)', category: 'Preço Varejo', type: 'currency', example: '9.99' },
   { id: 'retail.promoPrice', namespace: 'retail', label: 'Preço Promo (Retail)', category: 'Promoção Varejo', type: 'currency', example: '7.99' },
@@ -111,9 +113,9 @@ export const DEFAULT_PHARMACY_CATALOG: IntegrationFieldDefinition[] = [
 ];
 
 export const SYSTEM_FIELDS: SystemFieldDefinition[] = [
-  { id: 'system.printDateTime', namespace: 'system', label: 'Data e Hora de Impressão', category: 'Sistema', example: '28/08/2026 14:30' },
-  { id: 'system.printDate', namespace: 'system', label: 'Data de Impressão', category: 'Sistema', example: '28/08/2026' },
-  { id: 'system.printTime', namespace: 'system', label: 'Hora de Impressão', category: 'Sistema', example: '14:30' },
+  { id: 'system.printDateTime', namespace: 'system', label: 'Data e Hora de Impressão', category: 'Sistema', example: '28/08/2026 14:30', format: 'datetime' },
+  { id: 'system.printDate', namespace: 'system', label: 'Data de Impressão', category: 'Sistema', example: '28/08/2026', format: 'date' },
+  { id: 'system.printTime', namespace: 'system', label: 'Hora de Impressão', category: 'Sistema', example: '14:30', format: 'time' },
 ];
 
 export function getIntegrationFieldsByNiche(nicheId?: string): IntegrationFieldDefinition[] {
@@ -129,3 +131,20 @@ export function getIntegrationFieldsByNiche(nicheId?: string): IntegrationFieldD
 
 export type CanonicalFieldDefinition = IntegrationFieldDefinition | SystemFieldDefinition;
 export const CANONICAL_FIELDS: IntegrationFieldDefinition[] = DEFAULT_RETAIL_CATALOG;
+
+export const ALL_KNOWN_INTEGRATION_FIELDS: IntegrationFieldDefinition[] = [
+  ...DEFAULT_RETAIL_CATALOG,
+  ...DEFAULT_HOSPITAL_CATALOG,
+  ...DEFAULT_LABORATORY_CATALOG,
+  ...DEFAULT_LOGISTICS_CATALOG,
+  ...DEFAULT_INDUSTRY_CATALOG,
+  ...DEFAULT_FOOD_CATALOG,
+  ...DEFAULT_PHARMACY_CATALOG,
+];
+
+export function getFieldDefinition(fieldId?: string): CanonicalFieldDefinition | undefined {
+  if (!fieldId) return undefined;
+  const sys = SYSTEM_FIELDS.find((f) => f.id === fieldId);
+  if (sys) return sys;
+  return ALL_KNOWN_INTEGRATION_FIELDS.find((f) => f.id === fieldId);
+}

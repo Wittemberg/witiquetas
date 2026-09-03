@@ -62,6 +62,25 @@ const TOOL_QRCODE: NicheToolItem = {
   description: 'Código 2D QR Code',
 };
 
+export const TOOL_DATE: NicheToolItem = {
+  toolId: 'date',
+  label: 'Data',
+  iconName: 'Calendar',
+  elementType: 'text',
+  bindingPreset: {
+    source: 'system',
+    fieldId: 'system.printDate',
+    namespace: 'system',
+  },
+  defaultProperties: {
+    name: 'Data',
+    text: 'Data de Impressão',
+    format: 'DD/MM/YYYY',
+  },
+  order: 15,
+  description: 'Data de impressão ou data dinâmica',
+};
+
 // 2. CONFIGURAÇÕES POR NICHO (11 NICHOS)
 
 export const NICHE_TOOLBOX_CONFIGS: Record<string, NicheToolboxConfig> = {
@@ -79,9 +98,10 @@ export const NICHE_TOOLBOX_CONFIGS: Record<string, NicheToolboxConfig> = {
     ],
     availableTools: [
       TOOL_FREE_TEXT,
+      TOOL_DATE,
       { toolId: 'sku', label: 'SKU', iconName: 'Hash', elementType: 'text', bindingPreset: { source: 'integration', fieldId: 'produto.sku', namespace: 'produto' }, order: 10 },
       { toolId: 'lot', label: 'Lote', iconName: 'Layers', elementType: 'text', bindingPreset: { source: 'integration', fieldId: 'lote.numero', namespace: 'lote' }, order: 11 },
-      { toolId: 'expiration', label: 'Validade', iconName: 'Calendar', elementType: 'text', bindingPreset: { source: 'integration', fieldId: 'lote.validade', namespace: 'lote' }, order: 12 },
+      { toolId: 'expiration', label: 'Validade', iconName: 'Calendar', elementType: 'text', bindingPreset: { source: 'integration', fieldId: 'lote.validade', namespace: 'lote' }, defaultProperties: { format: 'DD/MM/YYYY' }, order: 12 },
       { toolId: 'brand', label: 'Marca', iconName: 'Award', elementType: 'text', bindingPreset: { source: 'integration', fieldId: 'produto.marca', namespace: 'produto' }, order: 13 },
     ],
     hiddenTools: ['patient-name', 'patient-id', 'bed', 'collection-id', 'donation-id', 'asset-id'],
@@ -96,12 +116,13 @@ export const NICHE_TOOLBOX_CONFIGS: Record<string, NicheToolboxConfig> = {
       { toolId: 'barcode', label: 'Código EAN-13', iconName: 'Barcode', elementType: 'barcode', bindingPreset: { source: 'integration', fieldId: 'produto.ean', namespace: 'produto' }, inspectorProfile: 'barcode', order: 3 },
       TOOL_QRCODE,
       { toolId: 'lot', label: 'Lote', iconName: 'Layers', elementType: 'text', bindingPreset: { source: 'integration', fieldId: 'lote.numero', namespace: 'lote' }, order: 5 },
-      { toolId: 'expiration', label: 'Validade', iconName: 'Calendar', elementType: 'text', bindingPreset: { source: 'integration', fieldId: 'lote.validade', namespace: 'lote' }, order: 6 },
+      { toolId: 'expiration', label: 'Validade', iconName: 'Calendar', elementType: 'text', bindingPreset: { source: 'integration', fieldId: 'lote.validade', namespace: 'lote' }, defaultProperties: { format: 'DD/MM/YYYY' }, order: 6 },
       TOOL_SHAPE,
       TOOL_IMAGE,
     ],
     availableTools: [
       TOOL_FREE_TEXT,
+      TOOL_DATE,
       { toolId: 'brand', label: 'Marca', iconName: 'Award', elementType: 'text', bindingPreset: { source: 'integration', fieldId: 'produto.marca', namespace: 'produto' }, order: 10 },
       { toolId: 'unit', label: 'Unidade', iconName: 'Box', elementType: 'text', bindingPreset: { source: 'integration', fieldId: 'produto.unidade', namespace: 'produto' }, order: 11 },
       { toolId: 'price', label: 'Preço', iconName: 'DollarSign', elementType: 'price', bindingPreset: { source: 'integration', fieldId: 'produto.preco', namespace: 'produto' }, order: 12 },
@@ -126,6 +147,7 @@ export const NICHE_TOOLBOX_CONFIGS: Record<string, NicheToolboxConfig> = {
     ],
     availableTools: [
       TOOL_FREE_TEXT,
+      TOOL_DATE,
       { toolId: 'admission-date', label: 'Data Admissão', iconName: 'Clock', elementType: 'text', bindingPreset: { source: 'integration', fieldId: 'atendimento.dataAdmissao', namespace: 'atendimento' }, order: 10 },
       { toolId: 'responsible-professional', label: 'Médico / Profissional', iconName: 'UserCheck', elementType: 'text', bindingPreset: { source: 'integration', fieldId: 'atendimento.medico', namespace: 'atendimento' }, order: 11 },
       { toolId: 'institution-name', label: 'Nome do Hospital', iconName: 'Building', elementType: 'text', bindingPreset: { source: 'integration', fieldId: 'hospital.nome', namespace: 'hospital' }, order: 12 },
@@ -150,6 +172,7 @@ export const NICHE_TOOLBOX_CONFIGS: Record<string, NicheToolboxConfig> = {
     ],
     availableTools: [
       TOOL_FREE_TEXT,
+      TOOL_DATE,
       { toolId: 'exam-code', label: 'Código Exame', iconName: 'FileCode', elementType: 'text', bindingPreset: { source: 'integration', fieldId: 'exame.codigo', namespace: 'exame' }, order: 10 },
       { toolId: 'requesting-sector', label: 'Setor Solicitante', iconName: 'MapPin', elementType: 'text', bindingPreset: { source: 'integration', fieldId: 'solicitante.setor', namespace: 'solicitante' }, order: 11 },
       { toolId: 'institution-name', label: 'Nome Laboratório', iconName: 'Building', elementType: 'text', bindingPreset: { source: 'integration', fieldId: 'laboratorio.nome', namespace: 'laboratorio' }, order: 12 },
@@ -174,6 +197,7 @@ export const NICHE_TOOLBOX_CONFIGS: Record<string, NicheToolboxConfig> = {
     ],
     availableTools: [
       TOOL_FREE_TEXT,
+      TOOL_DATE,
       { toolId: 'collection-date-time', label: 'Data/Hora Coleta', iconName: 'Clock', elementType: 'text', bindingPreset: { source: 'integration', fieldId: 'blood.collectionDateTime', namespace: 'blood' }, order: 10 },
       { toolId: 'donor-id', label: 'Cód. Doador', iconName: 'User', elementType: 'text', bindingPreset: { source: 'integration', fieldId: 'blood.donorId', namespace: 'blood' }, order: 11 },
       { toolId: 'component-volume', label: 'Volume (mL)', iconName: 'Box', elementType: 'text', bindingPreset: { source: 'integration', fieldId: 'blood.volume', namespace: 'blood' }, order: 12 },
@@ -198,6 +222,7 @@ export const NICHE_TOOLBOX_CONFIGS: Record<string, NicheToolboxConfig> = {
     ],
     availableTools: [
       TOOL_FREE_TEXT,
+      TOOL_DATE,
       { toolId: 'origin', label: 'Origem', iconName: 'Home', elementType: 'text', bindingPreset: { source: 'integration', fieldId: 'expedicao.origem', namespace: 'expedicao' }, order: 10 },
       { toolId: 'order-id', label: 'Nº Pedido', iconName: 'FileText', elementType: 'text', bindingPreset: { source: 'integration', fieldId: 'pedido.id', namespace: 'pedido' }, order: 11 },
       { toolId: 'gtin', label: 'GTIN / EAN', iconName: 'Barcode', elementType: 'text', bindingPreset: { source: 'integration', fieldId: 'produto.gtin', namespace: 'produto' }, order: 12 },
@@ -212,7 +237,7 @@ export const NICHE_TOOLBOX_CONFIGS: Record<string, NicheToolboxConfig> = {
       { toolId: 'medicine-name', label: 'Nome Medicamento', iconName: 'Pill', elementType: 'text', bindingPreset: { source: 'integration', fieldId: 'medicamento.nome', namespace: 'medicamento' }, defaultProperties: { fontWeight: 'bold' }, inspectorProfile: 'medicine-name', order: 1 },
       { toolId: 'active-ingredient', label: 'Princípio Ativo', iconName: 'Activity', elementType: 'text', bindingPreset: { source: 'integration', fieldId: 'medicamento.principioAtivo', namespace: 'medicamento' }, order: 2 },
       { toolId: 'lot', label: 'Lote Farmacêutico', iconName: 'Layers', elementType: 'text', bindingPreset: { source: 'integration', fieldId: 'medicamento.lote', namespace: 'medicamento' }, order: 3 },
-      { toolId: 'expiration', label: 'Validade', iconName: 'Calendar', elementType: 'text', bindingPreset: { source: 'integration', fieldId: 'medicamento.validade', namespace: 'medicamento' }, order: 4 },
+      { toolId: 'expiration', label: 'Validade', iconName: 'Calendar', elementType: 'text', bindingPreset: { source: 'integration', fieldId: 'medicamento.validade', namespace: 'medicamento' }, defaultProperties: { format: 'DD/MM/YYYY' }, order: 4 },
       { toolId: 'registration', label: 'Reg. ANVISA (MS)', iconName: 'ShieldCheck', elementType: 'text', bindingPreset: { source: 'integration', fieldId: 'medicamento.registro', namespace: 'medicamento' }, order: 5 },
       { toolId: 'barcode', label: 'Cód. Barras', iconName: 'Barcode', elementType: 'barcode', bindingPreset: { source: 'integration', fieldId: 'medicamento.codigo', namespace: 'medicamento' }, order: 6 },
       TOOL_QRCODE,
@@ -221,6 +246,7 @@ export const NICHE_TOOLBOX_CONFIGS: Record<string, NicheToolboxConfig> = {
     ],
     availableTools: [
       TOOL_FREE_TEXT,
+      TOOL_DATE,
       { toolId: 'dosage', label: 'Dosagem / Posologia', iconName: 'FileText', elementType: 'text', bindingPreset: { source: 'integration', fieldId: 'medicamento.dosagem', namespace: 'medicamento' }, order: 10 },
       { toolId: 'manufacturer', label: 'Fabricante', iconName: 'Building', elementType: 'text', bindingPreset: { source: 'integration', fieldId: 'fabricante', namespace: 'medicamento' }, order: 11 },
       { toolId: 'price', label: 'Preço', iconName: 'DollarSign', elementType: 'price', bindingPreset: { source: 'integration', fieldId: 'produto.preco', namespace: 'produto' }, order: 12 },
@@ -244,6 +270,7 @@ export const NICHE_TOOLBOX_CONFIGS: Record<string, NicheToolboxConfig> = {
     ],
     availableTools: [
       TOOL_FREE_TEXT,
+      TOOL_DATE,
       { toolId: 'brand', label: 'Marca / Grife', iconName: 'Bookmark', elementType: 'text', bindingPreset: { source: 'integration', fieldId: 'produto.marca', namespace: 'produto' }, order: 11 },
     ],
     hiddenTools: ['patient-name', 'patient-id', 'donation-id', 'asset-id'],
@@ -264,6 +291,7 @@ export const NICHE_TOOLBOX_CONFIGS: Record<string, NicheToolboxConfig> = {
     ],
     availableTools: [
       TOOL_FREE_TEXT,
+      TOOL_DATE,
       { toolId: 'sku', label: 'Ref / SKU', iconName: 'Hash', elementType: 'text', bindingPreset: { source: 'integration', fieldId: 'produto.sku', namespace: 'produto' }, order: 10 },
       { toolId: 'brand', label: 'Marca', iconName: 'Award', elementType: 'text', bindingPreset: { source: 'integration', fieldId: 'produto.marca', namespace: 'produto' }, order: 11 },
     ],
@@ -286,6 +314,7 @@ export const NICHE_TOOLBOX_CONFIGS: Record<string, NicheToolboxConfig> = {
     ],
     availableTools: [
       TOOL_FREE_TEXT,
+      TOOL_DATE,
       { toolId: 'responsible', label: 'Responsável', iconName: 'User', elementType: 'text', bindingPreset: { source: 'integration', fieldId: 'asset.responsible', namespace: 'asset' }, order: 10 },
       { toolId: 'acquisition-date', label: 'Data Aquisição', iconName: 'Calendar', elementType: 'text', bindingPreset: { source: 'integration', fieldId: 'asset.acquisitionDate', namespace: 'asset' }, order: 11 },
     ],
@@ -304,6 +333,7 @@ export const NICHE_TOOLBOX_CONFIGS: Record<string, NicheToolboxConfig> = {
     ],
     availableTools: [
       { toolId: 'price', label: 'Preço', iconName: 'DollarSign', elementType: 'price', bindingPreset: { source: 'integration', fieldId: 'produto.preco', namespace: 'produto' }, order: 10 },
+      TOOL_DATE,
     ],
     hiddenTools: [],
   },

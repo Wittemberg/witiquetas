@@ -91,6 +91,8 @@ export const MOCK_PRODUCT_DATA: Record<string, string> = {
   'job.quantidade': '1',
   'impressao.data': '15/08/2026',
   'impressao.hora': '15:30',
+  'lote.numero': 'LOT-2026-08',
+  'lote.validade': '2026-08-28',
   'system.printDateTime': '20/08/2026 12:35',
   'system.printDate': '20/08/2026',
   'system.printTime': '12:35',
@@ -155,22 +157,33 @@ export function resolveFieldValue(
 ): string | undefined {
   if (!field) return undefined;
 
+  const now = new Date();
+  const dd = String(now.getDate()).padStart(2, '0');
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const yyyy = String(now.getFullYear());
+  const hh = String(now.getHours()).padStart(2, '0');
+  const min = String(now.getMinutes()).padStart(2, '0');
+  const fallbackDate = `${dd}/${mm}/${yyyy}`;
+  const fallbackDateTime = `${fallbackDate} ${hh}:${min}`;
+  const fallbackTime = `${hh}:${min}`;
+
   if (field === 'system.printDateTime' || field === 'system.printDate' || field === 'system.printTime') {
     const fmt = format || (field === 'system.printDate' ? 'date' : field === 'system.printTime' ? 'time' : 'datetime');
     if (fmt === 'date' || fmt === 'DD/MM/YYYY' || fmt === 'DD/MM/YY' || fmt === 'YYYY-MM-DD') {
-      const raw = data['system.printDate'] || '20/08/2026';
-      return formatDateValue(raw, fmt);
+      const raw = data['system.printDate'] || fallbackDate;
+      return formatDateValue(raw, fmt === 'date' ? 'DD/MM/YYYY' : fmt);
     }
     if (fmt === 'time') {
-      return data['system.printTime'] || '12:35';
+      return data['system.printTime'] || fallbackTime;
     }
-    return data['system.printDateTime'] || '20/08/2026 12:35';
+    return data['system.printDateTime'] || fallbackDateTime;
   }
 
   if (data[field] !== undefined) {
     const val = data[field];
-    if (format && (format === 'DD/MM/YYYY' || format === 'DD/MM/YY' || format === 'YYYY-MM-DD' || format === 'date')) {
-      return formatDateValue(val, format);
+    const isDate = field.includes('validade') || field.includes('expiration') || field.includes('Date') || field.includes('data');
+    if (format || isDate) {
+      return formatDateValue(val, format || 'DD/MM/YYYY');
     }
     return val;
   }

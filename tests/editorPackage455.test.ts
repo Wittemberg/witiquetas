@@ -213,4 +213,128 @@ describe('PACOTE 4.5.5 — Correções Funcionais Finais do Editor Antes do Free
     const formattedISO = resolveFieldValue('system.printDate', undefined, 'YYYY-MM-DD');
     assert.match(formattedISO!, /^\d{4}-\d{2}-\d{2}$/, 'Deve formatar como AAAA-MM-DD');
   });
+
+  // =========================================================================
+  // HOTFIX 4.5.5.1 — DATA TIPADA + DATA DE IMPRESSÃO ACESSÍVEL (17 TESTES)
+  // =========================================================================
+
+  test('9. lote.validade: catalog metadata possui type = date', async () => {
+    const { getFieldDefinition, DEFAULT_RETAIL_CATALOG } = await import('../packages/label-schema/dist/index.js');
+    const fieldDef = getFieldDefinition('lote.validade');
+    assert.ok(fieldDef, 'lote.validade deve ter definição de campo registrada');
+    assert.strictEqual((fieldDef as any).type, 'date', 'lote.validade deve ter type === date');
+    assert.strictEqual(fieldDef?.namespace, 'lote');
+
+    const inRetail = DEFAULT_RETAIL_CATALOG.find((f) => f.id === 'lote.validade');
+    assert.ok(inRetail, 'lote.validade deve estar presente no DEFAULT_RETAIL_CATALOG');
+    assert.strictEqual(inRetail?.type, 'date');
+  });
+
+  test('10. Validade não cria novo elementType (permanece text com binding date)', () => {
+    const validadeElem: TextElement = {
+      id: 'text-validade-test',
+      type: 'text',
+      name: 'Validade',
+      text: 'Validade',
+      field: 'lote.validade',
+      binding: {
+        source: 'integration',
+        fieldId: 'lote.validade',
+        namespace: 'lote',
+      },
+      format: 'DD/MM/YYYY',
+      fontSize: 12,
+      fontFamily: 'Roboto',
+      x: 10,
+      y: 20,
+      width: 40,
+      height: 8,
+    };
+
+    assert.strictEqual(validadeElem.type, 'text', 'Elemento de Validade DEVE usar elementType text');
+    assert.strictEqual(validadeElem.binding?.source, 'integration');
+    assert.strictEqual(validadeElem.binding?.fieldId, 'lote.validade');
+    assert.strictEqual(validadeElem.format, 'DD/MM/YYYY');
+  });
+
+  test('11. Formatação real do valor de teste 2026-08-28', () => {
+    const rawISO = '2026-08-28';
+    assert.strictEqual(formatDateValue(rawISO, 'DD/MM/YYYY'), '28/08/2026');
+    assert.strictEqual(formatDateValue(rawISO, 'DD/MM/YY'), '28/08/26');
+    assert.strictEqual(formatDateValue(rawISO, 'YYYY-MM-DD'), '2026-08-28');
+  });
+
+  test('12. Resolução automática de campo tipo date com formatação padrão', () => {
+    const mockData = { 'lote.validade': '2026-08-28' };
+    const resolved = resolveFieldValue('lote.validade', mockData);
+    assert.strictEqual(resolved, '28/08/2026', 'Data ISO deve ser auto-formatada para DD/MM/YYYY');
+
+    const resolvedShort = resolveFieldValue('lote.validade', mockData, 'DD/MM/YY');
+    assert.strictEqual(resolvedShort, '28/08/26');
+
+    const resolvedISO = resolveFieldValue('lote.validade', mockData, 'YYYY-MM-DD');
+    assert.strictEqual(resolvedISO, '2026-08-28');
+  });
+
+  test('13. system.printDate e system.printDateTime canônicos preservados', () => {
+    const pDate = SYSTEM_FIELDS.find((f) => f.id === 'system.printDate');
+    const pDateTime = SYSTEM_FIELDS.find((f) => f.id === 'system.printDateTime');
+
+    assert.ok(pDate, 'system.printDate canônico deve existir');
+    assert.ok(pDateTime, 'system.printDateTime canônico deve existir');
+    assert.strictEqual(pDate?.format, 'date');
+    assert.strictEqual(pDateTime?.format, 'datetime');
+  });
+
+  test('14. Resolução de system.printDate não depende do ERP nem do mock', () => {
+    // Passando dicionário completamente vazio (sem ERP)
+    const resolvedNoErp = resolveFieldValue('system.printDate', {});
+    assert.ok(resolvedNoErp, 'Deve resolver data mesmo sem mock e sem ERP');
+    assert.match(resolvedNoErp!, /^\d{2}\/\d{2}\/\d{4}$/, 'Deve resolver no formato DD/MM/AAAA');
+    assert.doesNotMatch(resolvedNoErp!, /\{\{/, 'Não deve exibir chaves de interpolação não resolvidas');
+  });
+
+  test('15. TOOL_DATE canônica definida com system.printDate e format DD/MM/YYYY', async () => {
+    const { TOOL_DATE } = await import('../packages/label-schema/dist/index.js');
+    assert.ok(TOOL_DATE, 'TOOL_DATE deve ser exportada');
+    assert.strictEqual(TOOL_DATE.toolId, 'date');
+    assert.strictEqual(TOOL_DATE.label, 'Data');
+    assert.strictEqual(TOOL_DATE.iconName, 'Calendar');
+    assert.strictEqual(TOOL_DATE.elementType, 'text');
+    assert.strictEqual(TOOL_DATE.bindingPreset?.source, 'system');
+    assert.strictEqual(TOOL_DATE.bindingPreset?.fieldId, 'system.printDate');
+    assert.strictEqual(TOOL_DATE.bindingPreset?.namespace, 'system');
+    assert.strictEqual(TOOL_DATE.defaultProperties?.format, 'DD/MM/YYYY');
+  });
+
+  test('16. TOOL_DATE presente em availableTools dos nichos operacionais', () => {
+    const nichesToCheck = [
+      'gondola-supermercado',
+      'produto-codigo-barras',
+      'hospital-identificacao',
+      'laboratorio',
+      'logistica-expedicao-ecommerce',
+      'farmacia-medicamentos',
+      'uso-geral',
+    ];
+
+    for (const slug of nichesToCheck) {
+      const config = getNicheToolboxConfig(slug);
+      const availIds = config.availableTools.map((t) => t.toolId);
+      assert.ok(
+        availIds.includes('date'),
+        `Nicho ${slug} deve conter 'date' em availableTools`
+      );
+    }
+  });
+
+  test('17. FieldPicker reconhece lote.validade sem rotular como Campo Personalizado', async () => {
+    const { getFieldDefinition, ALL_KNOWN_INTEGRATION_FIELDS } = await import('../packages/label-schema/dist/index.js');
+    const def = getFieldDefinition('lote.validade');
+    assert.ok(def, 'Campo deve ser reconhecido');
+    assert.strictEqual(def?.label, 'Validade');
+
+    const isInAllKnown = ALL_KNOWN_INTEGRATION_FIELDS.some((f) => f.id === 'lote.validade');
+    assert.ok(isInAllKnown, 'lote.validade deve estar em ALL_KNOWN_INTEGRATION_FIELDS');
+  });
 });

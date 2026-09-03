@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useEditorStore, formatDimensionBR } from './useEditorStore';
 import FieldPicker from './FieldPicker';
-import { CANONICAL_FIELDS, TextElement, PriceElement, BarcodeElement, QrCodeElement, RectangleElement, LineElement, ImageElement } from '@witiquetas/label-schema';
+import { CANONICAL_FIELDS, TextElement, PriceElement, BarcodeElement, QrCodeElement, RectangleElement, LineElement, ImageElement, getFieldDefinition } from '@witiquetas/label-schema';
 import { CURATED_FONTS, getFontCompatibility } from './fontsCatalog';
 import { QRCodeLibraryItemDTO } from '@witiquetas/contracts';
 import { validateCheckDigit, BarcodeFormat } from './barcodeEngine';
@@ -283,56 +283,113 @@ export default function PropertyInspector() {
       {/* =====================================================================
          TIPO: TEXTO
          ===================================================================== */}
-      {elem.type === 'text' && (
-        <>
-          <div className="inspector-section">
-            <div className="inspector-section-title">Conteúdo do Texto</div>
-            
-            <FieldPicker
-              label="Campo da integração"
-              nicheId={activeNicheId}
-              value={(elem as TextElement).field || ''}
-              onChange={(val) => {
-                if (val) {
-                  const isSystem = val.startsWith('system.');
-                  updateElement(elem.id, {
-                    field: val,
-                    binding: {
-                      source: isSystem ? 'system' : 'integration',
-                      fieldId: val,
-                      namespace: val.includes('.') ? val.split('.')[0] : undefined,
-                    },
-                  });
-                } else {
-                  updateElement(elem.id, {
-                    field: undefined,
-                    binding: {
-                      source: 'manual',
-                    },
-                  });
-                }
-              }}
-            />
+      {elem.type === 'text' && (() => {
+        const textElem = elem as TextElement;
+        const source = textElem.binding?.source ?? (
+          textElem.field?.startsWith('system.') ? 'system' :
+          textElem.field ? 'integration' :
+          'manual'
+        );
 
-            {/* Seletor de Formato para Campos de Data / Sistema */}
-            {(() => {
-              const textElem = elem as TextElement;
-              const isDate =
-                textElem.field === 'system.printDate' ||
-                textElem.field === 'system.printDateTime' ||
-                textElem.field?.includes('validade') ||
-                textElem.field?.includes('expiration') ||
-                textElem.field?.includes('Date') ||
-                textElem.field?.includes('Data') ||
-                textElem.format === 'DD/MM/YYYY' ||
-                textElem.format === 'DD/MM/YY' ||
-                textElem.format === 'YYYY-MM-DD' ||
-                textElem.format === 'date';
+        const fieldDef = getFieldDefinition(textElem.field);
+        const isDateField =
+          (fieldDef && 'type' in fieldDef && (fieldDef as any).type === 'date') ||
+          (fieldDef && 'format' in fieldDef && (fieldDef as any).format === 'date') ||
+          textElem.field === 'system.printDate' ||
+          textElem.field === 'system.printDateTime' ||
+          textElem.field?.includes('validade') ||
+          textElem.field?.includes('expiration') ||
+          textElem.format === 'DD/MM/YYYY' ||
+          textElem.format === 'DD/MM/YY' ||
+          textElem.format === 'YYYY-MM-DD';
 
-              if (!isDate) return null;
+        const sectionTitle =
+          isDateField && source === 'system' ? 'Conteúdo da Data' :
+          isDateField && source === 'integration' ? 'Conteúdo da Validade / Data' :
+          source === 'system' ? 'Conteúdo do Sistema' :
+          source === 'integration' ? 'Conteúdo da Integração' :
+          'Conteúdo do Texto';
 
-              return (
-                <div style={{ marginTop: '0.4rem' }}>
+        const pickerLabel =
+          source === 'system' ? 'Campo do Sistema' :
+          source === 'integration' ? 'Campo da Integração' :
+          'Campo da Integração / Sistema';
+
+        return (
+          <>
+            <div className="inspector-section">
+              <div className="inspector-section-title">{sectionTitle}</div>
+
+              {/* Badges de Origem e Tipo */}
+              <div style={{ display: 'flex', gap: '0.4rem', marginBottom: '0.5rem' }}>
+                <span
+                  style={{
+                    fontSize: '0.72rem',
+                    fontWeight: 700,
+                    padding: '0.15rem 0.45rem',
+                    borderRadius: '4px',
+                    background: source === 'manual' ? 'var(--bg-muted, #334155)' : source === 'system' ? '#0284c7' : '#059669',
+                    color: '#ffffff',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.04em',
+                  }}
+                >
+                  {source === 'manual' ? 'Texto Manual' : source === 'system' ? 'Sistema' : 'Integração'}
+                </span>
+                {isDateField && (
+                  <span
+                    style={{
+                      fontSize: '0.72rem',
+                      fontWeight: 700,
+                      padding: '0.15rem 0.45rem',
+                      borderRadius: '4px',
+                      background: 'rgba(234, 88, 12, 0.2)',
+                      color: '#ea580c',
+                      border: '1px solid rgba(234, 88, 12, 0.4)',
+                    }}
+                  >
+                    TIPO: DATA
+                  </span>
+                )}
+              </div>
+
+              {/* Seletor de Campo */}
+              <FieldPicker
+                label={pickerLabel}
+                nicheId={activeNicheId}
+                value={textElem.field || ''}
+                onChange={(val) => {
+                  if (val) {
+                    const isSystem = val.startsWith('system.');
+                    const fDef = getFieldDefinition(val);
+                    const isValDate =
+                      (fDef && 'type' in fDef && (fDef as any).type === 'date') ||
+                      (fDef && 'format' in fDef && (fDef as any).format === 'date') ||
+                      val.includes('validade') ||
+                      val.includes('Date');
+                    updateElement(elem.id, {
+                      field: val,
+                      binding: {
+                        source: isSystem ? 'system' : 'integration',
+                        fieldId: val,
+                        namespace: val.includes('.') ? val.split('.')[0] : undefined,
+                      },
+                      format: isValDate ? (textElem.format || 'DD/MM/YYYY') : textElem.format,
+                    });
+                  } else {
+                    updateElement(elem.id, {
+                      field: undefined,
+                      binding: {
+                        source: 'manual',
+                      },
+                    });
+                  }
+                }}
+              />
+
+              {/* Seletor de Formato para Campos de Data */}
+              {isDateField && (
+                <div style={{ marginTop: '0.5rem' }}>
                   <label className="metric-label">Formato de Data</label>
                   <select
                     className="inspector-select"
@@ -350,20 +407,22 @@ export default function PropertyInspector() {
                     )}
                   </select>
                 </div>
-              );
-            })()}
+              )}
 
-            <div>
-              <label className="metric-label">Texto Manual</label>
-              <input
-                type="text"
-                className="inspector-input"
-                placeholder="Digite o texto..."
-                value={(elem as TextElement).text || ''}
-                onChange={(e) => updateElement(elem.id, { text: e.target.value })}
-              />
+              {/* Campo de Texto Manual SOMENTE quando a origem for MANUAL */}
+              {source === 'manual' && (
+                <div style={{ marginTop: '0.5rem' }}>
+                  <label className="metric-label">Texto Manual</label>
+                  <input
+                    type="text"
+                    className="inspector-input"
+                    placeholder="Digite o texto..."
+                    value={textElem.text || ''}
+                    onChange={(e) => updateElement(elem.id, { text: e.target.value })}
+                  />
+                </div>
+              )}
             </div>
-          </div>
 
           <div className="inspector-section">
             <div className="inspector-section-title">Tipografia & Estilo</div>
@@ -535,7 +594,8 @@ export default function PropertyInspector() {
             </label>
           </div>
         </>
-      )}
+      );
+    })()}
 
       {/* =====================================================================
          TIPO: PREÇO (Padrão Varejo & Centavos Reduzidos)

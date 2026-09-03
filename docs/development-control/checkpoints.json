@@ -1,6 +1,27 @@
 {
   "checkpoints": [
     {
+      "sha": "e103cb478bc3895e628469d41d2fdf21f7c8ec23",
+      "shortSha": "e103cb4",
+      "date": "2026-09-03T15:00:00Z",
+      "phase": "4",
+      "patch": "4.5.5",
+      "title": "fix(editor): estabilizar elementos antes da fase de administracao (PACOTE 4.5.5)",
+      "type": "HOTFIX",
+      "capabilities": [
+        "cap-single-price-element",
+        "cap-line-resize-restored",
+        "cap-line-rotation-restored",
+        "cap-manual-text-precedence",
+        "cap-typed-expiration-date",
+        "cap-system-print-date"
+      ],
+      "testsPassed": true,
+      "deployed": true,
+      "manualValidation": false,
+      "homologated": false
+    },
+    {
       "sha": "7a598175ddc622ea7cad24dfb374e88ba64d7b7f",
       "shortSha": "7a59817",
       "date": "2026-08-31T12:50:00Z",

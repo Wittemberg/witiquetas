@@ -218,7 +218,9 @@ export default function EditorLayout({
       name: tool.label,
       text: tool.label,
       field: tool.bindingPreset?.fieldId,
-      binding: tool.bindingPreset ? { source: tool.bindingPreset.source, fieldId: tool.bindingPreset.fieldId!, namespace: tool.bindingPreset.namespace } : undefined,
+      binding: tool.bindingPreset
+        ? { source: tool.bindingPreset.source, fieldId: tool.bindingPreset.fieldId!, namespace: tool.bindingPreset.namespace }
+        : { source: 'manual' },
       ...tool.defaultProperties,
     });
   };

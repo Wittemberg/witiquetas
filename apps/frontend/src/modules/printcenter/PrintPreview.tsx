@@ -119,16 +119,23 @@ function SingleElementPreview({
   switch (elem.type) {
     case 'text': {
       const textElem = elem as TextElement;
+      const source = textElem.binding?.source ?? (
+        textElem.field?.startsWith('system.') ? 'system' :
+        textElem.field ? 'integration' :
+        'manual'
+      );
       const fieldKey = textElem.field || (textElem.binding ? textElem.binding.fieldId : undefined);
 
       let rawContent = textElem.text || '';
-      if (fieldKey) {
-        const resolved = resolveFieldValue(fieldKey, dataContext);
+      if (source === 'manual') {
+        rawContent = textElem.text || '';
+      } else if (fieldKey) {
+        const resolved = resolveFieldValue(fieldKey, dataContext, textElem.format);
         if (resolved !== undefined && resolved !== null) {
           rawContent = String(resolved);
         }
       } else if (rawContent.includes('[[')) {
-        rawContent = resolveFieldValue(rawContent, dataContext) || rawContent;
+        rawContent = resolveFieldValue(rawContent, dataContext, textElem.format) || rawContent;
       }
 
       const calculatedFontSize = mmToPx(textElem.fontSizeMm || (textElem.fontSize ? textElem.fontSize / 3.78 : 3.5), dpi);

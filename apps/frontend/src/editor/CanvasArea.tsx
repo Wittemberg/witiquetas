@@ -624,11 +624,17 @@ export default function CanvasArea() {
         const snappedRotation = applyMagneticRotationSnap(rawRotation).angle;
         node.rotation(snappedRotation);
 
-        const newWidthPx = Math.max(1, node.width() * scaleX);
+        const newWidthPx = Math.max(5, node.width() * Math.abs(scaleX));
+        let newXPx = node.x();
+        let newYPx = node.y();
+
+        if (scaleX < 0) {
+          newXPx = newXPx - newWidthPx;
+        }
 
         updateElement(elem.id, {
-          x: pxToMm(node.x(), dpi),
-          y: pxToMm(node.y(), dpi),
+          x: pxToMm(newXPx, dpi),
+          y: pxToMm(newYPx, dpi),
           width: pxToMm(newWidthPx, dpi),
           rotation: snappedRotation,
         });
@@ -654,10 +660,29 @@ export default function CanvasArea() {
       switch (elem.type) {
         case 'text': {
           const textElem = elem as TextElement;
+
+          // Precedência canônica por origem (PACOTE 4.5.5):
+          // source = 'manual' -> conteúdo manual prevalece (textElem.text)
+          // source = 'system' -> binding de sistema prevalece (resolveFieldValue)
+          // source = 'integration' -> binding integrado prevalece (resolveFieldValue quando showPreviewData)
+          const source = textElem.binding?.source ?? (
+            textElem.field?.startsWith('system.') ? 'system' :
+            textElem.field ? 'integration' :
+            'manual'
+          );
+
           const resolvedValue = resolveFieldValue(textElem.field, mockProductData || MOCK_PRODUCT_DATA, textElem.format);
-          let textContent = showPreviewData && textElem.field && resolvedValue !== undefined
-            ? resolvedValue
-            : textElem.text;
+
+          let textContent = textElem.text ?? '';
+          if (source === 'manual') {
+            textContent = textElem.text ?? '';
+          } else if (source === 'system') {
+            textContent = resolvedValue !== undefined ? resolvedValue : (textElem.text ?? '');
+          } else if (source === 'integration') {
+            textContent = (showPreviewData && textElem.field && resolvedValue !== undefined)
+              ? resolvedValue
+              : (textElem.text ?? '');
+          }
 
           // Aplicação de Transformações de Substring (Item 275-276)
           if (textElem.transformations && textElem.transformations.length > 0) {
@@ -1028,6 +1053,7 @@ export default function CanvasArea() {
               points={[0, 0, wPx, 0]}
               stroke={lineElem.color || '#000000'}
               strokeWidth={lineElem.strokeWidth || 1}
+              hitStrokeWidth={Math.max(14, (lineElem.strokeWidth || 1) * 3)}
             />
           </Group>
         );

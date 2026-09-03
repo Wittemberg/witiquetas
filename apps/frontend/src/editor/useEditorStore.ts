@@ -97,6 +97,56 @@ export const MOCK_PRODUCT_DATA: Record<string, string> = {
 };
 
 
+// Formatador Universal de Datas (PACOTE 4.5.5)
+export function formatDateValue(rawVal?: string, format?: string): string {
+  if (!rawVal) return '';
+  if (!format || format === 'default') return rawVal;
+
+  let d: number | undefined;
+  let m: number | undefined;
+  let y: number | undefined;
+
+  const brMatch = rawVal.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
+  const isoMatch = rawVal.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+
+  if (brMatch) {
+    d = parseInt(brMatch[1], 10);
+    m = parseInt(brMatch[2], 10);
+    y = parseInt(brMatch[3], 10);
+    if (y < 100) y += 2000;
+  } else if (isoMatch) {
+    y = parseInt(isoMatch[1], 10);
+    m = parseInt(isoMatch[2], 10);
+    d = parseInt(isoMatch[3], 10);
+  } else {
+    const parsed = new Date(rawVal);
+    if (!isNaN(parsed.getTime())) {
+      d = parsed.getDate();
+      m = parsed.getMonth() + 1;
+      y = parsed.getFullYear();
+    } else {
+      return rawVal;
+    }
+  }
+
+  const dd = String(d).padStart(2, '0');
+  const mm = String(m).padStart(2, '0');
+  const yyyy = String(y);
+  const yy = String(y).slice(-2);
+
+  switch (format) {
+    case 'DD/MM/YYYY':
+    case 'date':
+      return `${dd}/${mm}/${yyyy}`;
+    case 'DD/MM/YY':
+      return `${dd}/${mm}/${yy}`;
+    case 'YYYY-MM-DD':
+      return `${yyyy}-${mm}-${dd}`;
+    default:
+      return rawVal;
+  }
+}
+
 // Resolvedor Universal de Campos da Integração e do Sistema
 export function resolveFieldValue(
   field?: string,
@@ -107,8 +157,9 @@ export function resolveFieldValue(
 
   if (field === 'system.printDateTime' || field === 'system.printDate' || field === 'system.printTime') {
     const fmt = format || (field === 'system.printDate' ? 'date' : field === 'system.printTime' ? 'time' : 'datetime');
-    if (fmt === 'date') {
-      return data['system.printDate'] || '20/08/2026';
+    if (fmt === 'date' || fmt === 'DD/MM/YYYY' || fmt === 'DD/MM/YY' || fmt === 'YYYY-MM-DD') {
+      const raw = data['system.printDate'] || '20/08/2026';
+      return formatDateValue(raw, fmt);
     }
     if (fmt === 'time') {
       return data['system.printTime'] || '12:35';
@@ -117,7 +168,11 @@ export function resolveFieldValue(
   }
 
   if (data[field] !== undefined) {
-    return data[field];
+    const val = data[field];
+    if (format && (format === 'DD/MM/YYYY' || format === 'DD/MM/YY' || format === 'YYYY-MM-DD' || format === 'date')) {
+      return formatDateValue(val, format);
+    }
+    return val;
   }
 
   return undefined;

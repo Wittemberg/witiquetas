@@ -155,6 +155,56 @@ export interface ResolveBindingContext {
   nicheId?: string;
 }
 
+// Formatador Universal de Datas (PACOTE 4.5.5)
+export function formatDateValue(rawVal?: string, format?: string): string {
+  if (!rawVal) return '';
+  if (!format || format === 'default') return rawVal;
+
+  let d: number | undefined;
+  let m: number | undefined;
+  let y: number | undefined;
+
+  const brMatch = rawVal.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
+  const isoMatch = rawVal.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+
+  if (brMatch) {
+    d = parseInt(brMatch[1], 10);
+    m = parseInt(brMatch[2], 10);
+    y = parseInt(brMatch[3], 10);
+    if (y < 100) y += 2000;
+  } else if (isoMatch) {
+    y = parseInt(isoMatch[1], 10);
+    m = parseInt(isoMatch[2], 10);
+    d = parseInt(isoMatch[3], 10);
+  } else {
+    const parsed = new Date(rawVal);
+    if (!isNaN(parsed.getTime())) {
+      d = parsed.getDate();
+      m = parsed.getMonth() + 1;
+      y = parsed.getFullYear();
+    } else {
+      return rawVal;
+    }
+  }
+
+  const dd = String(d).padStart(2, '0');
+  const mm = String(m).padStart(2, '0');
+  const yyyy = String(y);
+  const yy = String(y).slice(-2);
+
+  switch (format) {
+    case 'DD/MM/YYYY':
+    case 'date':
+      return `${dd}/${mm}/${yyyy}`;
+    case 'DD/MM/YY':
+      return `${dd}/${mm}/${yy}`;
+    case 'YYYY-MM-DD':
+      return `${yyyy}-${mm}-${dd}`;
+    default:
+      return rawVal;
+  }
+}
+
 export function resolveFieldValue(
   bindingOrField?: ElementBinding | string,
   context: ResolveBindingContext | Record<string, string> = {}
@@ -198,7 +248,9 @@ export function resolveFieldValue(
     return dataMap['system.printDateTime'] || getTimeObj().toLocaleString('pt-BR');
   }
   if (fieldId === 'system.printDate') {
-    return dataMap['system.printDate'] || getTimeObj().toLocaleDateString('pt-BR');
+    const raw = dataMap['system.printDate'] || getTimeObj().toLocaleDateString('pt-BR');
+    const fmt = (typeof bindingOrField === 'object' && bindingOrField?.format) ? bindingOrField.format : undefined;
+    return formatDateValue(raw, fmt);
   }
   if (fieldId === 'system.printTime') {
     return dataMap['system.printTime'] || getTimeObj().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });

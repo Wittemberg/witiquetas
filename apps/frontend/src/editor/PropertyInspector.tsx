@@ -292,8 +292,66 @@ export default function PropertyInspector() {
               label="Campo da integração"
               nicheId={activeNicheId}
               value={(elem as TextElement).field || ''}
-              onChange={(val) => updateElement(elem.id, { field: val || undefined })}
+              onChange={(val) => {
+                if (val) {
+                  const isSystem = val.startsWith('system.');
+                  updateElement(elem.id, {
+                    field: val,
+                    binding: {
+                      source: isSystem ? 'system' : 'integration',
+                      fieldId: val,
+                      namespace: val.includes('.') ? val.split('.')[0] : undefined,
+                    },
+                  });
+                } else {
+                  updateElement(elem.id, {
+                    field: undefined,
+                    binding: {
+                      source: 'manual',
+                    },
+                  });
+                }
+              }}
             />
+
+            {/* Seletor de Formato para Campos de Data / Sistema */}
+            {(() => {
+              const textElem = elem as TextElement;
+              const isDate =
+                textElem.field === 'system.printDate' ||
+                textElem.field === 'system.printDateTime' ||
+                textElem.field?.includes('validade') ||
+                textElem.field?.includes('expiration') ||
+                textElem.field?.includes('Date') ||
+                textElem.field?.includes('Data') ||
+                textElem.format === 'DD/MM/YYYY' ||
+                textElem.format === 'DD/MM/YY' ||
+                textElem.format === 'YYYY-MM-DD' ||
+                textElem.format === 'date';
+
+              if (!isDate) return null;
+
+              return (
+                <div style={{ marginTop: '0.4rem' }}>
+                  <label className="metric-label">Formato de Data</label>
+                  <select
+                    className="inspector-select"
+                    value={textElem.format || (textElem.field === 'system.printDateTime' ? 'datetime' : 'DD/MM/YYYY')}
+                    onChange={(e) => updateElement(elem.id, { format: e.target.value })}
+                  >
+                    <option value="DD/MM/YYYY">DD/MM/AAAA (ex: 28/08/2026)</option>
+                    <option value="DD/MM/YY">DD/MM/AA (ex: 28/08/26)</option>
+                    <option value="YYYY-MM-DD">AAAA-MM-DD (ex: 2026-08-28)</option>
+                    {textElem.field === 'system.printDateTime' && (
+                      <>
+                        <option value="datetime">Data e Hora (ex: 28/08/2026 14:30)</option>
+                        <option value="time">Apenas Hora (ex: 14:30)</option>
+                      </>
+                    )}
+                  </select>
+                </div>
+              );
+            })()}
 
             <div>
               <label className="metric-label">Texto Manual</label>
@@ -854,15 +912,17 @@ export default function PropertyInspector() {
         <div className="inspector-section">
           <div className="inspector-section-title">Propriedades da Linha</div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', marginBottom: '0.5rem' }}>
             <div>
-              <label className="metric-label">Cor</label>
+              <label className="metric-label">Comprimento (mm)</label>
               <input
-                type="color"
+                type="number"
+                step="0.5"
+                min="1"
+                max={document?.dimensions?.widthMm || 500}
                 className="inspector-input"
-                style={{ height: '32px', padding: '2px' }}
-                value={(elem as LineElement).color || '#000000'}
-                onChange={(e) => updateElement(elem.id, { color: e.target.value })}
+                value={Number(elem.width?.toFixed(1)) || 1}
+                onChange={(e) => updateElement(elem.id, { width: Math.max(1, parseFloat(e.target.value) || 1) })}
               />
             </div>
             <div>
@@ -875,6 +935,40 @@ export default function PropertyInspector() {
                 value={(elem as LineElement).strokeWidth || 1}
                 onChange={(e) => updateElement(elem.id, { strokeWidth: parseInt(e.target.value) || 1 })}
               />
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '0.5rem', marginBottom: '0.5rem' }}>
+            <div>
+              <label className="metric-label">Cor</label>
+              <input
+                type="color"
+                className="inspector-input"
+                style={{ height: '32px', padding: '2px' }}
+                value={(elem as LineElement).color || '#000000'}
+                onChange={(e) => updateElement(elem.id, { color: e.target.value })}
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="metric-label">Rotação Canônica</label>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.25rem', marginTop: '0.3rem' }}>
+              {[0, 90, 180, 270].map((angle) => {
+                const currentRotation = normalizeRotation(elem.rotation || 0);
+                const isSelected = currentRotation === angle;
+                return (
+                  <button
+                    key={angle}
+                    type="button"
+                    className={`btn ${isSelected ? 'btn-primary' : ''}`}
+                    style={{ justifyContent: 'center', padding: '0.35rem 0.2rem', fontSize: '0.72rem', fontWeight: 700 }}
+                    onClick={() => updateElement(elem.id, { rotation: angle })}
+                  >
+                    {angle}°
+                  </button>
+                );
+              })}
             </div>
           </div>
         </div>

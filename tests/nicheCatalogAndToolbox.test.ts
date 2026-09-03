@@ -79,11 +79,11 @@ describe('HOTFIX 4.5.3 — Validação de Invariantes do Catálogo Histórico e 
       assert.ok(cfg.recommendedTools.length > 0, `Nicho ${n.slug} deve ter recommendedTools`);
     });
 
-    // Gondola tem Preço e Preço Promo
+    // PACOTE 4.5.5: Gôndola tem Preço unificado (promotional-price removido)
     const gondolaBox = getNicheToolboxConfig('gondola-supermercado');
     const gondolaRecIds = gondolaBox.recommendedTools.map((t) => t.toolId);
     assert.ok(gondolaRecIds.includes('price'), 'Gôndola deve ter price em recommendedTools');
-    assert.ok(gondolaRecIds.includes('promotional-price'), 'Gôndola deve ter promotional-price em recommendedTools');
+    assert.strictEqual(gondolaRecIds.includes('promotional-price'), false, 'PACOTE 4.5.5: Gôndola NÃO deve ter promotional-price');
 
     // Hospital NÃO tem Preço e Preço Promo em NENHUMA lista
     const hospitalBox = getNicheToolboxConfig('hospital-identificacao');

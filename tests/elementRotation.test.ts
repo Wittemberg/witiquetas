@@ -4,7 +4,7 @@ import {
   normalizeRotation,
   getElementBoundingBox,
   applyMagneticRotationSnap,
-} from '../apps/frontend/src/editor/bounds.js';
+} from '../apps/frontend/src/editor/bounds.ts';
 import type {
   LabelElement,
   TextElement,

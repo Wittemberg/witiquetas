@@ -1,6 +1,31 @@
 {
   "checkpoints": [
     {
+      "sha": "8bf4a733e78eeea75115b7788ac6a598714c1292",
+      "shortSha": "8bf4a73",
+      "date": "2026-09-04T18:00:00Z",
+      "phase": "5",
+      "patch": "5.1.0-candidate",
+      "title": "feat(admin): fundacao de administracao, multiempresa e rbac (PACOTE 5.1)",
+      "type": "FEATURE",
+      "capabilities": [
+        "cap-company-settings",
+        "cap-enabled-niches",
+        "cap-enabled-elements",
+        "cap-enabled-fields",
+        "cap-effective-configuration",
+        "cap-permission-catalog",
+        "cap-role-permissions",
+        "cap-user-role-assignment",
+        "cap-niche-access-control"
+      ],
+      "testsPassed": true,
+      "deployed": false,
+      "manualValidation": false,
+      "homologated": false,
+      "evidence": "Suíte completa de testes de isolamento multi-tenant relacional, RBAC e EffectiveConfigurationService"
+    },
+    {
       "sha": "bdc5b09faa31b5ea14be7cc75c59773d04010e40",
       "shortSha": "bdc5b09",
       "date": "2026-09-04T17:15:00Z",

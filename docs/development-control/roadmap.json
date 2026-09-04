@@ -727,18 +727,18 @@
                                                 "module":  "admin",
                                                 "weight":  2,
                                                 "mvp":  false,
-                                                "status":  "PLANNED",
+                                                "status":  "IMPLEMENTED",
                                                 "manualValidation":  false,
                                                 "physicalValidation":  false,
                                                 "frozen":  false,
                                                 "evidence":  [
-
+                                                                 "tests/adminRbacFoundation.test.ts"
                                                              ],
                                                 "dependencies":  [
 
                                                                  ],
                                                 "notes":  [
-                                                              "Configuração corporativa multi-tenant."
+                                                              "PACOTE 5.1: Criação e governança corporativa multi-tenant persistente com isolamento estrito por company_id."
                                                           ]
                                             },
                                             {
@@ -748,18 +748,18 @@
                                                 "module":  "admin",
                                                 "weight":  2,
                                                 "mvp":  false,
-                                                "status":  "PLANNED",
+                                                "status":  "IMPLEMENTED",
                                                 "manualValidation":  false,
                                                 "physicalValidation":  false,
                                                 "frozen":  false,
                                                 "evidence":  [
-
+                                                                 "tests/adminRbacFoundation.test.ts"
                                                              ],
                                                 "dependencies":  [
                                                                      "cap-company-settings"
                                                                  ],
                                                 "notes":  [
-                                                              "Restringe nichos disponíveis na UI do cliente."
+                                                              "PACOTE 5.1: Tabela company_niches associando nichos habilitados/desabilitados por tenant."
                                                           ]
                                             },
                                             {
@@ -769,18 +769,18 @@
                                                 "module":  "admin",
                                                 "weight":  2,
                                                 "mvp":  false,
-                                                "status":  "PLANNED",
+                                                "status":  "IMPLEMENTED",
                                                 "manualValidation":  false,
                                                 "physicalValidation":  false,
                                                 "frozen":  false,
                                                 "evidence":  [
-
+                                                                 "tests/adminRbacFoundation.test.ts"
                                                              ],
                                                 "dependencies":  [
                                                                      "cap-enabled-niches"
                                                                  ],
                                                 "notes":  [
-                                                              "Filtro do resolvedor de elementos da Toolbox."
+                                                              "PACOTE 5.1: Configuração relacional de elementos habilitados por nicho e empresa."
                                                           ]
                                             },
                                             {
@@ -790,18 +790,18 @@
                                                 "module":  "admin",
                                                 "weight":  2,
                                                 "mvp":  false,
-                                                "status":  "PLANNED",
+                                                "status":  "IMPLEMENTED",
                                                 "manualValidation":  false,
                                                 "physicalValidation":  false,
                                                 "frozen":  false,
                                                 "evidence":  [
-
+                                                                 "tests/adminRbacFoundation.test.ts"
                                                              ],
                                                 "dependencies":  [
                                                                      "cap-company-settings"
                                                                  ],
                                                 "notes":  [
-                                                              "Governança do dicionário de dados da empresa."
+                                                              "PACOTE 5.1: Governança relacional de campos canônicos habilitados por nicho e empresa."
                                                           ]
                                             },
                                             {
@@ -811,12 +811,12 @@
                                                 "module":  "admin",
                                                 "weight":  2,
                                                 "mvp":  false,
-                                                "status":  "PLANNED",
+                                                "status":  "IMPLEMENTED",
                                                 "manualValidation":  false,
                                                 "physicalValidation":  false,
                                                 "frozen":  false,
                                                 "evidence":  [
-
+                                                                 "tests/adminRbacFoundation.test.ts"
                                                              ],
                                                 "dependencies":  [
                                                                      "cap-enabled-elements",
@@ -1001,18 +1001,17 @@
                                                 "module":  "auth-rbac",
                                                 "weight":  2,
                                                 "mvp":  false,
-                                                "status":  "PLANNED",
+                                                "status":  "IMPLEMENTED",
                                                 "manualValidation":  false,
                                                 "physicalValidation":  false,
                                                 "frozen":  false,
                                                 "evidence":  [
-
+                                                                 "tests/adminRbacFoundation.test.ts"
                                                              ],
                                                 "dependencies":  [
-
                                                                  ],
                                                 "notes":  [
-                                                              "Base imutável de permissões granulares."
+                                                              "PACOTE 5.1: Catálogo imutável CANONICAL_PERMISSIONS com 25 permissões canônicas registradas e testadas."
                                                           ]
                                             },
                                             {
@@ -1022,19 +1021,19 @@
                                                 "module":  "auth-rbac",
                                                 "weight":  2,
                                                 "mvp":  false,
-                                                "status":  "PLANNED",
+                                                "status":  "IMPLEMENTED",
                                                 "manualValidation":  false,
                                                 "physicalValidation":  false,
                                                 "frozen":  false,
                                                 "evidence":  [
-
+                                                                 "tests/adminRbacFoundation.test.ts"
                                                              ],
                                                 "dependencies":  [
                                                                      "cap-permission-catalog",
                                                                      "cap-role-management"
                                                                  ],
                                                 "notes":  [
-                                                              "Definição de escopo de atuação de cada perfil."
+                                                              "PACOTE 5.1: Tabela relacional role_permissions e métodos de associação granular no RoleRepository."
                                                           ]
                                             },
                                             {
@@ -1044,19 +1043,19 @@
                                                 "module":  "auth-rbac",
                                                 "weight":  2,
                                                 "mvp":  false,
-                                                "status":  "PLANNED",
+                                                "status":  "IMPLEMENTED",
                                                 "manualValidation":  false,
                                                 "physicalValidation":  false,
                                                 "frozen":  false,
                                                 "evidence":  [
-
+                                                                 "tests/adminRbacFoundation.test.ts"
                                                              ],
                                                 "dependencies":  [
                                                                      "cap-user-management",
                                                                      "cap-role-management"
                                                                  ],
                                                 "notes":  [
-                                                              "Concessão efetiva de privilégios."
+                                                              "PACOTE 5.1: Tabela user_roles com FK composta e isolamento relacional estrito impedindo cross-tenant."
                                                           ]
                                             },
                                             {
@@ -1066,12 +1065,12 @@
                                                 "module":  "auth-rbac",
                                                 "weight":  2,
                                                 "mvp":  false,
-                                                "status":  "PLANNED",
+                                                "status":  "IMPLEMENTED",
                                                 "manualValidation":  false,
                                                 "physicalValidation":  false,
                                                 "frozen":  false,
                                                 "evidence":  [
-
+                                                                 "tests/adminRbacFoundation.test.ts"
                                                              ],
                                                 "dependencies":  [
                                                                      "cap-enabled-niches",

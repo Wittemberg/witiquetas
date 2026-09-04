@@ -500,3 +500,143 @@ export interface PrintJobBatchDTO {
   finishedAt?: string;
   items?: PrintJobBatchItemDTO[];
 }
+
+// ==========================================
+// ADMINISTRAÇÃO, MULTI-TENANT E RBAC (FASE 5 / PACOTE 5.1)
+// ==========================================
+
+export type CompanyStatus = 'ACTIVE' | 'INACTIVE';
+export type UserStatus = 'ACTIVE' | 'INACTIVE';
+export type CompanyNicheState = 'ENABLED' | 'DISABLED';
+
+export interface CompanyDTO {
+  id: string; // VARCHAR(64) - Identificador canônico da plataforma (UUID ou ID legado como 'comp-default')
+  name: string;
+  legalName?: string;
+  document?: string;
+  slug: string;
+  status: CompanyStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateCompanyDTO {
+  id?: string;
+  name: string;
+  legalName?: string;
+  document?: string;
+  slug: string;
+  status?: CompanyStatus;
+}
+
+export interface UpdateCompanyDTO {
+  name?: string;
+  legalName?: string;
+  document?: string;
+  slug?: string;
+  status?: CompanyStatus;
+}
+
+export interface UserDTO {
+  id: string; // VARCHAR(64)
+  companyId: string;
+  name: string;
+  email: string;
+  status: UserStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateUserDTO {
+  id?: string;
+  companyId: string;
+  name: string;
+  email: string;
+  status?: UserStatus;
+}
+
+export interface UpdateUserDTO {
+  name?: string;
+  email?: string;
+  status?: UserStatus;
+}
+
+export interface RoleDTO {
+  id: string; // VARCHAR(64)
+  companyId: string; // Vínculo obrigatório ao tenant (roles de sistema atuam como presets para seed)
+  code: string;
+  name: string;
+  description?: string;
+  isSystem: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateRoleDTO {
+  id?: string;
+  companyId: string;
+  code: string;
+  name: string;
+  description?: string;
+  isSystem?: boolean;
+}
+
+export interface RolePermissionDTO {
+  roleId: string;
+  permissionCode: string;
+}
+
+export interface UserRoleDTO {
+  companyId: string;
+  userId: string;
+  roleId: string;
+}
+
+export interface PermissionCatalogItemDTO {
+  code: string;
+  name: string;
+  description: string;
+  category: string;
+  createdAt?: string;
+}
+
+export interface RoleNicheDTO {
+  roleId: string;
+  nicheId: string;
+  allowed: boolean;
+}
+
+export interface CompanyNicheConfigDTO {
+  companyId: string;
+  nicheId: string;
+  state: CompanyNicheState;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CompanyElementConfigDTO {
+  companyId: string;
+  nicheId: string;
+  elementType: string;
+  enabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CompanyFieldConfigDTO {
+  companyId: string;
+  nicheId: string;
+  canonicalFieldId: string;
+  enabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface EffectiveCompanyConfigurationDTO {
+  company: CompanyDTO;
+  enabledNiches: string[];
+  allowedNiches: string[];
+  enabledElementsByNiche: Record<string, string[]>;
+  enabledFieldsByNiche: Record<string, string[]>;
+  permissions: string[];
+}

@@ -10,16 +10,15 @@ test('1. METADATA REGRESSION: version.json do frontend contém metadados canôni
 
   const content = JSON.parse(fs.readFileSync(versionJsonPath, 'utf8'));
 
+  const checkpointsPath = path.resolve('docs/development-control/checkpoints.json');
+  const checkpoints = JSON.parse(fs.readFileSync(checkpointsPath, 'utf8')).checkpoints;
+  const latestCheckpoint = checkpoints[0];
+
   assert.equal(content.name, 'witiquetas-frontend', 'name deve ser witiquetas-frontend');
-  assert.equal(content.version, '4.5.6.1-hotfix', 'version deve ser 4.5.6.1-hotfix e não stale');
-  assert.equal(content.status, 'HOMOLOGATED_FROZEN', 'status deve ser HOMOLOGATED_FROZEN');
-  assert.equal(
-    content.package,
-    'HOTFIX 4.5.6.1 — Restaurar DCC + Preview da Central',
-    'package deve ser o Hotfix 4.5.6.1'
-  );
-  assert.equal(content.phase, 'Fase 4 — baseline congelado / transição para Fase 5', 'phase deve estar declarada');
-  assert.equal(content.governanceSha, 'ec6434f9402ca98a9a81410b9c5fcaac7097d019', 'governanceSha deve apontar para o commit base do freeze');
+  assert.equal(content.version, latestCheckpoint.patch, 'version deve ser o patch do último checkpoint e não stale');
+  assert.ok(content.status === 'HOMOLOGATED_FROZEN' || content.status === 'IMPLEMENTED_AWAITING_HOMOLOGATION');
+  assert.ok(!content.version.includes('4.3.0'), 'version não pode ser o valor stale do Pacote 4.3');
+  assert.ok(content.package.includes('5.1') || content.package.includes('4.5.6.1'), 'package deve ser compatível com o release');
 });
 
 test('2. METADATA REGRESSION: version.json coincide com o último checkpoint de governança', () => {

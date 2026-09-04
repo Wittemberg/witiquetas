@@ -123,7 +123,7 @@ test('DCC INVARIANT E & F: homologatedWeight <= implementedWeight <= totalWeight
   assert.ok(homologatedWeight <= implementedWeight, 'homologatedWeight não pode ser maior que implementedWeight');
   assert.ok(implementedWeight <= totalWeight, 'implementedWeight não pode ser maior que totalWeight');
   assert.equal(homologatedWeight, 204, 'homologatedWeight deve refletir 204 com PACOTE 4.5.5 e 4.5.5.1 homologados e Editor congelado');
-  assert.equal(implementedWeight, 234, 'implementedWeight deve refletir 234 com baseline do Editor e Central implementados');
+  assert.equal(implementedWeight, 252, 'implementedWeight deve refletir 252 com baseline do Editor/Central e capabilities do Pacote 5.1 implementadas');
 });
 
 test('DCC INVARIANT H & I: Matriz de nichos possui IDs unicos, nomes e status validos', () => {

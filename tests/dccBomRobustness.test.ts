@@ -94,14 +94,14 @@ test('9. DCC ROBUSTNESS: Frozen components são processados no overview', () => 
   assert.equal(printCenterFreeze.frozenSincePatch, '4.5.5.1');
 });
 
-test('10. DCC ROBUSTNESS: Totais de Roadmap e MVP permanecem exatos (354, 211, 234, 204)', () => {
+test('10. DCC ROBUSTNESS: Totais de Roadmap e MVP permanecem exatos (354, 211, 252, 204)', () => {
   const service = new DevelopmentControlService();
   const overview = service.getOverview();
 
   assert.equal(overview.progress.fullRoadmap.totalWeight, 354, 'Roadmap totalWeight deve ser 354');
-  assert.equal(overview.progress.fullRoadmap.implementedWeight, 234, 'Roadmap implementedWeight deve ser 234');
+  assert.equal(overview.progress.fullRoadmap.implementedWeight, 252, 'Roadmap implementedWeight deve ser 252');
   assert.equal(overview.progress.fullRoadmap.homologatedWeight, 204, 'Roadmap homologatedWeight deve ser 204');
-  assert.equal(overview.progress.fullRoadmap.implementationPercent, 66, 'Roadmap implementationPercent deve ser 66%');
+  assert.equal(overview.progress.fullRoadmap.implementationPercent, 71, 'Roadmap implementationPercent deve ser 71%');
   assert.equal(overview.progress.fullRoadmap.readinessPercent, 58, 'Roadmap readinessPercent deve ser 58%');
 
   assert.equal(overview.progress.mvp.totalWeight, 211, 'MVP totalWeight deve ser 211');

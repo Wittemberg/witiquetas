@@ -235,6 +235,8 @@ export class DevelopmentControlService {
       { id: 'sidebar-shell', name: 'Sidebar & Shell', description: 'Menu lateral recolhível e cabeçalho global', frozenSincePatch: '3.5.0', reason: 'Navegação canônica multinicho' },
       { id: 'pplb-compiler-core', name: 'Compilador PPLB & Round-Trip', description: 'Motor de compilação RAW PPLB com parser de condicionais [[SE]]', frozenSincePatch: '2.1.0', reason: 'Golden Model 16-ARGOX Diff Zero' },
       { id: 'concurrency-engine', name: 'Concorrência & Presence Engine', description: 'Presença atômica no DB com expiração 45s e Lock Otimista 409', frozenSincePatch: '3.2.8.3', reason: 'Integridade multi-aba e multi-navegador' },
+      { id: 'editor-baseline', name: 'Editor Baseline (EDITOR_BASELINE_FREEZE)', description: 'Canvas, Toolbox compacta, Layers, multiselect Ctrl/Cmd+click, Text, Price, Date, Barcode, QRCode, Line, Rectangle, Image, rotação canônica, resize, save/reload e catálogo de 11 nichos, 66 tamanhos e 112 relações', frozenSincePatch: '4.5.5.1', reason: 'Editor funcional homologado antes da fase de Administração' },
+      { id: 'print-center-baseline', name: 'Central de Impressão Baseline (PRINT_CENTER_BASELINE_FREEZE)', description: 'Templates/modelos, preview, datasets, seleção de impressora, print jobs, histórico, batch, fluxo Agent e transport semantics', frozenSincePatch: '4.5.5.1', reason: 'Fluxo suficientemente maduro para retomada posterior após Administração e configuração contextual' },
     ];
   }
 

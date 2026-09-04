@@ -72,8 +72,8 @@ test('DCC INVARIANT A & G: Soma de pesos total e MVP é matematicamente consiste
     }
   }
 
-  assert.equal(totalWeight, 267, 'Soma total de pesos deve ser exatamente 267 após inclusão do escopo multinicho, UX e multiselect de camadas');
-  assert.equal(mvpTotalWeight, 198, 'Soma de pesos do MVP deve ser exatamente 198 (172 anterior + 26 novos P0/MVP)');
+  assert.equal(totalWeight, 354, 'Soma total de pesos deve ser exatamente 354 após freeze do Editor/Central e expansão da Fase 5');
+  assert.equal(mvpTotalWeight, 211, 'Soma de pesos do MVP deve ser exatamente 211 com baseline homologado e governança multi-tenant');
 });
 
 test('DCC INVARIANT B: Nenhuma capability possui ID duplicado no roadmap', () => {
@@ -122,8 +122,8 @@ test('DCC INVARIANT E & F: homologatedWeight <= implementedWeight <= totalWeight
 
   assert.ok(homologatedWeight <= implementedWeight, 'homologatedWeight não pode ser maior que implementedWeight');
   assert.ok(implementedWeight <= totalWeight, 'implementedWeight não pode ser maior que totalWeight');
-  assert.equal(homologatedWeight, 151, 'homologatedWeight deve refletir 151 com PACOTE 4.4 homologado');
-  assert.equal(implementedWeight, 191, 'implementedWeight deve refletir 191 com PACOTE 4.5 (cap-multiniche-profiles) implementado');
+  assert.equal(homologatedWeight, 204, 'homologatedWeight deve refletir 204 com PACOTE 4.5.5 e 4.5.5.1 homologados e Editor congelado');
+  assert.equal(implementedWeight, 234, 'implementedWeight deve refletir 234 com baseline do Editor e Central implementados');
 });
 
 test('DCC INVARIANT H & I: Matriz de nichos possui IDs unicos, nomes e status validos', () => {

@@ -14,8 +14,9 @@
       ],
       "testsPassed": true,
       "deployed": true,
-      "manualValidation": false,
-      "homologated": false
+      "manualValidation": true,
+      "homologated": true,
+      "evidence": "Homologação manual concluída pelo usuário em 100%"
     },
     {
       "sha": "e103cb478bc3895e628469d41d2fdf21f7c8ec23",
@@ -35,8 +36,9 @@
       ],
       "testsPassed": true,
       "deployed": true,
-      "manualValidation": false,
-      "homologated": false
+      "manualValidation": true,
+      "homologated": true,
+      "evidence": "Homologação manual concluída pelo usuário em 100%"
     },
     {
       "sha": "7a598175ddc622ea7cad24dfb374e88ba64d7b7f",

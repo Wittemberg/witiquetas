@@ -1,693 +1,1637 @@
-{
-  "phases": [
-    {
-      "id": "phase-0",
-      "code": "0",
-      "name": "Fase 0 — Fundação e Validação de Conectividade",
-      "description": "Base executável monorepo, containers Docker, backend Node.js/PostgreSQL/MinIO, CI/CD GitHub Actions e Portainer.",
-      "status": "FROZEN",
-      "capabilities": [
-        {
-          "id": "cap-monorepo-setup",
-          "name": "Arquitetura Monorepo e Workspace Node/TypeScript",
-          "description": "Estruturação dos apps e pacotes compartilhados (contracts, label-schema, printer-core, printer-ppla, printer-pplb).",
-          "module": "foundation",
-          "weight": 8,
-          "mvp": true,
-          "status": "FROZEN",
-          "manualValidation": true,
-          "physicalValidation": false,
-          "frozen": true,
-          "evidence": [
-            "packages/contracts",
-            "packages/label-schema",
-            "packages/printer-core"
-          ],
-          "dependencies": [],
-          "notes": [
-            "Estrutura base mantida intacta desde a Fase 0."
-          ]
-        },
-        {
-          "id": "cap-docker-cicd",
-          "name": "Containers Docker, GHCR, GitHub Actions e Portainer CD",
-          "description": "Esteira CI/CD zero-rebuild com promoção imutável candidate -> production/stable e auto-rollback.",
-          "module": "deployment-cicd",
-          "weight": 10,
-          "mvp": true,
-          "status": "FROZEN",
-          "manualValidation": true,
-          "physicalValidation": false,
-          "frozen": true,
-          "evidence": [
-            ".github/workflows/docker.yml",
-            "apps/backend/Dockerfile",
-            "apps/frontend/Dockerfile"
-          ],
-          "dependencies": [
-            "cap-monorepo-setup"
-          ],
-          "notes": [
-            "Validação continua e automatizada via webhook e auto-rollback guard em 150s."
-          ]
-        },
-        {
-          "id": "cap-infra-storage-db",
-          "name": "Infraestrutura de Banco PostgreSQL e Storage MinIO/S3",
-          "description": "Fail-Closed PostgreSQL para metadados/modelos e MinIO para imagens com rotas de health check /api/health.",
-          "module": "foundation",
-          "weight": 8,
-          "mvp": true,
-          "status": "FROZEN",
-          "manualValidation": true,
-          "physicalValidation": false,
-          "frozen": true,
-          "evidence": [
-            "apps/backend/src/db.ts",
-            "apps/backend/src/index.ts"
-          ],
-          "dependencies": [
-            "cap-monorepo-setup"
-          ],
-          "notes": [
-            "Health checks e estatísticas operacionais em tempo real."
-          ]
-        }
-      ]
-    },
-    {
-      "id": "phase-1",
-      "code": "1",
-      "name": "Fase 1 — Editor Visual e Schema Abstrato",
-      "description": "Interface visual para montagem de etiquetas térmicas independente de linguagem física com serialização LabelDocument v1.",
-      "status": "FROZEN",
-      "capabilities": [
-        {
-          "id": "cap-canvas-core",
-          "name": "Canvas Interativo com Zoom, Grid, Snap e Bounds Clamping",
-          "description": "Área de trabalho física com dimensões reais em mm, DPI, rotação, zoom responsivo e travamento nas bordas.",
-          "module": "editor-core",
-          "weight": 12,
-          "mvp": true,
-          "status": "FROZEN",
-          "manualValidation": true,
-          "physicalValidation": false,
-          "frozen": true,
-          "evidence": [
-            "apps/frontend/src/editor/CanvasArea.tsx",
-            "apps/frontend/src/editor/bounds.ts"
-          ],
-          "dependencies": [
-            "cap-monorepo-setup"
-          ],
-          "notes": [
-            "Congelado para proteger manipulação geométrica do canvas."
-          ]
-        },
-        {
-          "id": "cap-visual-elements",
-          "name": "Componentes Visuais (Price, Line, Text, Barcode, QRCode)",
-          "description": "Elementos visuais canônicos do schema abstrato com renderização vetorial e suporte a second line scale.",
-          "module": "elements",
-          "weight": 10,
-          "mvp": true,
-          "status": "FROZEN",
-          "manualValidation": true,
-          "physicalValidation": false,
-          "frozen": true,
-          "evidence": [
-            "apps/frontend/src/editor/components/PriceElement.tsx",
-            "apps/frontend/src/editor/components/LineElement.tsx"
-          ],
-          "dependencies": [
-            "cap-canvas-core"
-          ],
-          "notes": [
-            "Componentes Price, Line e Multiselect formalmente congelados."
-          ]
-        },
-        {
-          "id": "cap-undo-redo-state",
-          "name": "Gestão de Estado Reativa e Histórico Undo/Redo",
-          "description": "Editor store desacoplada com imutabilidade e pilha de desfazer/refazer.",
-          "module": "editor-core",
-          "weight": 8,
-          "mvp": true,
-          "status": "FROZEN",
-          "manualValidation": true,
-          "physicalValidation": false,
-          "frozen": true,
-          "evidence": [
-            "apps/frontend/src/editor/useEditorStore.ts"
-          ],
-          "dependencies": [
-            "cap-canvas-core"
-          ],
-          "notes": [
-            "Store desacoplada de presenças e histórico."
-          ]
-        }
-      ]
-    },
-    {
-      "id": "phase-2",
-      "code": "2",
-      "name": "Fase 2 — Compiladores PPLA/PPLB e Preprocessador Legado",
-      "description": "Motor de compilação RAW de baixo nível para impressoras Argox/PPLA/PPLB, parser de macros ERP e Round-Trip Diff Zero.",
-      "status": "HOMOLOGATED",
-      "capabilities": [
-        {
-          "id": "cap-pplb-compiler",
-          "name": "Compilador PPLB com Mapeamento de Fontes e Métricas Físicas",
-          "description": "Geração nativa de comandos PPLB (Q, q, N, N, B, A) com conversão exata dotsToMm e mmToDots.",
-          "module": "compilers",
-          "weight": 12,
-          "mvp": true,
-          "status": "FROZEN",
-          "manualValidation": true,
-          "physicalValidation": true,
-          "frozen": true,
-          "evidence": [
-            "packages/printer-pplb"
-          ],
-          "dependencies": [
-            "cap-monorepo-setup"
-          ],
-          "notes": [
-            "Suíte de 61 testes automatizados (Golden Tests PPLB) aprovada 100%."
-          ]
-        },
-        {
-          "id": "cap-ppla-compiler",
-          "name": "Compilador PPLA Base",
-          "description": "Geração nativa de comandos PPLA para impressoras térmicas legadas Argox OS-214.",
-          "module": "compilers",
-          "weight": 8,
-          "mvp": true,
-          "status": "HOMOLOGATED",
-          "manualValidation": true,
-          "physicalValidation": true,
-          "frozen": true,
-          "evidence": [
-            "packages/printer-ppla"
-          ],
-          "dependencies": [
-            "cap-monorepo-setup"
-          ],
-          "notes": [
-            "Suporte a PPLA base homologado em bancada."
-          ]
-        },
-        {
-          "id": "cap-legacy-importer",
-          "name": "Importador e Preprocessador com Preservação de Comentários (Round-Trip)",
-          "description": "Parsing de templates PPLB legados com suporte a condicionais inline/multilinha ([[SE]], [[SENAO]], [[FIMSE]]) e diff zero.",
-          "module": "importers",
-          "weight": 10,
-          "mvp": true,
-          "status": "FROZEN",
-          "manualValidation": true,
-          "physicalValidation": true,
-          "frozen": true,
-          "evidence": [
-            "packages/printer-pplb/src/importer.ts"
-          ],
-          "dependencies": [
-            "cap-pplb-compiler"
-          ],
-          "notes": [
-            "Testes Golden Model 16-ARGOX REGRA - ATACADO.txt 100% homologados."
-          ]
-        }
-      ]
-    },
-    {
-      "id": "phase-3",
-      "code": "3",
-      "name": "Fase 3 — Agente Local de Impressão (Daemon Rust)",
-      "description": "Daemon nativo em Rust para comunicação direta com impressoras térmicas locais via RAW TCP, USB e Spooler de impressão.",
-      "status": "HOMOLOGATED",
-      "capabilities": [
-        {
-          "id": "cap-agent-core-rust",
-          "name": "Daemon Nativo em Rust (x64 PE Executable)",
-          "description": "Agente executável headless compilado em Rust com suporte a comunicação assíncrona Tokio, TLS e RAW TCP.",
-          "module": "agent",
-          "weight": 12,
-          "mvp": true,
-          "status": "FROZEN",
-          "manualValidation": true,
-          "physicalValidation": true,
-          "frozen": true,
-          "evidence": [
-            "apps/agent-core",
-            "apps/backend/src/routes/agents.ts"
-          ],
-          "dependencies": [
-            "cap-monorepo-setup"
-          ],
-          "notes": [
-            "Compilação Windows x64 automatizada no CI e distribuída via GET /api/agents/download/windows-x64."
-          ]
-        },
-        {
-          "id": "cap-agent-pairing",
-          "name": "Protocolo de Pareamento de Agentes e Heartbeat",
-          "description": "Pareamento seguro de estaca de trabalho por código de 6 dígitos e heartbeat contínuo.",
-          "module": "agent",
-          "weight": 8,
-          "mvp": true,
-          "status": "HOMOLOGATED",
-          "manualValidation": true,
-          "physicalValidation": true,
-          "frozen": false,
-          "evidence": [
-            "apps/frontend/src/agent/PairAgentModal.tsx"
-          ],
-          "dependencies": [
-            "cap-agent-core-rust"
-          ],
-          "notes": [
-            "Modal de pareamento operacional na interface."
-          ]
-        }
-      ]
-    },
-    {
-      "id": "phase-3-5",
-      "code": "3.5",
-      "name": "Fase 3.5 — Hardening de Produto, UX, Application Shell e Concorrência",
-      "description": "Consolidação de UX multinicho, Application Shell moderno, Ciclo de Vida de Modelos (Meus Modelos), Concorrência Atômica com Presença e Invariância Geométrica da Toolbar.",
-      "status": "HOMOLOGATED",
-      "capabilities": [
-        {
-          "id": "cap-app-shell-ux",
-          "name": "Application Shell Moderno e Navegação Sidebar",
-          "description": "Shell responsivo com Sidebar recolhível (localStorage), Drawer mobile, GlobalHeader unificado e tokens de design.",
-          "module": "app-shell",
-          "weight": 10,
-          "mvp": true,
-          "status": "FROZEN",
-          "manualValidation": true,
-          "physicalValidation": false,
-          "frozen": true,
-          "evidence": [
-            "apps/frontend/src/shell/ApplicationShell.tsx",
-            "apps/frontend/src/shell/Sidebar.tsx"
-          ],
-          "dependencies": [
-            "cap-canvas-core"
-          ],
-          "notes": [
-            "Consolidação de UX formalizada em docs/product/PRODUCT-UX-CONSOLIDATION.md."
-          ]
-        },
-        {
-          "id": "cap-model-lifecycle-db",
-          "name": "Ciclo de Vida do Modelo em PostgreSQL (Meus Modelos)",
-          "description": "Persistência em banco relacional, listagem, busca, renomear, duplicar no backend e soft-delete.",
-          "module": "model-lifecycle",
-          "weight": 10,
-          "mvp": true,
-          "status": "FROZEN",
-          "manualValidation": true,
-          "physicalValidation": false,
-          "frozen": true,
-          "evidence": [
-            "apps/frontend/src/modules/models/ModelsPage.tsx",
-            "apps/backend/src/repositories/templateRepository.ts"
-          ],
-          "dependencies": [
-            "cap-infra-storage-db"
-          ],
-          "notes": [
-            "Operações de CRUD de modelos 100% homologadas com Fail-Closed."
-          ]
-        },
-        {
-          "id": "cap-concurrency-presence",
-          "name": "Concorrência Atômica, Heartbeat de Presença e Lock Otimista (HTTP 409)",
-          "description": "Proteção contra sobrescrita simultânea, heartbeat a cada 15s com expiração em 45s, detecção de sessão por aba (UUID-B) e modal de resolução de conflito com Save As Copy.",
-          "module": "concurrency",
-          "weight": 12,
-          "mvp": true,
-          "status": "FROZEN",
-          "manualValidation": true,
-          "physicalValidation": false,
-          "frozen": true,
-          "evidence": [
-            "apps/backend/src/repositories/presenceRepository.ts",
-            "apps/frontend/src/editor/__tests__/patch3283.test.ts"
-          ],
-          "dependencies": [
-            "cap-model-lifecycle-db"
-          ],
-          "notes": [
-            "Homologação manual concluída e validada em produção no PATCH 3.2.8.3."
-          ]
-        },
-        {
-          "id": "cap-toolbar-geometry-stabilization",
-          "name": "Estabilização Geométrica do Status na Toolbar",
-          "description": "Invariância visual com container fixo de 140px (save-status-container), impedindo layout shift em qualquer troca de estado (Salvo, Não salvo, Salvando..., Conflito, Removido, Erro).",
-          "module": "app-shell",
-          "weight": 8,
-          "mvp": true,
-          "status": "FROZEN",
-          "manualValidation": true,
-          "physicalValidation": false,
-          "frozen": true,
-          "evidence": [
-            "apps/frontend/src/editor/EditorLayout.tsx",
-            "apps/frontend/src/editor/__tests__/patch3284.test.ts"
-          ],
-          "dependencies": [
-            "cap-app-shell-ux"
-          ],
-          "notes": [
-            "Homologado no PATCH 3.2.8.4. Zero deslocamento no botão Imprimir."
-          ]
-        },
-        {
-          "id": "cap-development-control-center-backend",
-          "name": "Development Control Center 0.1 — Domínio e Backend API",
-          "description": "Estrutura de dados versionada do roadmap, cálculos desacoplados de métricas (MVP Readiness vs Full Roadmap), auditoria de saúde e rotas protegidas por ambiente.",
-          "module": "admin",
-          "weight": 8,
-          "mvp": false,
-          "status": "VALIDATION",
-          "manualValidation": true,
-          "physicalValidation": false,
-          "frozen": false,
-          "evidence": [
-            "docs/development-control",
-            "apps/backend/src/routes/developmentControl.ts"
-          ],
-          "dependencies": [
-            "cap-infra-storage-db"
-          ],
-          "notes": [
-            "Módulo interno de visibilidade sistêmica do produto."
-          ]
-        },
-        {
-          "id": "cap-development-control-center-frontend",
-          "name": "Development Control Center 0.1 — Interface Visual de Governança",
-          "description": "Painel interno com Hero de progresso, timeline de fases, grid de módulos, lista de componentes congelados e gap para MVP.",
-          "module": "admin",
-          "weight": 8,
-          "mvp": false,
-          "status": "VALIDATION",
-          "manualValidation": true,
-          "physicalValidation": false,
-          "frozen": false,
-          "evidence": [
-            "apps/frontend/src/modules/devcontrol/DevControlPage.tsx"
-          ],
-          "dependencies": [
-            "cap-development-control-center-backend"
-          ],
-          "notes": [
-            "Interface restrita aos ambientes de desenvolvimento e homologação."
-          ]
-        }
-      ]
-    },
-    {
-      "id": "phase-4",
-      "code": "4",
-      "name": "Fase 4 — Central de Impressão Universal, Perfis Multi-Nicho, RBAC e Multi-Tenancy",
-      "description": "Plataforma comercial para envio de impressões em massa por operadores, perfis operacionais multinicho, gestão de permissões (RBAC) e isolamento multiempresa.",
-      "status": "IN_PROGRESS",
-      "capabilities": [
-        {
-          "id": "cap-universal-print-center",
-          "name": "Central de Impressão Universal (Universal Print Center)",
-          "description": "Busca contextual única, grid com colunas dinâmicas adaptáveis por perfil/nicho ativo e disparo em lote para impressoras físicas.",
-          "module": "print-center",
-          "weight": 14,
-          "mvp": true,
-          "status": "IN_PROGRESS",
-          "manualValidation": false,
-          "physicalValidation": false,
-          "frozen": false,
-          "evidence": [],
-          "dependencies": [
-            "cap-pplb-compiler",
-            "cap-agent-core-rust"
-          ],
-          "notes": [
-            "Requisito essencial para MVP comercial de operadores.",
-            "A Central não possui dataset ou grid fixado exclusivamente em varejo, adaptando origem de dados, colunas, busca, preview e identificação ao perfil ativo (Varejo, Hospitalar, Laboratório, Logística, Indústria, Alimentação, Farmácia)."
-          ]
-        },
-        {
-          "id": "cap-rbac-multi-tenant",
-          "name": "Governança Multi-Tenant e Autenticação RBAC",
-          "description": "Isolamento estrito entre empresas (Tenants), perfis (Administrador, Designer, Operador) e validação de tokens JWT.",
-          "module": "auth-rbac",
-          "weight": 12,
-          "mvp": true,
-          "status": "PLANNED",
-          "manualValidation": false,
-          "physicalValidation": false,
-          "frozen": false,
-          "evidence": [],
-          "dependencies": [
-            "cap-infra-storage-db"
-          ],
-          "notes": [
-            "Garante a separação completa entre clientes e filiais."
-          ]
-        },
-        {
-          "id": "cap-licensing-billing",
-          "name": "Gestão de Licenças e Limite de Dispositivos",
-          "description": "Controle de vigência de licenças, limite de impressoras cadastradas e modo de demonstração (Trial).",
-          "module": "licensing",
-          "weight": 8,
-          "mvp": false,
-          "status": "PLANNED",
-          "manualValidation": false,
-          "physicalValidation": false,
-          "frozen": false,
-          "evidence": [],
-          "dependencies": [
-            "cap-rbac-multi-tenant"
-          ],
-          "notes": [
-            "Módulo de bilhetagem e limites comerciais."
-          ]
-        },
-        {
-          "id": "cap-multiniche-profiles",
-          "name": "Perfis Operacionais Multi-Nicho",
-          "description": "Sistema responsável por definir comportamento contextual da plataforma por nicho, incluindo elementos padrão, campos de integração, datasets, templates iniciais, configuração da Central de Impressão e regras de apresentação.",
-          "module": "multiniche",
-          "weight": 10,
-          "mvp": true,
-          "status": "IMPLEMENTED",
-          "manualValidation": false,
-          "physicalValidation": false,
-          "frozen": false,
-          "evidence": [
-            "tests/multiNicheProfiles.test.ts"
-          ],
-          "dependencies": [
-            "cap-universal-print-center"
-          ],
-          "notes": [
-            "Definição e suporte aos 7 perfis operacionais (Varejo, Hospitalar, Laboratório Clínico, Logística/Distribuição, Indústria/Produção, Alimentação/Perecíveis, Farmácia/Medicamentos).",
-            "Varejo é a baseline existente homologada. Os demais perfis adaptam campos de integração, colunas da Central e datasets de homologação."
-          ]
-        },
-        {
-          "id": "cap-logo-element",
-          "name": "Elemento de Logomarca / Imagem Monocromática",
-          "description": "Elemento visual destinado a logomarcas e símbolos gráficos compatíveis com impressão térmica.",
-          "module": "elements",
-          "weight": 8,
-          "mvp": false,
-          "status": "IMPLEMENTED",
-          "manualValidation": false,
-          "physicalValidation": false,
-          "frozen": false,
-          "evidence": [
-            "packages/label-schema/src/types.ts",
-            "packages/printer-pplb/src/index.ts",
-            "packages/printer-ppla/src/index.ts",
-            "packages/printer-core/src/zplCompiler.ts",
-            "apps/frontend/src/editor/CanvasArea.tsx",
-            "apps/frontend/src/editor/PropertyInspector.tsx",
-            "apps/frontend/src/modules/printcenter/PrintPreview.tsx",
-            "tests/shapeAndImage.test.ts"
-          ],
-          "dependencies": [
-            "cap-canvas-core"
-          ],
-          "notes": [
-            "Pacote 4.3 (Ajuste P0): Implementação do ImageElement com upload local (PNG/JPG/JPEG/SVG), drag, resize com proporção preservada, rotações 0/90/180/270°, undo/redo e preview. Mapeamento de capability dos compiladores: PPLB, PPLA e ZPL possuem validação e compile() que falham explicitamente interrompendo a geração de código quando há ImageElement visível, sem ignorar silenciosamente nem gerar comandos parciais. Imagens ocultas (visible=false) não bloqueiam compilação."
-          ]
-        },
-        {
-          "id": "cap-element-transformations",
-          "name": "Transformações Geométricas dos Elementos",
-          "description": "Rotação canônica (0°, 90°, 180°, 270°) e transformações geométricas para todos os elementos suportados no Editor, Preview, Compiladores, Importadores e Exportadores.",
-          "module": "editor-core",
-          "weight": 10,
-          "mvp": true,
-          "status": "IN_PROGRESS",
-          "manualValidation": false,
-          "physicalValidation": false,
-          "frozen": false,
-          "evidence": [],
-          "dependencies": [
-            "cap-canvas-core"
-          ],
-          "notes": [
-            "Garante 0°, 90°, 180° e 270° em todos os compiladores (PPLA/PPLB/ZPL) e preview visual com giro canônico para a esquerda."
-          ]
-        },
-        {
-          "id": "cap-shape-element",
-          "name": "Elemento Unificado Linha / Moldura (Shape)",
-          "description": "Abstração única para elementos geométricos simples (moldura com opção de usar como linha), preservando retrocompatibilidade total com LineElement e RectangleElement.",
-          "module": "elements",
-          "weight": 6,
-          "mvp": false,
-          "status": "IMPLEMENTED",
-          "manualValidation": false,
-          "physicalValidation": false,
-          "frozen": false,
-          "evidence": [
-            "apps/frontend/src/editor/EditorLayout.tsx",
-            "apps/frontend/src/editor/PropertyInspector.tsx",
-            "apps/frontend/src/editor/CanvasArea.tsx",
-            "tests/shapeAndImage.test.ts"
-          ],
-          "dependencies": [
-            "cap-visual-elements"
-          ],
-          "notes": [
-            "Pacote 4.3: Abstração de UI Forma na toolbar unificando Linha e Retângulo em popover compacto. Preserva 100% da retrocompatibilidade com modelos legados e schemas sem migração destrutiva."
-          ]
-        },
-        {
-          "id": "cap-layers-multiselect",
-          "name": "Multiseleção via Lista de Camadas (UX Layers Multiselect)",
-          "description": "Permite selecionar múltiplos elementos na lista de Camadas utilizando Ctrl + Clique (Windows/Linux) e Cmd + Clique (macOS), mantendo sincronia 100% canônica com a seleção do Canvas.",
-          "module": "editor-core",
-          "weight": 5,
-          "mvp": false,
-          "status": "HOMOLOGATED",
-          "manualValidation": true,
-          "physicalValidation": false,
-          "frozen": false,
-          "evidence": [
-            "apps/frontend/src/editor/EditorLayout.tsx",
-            "apps/frontend/src/editor/useEditorStore.ts",
-            "tests/layersMultiselect.test.ts"
-          ],
-          "dependencies": [
-            "cap-canvas-core"
-          ],
-          "notes": [
-            "PACOTE 4.4: Adicionado suporte a Ctrl/Cmd+clique na lista de Camadas do Editor. Permite seleção determinística de elementos sobrepostos ou finos. Reutiliza estritamente o estado canônico único selectedElementIds sem criar estado paralelo."
-          ]
-        },
-        {
-          "id": "cap-editor-toolbar-compactness",
-          "name": "Compactação da Toolbar do Editor (UX Compactness 2)",
-          "description": "Otimização da largura da toolbar do Editor ao abrir o painel lateral, removendo botões redundantes e movendo configurações secundárias para o menu Opções.",
-          "module": "app-shell",
-          "weight": 6,
-          "mvp": true,
-          "status": "IN_PROGRESS",
-          "manualValidation": false,
-          "physicalValidation": false,
-          "frozen": false,
-          "evidence": [],
-          "dependencies": [
-            "cap-app-shell-ux"
-          ],
-          "notes": [
-            "Remove botões \"Dados de Integração\" e tema da toolbar do Editor, concentrando toggles no menu Opções para eliminar overflow horizontal."
-          ]
-        }
-      ]
-    },
-    {
-      "id": "phase-5",
-      "code": "5",
-      "name": "Fase 5 — Novas Linguagens (ZPL, EPL) e Catálogo de Impressoras",
-      "description": "Expansão de compiladores nativos para suporte a impressoras Zebra (ZPL/EPL) e Elgin.",
-      "status": "PLANNED",
-      "capabilities": [
-        {
-          "id": "cap-zpl-compiler",
-          "name": "Compilador Zebra ZPL II",
-          "description": "Gerador nativo de comandos ZPL II com suporte a fontes nativas, Barcodes e rotinas de ajuste de densidade.",
-          "module": "compilers",
-          "weight": 10,
-          "mvp": false,
-          "status": "PLANNED",
-          "manualValidation": false,
-          "physicalValidation": false,
-          "frozen": false,
-          "evidence": [],
-          "dependencies": [
-            "cap-pplb-compiler"
-          ],
-          "notes": [
-            "Segunda linguagem principal solicitada por clientes industriais."
-          ]
-        },
-        {
-          "id": "cap-printer-kb",
-          "name": "Printer Language Knowledge Base & Catálogo de Modelos",
-          "description": "Base de conhecimento técnica parametrizada por fabricante e modelo de impressora.",
-          "module": "printers",
-          "weight": 6,
-          "mvp": false,
-          "status": "PLANNED",
-          "manualValidation": false,
-          "physicalValidation": false,
-          "frozen": false,
-          "evidence": [],
-          "dependencies": [],
-          "notes": [
-            "Base de suporte para mapeamento de resoluções e drivers."
-          ]
-        }
-      ]
-    },
-    {
-      "id": "phase-6",
-      "code": "6",
-      "name": "Fase 6 — Integrações Nativas com ERPs e Contrato Público",
-      "description": "SDK de integração pública via API REST/Webhooks e catálogo universal de campos ERP.",
-      "status": "PLANNED",
-      "capabilities": [
-        {
-          "id": "cap-erp-integration-sdk",
-          "name": "SDK de Integração ERP e Contrato OpenAPI / Webhooks",
-          "description": "Interface formal para que software houses conectem ERPs parceiros diretamente à Central de Impressão Witiquetas.",
-          "module": "integrations",
-          "weight": 10,
-          "mvp": false,
-          "status": "PLANNED",
-          "manualValidation": false,
-          "physicalValidation": false,
-          "frozen": false,
-          "evidence": [],
-          "dependencies": [
-            "cap-universal-print-center"
-          ],
-          "notes": [
-            "Especificação pública para parceiros de tecnologia."
-          ]
-        }
-      ]
-    }
-  ]
+﻿{
+    "phases":  [
+                   {
+                       "id":  "phase-0",
+                       "code":  "0",
+                       "name":  "Fase 0 â€” FundaÃ§Ã£o e ValidaÃ§Ã£o de Conectividade",
+                       "description":  "Base executÃ¡vel monorepo, containers Docker, backend Node.js/PostgreSQL/MinIO, CI/CD GitHub Actions e Portainer.",
+                       "status":  "FROZEN",
+                       "capabilities":  [
+                                            {
+                                                "id":  "cap-monorepo-setup",
+                                                "name":  "Arquitetura Monorepo e Workspace Node/TypeScript",
+                                                "description":  "EstruturaÃ§Ã£o dos apps e pacotes compartilhados (contracts, label-schema, printer-core, printer-ppla, printer-pplb).",
+                                                "module":  "foundation",
+                                                "weight":  8,
+                                                "mvp":  true,
+                                                "status":  "FROZEN",
+                                                "manualValidation":  true,
+                                                "physicalValidation":  false,
+                                                "frozen":  true,
+                                                "evidence":  [
+                                                                 "packages/contracts",
+                                                                 "packages/label-schema",
+                                                                 "packages/printer-core"
+                                                             ],
+                                                "dependencies":  [
+
+                                                                 ],
+                                                "notes":  [
+                                                              "Estrutura base mantida intacta desde a Fase 0."
+                                                          ]
+                                            },
+                                            {
+                                                "id":  "cap-docker-cicd",
+                                                "name":  "Containers Docker, GHCR, GitHub Actions e Portainer CD",
+                                                "description":  "Esteira CI/CD zero-rebuild com promoÃ§Ã£o imutÃ¡vel candidate -\u003e production/stable e auto-rollback.",
+                                                "module":  "deployment-cicd",
+                                                "weight":  10,
+                                                "mvp":  true,
+                                                "status":  "FROZEN",
+                                                "manualValidation":  true,
+                                                "physicalValidation":  false,
+                                                "frozen":  true,
+                                                "evidence":  [
+                                                                 ".github/workflows/docker.yml",
+                                                                 "apps/backend/Dockerfile",
+                                                                 "apps/frontend/Dockerfile"
+                                                             ],
+                                                "dependencies":  [
+                                                                     "cap-monorepo-setup"
+                                                                 ],
+                                                "notes":  [
+                                                              "ValidaÃ§Ã£o continua e automatizada via webhook e auto-rollback guard em 150s."
+                                                          ]
+                                            },
+                                            {
+                                                "id":  "cap-infra-storage-db",
+                                                "name":  "Infraestrutura de Banco PostgreSQL e Storage MinIO/S3",
+                                                "description":  "Fail-Closed PostgreSQL para metadados/modelos e MinIO para imagens com rotas de health check /api/health.",
+                                                "module":  "foundation",
+                                                "weight":  8,
+                                                "mvp":  true,
+                                                "status":  "FROZEN",
+                                                "manualValidation":  true,
+                                                "physicalValidation":  false,
+                                                "frozen":  true,
+                                                "evidence":  [
+                                                                 "apps/backend/src/db.ts",
+                                                                 "apps/backend/src/index.ts"
+                                                             ],
+                                                "dependencies":  [
+                                                                     "cap-monorepo-setup"
+                                                                 ],
+                                                "notes":  [
+                                                              "Health checks e estatÃ­sticas operacionais em tempo real."
+                                                          ]
+                                            }
+                                        ]
+                   },
+                   {
+                       "id":  "phase-1",
+                       "code":  "1",
+                       "name":  "Fase 1 â€” Editor Visual e Schema Abstrato",
+                       "description":  "Interface visual para montagem de etiquetas tÃ©rmicas independente de linguagem fÃ­sica com serializaÃ§Ã£o LabelDocument v1.",
+                       "status":  "FROZEN",
+                       "capabilities":  [
+                                            {
+                                                "id":  "cap-canvas-core",
+                                                "name":  "Canvas Interativo com Zoom, Grid, Snap e Bounds Clamping",
+                                                "description":  "Ãrea de trabalho fÃ­sica com dimensÃµes reais em mm, DPI, rotaÃ§Ã£o, zoom responsivo e travamento nas bordas.",
+                                                "module":  "editor-core",
+                                                "weight":  12,
+                                                "mvp":  true,
+                                                "status":  "FROZEN",
+                                                "manualValidation":  true,
+                                                "physicalValidation":  false,
+                                                "frozen":  true,
+                                                "evidence":  [
+                                                                 "apps/frontend/src/editor/CanvasArea.tsx",
+                                                                 "apps/frontend/src/editor/bounds.ts"
+                                                             ],
+                                                "dependencies":  [
+                                                                     "cap-monorepo-setup"
+                                                                 ],
+                                                "notes":  [
+                                                              "Congelado para proteger manipulaÃ§Ã£o geomÃ©trica do canvas."
+                                                          ]
+                                            },
+                                            {
+                                                "id":  "cap-visual-elements",
+                                                "name":  "Componentes Visuais (Price, Line, Text, Barcode, QRCode)",
+                                                "description":  "Elementos visuais canÃ´nicos do schema abstrato com renderizaÃ§Ã£o vetorial e suporte a second line scale.",
+                                                "module":  "elements",
+                                                "weight":  10,
+                                                "mvp":  true,
+                                                "status":  "FROZEN",
+                                                "manualValidation":  true,
+                                                "physicalValidation":  false,
+                                                "frozen":  true,
+                                                "evidence":  [
+                                                                 "apps/frontend/src/editor/components/PriceElement.tsx",
+                                                                 "apps/frontend/src/editor/components/LineElement.tsx"
+                                                             ],
+                                                "dependencies":  [
+                                                                     "cap-canvas-core"
+                                                                 ],
+                                                "notes":  [
+                                                              "Componentes Price, Line e Multiselect formalmente congelados."
+                                                          ]
+                                            },
+                                            {
+                                                "id":  "cap-undo-redo-state",
+                                                "name":  "GestÃ£o de Estado Reativa e HistÃ³rico Undo/Redo",
+                                                "description":  "Editor store desacoplada com imutabilidade e pilha de desfazer/refazer.",
+                                                "module":  "editor-core",
+                                                "weight":  8,
+                                                "mvp":  true,
+                                                "status":  "FROZEN",
+                                                "manualValidation":  true,
+                                                "physicalValidation":  false,
+                                                "frozen":  true,
+                                                "evidence":  [
+                                                                 "apps/frontend/src/editor/useEditorStore.ts"
+                                                             ],
+                                                "dependencies":  [
+                                                                     "cap-canvas-core"
+                                                                 ],
+                                                "notes":  [
+                                                              "Store desacoplada de presenÃ§as e histÃ³rico."
+                                                          ]
+                                            }
+                                        ]
+                   },
+                   {
+                       "id":  "phase-2",
+                       "code":  "2",
+                       "name":  "Fase 2 â€” Compiladores PPLA/PPLB e Preprocessador Legado",
+                       "description":  "Motor de compilaÃ§Ã£o RAW de baixo nÃ­vel para impressoras Argox/PPLA/PPLB, parser de macros ERP e Round-Trip Diff Zero.",
+                       "status":  "HOMOLOGATED",
+                       "capabilities":  [
+                                            {
+                                                "id":  "cap-pplb-compiler",
+                                                "name":  "Compilador PPLB com Mapeamento de Fontes e MÃ©tricas FÃ­sicas",
+                                                "description":  "GeraÃ§Ã£o nativa de comandos PPLB (Q, q, N, N, B, A) com conversÃ£o exata dotsToMm e mmToDots.",
+                                                "module":  "compilers",
+                                                "weight":  12,
+                                                "mvp":  true,
+                                                "status":  "FROZEN",
+                                                "manualValidation":  true,
+                                                "physicalValidation":  true,
+                                                "frozen":  true,
+                                                "evidence":  [
+                                                                 "packages/printer-pplb"
+                                                             ],
+                                                "dependencies":  [
+                                                                     "cap-monorepo-setup"
+                                                                 ],
+                                                "notes":  [
+                                                              "SuÃ­te de 61 testes automatizados (Golden Tests PPLB) aprovada 100%."
+                                                          ]
+                                            },
+                                            {
+                                                "id":  "cap-ppla-compiler",
+                                                "name":  "Compilador PPLA Base",
+                                                "description":  "GeraÃ§Ã£o nativa de comandos PPLA para impressoras tÃ©rmicas legadas Argox OS-214.",
+                                                "module":  "compilers",
+                                                "weight":  8,
+                                                "mvp":  true,
+                                                "status":  "HOMOLOGATED",
+                                                "manualValidation":  true,
+                                                "physicalValidation":  true,
+                                                "frozen":  true,
+                                                "evidence":  [
+                                                                 "packages/printer-ppla"
+                                                             ],
+                                                "dependencies":  [
+                                                                     "cap-monorepo-setup"
+                                                                 ],
+                                                "notes":  [
+                                                              "Suporte a PPLA base homologado em bancada."
+                                                          ]
+                                            },
+                                            {
+                                                "id":  "cap-legacy-importer",
+                                                "name":  "Importador e Preprocessador com PreservaÃ§Ã£o de ComentÃ¡rios (Round-Trip)",
+                                                "description":  "Parsing de templates PPLB legados com suporte a condicionais inline/multilinha ([[SE]], [[SENAO]], [[FIMSE]]) e diff zero.",
+                                                "module":  "importers",
+                                                "weight":  10,
+                                                "mvp":  true,
+                                                "status":  "FROZEN",
+                                                "manualValidation":  true,
+                                                "physicalValidation":  true,
+                                                "frozen":  true,
+                                                "evidence":  [
+                                                                 "packages/printer-pplb/src/importer.ts"
+                                                             ],
+                                                "dependencies":  [
+                                                                     "cap-pplb-compiler"
+                                                                 ],
+                                                "notes":  [
+                                                              "Testes Golden Model 16-ARGOX REGRA - ATACADO.txt 100% homologados."
+                                                          ]
+                                            }
+                                        ]
+                   },
+                   {
+                       "id":  "phase-3",
+                       "code":  "3",
+                       "name":  "Fase 3 â€” Agente Local de ImpressÃ£o (Daemon Rust)",
+                       "description":  "Daemon nativo em Rust para comunicaÃ§Ã£o direta com impressoras tÃ©rmicas locais via RAW TCP, USB e Spooler de impressÃ£o.",
+                       "status":  "HOMOLOGATED",
+                       "capabilities":  [
+                                            {
+                                                "id":  "cap-agent-core-rust",
+                                                "name":  "Daemon Nativo em Rust (x64 PE Executable)",
+                                                "description":  "Agente executÃ¡vel headless compilado em Rust com suporte a comunicaÃ§Ã£o assÃ­ncrona Tokio, TLS e RAW TCP.",
+                                                "module":  "agent",
+                                                "weight":  12,
+                                                "mvp":  true,
+                                                "status":  "FROZEN",
+                                                "manualValidation":  true,
+                                                "physicalValidation":  true,
+                                                "frozen":  true,
+                                                "evidence":  [
+                                                                 "apps/agent-core",
+                                                                 "apps/backend/src/routes/agents.ts"
+                                                             ],
+                                                "dependencies":  [
+                                                                     "cap-monorepo-setup"
+                                                                 ],
+                                                "notes":  [
+                                                              "CompilaÃ§Ã£o Windows x64 automatizada no CI e distribuÃ­da via GET /api/agents/download/windows-x64."
+                                                          ]
+                                            },
+                                            {
+                                                "id":  "cap-agent-pairing",
+                                                "name":  "Protocolo de Pareamento de Agentes e Heartbeat",
+                                                "description":  "Pareamento seguro de estaca de trabalho por cÃ³digo de 6 dÃ­gitos e heartbeat contÃ­nuo.",
+                                                "module":  "agent",
+                                                "weight":  8,
+                                                "mvp":  true,
+                                                "status":  "HOMOLOGATED",
+                                                "manualValidation":  true,
+                                                "physicalValidation":  true,
+                                                "frozen":  false,
+                                                "evidence":  [
+                                                                 "apps/frontend/src/agent/PairAgentModal.tsx"
+                                                             ],
+                                                "dependencies":  [
+                                                                     "cap-agent-core-rust"
+                                                                 ],
+                                                "notes":  [
+                                                              "Modal de pareamento operacional na interface."
+                                                          ]
+                                            }
+                                        ]
+                   },
+                   {
+                       "id":  "phase-3-5",
+                       "code":  "3.5",
+                       "name":  "Fase 3.5 â€” Hardening de Produto, UX, Application Shell e ConcorrÃªncia",
+                       "description":  "ConsolidaÃ§Ã£o de UX multinicho, Application Shell moderno, Ciclo de Vida de Modelos (Meus Modelos), ConcorrÃªncia AtÃ´mica com PresenÃ§a e InvariÃ¢ncia GeomÃ©trica da Toolbar.",
+                       "status":  "HOMOLOGATED",
+                       "capabilities":  [
+                                            {
+                                                "id":  "cap-app-shell-ux",
+                                                "name":  "Application Shell Moderno e NavegaÃ§Ã£o Sidebar",
+                                                "description":  "Shell responsivo com Sidebar recolhÃ­vel (localStorage), Drawer mobile, GlobalHeader unificado e tokens de design.",
+                                                "module":  "app-shell",
+                                                "weight":  10,
+                                                "mvp":  true,
+                                                "status":  "FROZEN",
+                                                "manualValidation":  true,
+                                                "physicalValidation":  false,
+                                                "frozen":  true,
+                                                "evidence":  [
+                                                                 "apps/frontend/src/shell/ApplicationShell.tsx",
+                                                                 "apps/frontend/src/shell/Sidebar.tsx"
+                                                             ],
+                                                "dependencies":  [
+                                                                     "cap-canvas-core"
+                                                                 ],
+                                                "notes":  [
+                                                              "ConsolidaÃ§Ã£o de UX formalizada em docs/product/PRODUCT-UX-CONSOLIDATION.md."
+                                                          ]
+                                            },
+                                            {
+                                                "id":  "cap-model-lifecycle-db",
+                                                "name":  "Ciclo de Vida do Modelo em PostgreSQL (Meus Modelos)",
+                                                "description":  "PersistÃªncia em banco relacional, listagem, busca, renomear, duplicar no backend e soft-delete.",
+                                                "module":  "model-lifecycle",
+                                                "weight":  10,
+                                                "mvp":  true,
+                                                "status":  "FROZEN",
+                                                "manualValidation":  true,
+                                                "physicalValidation":  false,
+                                                "frozen":  true,
+                                                "evidence":  [
+                                                                 "apps/frontend/src/modules/models/ModelsPage.tsx",
+                                                                 "apps/backend/src/repositories/templateRepository.ts"
+                                                             ],
+                                                "dependencies":  [
+                                                                     "cap-infra-storage-db"
+                                                                 ],
+                                                "notes":  [
+                                                              "OperaÃ§Ãµes de CRUD de modelos 100% homologadas com Fail-Closed."
+                                                          ]
+                                            },
+                                            {
+                                                "id":  "cap-concurrency-presence",
+                                                "name":  "ConcorrÃªncia AtÃ´mica, Heartbeat de PresenÃ§a e Lock Otimista (HTTP 409)",
+                                                "description":  "ProteÃ§Ã£o contra sobrescrita simultÃ¢nea, heartbeat a cada 15s com expiraÃ§Ã£o em 45s, detecÃ§Ã£o de sessÃ£o por aba (UUID-B) e modal de resoluÃ§Ã£o de conflito com Save As Copy.",
+                                                "module":  "concurrency",
+                                                "weight":  12,
+                                                "mvp":  true,
+                                                "status":  "FROZEN",
+                                                "manualValidation":  true,
+                                                "physicalValidation":  false,
+                                                "frozen":  true,
+                                                "evidence":  [
+                                                                 "apps/backend/src/repositories/presenceRepository.ts",
+                                                                 "apps/frontend/src/editor/__tests__/patch3283.test.ts"
+                                                             ],
+                                                "dependencies":  [
+                                                                     "cap-model-lifecycle-db"
+                                                                 ],
+                                                "notes":  [
+                                                              "HomologaÃ§Ã£o manual concluÃ­da e validada em produÃ§Ã£o no PATCH 3.2.8.3."
+                                                          ]
+                                            },
+                                            {
+                                                "id":  "cap-toolbar-geometry-stabilization",
+                                                "name":  "EstabilizaÃ§Ã£o GeomÃ©trica do Status na Toolbar",
+                                                "description":  "InvariÃ¢ncia visual com container fixo de 140px (save-status-container), impedindo layout shift em qualquer troca de estado (Salvo, NÃ£o salvo, Salvando..., Conflito, Removido, Erro).",
+                                                "module":  "app-shell",
+                                                "weight":  8,
+                                                "mvp":  true,
+                                                "status":  "FROZEN",
+                                                "manualValidation":  true,
+                                                "physicalValidation":  false,
+                                                "frozen":  true,
+                                                "evidence":  [
+                                                                 "apps/frontend/src/editor/EditorLayout.tsx",
+                                                                 "apps/frontend/src/editor/__tests__/patch3284.test.ts"
+                                                             ],
+                                                "dependencies":  [
+                                                                     "cap-app-shell-ux"
+                                                                 ],
+                                                "notes":  [
+                                                              "Homologado no PATCH 3.2.8.4. Zero deslocamento no botÃ£o Imprimir."
+                                                          ]
+                                            },
+                                            {
+                                                "id":  "cap-development-control-center-backend",
+                                                "name":  "Development Control Center 0.1 â€” DomÃ­nio e Backend API",
+                                                "description":  "Estrutura de dados versionada do roadmap, cÃ¡lculos desacoplados de mÃ©tricas (MVP Readiness vs Full Roadmap), auditoria de saÃºde e rotas protegidas por ambiente.",
+                                                "module":  "admin",
+                                                "weight":  8,
+                                                "mvp":  false,
+                                                "status":  "VALIDATION",
+                                                "manualValidation":  true,
+                                                "physicalValidation":  false,
+                                                "frozen":  false,
+                                                "evidence":  [
+                                                                 "docs/development-control",
+                                                                 "apps/backend/src/routes/developmentControl.ts"
+                                                             ],
+                                                "dependencies":  [
+                                                                     "cap-infra-storage-db"
+                                                                 ],
+                                                "notes":  [
+                                                              "MÃ³dulo interno de visibilidade sistÃªmica do produto."
+                                                          ]
+                                            },
+                                            {
+                                                "id":  "cap-development-control-center-frontend",
+                                                "name":  "Development Control Center 0.1 â€” Interface Visual de GovernanÃ§a",
+                                                "description":  "Painel interno com Hero de progresso, timeline de fases, grid de mÃ³dulos, lista de componentes congelados e gap para MVP.",
+                                                "module":  "admin",
+                                                "weight":  8,
+                                                "mvp":  false,
+                                                "status":  "VALIDATION",
+                                                "manualValidation":  true,
+                                                "physicalValidation":  false,
+                                                "frozen":  false,
+                                                "evidence":  [
+                                                                 "apps/frontend/src/modules/devcontrol/DevControlPage.tsx"
+                                                             ],
+                                                "dependencies":  [
+                                                                     "cap-development-control-center-backend"
+                                                                 ],
+                                                "notes":  [
+                                                              "Interface restrita aos ambientes de desenvolvimento e homologaÃ§Ã£o."
+                                                          ]
+                                            }
+                                        ]
+                   },
+                   {
+                       "id":  "phase-4",
+                       "code":  "4",
+                       "name":  "Fase 4 — Central de Impressão Universal e Perfis Multi-Nicho",
+                       "description":  "Plataforma para envio de impressões por operadores, perfis operacionais multinicho homologados e baseline estável da Central de Impressão.",
+                       "status":  "IN_PROGRESS",
+                       "capabilities":  [
+                                            {
+                                                "id":  "cap-universal-print-center",
+                                                "name":  "Central de ImpressÃ£o Universal (Universal Print Center)",
+                                                "description":  "Busca contextual Ãºnica, grid com colunas dinÃ¢micas adaptÃ¡veis por perfil/nicho ativo e disparo em lote para impressoras fÃ­sicas.",
+                                                "module":  "print-center",
+                                                "weight":  14,
+                                                "mvp":  true,
+                                                "status":  "IMPLEMENTED",
+                                                "manualValidation":  false,
+                                                "physicalValidation":  false,
+                                                "frozen":  false,
+                                                "evidence":  [
+
+                                                             ],
+                                                "dependencies":  [
+                                                                     "cap-pplb-compiler",
+                                                                     "cap-agent-core-rust"
+                                                                 ],
+                                                "notes":  [
+                                                              "Requisito essencial para operadores comerciais.",
+                                                              "Baseline da Central de Impressão formalmente congelado/pausado (PRINT_CENTER_BASELINE_FREEZE) para retomada posterior após Administração e configuração contextual. Preservados: templates/modelos, preview, datasets, seleção de impressora, print jobs, histórico, batch, fluxo Agent e transport semantics."
+                                                          ]
+                                            },
+                                            {
+                                                "id":  "cap-multiniche-profiles",
+                                                "name":  "Perfis Operacionais Multi-Nicho",
+                                                "description":  "Sistema responsÃ¡vel por definir comportamento contextual da plataforma por nicho, incluindo elementos padrÃ£o, campos de integraÃ§Ã£o, datasets, templates iniciais, configuraÃ§Ã£o da Central de ImpressÃ£o e regras de apresentaÃ§Ã£o.",
+                                                "module":  "multiniche",
+                                                "weight":  10,
+                                                "mvp":  true,
+                                                "status":  "HOMOLOGATED",
+                                                "manualValidation":  true,
+                                                "physicalValidation":  false,
+                                                "frozen":  true,
+                                                "evidence":  [
+                                                                 "tests/multiNicheProfiles.test.ts",
+                                                                 "tests/nicheCatalogAndToolbox.test.ts",
+                                                                 "Homologação manual concluída pelo usuário em 100%"
+                                                             ],
+                                                "dependencies":  [
+                                                                     "cap-universal-print-center"
+                                                                 ],
+                                                "notes":  [
+                                                              "Catálogo completo de 11 nichos, 66 tamanhos e 112 relações homologado e formalmente congelado no Editor Baseline."
+                                                          ]
+                                            },
+                                            {
+                                                "id":  "cap-logo-element",
+                                                "name":  "Elemento de Logomarca / Imagem MonocromÃ¡tica",
+                                                "description":  "Elemento visual destinado a logomarcas e sÃ­mbolos grÃ¡ficos compatÃ­veis com impressÃ£o tÃ©rmica.",
+                                                "module":  "elements",
+                                                "weight":  8,
+                                                "mvp":  false,
+                                                "status":  "HOMOLOGATED",
+                                                "manualValidation":  true,
+                                                "physicalValidation":  false,
+                                                "frozen":  true,
+                                                "evidence":  [
+                                                                 "tests/shapeAndImage.test.ts",
+                                                                 "Homologação manual concluída pelo usuário em 100%"
+                                                             ],
+                                                "dependencies":  [
+                                                                     "cap-canvas-core"
+                                                                 ],
+                                                "notes":  [
+                                                              "Pacote 4.3 (Ajuste P0): ImplementaÃ§Ã£o do ImageElement com upload local (PNG/JPG/JPEG/SVG), drag, resize com proporÃ§Ã£o preservada, rotaÃ§Ãµes 0/90/180/270Â°, undo/redo e preview. Mapeamento de capability dos compiladores: PPLB, PPLA e ZPL possuem validaÃ§Ã£o e compile() que falham explicitamente interrompendo a geraÃ§Ã£o de cÃ³digo quando hÃ¡ ImageElement visÃ­vel, sem ignorar silenciosamente nem gerar comandos parciais. Imagens ocultas (visible=false) nÃ£o bloqueiam compilaÃ§Ã£o."
+                                                          ]
+                                            },
+                                            {
+                                                "id":  "cap-element-transformations",
+                                                "name":  "TransformaÃ§Ãµes GeomÃ©tricas dos Elementos",
+                                                "description":  "RotaÃ§Ã£o canÃ´nica (0Â°, 90Â°, 180Â°, 270Â°) e transformaÃ§Ãµes geomÃ©tricas para todos os elementos suportados no Editor, Preview, Compiladores, Importadores e Exportadores.",
+                                                "module":  "editor-core",
+                                                "weight":  10,
+                                                "mvp":  true,
+                                                "status":  "HOMOLOGATED",
+                                                "manualValidation":  true,
+                                                "physicalValidation":  false,
+                                                "frozen":  true,
+                                                "evidence":  [
+                                                                 "tests/elementRotation.test.ts",
+                                                                 "tests/editorPackage455.test.ts",
+                                                                 "Homologação manual concluída pelo usuário em 100%"
+                                                             ],
+                                                "dependencies":  [
+                                                                     "cap-canvas-core"
+                                                                 ],
+                                                "notes":  [
+                                                              "Rotação canônica 0°, 90°, 180°, 270° com snap magnético e bounding box perfeito para todos os elementos visuais do Editor."
+                                                          ]
+                                            },
+                                            {
+                                                "id":  "cap-shape-element",
+                                                "name":  "Elemento Unificado Linha / Moldura (Shape)",
+                                                "description":  "AbstraÃ§Ã£o Ãºnica para elementos geomÃ©tricos simples (moldura com opÃ§Ã£o de usar como linha), preservando retrocompatibilidade total com LineElement e RectangleElement.",
+                                                "module":  "elements",
+                                                "weight":  6,
+                                                "mvp":  false,
+                                                "status":  "HOMOLOGATED",
+                                                "manualValidation":  true,
+                                                "physicalValidation":  false,
+                                                "frozen":  true,
+                                                "evidence":  [
+                                                                 "tests/shapeAndImage.test.ts",
+                                                                 "Homologação manual concluída pelo usuário em 100%"
+                                                             ],
+                                                "dependencies":  [
+                                                                     "cap-visual-elements"
+                                                                 ],
+                                                "notes":  [
+                                                              "Pacote 4.3: AbstraÃ§Ã£o de UI Forma na toolbar unificando Linha e RetÃ¢ngulo em popover compacto. Preserva 100% da retrocompatibilidade com modelos legados e schemas sem migraÃ§Ã£o destrutiva."
+                                                          ]
+                                            },
+                                            {
+                                                "id":  "cap-layers-multiselect",
+                                                "name":  "MultiseleÃ§Ã£o via Lista de Camadas (UX Layers Multiselect)",
+                                                "description":  "Permite selecionar mÃºltiplos elementos na lista de Camadas utilizando Ctrl + Clique (Windows/Linux) e Cmd + Clique (macOS), mantendo sincronia 100% canÃ´nica com a seleÃ§Ã£o do Canvas.",
+                                                "module":  "editor-core",
+                                                "weight":  5,
+                                                "mvp":  false,
+                                                "status":  "HOMOLOGATED",
+                                                "manualValidation":  true,
+                                                "physicalValidation":  false,
+                                                "frozen":  true,
+                                                "evidence":  [
+                                                                 "tests/layersMultiselect.test.ts",
+                                                                 "Homologação manual concluída pelo usuário em 100%"
+                                                             ],
+                                                "dependencies":  [
+                                                                     "cap-canvas-core"
+                                                                 ],
+                                                "notes":  [
+                                                              "PACOTE 4.4: Adicionado suporte a Ctrl/Cmd+clique na lista de Camadas do Editor. Permite seleÃ§Ã£o determinÃ­stica de elementos sobrepostos ou finos. Reutiliza estritamente o estado canÃ´nico Ãºnico selectedElementIds sem criar estado paralelo."
+                                                          ]
+                                            },
+                                            {
+                                                "id":  "cap-editor-toolbar-compactness",
+                                                "name":  "CompactaÃ§Ã£o da Toolbar do Editor (UX Compactness 2)",
+                                                "description":  "OtimizaÃ§Ã£o da largura da toolbar do Editor ao abrir o painel lateral, removendo botÃµes redundantes e movendo configuraÃ§Ãµes secundÃ¡rias para o menu OpÃ§Ãµes.",
+                                                "module":  "app-shell",
+                                                "weight":  6,
+                                                "mvp":  true,
+                                                "status":  "HOMOLOGATED",
+                                                "manualValidation":  true,
+                                                "physicalValidation":  false,
+                                                "frozen":  true,
+                                                "evidence":  [
+                                                                 "tests/uxCanonical.test.ts",
+                                                                 "Homologação manual concluída pelo usuário em 100%"
+                                                             ],
+                                                "dependencies":  [
+                                                                     "cap-app-shell-ux"
+                                                                 ],
+                                                "notes":  [
+                                                              "Toolbox compacta em lista na sidebar e fluxo vertical natural homologado no HOTFIX UX 4.5.4."
+                                                          ]
+                                            },
+                                            {
+                                                "id":  "cap-single-price-element",
+                                                "name":  "Elemento Preço Único e Descontinuação de Preço Promocional Duplicado",
+                                                "description":  "Unificação do elemento visual de preço eliminando promotional-price da Toolbox e mantendo isPromotional retrocompatível.",
+                                                "module":  "elements",
+                                                "weight":  3,
+                                                "mvp":  true,
+                                                "status":  "HOMOLOGATED",
+                                                "manualValidation":  true,
+                                                "physicalValidation":  false,
+                                                "frozen":  true,
+                                                "evidence":  [
+                                                                 "tests/editorPackage455.test.ts",
+                                                                 "Homologação manual concluída pelo usuário em 100%"
+                                                             ],
+                                                "dependencies":  [
+                                                                     "cap-visual-elements"
+                                                                 ],
+                                                "notes":  [
+                                                              "PACOTE 4.5.5: elemento preço unificado sem duplicidade visual, com preservação de modelos legados."
+                                                          ]
+                                            },
+                                            {
+                                                "id":  "cap-line-resize-restored",
+                                                "name":  "Restauração de Redimensionamento do Elemento Linha",
+                                                "description":  "Redimensionamento interativo de comprimento e espessura do elemento Linha sem conversão espúria em retângulo.",
+                                                "module":  "elements",
+                                                "weight":  2,
+                                                "mvp":  true,
+                                                "status":  "HOMOLOGATED",
+                                                "manualValidation":  true,
+                                                "physicalValidation":  false,
+                                                "frozen":  true,
+                                                "evidence":  [
+                                                                 "tests/editorPackage455.test.ts",
+                                                                 "Homologação manual concluída pelo usuário em 100%"
+                                                             ],
+                                                "dependencies":  [
+                                                                     "cap-shape-element"
+                                                                 ],
+                                                "notes":  [
+                                                              "PACOTE 4.5.5: resize de linha restaurado preservando tipo canônico line."
+                                                          ]
+                                            },
+                                            {
+                                                "id":  "cap-line-rotation-restored",
+                                                "name":  "Restauração de Rotação Canônica do Elemento Linha",
+                                                "description":  "Rotação canônica (0°, 90°, 180°, 270°) com snap magnético e bounding box geométrico perfeito para o elemento Linha.",
+                                                "module":  "elements",
+                                                "weight":  2,
+                                                "mvp":  true,
+                                                "status":  "HOMOLOGATED",
+                                                "manualValidation":  true,
+                                                "physicalValidation":  false,
+                                                "frozen":  true,
+                                                "evidence":  [
+                                                                 "tests/editorPackage455.test.ts",
+                                                                 "Homologação manual concluída pelo usuário em 100%"
+                                                             ],
+                                                "dependencies":  [
+                                                                     "cap-element-transformations"
+                                                                 ],
+                                                "notes":  [
+                                                              "PACOTE 4.5.5: rotação de linha restaurada com fidelidade visual e física."
+                                                          ]
+                                            },
+                                            {
+                                                "id":  "cap-manual-text-precedence",
+                                                "name":  "Precedência de Texto Manual sobre Campo Vinculado",
+                                                "description":  "Garante que o texto digitado manualmente tenha precedência estrita sobre dados vinculados sem sobrescrita destrutiva.",
+                                                "module":  "elements",
+                                                "weight":  2,
+                                                "mvp":  true,
+                                                "status":  "HOMOLOGATED",
+                                                "manualValidation":  true,
+                                                "physicalValidation":  false,
+                                                "frozen":  true,
+                                                "evidence":  [
+                                                                 "tests/editorPackage455.test.ts",
+                                                                 "Homologação manual concluída pelo usuário em 100%"
+                                                             ],
+                                                "dependencies":  [
+                                                                     "cap-visual-elements"
+                                                                 ],
+                                                "notes":  [
+                                                              "PACOTE 4.5.5: precedência de texto manual garantida no dataBindingEngine."
+                                                          ]
+                                            },
+                                            {
+                                                "id":  "cap-typed-expiration-date",
+                                                "name":  "Campo de Data de Validade Tipada e Formatação",
+                                                "description":  "Suporte a campo tipado de data de validade com máscara e formatação canônica DD/MM/AAAA no editor e preview.",
+                                                "module":  "elements",
+                                                "weight":  2,
+                                                "mvp":  true,
+                                                "status":  "HOMOLOGATED",
+                                                "manualValidation":  true,
+                                                "physicalValidation":  false,
+                                                "frozen":  true,
+                                                "evidence":  [
+                                                                 "tests/editorPackage455.test.ts",
+                                                                 "Homologação manual concluída pelo usuário em 100%"
+                                                             ],
+                                                "dependencies":  [
+                                                                     "cap-visual-elements"
+                                                                 ],
+                                                "notes":  [
+                                                              "HOTFIX 4.5.5.1: data de validade tipada com formatação DD/MM/AAAA e fallback gracioso."
+                                                          ]
+                                            },
+                                            {
+                                                "id":  "cap-system-print-date",
+                                                "name":  "Campo de Sistema Data de Impressão do Witiquetas",
+                                                "description":  "Disponibilização do campo de sistema da data de impressão gerada pela aplicação no momento da compilação/disparo.",
+                                                "module":  "elements",
+                                                "weight":  2,
+                                                "mvp":  true,
+                                                "status":  "HOMOLOGATED",
+                                                "manualValidation":  true,
+                                                "physicalValidation":  false,
+                                                "frozen":  true,
+                                                "evidence":  [
+                                                                 "tests/editorPackage455.test.ts",
+                                                                 "Homologação manual concluída pelo usuário em 100%"
+                                                             ],
+                                                "dependencies":  [
+                                                                     "cap-visual-elements"
+                                                                 ],
+                                                "notes":  [
+                                                              "HOTFIX 4.5.5.1: campo de sistema data de impressão acessível e resolvido em runtime."
+                                                          ]
+                                            }
+                                        ]
+                   },
+                   {
+                       "id":  "phase-5",
+                       "code":  "5",
+                       "name":  "Fase 5 — Administração e Governança da Aplicação",
+                       "description":  "Transformar o Witiquetas de editor funcional em plataforma configurável, multiempresa e preparada para integrações reais.",
+                       "status":  "PLANNED",
+                       "capabilities":  [
+                                            {
+                                                "id":  "cap-company-settings",
+                                                "name":  "Configurações Gerais da Empresa / Tenant",
+                                                "description":  "Parâmetros globais, dados cadastrais, logotipo padrão e limites por empresa.",
+                                                "module":  "admin",
+                                                "weight":  2,
+                                                "mvp":  false,
+                                                "status":  "PLANNED",
+                                                "manualValidation":  false,
+                                                "physicalValidation":  false,
+                                                "frozen":  false,
+                                                "evidence":  [
+
+                                                             ],
+                                                "dependencies":  [
+
+                                                                 ],
+                                                "notes":  [
+                                                              "Configuração corporativa multi-tenant."
+                                                          ]
+                                            },
+                                            {
+                                                "id":  "cap-enabled-niches",
+                                                "name":  "Habilitação Contextual de Nichos por Empresa",
+                                                "description":  "Definição de quais dos 11 nichos operacionais estão ativos para a empresa.",
+                                                "module":  "admin",
+                                                "weight":  2,
+                                                "mvp":  false,
+                                                "status":  "PLANNED",
+                                                "manualValidation":  false,
+                                                "physicalValidation":  false,
+                                                "frozen":  false,
+                                                "evidence":  [
+
+                                                             ],
+                                                "dependencies":  [
+                                                                     "cap-company-settings"
+                                                                 ],
+                                                "notes":  [
+                                                              "Restringe nichos disponíveis na UI do cliente."
+                                                          ]
+                                            },
+                                            {
+                                                "id":  "cap-enabled-elements",
+                                                "name":  "Habilitação de Elementos Visuais por Nicho e Empresa",
+                                                "description":  "Matriz de elementos visuais permitidos por nicho e empresa contratante.",
+                                                "module":  "admin",
+                                                "weight":  2,
+                                                "mvp":  false,
+                                                "status":  "PLANNED",
+                                                "manualValidation":  false,
+                                                "physicalValidation":  false,
+                                                "frozen":  false,
+                                                "evidence":  [
+
+                                                             ],
+                                                "dependencies":  [
+                                                                     "cap-enabled-niches"
+                                                                 ],
+                                                "notes":  [
+                                                              "Filtro do resolvedor de elementos da Toolbox."
+                                                          ]
+                                            },
+                                            {
+                                                "id":  "cap-enabled-fields",
+                                                "name":  "Habilitação de Campos Canônicos por Empresa",
+                                                "description":  "Seleção dos campos do catálogo canônico expostos aos operadores e designers.",
+                                                "module":  "admin",
+                                                "weight":  2,
+                                                "mvp":  false,
+                                                "status":  "PLANNED",
+                                                "manualValidation":  false,
+                                                "physicalValidation":  false,
+                                                "frozen":  false,
+                                                "evidence":  [
+
+                                                             ],
+                                                "dependencies":  [
+                                                                     "cap-company-settings"
+                                                                 ],
+                                                "notes":  [
+                                                              "Governança do dicionário de dados da empresa."
+                                                          ]
+                                            },
+                                            {
+                                                "id":  "cap-effective-configuration",
+                                                "name":  "Resolvedor de Configuração Efetiva da Plataforma",
+                                                "description":  "Motor que calcula a intersecção de suporte da plataforma, empresa, nicho e permissões.",
+                                                "module":  "admin",
+                                                "weight":  2,
+                                                "mvp":  false,
+                                                "status":  "PLANNED",
+                                                "manualValidation":  false,
+                                                "physicalValidation":  false,
+                                                "frozen":  false,
+                                                "evidence":  [
+
+                                                             ],
+                                                "dependencies":  [
+                                                                     "cap-enabled-elements",
+                                                                     "cap-enabled-fields"
+                                                                 ],
+                                                "notes":  [
+                                                              "Implementa os algoritmos canônicos de intersecção."
+                                                          ]
+                                            },
+                                            {
+                                                "id":  "cap-login",
+                                                "name":  "Fluxo de Autenticação com E-mail e Senha",
+                                                "description":  "Endpoint de login seguro com hash bcrypt/argon2, rate limiting e emissão de JWT.",
+                                                "module":  "auth-rbac",
+                                                "weight":  2,
+                                                "mvp":  false,
+                                                "status":  "PLANNED",
+                                                "manualValidation":  false,
+                                                "physicalValidation":  false,
+                                                "frozen":  false,
+                                                "evidence":  [
+
+                                                             ],
+                                                "dependencies":  [
+                                                                     "cap-infra-storage-db"
+                                                                 ],
+                                                "notes":  [
+                                                              "Autenticação primária da plataforma."
+                                                          ]
+                                            },
+                                            {
+                                                "id":  "cap-session",
+                                                "name":  "Gerenciamento de Sessão Segura e Tokens JWT",
+                                                "description":  "Ciclo de vida de tokens de acesso, refresh tokens e rotação com revogação.",
+                                                "module":  "auth-rbac",
+                                                "weight":  2,
+                                                "mvp":  false,
+                                                "status":  "PLANNED",
+                                                "manualValidation":  false,
+                                                "physicalValidation":  false,
+                                                "frozen":  false,
+                                                "evidence":  [
+
+                                                             ],
+                                                "dependencies":  [
+                                                                     "cap-login"
+                                                                 ],
+                                                "notes":  [
+                                                              "Sessões stateless resilientes."
+                                                          ]
+                                            },
+                                            {
+                                                "id":  "cap-session-context",
+                                                "name":  "Contexto de Sessão Ativa (Tenant, Nicho, Papel)",
+                                                "description":  "Injeção contextual do tenant ativo, nicho operacional selecionado e papel na requisição.",
+                                                "module":  "auth-rbac",
+                                                "weight":  2,
+                                                "mvp":  false,
+                                                "status":  "PLANNED",
+                                                "manualValidation":  false,
+                                                "physicalValidation":  false,
+                                                "frozen":  false,
+                                                "evidence":  [
+
+                                                             ],
+                                                "dependencies":  [
+                                                                     "cap-session"
+                                                                 ],
+                                                "notes":  [
+                                                              "Isolamento estrito entre contextos operacionais."
+                                                          ]
+                                            },
+                                            {
+                                                "id":  "cap-logout",
+                                                "name":  "Encerramento de Sessão e Invalidação de Token",
+                                                "description":  "Revogação imediata de token e limpeza de sessão nos clientes e cookies.",
+                                                "module":  "auth-rbac",
+                                                "weight":  2,
+                                                "mvp":  false,
+                                                "status":  "PLANNED",
+                                                "manualValidation":  false,
+                                                "physicalValidation":  false,
+                                                "frozen":  false,
+                                                "evidence":  [
+
+                                                             ],
+                                                "dependencies":  [
+                                                                     "cap-session"
+                                                                 ],
+                                                "notes":  [
+                                                              "Segurança no encerramento de estacas de trabalho."
+                                                          ]
+                                            },
+                                            {
+                                                "id":  "cap-user-management",
+                                                "name":  "Gestão e CRUD de Usuários da Empresa",
+                                                "description":  "Cadastro, edição, busca e listagem de usuários vinculados a tenants.",
+                                                "module":  "auth-rbac",
+                                                "weight":  2,
+                                                "mvp":  false,
+                                                "status":  "PLANNED",
+                                                "manualValidation":  false,
+                                                "physicalValidation":  false,
+                                                "frozen":  false,
+                                                "evidence":  [
+
+                                                             ],
+                                                "dependencies":  [
+                                                                     "cap-session"
+                                                                 ],
+                                                "notes":  [
+                                                              "Administração de identidades corporativas."
+                                                          ]
+                                            },
+                                            {
+                                                "id":  "cap-user-status",
+                                                "name":  "Ciclo de Vida e Status do Usuário",
+                                                "description":  "Controle de estados do usuário: Ativo, Inativo, Bloqueado e Primeiro Acesso.",
+                                                "module":  "auth-rbac",
+                                                "weight":  2,
+                                                "mvp":  false,
+                                                "status":  "PLANNED",
+                                                "manualValidation":  false,
+                                                "physicalValidation":  false,
+                                                "frozen":  false,
+                                                "evidence":  [
+
+                                                             ],
+                                                "dependencies":  [
+                                                                     "cap-user-management"
+                                                                 ],
+                                                "notes":  [
+                                                              "Fail-closed para usuários inativos."
+                                                          ]
+                                            },
+                                            {
+                                                "id":  "cap-user-company-assignment",
+                                                "name":  "Vínculo de Usuários a Empresas e Filiais",
+                                                "description":  "Associação multiempresa permitindo troca de filial e contexto operacional.",
+                                                "module":  "auth-rbac",
+                                                "weight":  2,
+                                                "mvp":  false,
+                                                "status":  "PLANNED",
+                                                "manualValidation":  false,
+                                                "physicalValidation":  false,
+                                                "frozen":  false,
+                                                "evidence":  [
+
+                                                             ],
+                                                "dependencies":  [
+                                                                     "cap-user-management"
+                                                                 ],
+                                                "notes":  [
+                                                              "Suporte a redes com múltiplas lojas e centros de distribuição."
+                                                          ]
+                                            },
+                                            {
+                                                "id":  "cap-role-management",
+                                                "name":  "Gestão de Perfis de Acesso (Administrador, Designer, Operador)",
+                                                "description":  "Criação e parametrização de papéis canônicos e personalizados no tenant.",
+                                                "module":  "auth-rbac",
+                                                "weight":  2,
+                                                "mvp":  false,
+                                                "status":  "PLANNED",
+                                                "manualValidation":  false,
+                                                "physicalValidation":  false,
+                                                "frozen":  false,
+                                                "evidence":  [
+
+                                                             ],
+                                                "dependencies":  [
+                                                                     "cap-session"
+                                                                 ],
+                                                "notes":  [
+                                                              "Matriz canônica de papéis do Witiquetas."
+                                                          ]
+                                            },
+                                            {
+                                                "id":  "cap-permission-catalog",
+                                                "name":  "Catálogo Canônico de Permissões da Plataforma",
+                                                "description":  "Dicionário estrito de ações autorizáveis (models:create, print:execute, admin:manage, etc.).",
+                                                "module":  "auth-rbac",
+                                                "weight":  2,
+                                                "mvp":  false,
+                                                "status":  "PLANNED",
+                                                "manualValidation":  false,
+                                                "physicalValidation":  false,
+                                                "frozen":  false,
+                                                "evidence":  [
+
+                                                             ],
+                                                "dependencies":  [
+
+                                                                 ],
+                                                "notes":  [
+                                                              "Base imutável de permissões granulares."
+                                                          ]
+                                            },
+                                            {
+                                                "id":  "cap-role-permissions",
+                                                "name":  "Mapeamento de Permissões por Perfil",
+                                                "description":  "Associação granular de permissões do catálogo aos papéis cadastrados.",
+                                                "module":  "auth-rbac",
+                                                "weight":  2,
+                                                "mvp":  false,
+                                                "status":  "PLANNED",
+                                                "manualValidation":  false,
+                                                "physicalValidation":  false,
+                                                "frozen":  false,
+                                                "evidence":  [
+
+                                                             ],
+                                                "dependencies":  [
+                                                                     "cap-permission-catalog",
+                                                                     "cap-role-management"
+                                                                 ],
+                                                "notes":  [
+                                                              "Definição de escopo de atuação de cada perfil."
+                                                          ]
+                                            },
+                                            {
+                                                "id":  "cap-user-role-assignment",
+                                                "name":  "Atribuição de Papéis a Usuários",
+                                                "description":  "Vínculo de um ou mais papéis a cada usuário no contexto de cada empresa.",
+                                                "module":  "auth-rbac",
+                                                "weight":  2,
+                                                "mvp":  false,
+                                                "status":  "PLANNED",
+                                                "manualValidation":  false,
+                                                "physicalValidation":  false,
+                                                "frozen":  false,
+                                                "evidence":  [
+
+                                                             ],
+                                                "dependencies":  [
+                                                                     "cap-user-management",
+                                                                     "cap-role-management"
+                                                                 ],
+                                                "notes":  [
+                                                              "Concessão efetiva de privilégios."
+                                                          ]
+                                            },
+                                            {
+                                                "id":  "cap-niche-access-control",
+                                                "name":  "Controle de Acesso a Nichos por Perfil/Usuário",
+                                                "description":  "Permissão seletiva para operar apenas em nichos específicos (ex: Farmácia vs Almoxarifado).",
+                                                "module":  "auth-rbac",
+                                                "weight":  2,
+                                                "mvp":  false,
+                                                "status":  "PLANNED",
+                                                "manualValidation":  false,
+                                                "physicalValidation":  false,
+                                                "frozen":  false,
+                                                "evidence":  [
+
+                                                             ],
+                                                "dependencies":  [
+                                                                     "cap-enabled-niches",
+                                                                     "cap-user-role-assignment"
+                                                                 ],
+                                                "notes":  [
+                                                              "Segurança por setor de negócio."
+                                                          ]
+                                            },
+                                            {
+                                                "id":  "cap-rbac-multi-tenant",
+                                                "name":  "Governança Multi-Tenant e Autenticação RBAC Macro",
+                                                "description":  "Isolamento estrito entre empresas (Tenants), perfis e validação de tokens JWT.",
+                                                "module":  "auth-rbac",
+                                                "weight":  12,
+                                                "mvp":  true,
+                                                "status":  "PLANNED",
+                                                "manualValidation":  false,
+                                                "physicalValidation":  false,
+                                                "frozen":  false,
+                                                "evidence":  [
+
+                                                             ],
+                                                "dependencies":  [
+                                                                     "cap-infra-storage-db"
+                                                                 ],
+                                                "notes":  [
+                                                              "Garante a separação completa entre clientes e filiais."
+                                                          ]
+                                            },
+                                            {
+                                                "id":  "cap-integration-registry",
+                                                "name":  "Cadastro de Integrações e Provedores ERP",
+                                                "description":  "Registro de instâncias de integração por empresa (ex: Protheus, SAP, Bling, Tiny, Linx).",
+                                                "module":  "integrations",
+                                                "weight":  2,
+                                                "mvp":  false,
+                                                "status":  "PLANNED",
+                                                "manualValidation":  false,
+                                                "physicalValidation":  false,
+                                                "frozen":  false,
+                                                "evidence":  [
+
+                                                             ],
+                                                "dependencies":  [
+                                                                     "cap-company-settings"
+                                                                 ],
+                                                "notes":  [
+                                                              "Conexão com fontes de dados corporativas."
+                                                          ]
+                                            },
+                                            {
+                                                "id":  "cap-canonical-field-registry",
+                                                "name":  "Dicionário Canônico de Campos da Plataforma",
+                                                "description":  "Definição formal dos campos canônicos suportados com tipos e regras de validação.",
+                                                "module":  "integrations",
+                                                "weight":  2,
+                                                "mvp":  false,
+                                                "status":  "PLANNED",
+                                                "manualValidation":  false,
+                                                "physicalValidation":  false,
+                                                "frozen":  false,
+                                                "evidence":  [
+
+                                                             ],
+                                                "dependencies":  [
+
+                                                                 ],
+                                                "notes":  [
+                                                              "Dicionário universal independente de ERP."
+                                                          ]
+                                            },
+                                            {
+                                                "id":  "cap-integration-field-mapping",
+                                                "name":  "Mapeamento de Campos de Integração para Campos Canônicos",
+                                                "description":  "Interface declarativa de de-para entre campos enviados pelo ERP e o dicionário canônico.",
+                                                "module":  "integrations",
+                                                "weight":  2,
+                                                "mvp":  false,
+                                                "status":  "PLANNED",
+                                                "manualValidation":  false,
+                                                "physicalValidation":  false,
+                                                "frozen":  false,
+                                                "evidence":  [
+
+                                                             ],
+                                                "dependencies":  [
+                                                                     "cap-canonical-field-registry",
+                                                                     "cap-integration-registry"
+                                                                 ],
+                                                "notes":  [
+                                                              "Transformação de schemas em runtime sem alterar templates."
+                                                          ]
+                                            },
+                                            {
+                                                "id":  "cap-integration-capability-matrix",
+                                                "name":  "Matriz de Capacidades por Integração",
+                                                "description":  "Declaração dos tipos de dados, eventos e formatos suportados por cada conector ERP.",
+                                                "module":  "integrations",
+                                                "weight":  2,
+                                                "mvp":  false,
+                                                "status":  "PLANNED",
+                                                "manualValidation":  false,
+                                                "physicalValidation":  false,
+                                                "frozen":  false,
+                                                "evidence":  [
+
+                                                             ],
+                                                "dependencies":  [
+                                                                     "cap-integration-registry"
+                                                                 ],
+                                                "notes":  [
+                                                              "Evita tentativas de uso de dados não providos pelo ERP."
+                                                          ]
+                                            },
+                                            {
+                                                "id":  "cap-integration-contract-export",
+                                                "name":  "Exportação e Documentação do Contrato Público de Integração",
+                                                "description":  "Geração de spec OpenAPI/Swagger e schemas JSON para desenvolvimento por parceiros.",
+                                                "module":  "integrations",
+                                                "weight":  2,
+                                                "mvp":  false,
+                                                "status":  "PLANNED",
+                                                "manualValidation":  false,
+                                                "physicalValidation":  false,
+                                                "frozen":  false,
+                                                "evidence":  [
+
+                                                             ],
+                                                "dependencies":  [
+                                                                     "cap-canonical-field-registry"
+                                                                 ],
+                                                "notes":  [
+                                                              "Facilita integração por software houses externas."
+                                                          ]
+                                            },
+                                            {
+                                                "id":  "cap-admin-shell",
+                                                "name":  "Shell Visual e Navegação da Área Administrativa",
+                                                "description":  "Layout unificado da área restrita de governança com navegação vertical por módulos.",
+                                                "module":  "admin",
+                                                "weight":  2,
+                                                "mvp":  false,
+                                                "status":  "PLANNED",
+                                                "manualValidation":  false,
+                                                "physicalValidation":  false,
+                                                "frozen":  false,
+                                                "evidence":  [
+
+                                                             ],
+                                                "dependencies":  [
+                                                                     "cap-session-context"
+                                                                 ],
+                                                "notes":  [
+                                                              "Estrutura visual alvo: Empresa, Nichos/Elementos, Integrações, Usuários, Perfis, etc."
+                                                          ]
+                                            },
+                                            {
+                                                "id":  "cap-admin-company",
+                                                "name":  "Interface de Gestão da Empresa e Filiais",
+                                                "description":  "Telas para visualização e edição de configurações empresariais e dados cadastrais.",
+                                                "module":  "admin",
+                                                "weight":  2,
+                                                "mvp":  false,
+                                                "status":  "PLANNED",
+                                                "manualValidation":  false,
+                                                "physicalValidation":  false,
+                                                "frozen":  false,
+                                                "evidence":  [
+
+                                                             ],
+                                                "dependencies":  [
+                                                                     "cap-admin-shell",
+                                                                     "cap-company-settings"
+                                                                 ],
+                                                "notes":  [
+                                                              "Painel corporativo do cliente."
+                                                          ]
+                                            },
+                                            {
+                                                "id":  "cap-admin-niches-elements",
+                                                "name":  "Interface de Configuração de Nichos e Elementos Habilitados",
+                                                "description":  "Painel para administradores ativarem nichos e habilitarem elementos visuais por setor.",
+                                                "module":  "admin",
+                                                "weight":  2,
+                                                "mvp":  false,
+                                                "status":  "PLANNED",
+                                                "manualValidation":  false,
+                                                "physicalValidation":  false,
+                                                "frozen":  false,
+                                                "evidence":  [
+
+                                                             ],
+                                                "dependencies":  [
+                                                                     "cap-admin-shell",
+                                                                     "cap-enabled-elements"
+                                                                 ],
+                                                "notes":  [
+                                                              "Configuração visual contextual do editor por filial."
+                                                          ]
+                                            },
+                                            {
+                                                "id":  "cap-admin-users",
+                                                "name":  "Interface de Gestão de Usuários",
+                                                "description":  "Telas de busca, cadastro, convite, ativação e atribuição de perfis aos colaboradores.",
+                                                "module":  "admin",
+                                                "weight":  2,
+                                                "mvp":  false,
+                                                "status":  "PLANNED",
+                                                "manualValidation":  false,
+                                                "physicalValidation":  false,
+                                                "frozen":  false,
+                                                "evidence":  [
+
+                                                             ],
+                                                "dependencies":  [
+                                                                     "cap-admin-shell",
+                                                                     "cap-user-management"
+                                                                 ],
+                                                "notes":  [
+                                                              "Gestão de operadores e designers."
+                                                          ]
+                                            },
+                                            {
+                                                "id":  "cap-admin-roles",
+                                                "name":  "Interface de Gestão de Perfis e Permissões",
+                                                "description":  "Matriz visual de papéis e checkboxes de permissões concedidas.",
+                                                "module":  "admin",
+                                                "weight":  2,
+                                                "mvp":  false,
+                                                "status":  "PLANNED",
+                                                "manualValidation":  false,
+                                                "physicalValidation":  false,
+                                                "frozen":  false,
+                                                "evidence":  [
+
+                                                             ],
+                                                "dependencies":  [
+                                                                     "cap-admin-shell",
+                                                                     "cap-role-permissions"
+                                                                 ],
+                                                "notes":  [
+                                                              "Parametrização simplificada de RBAC."
+                                                          ]
+                                            },
+                                            {
+                                                "id":  "cap-admin-integrations",
+                                                "name":  "Interface de Configuração de Integrações ERP",
+                                                "description":  "Painel para cadastro de endpoints, chaves de API, webhook listeners e mapeamentos de-para.",
+                                                "module":  "admin",
+                                                "weight":  2,
+                                                "mvp":  false,
+                                                "status":  "PLANNED",
+                                                "manualValidation":  false,
+                                                "physicalValidation":  false,
+                                                "frozen":  false,
+                                                "evidence":  [
+
+                                                             ],
+                                                "dependencies":  [
+                                                                     "cap-admin-shell",
+                                                                     "cap-integration-field-mapping"
+                                                                 ],
+                                                "notes":  [
+                                                              "Configuração sem necessidade de código."
+                                                          ]
+                                            },
+                                            {
+                                                "id":  "cap-admin-printers-agents",
+                                                "name":  "Interface de Monitoramento de Impressoras e Agentes Locais",
+                                                "description":  "Painel de saúde das impressoras de rede e status de heartbeat dos agentes pareados.",
+                                                "module":  "admin",
+                                                "weight":  2,
+                                                "mvp":  false,
+                                                "status":  "PLANNED",
+                                                "manualValidation":  false,
+                                                "physicalValidation":  false,
+                                                "frozen":  false,
+                                                "evidence":  [
+
+                                                             ],
+                                                "dependencies":  [
+                                                                     "cap-admin-shell"
+                                                                 ],
+                                                "notes":  [
+                                                              "Visibilidade operacional do parque de dispositivos."
+                                                          ]
+                                            },
+                                            {
+                                                "id":  "cap-admin-audit",
+                                                "name":  "Interface de Visualização de Trilhas de Auditoria",
+                                                "description":  "Tela para consulta e filtro de logs de alterações críticas e eventos de segurança.",
+                                                "module":  "admin",
+                                                "weight":  2,
+                                                "mvp":  false,
+                                                "status":  "PLANNED",
+                                                "manualValidation":  false,
+                                                "physicalValidation":  false,
+                                                "frozen":  false,
+                                                "evidence":  [
+
+                                                             ],
+                                                "dependencies":  [
+                                                                     "cap-admin-shell"
+                                                                 ],
+                                                "notes":  [
+                                                              "Rastreabilidade e conformidade LGPD/SOX."
+                                                          ]
+                                            },
+                                            {
+                                                "id":  "cap-authz-enforcement",
+                                                "name":  "Middleware Fail-Closed de Aplicação de Autorização",
+                                                "description":  "Interceptador de segurança em todas as rotas de backend que valida permissões ativas.",
+                                                "module":  "admin",
+                                                "weight":  2,
+                                                "mvp":  false,
+                                                "status":  "PLANNED",
+                                                "manualValidation":  false,
+                                                "physicalValidation":  false,
+                                                "frozen":  false,
+                                                "evidence":  [
+
+                                                             ],
+                                                "dependencies":  [
+                                                                     "cap-role-permissions"
+                                                                 ],
+                                                "notes":  [
+                                                              "Nenhuma rota protegida executa sem validação estrita."
+                                                          ]
+                                            },
+                                            {
+                                                "id":  "cap-admin-audit-log",
+                                                "name":  "Log Imutável de Eventos Administrativos",
+                                                "description":  "Tabela append-only para gravação de logins, alterações de permissão e ações de admin.",
+                                                "module":  "admin",
+                                                "weight":  2,
+                                                "mvp":  false,
+                                                "status":  "PLANNED",
+                                                "manualValidation":  false,
+                                                "physicalValidation":  false,
+                                                "frozen":  false,
+                                                "evidence":  [
+
+                                                             ],
+                                                "dependencies":  [
+                                                                     "cap-infra-storage-db"
+                                                                 ],
+                                                "notes":  [
+                                                              "Imutabilidade e auditoria forense."
+                                                          ]
+                                            },
+                                            {
+                                                "id":  "cap-config-change-audit",
+                                                "name":  "Auditoria de Alterações de Configuração da Plataforma",
+                                                "description":  "Trilha detalhada com snapshot before/after de alterações em nichos, campos e elementos.",
+                                                "module":  "admin",
+                                                "weight":  2,
+                                                "mvp":  false,
+                                                "status":  "PLANNED",
+                                                "manualValidation":  false,
+                                                "physicalValidation":  false,
+                                                "frozen":  false,
+                                                "evidence":  [
+
+                                                             ],
+                                                "dependencies":  [
+                                                                     "cap-admin-audit-log"
+                                                                 ],
+                                                "notes":  [
+                                                              "Garante rastreabilidade de quem alterou o comportamento."
+                                                          ]
+                                            },
+                                            {
+                                                "id":  "cap-licensing-billing",
+                                                "name":  "Gestão de Licenças e Limite de Dispositivos",
+                                                "description":  "Controle de vigência de licenças, limite de impressoras cadastradas e modo de demonstração (Trial).",
+                                                "module":  "licensing",
+                                                "weight":  8,
+                                                "mvp":  false,
+                                                "status":  "PLANNED",
+                                                "manualValidation":  false,
+                                                "physicalValidation":  false,
+                                                "frozen":  false,
+                                                "evidence":  [
+
+                                                             ],
+                                                "dependencies":  [
+                                                                     "cap-rbac-multi-tenant"
+                                                                 ],
+                                                "notes":  [
+                                                              "Módulo de bilhetagem e limites comerciais."
+                                                          ]
+                                            },
+                                            {
+                                                "id":  "cap-pricing-policy-model",
+                                                "name":  "Modelo Conceitual de Políticas de Preço / PriceRule",
+                                                "description":  "Definição da entidade de domínio PriceRule (type, value, validFrom, validTo, minQuantity, maxQuantity, customerSegment, priority, active).",
+                                                "module":  "admin",
+                                                "weight":  2,
+                                                "mvp":  false,
+                                                "status":  "PLANNED",
+                                                "manualValidation":  false,
+                                                "physicalValidation":  false,
+                                                "frozen":  false,
+                                                "evidence":  [
+
+                                                             ],
+                                                "dependencies":  [
+
+                                                                 ],
+                                                "notes":  [
+                                                              "Existe UM único elemento visual Price; políticas são regras/dados."
+                                                          ]
+                                            },
+                                            {
+                                                "id":  "cap-price-rule-types",
+                                                "name":  "Tipos de Regras de Preço da Plataforma",
+                                                "description":  "Especificação formal de tipos: Preço Normal, Promocional, Fidelidade, Atacado, Rebaixa, Clube.",
+                                                "module":  "admin",
+                                                "weight":  2,
+                                                "mvp":  false,
+                                                "status":  "PLANNED",
+                                                "manualValidation":  false,
+                                                "physicalValidation":  false,
+                                                "frozen":  false,
+                                                "evidence":  [
+
+                                                             ],
+                                                "dependencies":  [
+                                                                     "cap-pricing-policy-model"
+                                                                 ],
+                                                "notes":  [
+                                                              "Regras de negócio sem duplicação de elementos visuais."
+                                                          ]
+                                            },
+                                            {
+                                                "id":  "cap-price-validity",
+                                                "name":  "Regras de Vigência Temporal e Quantidade Mínima",
+                                                "description":  "Validação de intervalos de data/hora e escalonamento por faixas de volume de compra.",
+                                                "module":  "admin",
+                                                "weight":  2,
+                                                "mvp":  false,
+                                                "status":  "PLANNED",
+                                                "manualValidation":  false,
+                                                "physicalValidation":  false,
+                                                "frozen":  false,
+                                                "evidence":  [
+
+                                                             ],
+                                                "dependencies":  [
+                                                                     "cap-pricing-policy-model"
+                                                                 ],
+                                                "notes":  [
+                                                              "Suporte a ofertas por período e atacarejo."
+                                                          ]
+                                            },
+                                            {
+                                                "id":  "cap-price-resolution",
+                                                "name":  "Resolvedor Conceitual de Preço Efetivo no Editor e Impressão",
+                                                "description":  "Algoritmo de resolução da regra de preço ativa prioritária com fallback para preço normal.",
+                                                "module":  "admin",
+                                                "weight":  2,
+                                                "mvp":  false,
+                                                "status":  "PLANNED",
+                                                "manualValidation":  false,
+                                                "physicalValidation":  false,
+                                                "frozen":  false,
+                                                "evidence":  [
+
+                                                             ],
+                                                "dependencies":  [
+                                                                     "cap-pricing-policy-model",
+                                                                     "cap-price-rule-types"
+                                                                 ],
+                                                "notes":  [
+                                                              "Calcula o preço final a exibir na etiqueta de acordo com a data/condição."
+                                                          ]
+                                            }
+                                        ]
+                   },
+                   {
+                       "id":  "phase-6",
+                       "code":  "6",
+                       "name":  "Fase 6 — Novas Linguagens (ZPL, EPL) e Catálogo de Impressoras",
+                       "description":  "ExpansÃ£o de compiladores nativos para suporte a impressoras Zebra (ZPL/EPL) e Elgin.",
+                       "status":  "PLANNED",
+                       "capabilities":  [
+                                            {
+                                                "id":  "cap-zpl-compiler",
+                                                "name":  "Compilador Zebra ZPL II",
+                                                "description":  "Gerador nativo de comandos ZPL II com suporte a fontes nativas, Barcodes e rotinas de ajuste de densidade.",
+                                                "module":  "compilers",
+                                                "weight":  10,
+                                                "mvp":  false,
+                                                "status":  "PLANNED",
+                                                "manualValidation":  false,
+                                                "physicalValidation":  false,
+                                                "frozen":  false,
+                                                "evidence":  [
+
+                                                             ],
+                                                "dependencies":  [
+                                                                     "cap-pplb-compiler"
+                                                                 ],
+                                                "notes":  [
+                                                              "Segunda linguagem principal solicitada por clientes industriais."
+                                                          ]
+                                            },
+                                            {
+                                                "id":  "cap-printer-kb",
+                                                "name":  "Printer Language Knowledge Base \u0026 CatÃ¡logo de Modelos",
+                                                "description":  "Base de conhecimento tÃ©cnica parametrizada por fabricante e modelo de impressora.",
+                                                "module":  "printers",
+                                                "weight":  6,
+                                                "mvp":  false,
+                                                "status":  "PLANNED",
+                                                "manualValidation":  false,
+                                                "physicalValidation":  false,
+                                                "frozen":  false,
+                                                "evidence":  [
+
+                                                             ],
+                                                "dependencies":  [
+
+                                                                 ],
+                                                "notes":  [
+                                                              "Base de suporte para mapeamento de resoluÃ§Ãµes e drivers."
+                                                          ]
+                                            }
+                                        ]
+                   },
+                   {
+                       "id":  "phase-7",
+                       "code":  "7",
+                       "name":  "Fase 7 — Integrações Nativas com ERPs e Contrato Público",
+                       "description":  "SDK de integraÃ§Ã£o pÃºblica via API REST/Webhooks e catÃ¡logo universal de campos ERP.",
+                       "status":  "PLANNED",
+                       "capabilities":  [
+                                            {
+                                                "id":  "cap-erp-integration-sdk",
+                                                "name":  "SDK de IntegraÃ§Ã£o ERP e Contrato OpenAPI / Webhooks",
+                                                "description":  "Interface formal para que software houses conectem ERPs parceiros diretamente Ã  Central de ImpressÃ£o Witiquetas.",
+                                                "module":  "integrations",
+                                                "weight":  10,
+                                                "mvp":  false,
+                                                "status":  "PLANNED",
+                                                "manualValidation":  false,
+                                                "physicalValidation":  false,
+                                                "frozen":  false,
+                                                "evidence":  [
+
+                                                             ],
+                                                "dependencies":  [
+                                                                     "cap-universal-print-center"
+                                                                 ],
+                                                "notes":  [
+                                                              "EspecificaÃ§Ã£o pÃºblica para parceiros de tecnologia."
+                                                          ]
+                                            }
+                                        ]
+                   }
+               ]
 }

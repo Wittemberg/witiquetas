@@ -290,7 +290,7 @@ jobs:
           done
 
           if [ "$DEPLOY_SUCCESS" != "true" ]; then
-            echo "AVISO: O container em produção não atualizou a resposta em /version.json dentro da janela de 150s."
+            echo "AVISO: O container em produção não atualizou a resposta em /version.json dentro da janela total de 150 segundos (150s)."
             echo "A imagem ghcr.io/wittemberg/witiquetas-frontend:stable (commit $EXPECTED_SHA) permanece publicada e pronta no GHCR."
             echo "Caso o Portainer não esteja configurado com auto-update por webhook, execute o 'Redeploy' da stack no Portainer para puxar a nova imagem :stable."
           fi

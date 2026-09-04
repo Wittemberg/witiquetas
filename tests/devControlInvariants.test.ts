@@ -5,15 +5,15 @@ import path from 'node:path';
 
 // Carregar os arquivos canônicos de controle de desenvolvimento
 const projectPath = path.resolve('docs/development-control/project.json');
-const projectContent = fs.readFileSync(projectPath, 'utf8');
+const projectContent = fs.readFileSync(projectPath, 'utf8').replace(/^\uFEFF/, '');
 const projectJson = JSON.parse(projectContent);
 
 const roadmapPath = path.resolve('docs/development-control/roadmap.json');
-const roadmapContent = fs.readFileSync(roadmapPath, 'utf8');
+const roadmapContent = fs.readFileSync(roadmapPath, 'utf8').replace(/^\uFEFF/, '');
 const roadmapJson = JSON.parse(roadmapContent);
 
 const checkpointsPath = path.resolve('docs/development-control/checkpoints.json');
-const checkpointsContent = fs.readFileSync(checkpointsPath, 'utf8');
+const checkpointsContent = fs.readFileSync(checkpointsPath, 'utf8').replace(/^\uFEFF/, '');
 const checkpointsJson = JSON.parse(checkpointsContent);
 
 const capabilities = roadmapJson.phases.flatMap((p: any) => p.capabilities);

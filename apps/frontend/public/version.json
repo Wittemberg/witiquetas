@@ -1,14 +1,14 @@
 {
   "name": "witiquetas-frontend",
-  "version": "4.5.6-governance",
-  "commit": "ec6434f9402ca98a9a81410b9c5fcaac7097d019",
-  "candidateSha": "ec6434f9402ca98a9a81410b9c5fcaac7097d019",
-  "runningSha": "ec6434f9402ca98a9a81410b9c5fcaac7097d019",
-  "shortCommit": "ec6434f",
-  "shortSha": "ec6434f",
+  "version": "4.5.6.1-hotfix",
+  "commit": "bdc5b09faa31b5ea14be7cc75c59773d04010e40",
+  "candidateSha": "bdc5b09faa31b5ea14be7cc75c59773d04010e40",
+  "runningSha": "bdc5b09faa31b5ea14be7cc75c59773d04010e40",
+  "shortCommit": "bdc5b09",
+  "shortSha": "bdc5b09",
   "governanceSha": "ec6434f9402ca98a9a81410b9c5fcaac7097d019",
   "status": "HOMOLOGATED_FROZEN",
-  "package": "PACOTE 4.5.6 — Freeze Formal do Editor + Central de Impressão e Reconciliação do DCC / Roadmap",
+  "package": "HOTFIX 4.5.6.1 — Restaurar DCC + Preview da Central",
   "phase": "Fase 4 — baseline congelado / transição para Fase 5",
-  "timestamp": "2026-09-04T12:00:00Z"
+  "timestamp": "2026-09-04T17:15:00Z"
 }

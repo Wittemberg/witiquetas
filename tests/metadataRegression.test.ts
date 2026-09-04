@@ -4,19 +4,19 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 
-test('1. METADATA REGRESSION: version.json do frontend contém metadados canônicos do Pacote 4.5.6', () => {
+test('1. METADATA REGRESSION: version.json do frontend contém metadados canônicos do Hotfix 4.5.6.1', () => {
   const versionJsonPath = path.resolve('apps/frontend/public/version.json');
   assert.ok(fs.existsSync(versionJsonPath), 'apps/frontend/public/version.json deve existir');
 
   const content = JSON.parse(fs.readFileSync(versionJsonPath, 'utf8'));
 
   assert.equal(content.name, 'witiquetas-frontend', 'name deve ser witiquetas-frontend');
-  assert.equal(content.version, '4.5.6-governance', 'version deve ser 4.5.6-governance e não stale');
+  assert.equal(content.version, '4.5.6.1-hotfix', 'version deve ser 4.5.6.1-hotfix e não stale');
   assert.equal(content.status, 'HOMOLOGATED_FROZEN', 'status deve ser HOMOLOGATED_FROZEN');
   assert.equal(
     content.package,
-    'PACOTE 4.5.6 — Freeze Formal do Editor + Central de Impressão e Reconciliação do DCC / Roadmap',
-    'package deve ser o Pacote 4.5.6'
+    'HOTFIX 4.5.6.1 — Restaurar DCC + Preview da Central',
+    'package deve ser o Hotfix 4.5.6.1'
   );
   assert.equal(content.phase, 'Fase 4 — baseline congelado / transição para Fase 5', 'phase deve estar declarada');
   assert.equal(content.governanceSha, 'ec6434f9402ca98a9a81410b9c5fcaac7097d019', 'governanceSha deve apontar para o commit base do freeze');
@@ -30,7 +30,7 @@ test('2. METADATA REGRESSION: version.json coincide com o último checkpoint de 
   const versionJson = JSON.parse(fs.readFileSync(path.resolve('apps/frontend/public/version.json'), 'utf8'));
 
   assert.equal(versionJson.version, latestCheckpoint.patch, 'version deve corresponder ao patch do último checkpoint');
-  assert.equal(versionJson.governanceSha, latestCheckpoint.sha, 'governanceSha deve corresponder ao SHA do checkpoint de governança');
+  assert.equal(versionJson.candidateSha, latestCheckpoint.sha, 'candidateSha deve corresponder ao SHA do checkpoint de governança');
 });
 
 test('3. METADATA REGRESSION: Dockerfile do frontend não contém literais stale de pacotes antigos', () => {

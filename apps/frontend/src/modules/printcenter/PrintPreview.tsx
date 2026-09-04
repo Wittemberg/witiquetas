@@ -500,6 +500,7 @@ export const PrintPreview: React.FC<PrintPreviewProps> = ({
           alignItems: 'center',
           overflow: 'hidden',
           boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.1)',
+          flex: 1,
         }}
       >
         <div

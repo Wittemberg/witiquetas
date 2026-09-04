@@ -690,175 +690,176 @@ export const PrintCenterPage: React.FC = () => {
       ) : (
         /* CORPO DA CENTRAL (SELEÇÃO, BUSCA, GRID E PREVIEW) */
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-          {/* BARRA SUPERIOR DE SELEÇÃO: NICHO, MODELO, ORIGEM, IMPRESSORA & AGENT */}
-          <div className="print-center-config-card">
-            {/* 0. SELEÇÃO DE NICHO OPERACIONAL (PACOTE 4.5) */}
-            <div className="print-center-field-group">
-              <label className="print-center-label">
-                <Filter style={{ width: '0.875rem', height: '0.875rem' }} className="print-center-icon-blue" />
-                Nicho Operacional
-              </label>
-              <select
-                value={selectedNicheId}
-                onChange={(e) => setSelectedNicheId(e.target.value)}
-                className="print-center-select"
-              >
-                {CANONICAL_NICHE_PROFILES.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-                <option value="all">Todos os Nichos</option>
-              </select>
-            </div>
-
-            {/* 1. SELEÇÃO DE MODELO (Filtrado pelo Nicho) */}
-            <div className="print-center-field-group">
-              <label className="print-center-label">
-                <FileText style={{ width: '0.875rem', height: '0.875rem' }} className="print-center-icon-blue" />
-                Modelo de Etiqueta
-              </label>
-              <select
-                value={selectedTemplateId}
-                onChange={(e) => setSelectedTemplateId(e.target.value)}
-                className="print-center-select"
-              >
-                {filteredTemplateSummaries.length === 0 ? (
-                  <option value="">Nenhum modelo para o nicho selecionado</option>
-                ) : (
-                  filteredTemplateSummaries.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.title} ({t.widthMm}x{t.heightMm}mm - {t.printerLanguage})
-                    </option>
-                  ))
-                )}
-              </select>
-            </div>
-
-            {/* 2. ORIGEM DE DADOS / FONTE */}
-            <div className="print-center-field-group">
-              <label className="print-center-label">
-                <Database style={{ width: '0.875rem', height: '0.875rem' }} className="print-center-icon-blue" />
-                Origem de Dados
-              </label>
-              <select defaultValue="mock-catalog" className="print-center-select">
-                <option value="mock-catalog">Dados de Homologação ({CANONICAL_NICHE_PROFILES.find((p) => p.id === effectiveNicheId)?.name || 'Multi-Nicho'})</option>
-              </select>
-            </div>
-
-            {/* 3. SELEÇÃO DE IMPRESSORA E STATUS DO AGENT */}
-            <div className="print-center-field-group">
-              <div className="print-center-label-row">
+          {/* ÁREA SUPERIOR: 2 COLUNAS (CONFIGURAÇÃO À ESQUERDA, PRÉVIA À DIREITA) */}
+          <div className="print-center-top-grid">
+            {/* BLOCO ESQUERDO — CONFIGURAÇÃO (LINHA 1: NICHO | MODELO; LINHA 2: IMPRESSORA | ORIGEM) */}
+            <div className="print-center-config-card">
+              {/* LINHA 1, COL 1: SELEÇÃO DE NICHO OPERACIONAL */}
+              <div className="print-center-field-group">
                 <label className="print-center-label">
-                  <Printer style={{ width: '0.875rem', height: '0.875rem' }} className="print-center-icon-blue" />
-                  Impressora Destino
+                  <Filter style={{ width: '0.875rem', height: '0.875rem' }} className="print-center-icon-blue" />
+                  Nicho Operacional
                 </label>
-                <span
-                  className={`print-center-badge ${
-                    agentStatus.online ? 'print-center-badge-online' : 'print-center-badge-offline'
-                  }`}
+                <select
+                  value={selectedNicheId}
+                  onChange={(e) => setSelectedNicheId(e.target.value)}
+                  className="print-center-select"
                 >
-                  <span className="print-center-badge-dot" />
-                  {agentStatus.text}
-                </span>
-              </div>
-              <select
-                value={selectedPrinterId}
-                onChange={(e) => setSelectedPrinterId(e.target.value)}
-                className="print-center-select"
-              >
-                {printers.length === 0 ? (
-                  <option value="">Nenhuma impressora cadastrada</option>
-                ) : (
-                  printers.map((p) => (
+                  {CANONICAL_NICHE_PROFILES.map((p) => (
                     <option key={p.id} value={p.id}>
-                      {p.name} ({p.language} - {p.protocol})
+                      {p.name}
                     </option>
-                  ))
-                )}
-              </select>
-            </div>
-          </div>
+                  ))}
+                  <option value="all">Todos os Nichos</option>
+                </select>
+              </div>
 
-          {/* ÁREA PRINCIPAL DIVIDIDA: GRID DE REGISTROS (ESQUERDA) E PRÉVIA CONTEXTUAL (DIREITA) */}
-          <div className="print-center-main-grid">
-            {/* PAINEL ESQUERDO: BARRA DE FERRAMENTAS E TABELA DE DATAGRID */}
-            <div className="print-center-records-panel">
-              <PrintCenterGrid
-                records={records}
-                requiredFields={requiredFields}
-                searchQuery={searchQuery}
-                onSearchChange={setSearchQuery}
-                selectedIds={selectedIds}
-                quantities={quantities}
-                onToggleSelect={handleToggleSelect}
-                onToggleSelectAll={handleToggleSelectAll}
-                onChangeQuantity={handleChangeQuantity}
-                batchQuantityInput={batchQuantityInput}
-                onBatchQuantityInputChange={setBatchQuantityInput}
-                onApplyBatchQuantity={handleApplyBatchQuantity}
-                activeRecordId={activeRecordId}
-                onSetActiveRecordId={setActiveRecordId}
-              />
+              {/* LINHA 1, COL 2: SELEÇÃO DE MODELO (Filtrado pelo Nicho) */}
+              <div className="print-center-field-group">
+                <label className="print-center-label">
+                  <FileText style={{ width: '0.875rem', height: '0.875rem' }} className="print-center-icon-blue" />
+                  Modelo de Etiqueta
+                </label>
+                <select
+                  value={selectedTemplateId}
+                  onChange={(e) => setSelectedTemplateId(e.target.value)}
+                  className="print-center-select"
+                >
+                  {filteredTemplateSummaries.length === 0 ? (
+                    <option value="">Nenhum modelo para o nicho selecionado</option>
+                  ) : (
+                    filteredTemplateSummaries.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.title} ({t.widthMm}x{t.heightMm}mm - {t.printerLanguage})
+                      </option>
+                    ))
+                  )}
+                </select>
+              </div>
+
+              {/* LINHA 2, COL 1: SELEÇÃO DE IMPRESSORA E STATUS DO AGENT */}
+              <div className="print-center-field-group">
+                <div className="print-center-label-row">
+                  <label className="print-center-label">
+                    <Printer style={{ width: '0.875rem', height: '0.875rem' }} className="print-center-icon-blue" />
+                    Impressora Destino
+                  </label>
+                  <span
+                    className={`print-center-badge ${
+                      agentStatus.online ? 'print-center-badge-online' : 'print-center-badge-offline'
+                    }`}
+                  >
+                    <span className="print-center-badge-dot" />
+                    {agentStatus.text}
+                  </span>
+                </div>
+                <select
+                  value={selectedPrinterId}
+                  onChange={(e) => setSelectedPrinterId(e.target.value)}
+                  className="print-center-select"
+                >
+                  {printers.length === 0 ? (
+                    <option value="">Nenhuma impressora cadastrada</option>
+                  ) : (
+                    printers.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name} ({p.language} - {p.protocol})
+                      </option>
+                    ))
+                  )}
+                </select>
+              </div>
+
+              {/* LINHA 2, COL 2: ORIGEM DE DADOS / FONTE */}
+              <div className="print-center-field-group">
+                <label className="print-center-label">
+                  <Database style={{ width: '0.875rem', height: '0.875rem' }} className="print-center-icon-blue" />
+                  Origem de Dados
+                </label>
+                <select defaultValue="mock-catalog" className="print-center-select">
+                  <option value="mock-catalog">Dados de Homologação ({CANONICAL_NICHE_PROFILES.find((p) => p.id === effectiveNicheId)?.name || 'Multi-Nicho'})</option>
+                </select>
+              </div>
             </div>
 
-            {/* PAINEL DIREITO: VISUALIZADOR DE PRÉVIA CONTEXTUAL E AÇÕES */}
-            <div className="print-center-preview-panel">
+            {/* BLOCO DIREITO — CARD INDEPENDENTE DE PRÉVIA DE IMPRESSÃO */}
+            <div className="print-center-preview-card">
               <PrintPreview
                 document={selectedTemplate?.document || null}
                 data={(activeRecord?.data as Record<string, unknown>) || null}
                 activeRecord={activeRecord?.data || null}
                 modelName={selectedTemplate?.title || selectedTemplate?.name}
                 printerLanguage={selectedTemplate?.printerLanguage || 'PPLB'}
+                targetWidthPx={280}
                 totalSelectedRecords={totalSelectedRecords}
                 totalSelectedLabels={totalSelectedLabels}
                 selectedPrinterName={selectedPrinter?.name || 'Selecione a Impressora'}
                 isPrintEnabled={isPrintButtonEnabled}
                 onOpenConfirmModal={() => setIsConfirmModalOpen(true)}
               />
+            </div>
+          </div>
 
-              {/* CARD DE AÇÃO DE DISPARO */}
-              <div className="print-center-card">
-                <div className="print-center-card-header">
-                  <h3 className="print-center-card-title">
-                    <Layers style={{ width: '1rem', height: '1rem' }} className="print-center-icon-blue" />
-                    Resumo da Seleção
-                  </h3>
-                </div>
+          {/* TABELA DE REGISTROS ABAIXO DOS CARDS SUPERIORES */}
+          <div className="print-center-records-section" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+            <PrintCenterGrid
+              records={records}
+              requiredFields={requiredFields}
+              searchQuery={searchQuery}
+              onSearchChange={setSearchQuery}
+              selectedIds={selectedIds}
+              quantities={quantities}
+              onToggleSelect={handleToggleSelect}
+              onToggleSelectAll={handleToggleSelectAll}
+              onChangeQuantity={handleChangeQuantity}
+              batchQuantityInput={batchQuantityInput}
+              onBatchQuantityInputChange={setBatchQuantityInput}
+              onApplyBatchQuantity={handleApplyBatchQuantity}
+              activeRecordId={activeRecordId}
+              onSetActiveRecordId={setActiveRecordId}
+            />
 
-                <div className="print-center-summary-list">
-                  <div className="print-center-summary-item">
-                    <span>Registros Selecionados:</span>
-                    <span className="print-center-summary-value">{totalSelectedRecords}</span>
-                  </div>
-                  <div className="print-center-summary-item">
-                    <span>Total de Etiquetas:</span>
-                    <span className="print-center-summary-value-accent">{totalSelectedLabels}</span>
-                  </div>
-                  <div className="print-center-summary-item">
-                    <span>Linguagem de Impressão:</span>
-                    <span className="print-center-summary-value">
-                      {selectedTemplate?.printerLanguage || 'PPLB'}
-                    </span>
-                  </div>
-                </div>
-
-                <button
-                  disabled={!isPrintButtonEnabled}
-                  onClick={() => setIsConfirmModalOpen(true)}
-                  className="print-center-btn print-center-btn-primary"
-                  style={{ width: '100%', padding: '0.75rem 1rem', fontSize: '0.875rem', fontWeight: 700 }}
-                >
-                  <Send style={{ width: '1rem', height: '1rem' }} />
-                  Imprimir Seleção ({totalSelectedLabels} etiquetas)
-                </button>
-
-                {!agentStatus.online && (
-                  <p style={{ fontSize: '0.6875rem', color: 'var(--status-danger)', textAlign: 'center', fontWeight: 500, margin: 0 }}>
-                    A impressora selecionada ou seu Agente está offline. Conecte o hardware para habilitar a impressão.
-                  </p>
-                )}
+            {/* CARD DE AÇÃO DE DISPARO E RESUMO DA SELEÇÃO */}
+            <div className="print-center-card">
+              <div className="print-center-card-header">
+                <h3 className="print-center-card-title">
+                  <Layers style={{ width: '1rem', height: '1rem' }} className="print-center-icon-blue" />
+                  Resumo da Seleção
+                </h3>
               </div>
+
+              <div className="print-center-summary-list">
+                <div className="print-center-summary-item">
+                  <span>Registros Selecionados:</span>
+                  <span className="print-center-summary-value">{totalSelectedRecords}</span>
+                </div>
+                <div className="print-center-summary-item">
+                  <span>Total de Etiquetas:</span>
+                  <span className="print-center-summary-value-accent">{totalSelectedLabels}</span>
+                </div>
+                <div className="print-center-summary-item">
+                  <span>Linguagem de Impressão:</span>
+                  <span className="print-center-summary-value">
+                    {selectedTemplate?.printerLanguage || 'PPLB'}
+                  </span>
+                </div>
+              </div>
+
+              <button
+                disabled={!isPrintButtonEnabled}
+                onClick={() => setIsConfirmModalOpen(true)}
+                className="print-center-btn print-center-btn-primary"
+                style={{ width: '100%', padding: '0.75rem 1rem', fontSize: '0.875rem', fontWeight: 700 }}
+              >
+                <Send style={{ width: '1rem', height: '1rem' }} />
+                Imprimir Seleção ({totalSelectedLabels} etiquetas)
+              </button>
+
+              {!agentStatus.online && (
+                <p style={{ fontSize: '0.6875rem', color: 'var(--status-danger)', textAlign: 'center', fontWeight: 500, margin: 0 }}>
+                  A impressora selecionada ou seu Agente está offline. Conecte o hardware para habilitar a impressão.
+                </p>
+              )}
             </div>
           </div>
         </div>

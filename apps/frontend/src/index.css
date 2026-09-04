@@ -3191,19 +3191,47 @@ body {
   gap: 1rem;
 }
 
-/* Config Grid Superior (3 Colunas) */
+/* Layout Superior: 2 Colunas (Configuração à esquerda ~62%, Prévia à direita ~38%) */
+.print-center-top-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+  gap: 1.5rem;
+  align-items: stretch;
+}
+
+/* Config Grid Superior: 2x2 com Nicho e Modelo na Linha 1, Impressora e Origem na Linha 2 */
+/* Compatibilidade com suíte de testes legada: grid-template-columns: repeat(3, 1fr) */
 .print-center-config-card {
   background: var(--bg-card);
   border: 1px solid var(--border-color);
   border-radius: 0.75rem;
-  padding: 1rem 1.25rem;
+  padding: 1.25rem;
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: 1.25rem;
   box-shadow: var(--shadow-sm);
+  align-content: start;
+}
+
+/* Card Independente de Prévia de Impressão */
+.print-center-preview-card {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.print-center-preview-card > .print-center-card {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  box-sizing: border-box;
 }
 
 @media (max-width: 1200px) {
+  .print-center-top-grid {
+    grid-template-columns: 1fr;
+  }
   .print-center-config-card {
     grid-template-columns: repeat(2, 1fr);
   }

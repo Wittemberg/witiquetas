@@ -780,6 +780,49 @@ export const PrintCenterPage: React.FC = () => {
                   <option value="mock-catalog">Dados de Homologação ({CANONICAL_NICHE_PROFILES.find((p) => p.id === effectiveNicheId)?.name || 'Multi-Nicho'})</option>
                 </select>
               </div>
+
+              {/* ÁREA DE RESUMO DA SELEÇÃO E DISPARO (INTEGRADA AO CARD DE CONFIGURAÇÃO) */}
+              <div className="print-center-config-summary">
+                <div className="print-center-card-header" style={{ paddingBottom: '0.25rem', borderBottom: 'none' }}>
+                  <h3 className="print-center-card-title">
+                    <Layers style={{ width: '1rem', height: '1rem' }} className="print-center-icon-blue" />
+                    Resumo da Seleção
+                  </h3>
+                </div>
+
+                <div className="print-center-summary-list">
+                  <div className="print-center-summary-item">
+                    <span>Registros Selecionados:</span>
+                    <span className="print-center-summary-value">{totalSelectedRecords}</span>
+                  </div>
+                  <div className="print-center-summary-item">
+                    <span>Total de Etiquetas:</span>
+                    <span className="print-center-summary-value-accent">{totalSelectedLabels}</span>
+                  </div>
+                  <div className="print-center-summary-item">
+                    <span>Linguagem de Impressão:</span>
+                    <span className="print-center-summary-value">
+                      {selectedTemplate?.printerLanguage || 'PPLB'}
+                    </span>
+                  </div>
+                </div>
+
+                <button
+                  disabled={!isPrintButtonEnabled}
+                  onClick={() => setIsConfirmModalOpen(true)}
+                  className="print-center-btn print-center-btn-primary"
+                  style={{ width: '100%', padding: '0.75rem 1rem', fontSize: '0.875rem', fontWeight: 700 }}
+                >
+                  <Send style={{ width: '1rem', height: '1rem' }} />
+                  Imprimir Seleção ({totalSelectedLabels} etiquetas)
+                </button>
+
+                {!agentStatus.online && (
+                  <p style={{ fontSize: '0.6875rem', color: 'var(--status-danger)', textAlign: 'center', fontWeight: 500, margin: 0 }}>
+                    A impressora selecionada ou seu Agente está offline. Conecte o hardware para habilitar a impressão.
+                  </p>
+                )}
+              </div>
             </div>
 
             {/* BLOCO DIREITO — CARD INDEPENDENTE DE PRÉVIA DE IMPRESSÃO */}
@@ -800,68 +843,23 @@ export const PrintCenterPage: React.FC = () => {
             </div>
           </div>
 
-          {/* TABELA DE REGISTROS ABAIXO DOS CARDS SUPERIORES */}
-          <div className="print-center-records-section" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-            <PrintCenterGrid
-              records={records}
-              requiredFields={requiredFields}
-              searchQuery={searchQuery}
-              onSearchChange={setSearchQuery}
-              selectedIds={selectedIds}
-              quantities={quantities}
-              onToggleSelect={handleToggleSelect}
-              onToggleSelectAll={handleToggleSelectAll}
-              onChangeQuantity={handleChangeQuantity}
-              batchQuantityInput={batchQuantityInput}
-              onBatchQuantityInputChange={setBatchQuantityInput}
-              onApplyBatchQuantity={handleApplyBatchQuantity}
-              activeRecordId={activeRecordId}
-              onSetActiveRecordId={setActiveRecordId}
-            />
-
-            {/* CARD DE AÇÃO DE DISPARO E RESUMO DA SELEÇÃO */}
-            <div className="print-center-card">
-              <div className="print-center-card-header">
-                <h3 className="print-center-card-title">
-                  <Layers style={{ width: '1rem', height: '1rem' }} className="print-center-icon-blue" />
-                  Resumo da Seleção
-                </h3>
-              </div>
-
-              <div className="print-center-summary-list">
-                <div className="print-center-summary-item">
-                  <span>Registros Selecionados:</span>
-                  <span className="print-center-summary-value">{totalSelectedRecords}</span>
-                </div>
-                <div className="print-center-summary-item">
-                  <span>Total de Etiquetas:</span>
-                  <span className="print-center-summary-value-accent">{totalSelectedLabels}</span>
-                </div>
-                <div className="print-center-summary-item">
-                  <span>Linguagem de Impressão:</span>
-                  <span className="print-center-summary-value">
-                    {selectedTemplate?.printerLanguage || 'PPLB'}
-                  </span>
-                </div>
-              </div>
-
-              <button
-                disabled={!isPrintButtonEnabled}
-                onClick={() => setIsConfirmModalOpen(true)}
-                className="print-center-btn print-center-btn-primary"
-                style={{ width: '100%', padding: '0.75rem 1rem', fontSize: '0.875rem', fontWeight: 700 }}
-              >
-                <Send style={{ width: '1rem', height: '1rem' }} />
-                Imprimir Seleção ({totalSelectedLabels} etiquetas)
-              </button>
-
-              {!agentStatus.online && (
-                <p style={{ fontSize: '0.6875rem', color: 'var(--status-danger)', textAlign: 'center', fontWeight: 500, margin: 0 }}>
-                  A impressora selecionada ou seu Agente está offline. Conecte o hardware para habilitar a impressão.
-                </p>
-              )}
-            </div>
-          </div>
+          {/* TABELA DE REGISTROS IMEDIATAMENTE ABAIXO DOS CARDS SUPERIORES */}
+          <PrintCenterGrid
+            records={records}
+            requiredFields={requiredFields}
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            selectedIds={selectedIds}
+            quantities={quantities}
+            onToggleSelect={handleToggleSelect}
+            onToggleSelectAll={handleToggleSelectAll}
+            onChangeQuantity={handleChangeQuantity}
+            batchQuantityInput={batchQuantityInput}
+            onBatchQuantityInputChange={setBatchQuantityInput}
+            onApplyBatchQuantity={handleApplyBatchQuantity}
+            activeRecordId={activeRecordId}
+            onSetActiveRecordId={setActiveRecordId}
+          />
         </div>
       )}
 

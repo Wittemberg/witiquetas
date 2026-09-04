@@ -9,6 +9,7 @@ import {
   X,
   Database,
   Filter,
+  Layers,
 } from 'lucide-react';
 import {
   getRequiredIntegrationFields,
@@ -16,6 +17,7 @@ import {
   normalizeNicheId,
   CANONICAL_NICHE_PROFILES,
   getIntegrationFieldsByNiche,
+  resolveFieldValue,
 } from '@witiquetas/label-schema';
 import type {
   TemplateSummaryDTO,
@@ -804,13 +806,127 @@ export const PrintCenterPage: React.FC = () => {
             <div className="print-center-preview-panel">
               <PrintPreview
                 document={selectedTemplate?.document || null}
+                data={(activeRecord?.data as Record<string, unknown>) || null}
                 activeRecord={activeRecord?.data || null}
+                modelName={selectedTemplate?.title || selectedTemplate?.name}
+                printerLanguage={selectedTemplate?.printerLanguage || 'PPLB'}
                 totalSelectedRecords={totalSelectedRecords}
                 totalSelectedLabels={totalSelectedLabels}
                 selectedPrinterName={selectedPrinter?.name || 'Selecione a Impressora'}
                 isPrintEnabled={isPrintButtonEnabled}
                 onOpenConfirmModal={() => setIsConfirmModalOpen(true)}
               />
+
+              {/* CARD DE AÇÃO DE DISPARO */}
+              <div className="print-center-card">
+                <div className="print-center-card-header">
+                  <h3 className="print-center-card-title">
+                    <Layers style={{ width: '1rem', height: '1rem' }} className="print-center-icon-blue" />
+                    Resumo da Seleção
+                  </h3>
+                </div>
+
+                <div className="print-center-summary-list">
+                  <div className="print-center-summary-item">
+                    <span>Registros Selecionados:</span>
+                    <span className="print-center-summary-value">{totalSelectedRecords}</span>
+                  </div>
+                  <div className="print-center-summary-item">
+                    <span>Total de Etiquetas:</span>
+                    <span className="print-center-summary-value-accent">{totalSelectedLabels}</span>
+                  </div>
+                  <div className="print-center-summary-item">
+                    <span>Linguagem de Impressão:</span>
+                    <span className="print-center-summary-value">
+                      {selectedTemplate?.printerLanguage || 'PPLB'}
+                    </span>
+                  </div>
+                </div>
+
+                <button
+                  disabled={!isPrintButtonEnabled}
+                  onClick={() => setIsConfirmModalOpen(true)}
+                  className="print-center-btn print-center-btn-primary"
+                  style={{ width: '100%', padding: '0.75rem 1rem', fontSize: '0.875rem', fontWeight: 700 }}
+                >
+                  <Send style={{ width: '1rem', height: '1rem' }} />
+                  Imprimir Seleção ({totalSelectedLabels} etiquetas)
+                </button>
+
+                {!agentStatus.online && (
+                  <p style={{ fontSize: '0.6875rem', color: 'var(--status-danger)', textAlign: 'center', fontWeight: 500, margin: 0 }}>
+                    A impressora selecionada ou seu Agente está offline. Conecte o hardware para habilitar a impressão.
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL COMPACTO DE CONFIRMAÇÃO DE DISPARO */}
+      {isConfirmModalOpen && (
+        <div className="print-center-modal-overlay">
+          <div className="print-center-modal-card">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
+              <h3 style={{ fontSize: '1rem', fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Printer style={{ width: '1.25rem', height: '1.25rem' }} className="print-center-icon-blue" />
+                Confirmar Impressão em Lote
+              </h3>
+              <button
+                onClick={() => setIsConfirmModalOpen(false)}
+                style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
+              >
+                <X style={{ width: '1.25rem', height: '1.25rem' }} />
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', fontSize: '0.8125rem', background: 'var(--bg-input)', padding: '1rem', borderRadius: '0.5rem', border: '1px solid var(--border-color)' }}>
+              <div>
+                <span style={{ color: 'var(--text-muted)', display: 'block', fontWeight: 500 }}>Modelo de Etiqueta:</span>
+                <span style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-primary)' }}>{selectedTemplate?.title}</span>
+              </div>
+              <div>
+                <span style={{ color: 'var(--text-muted)', display: 'block', fontWeight: 500 }}>Impressora Destino:</span>
+                <span style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-primary)' }}>{selectedPrinter?.name}</span>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid var(--border-color)' }}>
+                <div>
+                  <span style={{ color: 'var(--text-muted)', display: 'block', fontWeight: 500 }}>Registros:</span>
+                  <span style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)' }}>{totalSelectedRecords}</span>
+                </div>
+                <div>
+                  <span style={{ color: 'var(--text-muted)', display: 'block', fontWeight: 500 }}>Total Etiquetas:</span>
+                  <span style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--accent-blue)' }}>{totalSelectedLabels}</span>
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', justifySelf: 'end', alignSelf: 'end', gap: '0.75rem', paddingTop: '0.5rem' }}>
+              <button
+                onClick={() => setIsConfirmModalOpen(false)}
+                disabled={isSubmitting}
+                className="print-center-btn print-center-btn-secondary"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleConfirmPrintBatch}
+                disabled={isSubmitting}
+                className="print-center-btn print-center-btn-primary"
+              >
+                {isSubmitting ? (
+                  <>
+                    <RefreshCw style={{ width: '1rem', height: '1rem' }} className="animate-spin" />
+                    Enviando Lote...
+                  </>
+                ) : (
+                  <>
+                    <Send style={{ width: '1rem', height: '1rem' }} />
+                    Enviar para Impressão
+                  </>
+                )}
+              </button>
             </div>
           </div>
         </div>

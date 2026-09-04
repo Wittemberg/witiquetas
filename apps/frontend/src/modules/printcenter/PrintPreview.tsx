@@ -21,10 +21,16 @@ import { Eye, FileText, AlertCircle } from 'lucide-react';
 
 export interface PrintPreviewProps {
   document: LabelDocument | null;
-  data: Record<string, unknown> | null;
+  data?: Record<string, unknown> | null;
+  activeRecord?: Record<string, unknown> | null;
   modelName?: string;
   printerLanguage?: string;
   targetWidthPx?: number;
+  totalSelectedRecords?: number;
+  totalSelectedLabels?: number;
+  selectedPrinterName?: string;
+  isPrintEnabled?: boolean;
+  onOpenConfirmModal?: () => void;
 }
 
 // Subcomponente QR Code Read-Only para Prévia
@@ -410,9 +416,15 @@ function SingleElementPreview({
 export const PrintPreview: React.FC<PrintPreviewProps> = ({
   document,
   data,
+  activeRecord,
   modelName,
   printerLanguage = 'PPLB',
   targetWidthPx = 280,
+  totalSelectedRecords = 0,
+  totalSelectedLabels = 0,
+  selectedPrinterName = 'Selecione a Impressora',
+  isPrintEnabled = false,
+  onOpenConfirmModal,
 }) => {
   // ESTADO SEM MODELO SELECIONADO
   if (!document) {
@@ -426,17 +438,8 @@ export const PrintPreview: React.FC<PrintPreviewProps> = ({
     );
   }
 
-  // ESTADO SEM REGISTRO SELECIONADO
-  if (!data) {
-    return (
-      <div className="print-center-card" style={{ textAlign: 'center', padding: '2rem 1rem' }}>
-        <AlertCircle style={{ width: '2rem', height: '2rem', margin: '0 auto 0.5rem auto', color: 'var(--text-muted)' }} />
-        <h4 style={{ margin: 0, fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
-          Selecione um registro para visualizar a impressão.
-        </h4>
-      </div>
-    );
-  }
+  // Dados efetivos do registro para renderização da prévia (suporta data, activeRecord ou objeto vazio para modelo base)
+  const effectiveData: Record<string, unknown> = data || activeRecord || {};
 
   const widthMm = document.dimensions?.widthMm || 100;
   const heightMm = document.dimensions?.heightMm || 30;
@@ -451,16 +454,18 @@ export const PrintPreview: React.FC<PrintPreviewProps> = ({
   const scaledHeightPx = nativeHeightPx * scale;
 
   // Extrair descrição curta do registro para identificação no topo
-  const recordSummary =
-    String(
-      data['retail.description'] ||
-        data['produto.descricao'] ||
-        data['hospital.patientName'] ||
-        data['logistics.recipient'] ||
-        data['retail.code'] ||
-        data['produto.codigo'] ||
-        'Registro Ativo'
-    );
+  const hasRecordData = Object.keys(effectiveData).length > 0;
+  const recordSummary = hasRecordData
+    ? String(
+        effectiveData['retail.description'] ||
+          effectiveData['produto.descricao'] ||
+          effectiveData['hospital.patientName'] ||
+          effectiveData['logistics.recipient'] ||
+          effectiveData['retail.code'] ||
+          effectiveData['produto.codigo'] ||
+          'Registro Ativo'
+      )
+    : (modelName || 'Modelo Base (Sem Dados)');
 
   return (
     <div className="print-center-card">
@@ -529,7 +534,7 @@ export const PrintPreview: React.FC<PrintPreviewProps> = ({
                   key={elem.id}
                   elem={elem}
                   dpi={dpi}
-                  dataContext={data as Record<string, unknown>}
+                  dataContext={effectiveData}
                 />
               ))}
             </Layer>
@@ -546,6 +551,12 @@ export const PrintPreview: React.FC<PrintPreviewProps> = ({
         <span style={{ color: 'var(--text-muted)', fontWeight: 500 }}>Registro: </span>
         <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{recordSummary}</span>
       </div>
+
+      {!hasRecordData && (
+        <p style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', textAlign: 'center', margin: 0 }}>
+          Selecione um registro para visualizar a impressão.
+        </p>
+      )}
     </div>
   );
 };

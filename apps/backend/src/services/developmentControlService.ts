@@ -36,8 +36,9 @@ function loadJsonFile<T>(filename: string): T {
   if (!fs.existsSync(filePath)) {
     throw new Error(`Arquivo de controle de desenvolvimento não encontrado: ${filePath}`);
   }
-  const content = fs.readFileSync(filePath, 'utf-8');
-  return JSON.parse(content) as T;
+  const rawContent = fs.readFileSync(filePath, 'utf-8');
+  const cleanContent = rawContent.replace(/^\uFEFF/, '');
+  return JSON.parse(cleanContent) as T;
 }
 
 export class DevelopmentControlService {

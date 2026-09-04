@@ -1,6 +1,28 @@
 {
   "checkpoints": [
     {
+      "sha": "ec6434f9402ca98a9a81410b9c5fcaac7097d019",
+      "shortSha": "ec6434f",
+      "date": "2026-09-04T12:00:00Z",
+      "phase": "4",
+      "patch": "4.5.6-governance",
+      "title": "docs(dcc): congelar editor e preparar fase de administracao (PACOTE 4.5.6)",
+      "type": "INFRA",
+      "capabilities": [
+        "cap-single-price-element",
+        "cap-line-resize-restored",
+        "cap-line-rotation-restored",
+        "cap-manual-text-precedence",
+        "cap-typed-expiration-date",
+        "cap-system-print-date"
+      ],
+      "testsPassed": true,
+      "deployed": true,
+      "manualValidation": true,
+      "homologated": true,
+      "evidence": "Homologação manual concluída pelo usuário em 100%"
+    },
+    {
       "sha": "86eeb97ace58310d471e769958eed65028a2c3d4",
       "shortSha": "86eeb97",
       "date": "2026-09-03T16:50:00Z",

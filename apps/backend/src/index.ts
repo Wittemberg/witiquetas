@@ -138,6 +138,11 @@ const handleVersion = (_req: Request, res: Response) => {
   res.json({
     name: 'witiquetas-backend',
     version: '4.5.6-governance',
+    commit: 'ec6434f9402ca98a9a81410b9c5fcaac7097d019',
+    candidateSha: 'ec6434f9402ca98a9a81410b9c5fcaac7097d019',
+    runningSha: 'ec6434f9402ca98a9a81410b9c5fcaac7097d019',
+    shortCommit: 'ec6434f',
+    shortSha: 'ec6434f',
     status: 'HOMOLOGATED_FROZEN',
     package: 'PACOTE 4.5.6 — Freeze Formal do Editor + Central de Impressão e Reconciliação do DCC / Roadmap',
     phase: 'Fase 4 — Central de Impressão Universal & Perfis Multi-Nicho (Baseline Congelado)',

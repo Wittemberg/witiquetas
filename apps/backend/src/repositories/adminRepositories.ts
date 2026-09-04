@@ -1,4 +1,10 @@
 import { pgPool } from '../db.js';
+import {
+  NICHES,
+  getNicheToolboxConfig,
+  getIntegrationFieldsByNiche,
+  SYSTEM_FIELDS,
+} from '@witiquetas/label-schema';
 import type {
   CompanyDTO,
   CreateCompanyDTO,
@@ -577,6 +583,9 @@ export const CompanyConfigurationRepository = {
   async setNicheState(companyId: string, nicheId: string, state: 'ENABLED' | 'DISABLED'): Promise<CompanyNicheConfigDTO> {
     const comp = await CompanyRepository.findById(companyId);
     if (!comp) throw new Error(`company_not_found: company '${companyId}' not found`);
+    if (!NICHES.some((n) => n.id === nicheId)) {
+      throw new Error(`invalid_niche: niche '${nicheId}' does not exist in platform`);
+    }
     const now = new Date().toISOString();
 
     if (pgPool) {
@@ -624,6 +633,21 @@ export const CompanyConfigurationRepository = {
   async setElementEnabled(companyId: string, nicheId: string, elementType: string, enabled: boolean): Promise<CompanyElementConfigDTO> {
     const comp = await CompanyRepository.findById(companyId);
     if (!comp) throw new Error(`company_not_found: company '${companyId}' not found`);
+    if (!NICHES.some((n) => n.id === nicheId)) {
+      throw new Error(`invalid_niche: niche '${nicheId}' does not exist in platform`);
+    }
+    const toolbox = getNicheToolboxConfig(nicheId);
+    const validElementTypes = new Set<string>([
+      ...toolbox.recommendedTools.map((t) => t.elementType),
+      ...toolbox.availableTools.map((t) => t.elementType),
+      'text',
+      'line',
+      'rectangle',
+      'image',
+    ]);
+    if (!validElementTypes.has(elementType)) {
+      throw new Error(`invalid_element: element '${elementType}' is not valid for niche '${nicheId}'`);
+    }
     const now = new Date().toISOString();
 
     if (pgPool) {
@@ -675,6 +699,16 @@ export const CompanyConfigurationRepository = {
   async setFieldEnabled(companyId: string, nicheId: string, canonicalFieldId: string, enabled: boolean): Promise<CompanyFieldConfigDTO> {
     const comp = await CompanyRepository.findById(companyId);
     if (!comp) throw new Error(`company_not_found: company '${companyId}' not found`);
+    if (!NICHES.some((n) => n.id === nicheId)) {
+      throw new Error(`invalid_niche: niche '${nicheId}' does not exist in platform`);
+    }
+    const validFields = new Set<string>([
+      ...getIntegrationFieldsByNiche(nicheId).map((f) => f.id),
+      ...SYSTEM_FIELDS.map((f) => f.id),
+    ]);
+    if (!validFields.has(canonicalFieldId)) {
+      throw new Error(`invalid_canonical_field: field '${canonicalFieldId}' is not valid for niche '${nicheId}'`);
+    }
     const now = new Date().toISOString();
 
     if (pgPool) {

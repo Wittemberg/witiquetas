@@ -7,6 +7,9 @@ import {
   RoleRepository,
   CompanyConfigurationRepository,
   CANONICAL_PERMISSIONS,
+  memCompanyNiches,
+  memCompanyNicheElements,
+  memCompanyNicheFields,
 } from '../apps/backend/src/repositories/adminRepositories.js';
 import { EffectiveConfigurationService } from '../apps/backend/src/services/effectiveConfigurationService.js';
 import { bootstrapAdminData } from '../apps/backend/src/services/adminBootstrapService.js';
@@ -245,23 +248,74 @@ test('FASE 5 / PACOTE 5.1 — SUÍTE DE TESTES OBRIGATÓRIOS', async (t) => {
     assert.equal(promoField?.enabled, false);
   });
 
-  // 12. Niche Inválido Rejeitado no Effective Context
-  await t.test('12. Niche inexistente na plataforma é ignorado pelo resolvedor efetivo', async () => {
-    await CompanyConfigurationRepository.setNicheState(compA.id, 'niche-inexistente-xyz', 'ENABLED');
+  // 12. Niche Inválido Rejeitado na Escrita e Ignorado no Resolver Defensivo
+  await t.test('12. Niche inexistente na plataforma é rejeitado na escrita e ignorado no resolver defensivo', async () => {
+    // 12.1 Write path rejeita niche inexistente
+    await assert.rejects(
+      async () => {
+        await CompanyConfigurationRepository.setNicheState(compA.id, 'niche-inexistente-xyz', 'ENABLED');
+      },
+      /invalid_niche/,
+      'Camada de escrita deve rejeitar niche_id inexistente'
+    );
+
+    // 12.2 Resolver ignora dado legado defensivamente
+    memCompanyNiches.set(`${compA.id}:niche-legado-invalido`, {
+      companyId: compA.id,
+      nicheId: 'niche-legado-invalido',
+      state: 'ENABLED',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
     const effective = await EffectiveConfigurationService.resolve({ companyId: compA.id });
-    assert.ok(!effective.enabledNiches.includes('niche-inexistente-xyz'), 'Nicho inexistente não pode entrar nos nichos efetivos');
+    assert.ok(!effective.enabledNiches.includes('niche-legado-invalido'), 'Nicho legado inválido não pode entrar nos nichos efetivos');
   });
 
-  // 13. Element/Tool Inválido Rejeitado
-  await t.test('13. Elemento promocional descontinuado ou não suportado não é computado na Toolbox', async () => {
+  // 13. Element/Tool Inválido Rejeitado na Escrita e no Resolver
+  await t.test('13. Elemento inexistente ou descontinuado é rejeitado na escrita e na Toolbox', async () => {
+    // 13.1 Write path rejeita elemento inexistente
+    await assert.rejects(
+      async () => {
+        await CompanyConfigurationRepository.setElementEnabled(compA.id, 'niche-gondola', 'promotional-price', true);
+      },
+      /invalid_element/,
+      'Camada de escrita deve rejeitar element_type inexistente para o nicho'
+    );
+
+    // 13.2 Resolver ignora dado legado defensivamente
+    memCompanyNicheElements.set(`${compA.id}:niche-gondola:promotional-price`, {
+      companyId: compA.id,
+      nicheId: 'niche-gondola',
+      elementType: 'promotional-price',
+      enabled: true,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
     const effective = await EffectiveConfigurationService.resolve({ companyId: compA.id });
     const gondolaElements = effective.enabledElementsByNiche['niche-gondola'] || [];
     assert.ok(!gondolaElements.includes('promotional-price'), 'Elemento descontinuado promotional-price não pode ser listado');
   });
 
-  // 14. Canonical Field Inválido Rejeitado
-  await t.test('14. Campo inexistente configurado na empresa não é exposto pelo resolvedor', async () => {
-    await CompanyConfigurationRepository.setFieldEnabled(compA.id, 'niche-gondola', 'campo.fantasma.inexistente', true);
+  // 14. Canonical Field Inválido Rejeitado na Escrita e no Resolver
+  await t.test('14. Campo inexistente é rejeitado na escrita e não é exposto pelo resolvedor', async () => {
+    // 14.1 Write path rejeita campo inexistente
+    await assert.rejects(
+      async () => {
+        await CompanyConfigurationRepository.setFieldEnabled(compA.id, 'niche-gondola', 'campo.fantasma.inexistente', true);
+      },
+      /invalid_canonical_field/,
+      'Camada de escrita deve rejeitar canonical_field_id inexistente para o nicho'
+    );
+
+    // 14.2 Resolver ignora dado legado defensivamente
+    memCompanyNicheFields.set(`${compA.id}:niche-gondola:campo.fantasma.inexistente`, {
+      companyId: compA.id,
+      nicheId: 'niche-gondola',
+      canonicalFieldId: 'campo.fantasma.inexistente',
+      enabled: true,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
     const effective = await EffectiveConfigurationService.resolve({ companyId: compA.id });
     const gondolaFields = effective.enabledFieldsByNiche['niche-gondola'] || [];
     assert.ok(!gondolaFields.includes('campo.fantasma.inexistente'), 'Campo inexistente não pode estar na lista de campos efetivos');

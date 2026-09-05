@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { Sidebar, NAV_ITEMS } from './Sidebar.js';
 import { GlobalHeader } from './GlobalHeader.js';
+import type { SessionContext } from '../auth/session.js';
 
 interface ApplicationShellProps {
   currentModule: string;
   onSelectModule: (id: string) => void;
   theme: 'dark' | 'light';
   onToggleTheme: () => void;
+  sessionContext?: SessionContext | null;
+  onLogout?: () => void;
   children: React.ReactNode;
 }
 
@@ -17,6 +20,8 @@ export const ApplicationShell: React.FC<ApplicationShellProps> = ({
   onSelectModule,
   theme,
   onToggleTheme,
+  sessionContext,
+  onLogout,
   children,
 }) => {
   const [collapsed, setCollapsed] = useState<boolean>(() => {
@@ -55,6 +60,8 @@ export const ApplicationShell: React.FC<ApplicationShellProps> = ({
           theme={theme}
           onToggleTheme={onToggleTheme}
           onOpenMobileMenu={() => setIsMobileOpen(true)}
+          sessionContext={sessionContext}
+          onLogout={onLogout}
         />
       )}
 

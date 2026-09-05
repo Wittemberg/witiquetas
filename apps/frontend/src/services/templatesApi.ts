@@ -4,8 +4,18 @@ import type {
   CreateTemplateDTO,
   UpdateTemplateDTO,
 } from '@witiquetas/contracts';
+import { getCsrfToken } from '../auth/session.js';
 
 const API_BASE = '/api/templates';
+
+function getMutatingHeaders(extraHeaders: Record<string, string> = {}): Record<string, string> {
+  const headers: Record<string, string> = { ...extraHeaders };
+  const csrf = getCsrfToken();
+  if (csrf) {
+    headers['x-csrf-token'] = csrf;
+  }
+  return headers;
+}
 
 export class ApiError extends Error {
   constructor(public status: number, message: string, public data?: any) {
@@ -24,7 +34,7 @@ export const templatesApi = {
       url += `?search=${encodeURIComponent(search.trim())}`;
     }
 
-    const res = await fetch(url);
+    const res = await fetch(url, { credentials: 'include' });
     if (!res.ok) {
       const errData = await res.json().catch(() => ({}));
       throw new ApiError(res.status, errData.error || 'Falha ao buscar modelos de etiquetas.', errData);
@@ -38,7 +48,7 @@ export const templatesApi = {
    * Buscar modelo completo por ID (com document_schema)
    */
   async getTemplateById(id: string): Promise<TemplateDTO> {
-    const res = await fetch(`${API_BASE}/${id}`);
+    const res = await fetch(`${API_BASE}/${id}`, { credentials: 'include' });
     if (!res.ok) {
       const errData = await res.json().catch(() => ({}));
       throw new ApiError(res.status, errData.error || 'Modelo não encontrado.', errData);
@@ -52,7 +62,8 @@ export const templatesApi = {
   async createTemplate(dto: CreateTemplateDTO): Promise<TemplateDTO> {
     const res = await fetch(API_BASE, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      headers: getMutatingHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify(dto),
     });
 
@@ -70,7 +81,8 @@ export const templatesApi = {
   async updateTemplate(id: string, dto: UpdateTemplateDTO): Promise<TemplateDTO> {
     const res = await fetch(`${API_BASE}/${id}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      headers: getMutatingHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify(dto),
     });
 
@@ -92,6 +104,8 @@ export const templatesApi = {
   async duplicateTemplate(id: string): Promise<TemplateDTO> {
     const res = await fetch(`${API_BASE}/${id}/duplicate`, {
       method: 'POST',
+      credentials: 'include',
+      headers: getMutatingHeaders(),
     });
 
     if (!res.ok) {
@@ -108,7 +122,8 @@ export const templatesApi = {
   async renameTemplate(id: string, title: string): Promise<TemplateDTO> {
     const res = await fetch(`${API_BASE}/${id}/name`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      headers: getMutatingHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({ title }),
     });
 
@@ -126,6 +141,8 @@ export const templatesApi = {
   async deleteTemplate(id: string): Promise<void> {
     const res = await fetch(`${API_BASE}/${id}`, {
       method: 'DELETE',
+      credentials: 'include',
+      headers: getMutatingHeaders(),
     });
 
     if (!res.ok) {
@@ -143,7 +160,8 @@ export const templatesApi = {
   ): Promise<any> {
     const res = await fetch(`${API_BASE}/${id}/presence/heartbeat`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      headers: getMutatingHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify(payload),
     });
 
@@ -160,7 +178,8 @@ export const templatesApi = {
   async leavePresence(id: string, sessionId: string): Promise<void> {
     await fetch(`${API_BASE}/${id}/presence/leave`, {
       method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      headers: getMutatingHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({ sessionId }),
     }).catch(() => {});
   },
@@ -169,7 +188,7 @@ export const templatesApi = {
    * Buscar presença ativa do modelo
    */
   async getPresence(id: string): Promise<any> {
-    const res = await fetch(`${API_BASE}/${id}/presence`);
+    const res = await fetch(`${API_BASE}/${id}/presence`, { credentials: 'include' });
     if (!res.ok) {
       const errData = await res.json().catch(() => ({}));
       throw new ApiError(res.status, errData.error || 'Falha ao buscar presença.', errData);

@@ -1,11 +1,14 @@
 import React from 'react';
-import { Menu, Building2, Sun, Moon } from 'lucide-react';
+import { Menu, Building2, Sun, Moon, LogOut, User as UserIcon } from 'lucide-react';
+import type { SessionContext } from '../auth/session.js';
 
 interface GlobalHeaderProps {
   currentModuleName: string;
   theme: 'dark' | 'light';
   onToggleTheme: () => void;
   onOpenMobileMenu?: () => void;
+  sessionContext?: SessionContext | null;
+  onLogout?: () => void;
 }
 
 export const GlobalHeader: React.FC<GlobalHeaderProps> = ({
@@ -13,7 +16,15 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({
   theme,
   onToggleTheme,
   onOpenMobileMenu,
+  sessionContext,
+  onLogout,
 }) => {
+  const companyName = sessionContext?.company?.name || 'Empresa Padrão';
+  const userName = sessionContext?.user?.name || sessionContext?.user?.email || 'Usuário';
+  const userInitials = sessionContext?.user?.name
+    ? sessionContext.user.name.split(' ').map((n) => n[0]).slice(0, 2).join('').toUpperCase()
+    : 'US';
+
   return (
     <header className="global-app-header">
       <div className="header-left">
@@ -35,9 +46,9 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({
 
       <div className="header-right">
         {/* Tenant/Company Badge */}
-        <div className="tenant-badge" title="Empresa / Tenant ativo">
+        <div className="tenant-badge" title={`Empresa / Tenant ativo: ${companyName}`}>
           <Building2 size={16} className="tenant-icon" />
-          <span className="tenant-name">Empresa Padrão</span>
+          <span className="tenant-name">{companyName}</span>
         </div>
 
         {/* Theme Toggle Button */}
@@ -51,16 +62,28 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({
           {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
         </button>
 
-        {/* Elemento Estrutural Discreto: Perfil do Usuário (Sessão Ativa) */}
-        <div
-          className="header-profile-placeholder disabled"
-          title="Perfil do Usuário (Sessão Ativa)"
-          aria-disabled="true"
-        >
-          <span className="user-avatar">US</span>
+        {/* Perfil do Usuário e Logout */}
+        <div className="header-profile-badge" title={`Usuário: ${userName}`}>
+          <div className="user-avatar" title={userName}>
+            {userInitials}
+          </div>
         </div>
+
+        {onLogout && (
+          <button
+            type="button"
+            className="header-logout-btn"
+            onClick={onLogout}
+            title="Sair do sistema (Logout)"
+            aria-label="Sair"
+          >
+            <LogOut size={15} />
+            <span>Sair</span>
+          </button>
+        )}
       </div>
     </header>
   );
 };
+
 

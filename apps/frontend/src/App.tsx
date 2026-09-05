@@ -21,7 +21,8 @@ import EditorLayout from './editor/EditorLayout.js';
 import NewTemplateWizard from './editor/NewTemplateWizard.js';
 import DownloadAgentModal from './agent/DownloadAgentModal.js';
 import PairAgentModal from './agent/PairAgentModal.js';
-import { ensurePreRbacSession } from './auth/session.js';
+import { fetchSessionContext, logoutUser, type SessionContext } from './auth/session.js';
+import { LoginForm } from './auth/LoginForm.js';
 import { ApplicationShell } from './shell/ApplicationShell.js';
 import { ModelsPage } from './modules/models/ModelsPage.js';
 import PrintCenterPage from './modules/printcenter/PrintCenterPage.js';
@@ -96,6 +97,10 @@ export default function App() {
   const [isPairModalOpen, setIsPairModalOpen] = useState<boolean>(false);
   const [agents, setAgents] = useState<any[]>([]);
 
+  // Sessão Humana e Contexto Efetivo (Pacote 5.2)
+  const [sessionContext, setSessionContext] = useState<SessionContext | null>(null);
+  const [sessionLoading, setSessionLoading] = useState<boolean>(true);
+
   // Tema Claro / Escuro
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     const saved = localStorage.getItem('witiquetas-theme');
@@ -106,6 +111,33 @@ export default function App() {
     document.documentElement.setAttribute('data-theme', theme);
     localStorage.setItem('witiquetas-theme', theme);
   }, [theme]);
+
+  // Inicialização e Verificação de Sessão Segura
+  useEffect(() => {
+    const initSession = async () => {
+      setSessionLoading(true);
+      try {
+        const ctx = await fetchSessionContext();
+        if (ctx) {
+          setSessionContext(ctx);
+          await fetchData();
+        } else {
+          setSessionContext(null);
+        }
+      } catch {
+        setSessionContext(null);
+      } finally {
+        setSessionLoading(false);
+      }
+    };
+
+    initSession();
+  }, []);
+
+  const handleLogout = async () => {
+    await logoutUser();
+    setSessionContext(null);
+  };
 
   // Sincronizar hash de navegação
   useEffect(() => {
@@ -150,12 +182,16 @@ export default function App() {
     setLoading(true);
     setError(null);
     try {
-      await ensurePreRbacSession();
-
       const [healthRes, versionRes, agentsRes] = await Promise.all([
         fetch('/api/health').then((r) => r.json()),
         fetch('/api/version').then((r) => r.json()),
-        fetch('/api/agents', { credentials: 'include' }).then((r) => r.json()).catch(() => ({ agents: [] })),
+        fetch('/api/agents', { credentials: 'include' }).then(async (r) => {
+          if (r.status === 401) {
+            setSessionContext(null);
+            return { agents: [] };
+          }
+          return r.json();
+        }).catch(() => ({ agents: [] })),
       ]);
 
       setHealth(healthRes);
@@ -170,14 +206,10 @@ export default function App() {
   };
 
   useEffect(() => {
-    fetchData();
-  }, []);
-
-  useEffect(() => {
-    if (!autoRefresh) return;
+    if (!autoRefresh || !sessionContext) return;
     const interval = setInterval(fetchData, 15000);
     return () => clearInterval(interval);
-  }, [autoRefresh]);
+  }, [autoRefresh, sessionContext]);
 
   const handleOpenModel = async (id: string) => {
     try {
@@ -544,12 +576,38 @@ export default function App() {
     }
   };
 
+  if (sessionLoading) {
+    return (
+      <div className={`app-shell-container theme-${theme} login-page-container`}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem', color: 'var(--text-muted)' }}>
+          <div className="btn-spinner" style={{ width: 36, height: 36, border: '3px solid var(--border-color)', borderTopColor: 'var(--accent-blue)', borderRadius: '50%' }} />
+          <span style={{ fontSize: '0.875rem' }}>Verificando autenticação...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (!sessionContext) {
+    return (
+      <div className={`app-shell-container theme-${theme}`}>
+        <LoginForm
+          onLoginSuccess={async (ctx) => {
+            setSessionContext(ctx);
+            await fetchData();
+          }}
+        />
+      </div>
+    );
+  }
+
   return (
     <ApplicationShell
       currentModule={currentModule}
       onSelectModule={setCurrentModule}
       theme={theme}
       onToggleTheme={toggleTheme}
+      sessionContext={sessionContext}
+      onLogout={handleLogout}
     >
       {renderModuleContent()}
 

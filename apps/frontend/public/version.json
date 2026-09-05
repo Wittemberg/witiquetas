@@ -1,14 +1,14 @@
 {
   "name": "witiquetas-frontend",
-  "version": "5.1.0-candidate",
-  "commit": "8bf4a733e78eeea75115b7788ac6a598714c1292",
-  "candidateSha": "8bf4a733e78eeea75115b7788ac6a598714c1292",
-  "runningSha": "8bf4a733e78eeea75115b7788ac6a598714c1292",
-  "shortCommit": "8bf4a73",
-  "shortSha": "8bf4a73",
-  "governanceSha": "8bf4a733e78eeea75115b7788ac6a598714c1292",
+  "version": "5.2.0-candidate",
+  "commit": "1cb8ced81386f8cc7a97423f76c26930b876cdc0",
+  "candidateSha": "1cb8ced81386f8cc7a97423f76c26930b876cdc0",
+  "runningSha": "1cb8ced81386f8cc7a97423f76c26930b876cdc0",
+  "shortCommit": "1cb8ced",
+  "shortSha": "1cb8ced",
+  "governanceSha": "1cb8ced81386f8cc7a97423f76c26930b876cdc0",
   "status": "IMPLEMENTED_AWAITING_HOMOLOGATION",
-  "package": "PACOTE 5.1 — Fundação de Administração, Multiempresa e RBAC",
+  "package": "PACOTE 5.2 — Autenticação, Sessão e Effective Session Context",
   "phase": "Fase 5 — Administração e Governança da Aplicação",
-  "timestamp": "2026-09-04T18:00:00Z"
+  "timestamp": "2026-09-05T18:00:00Z"
 }

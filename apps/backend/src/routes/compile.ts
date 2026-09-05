@@ -5,10 +5,16 @@ import { compilerRegistry, PrinterLanguage } from '@witiquetas/printer-core';
 // Garantir que os compiladores PPLA e PPLB sejam registrados no registry
 import '@witiquetas/printer-ppla';
 import '@witiquetas/printer-pplb';
+import {
+  requireAuthenticatedUser,
+  requirePermission,
+  requireCsrf,
+} from '../middleware/authMiddleware.js';
 
 const router = Router();
+router.use(requireAuthenticatedUser);
 
-router.post('/', (req: Request, res: Response) => {
+router.post('/', requirePermission('print.execute'), requireCsrf, (req: Request, res: Response) => {
   const { document, language = 'PPLB', data = {} } = req.body;
 
   if (!document) {

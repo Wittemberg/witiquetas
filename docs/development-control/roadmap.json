@@ -833,18 +833,18 @@
                                                 "module":  "auth-rbac",
                                                 "weight":  2,
                                                 "mvp":  false,
-                                                "status":  "PLANNED",
+                                                "status":  "IMPLEMENTED",
                                                 "manualValidation":  false,
                                                 "physicalValidation":  false,
                                                 "frozen":  false,
                                                 "evidence":  [
-
+                                                                 "tests/authSessionRbac.test.ts"
                                                              ],
                                                 "dependencies":  [
                                                                      "cap-infra-storage-db"
                                                                  ],
                                                 "notes":  [
-                                                              "Autenticação primária da plataforma."
+                                                              "PACOTE 5.2: Autenticação via bcrypt com rate limiting auditado, erro indistinguível e emissão de cookie HttpOnly e token CSRF."
                                                           ]
                                             },
                                             {
@@ -854,18 +854,18 @@
                                                 "module":  "auth-rbac",
                                                 "weight":  2,
                                                 "mvp":  false,
-                                                "status":  "PLANNED",
+                                                "status":  "IMPLEMENTED",
                                                 "manualValidation":  false,
                                                 "physicalValidation":  false,
                                                 "frozen":  false,
                                                 "evidence":  [
-
+                                                                 "tests/authSessionRbac.test.ts"
                                                              ],
                                                 "dependencies":  [
                                                                      "cap-login"
                                                                  ],
                                                 "notes":  [
-                                                              "Sessões stateless resilientes."
+                                                              "PACOTE 5.2: Sessão server-side com token de 256 bits gerado via crypto.randomBytes, token_hash SHA-256 no banco e CSRF token."
                                                           ]
                                             },
                                             {
@@ -875,18 +875,18 @@
                                                 "module":  "auth-rbac",
                                                 "weight":  2,
                                                 "mvp":  false,
-                                                "status":  "PLANNED",
+                                                "status":  "IMPLEMENTED",
                                                 "manualValidation":  false,
                                                 "physicalValidation":  false,
                                                 "frozen":  false,
                                                 "evidence":  [
-
+                                                                 "tests/authSessionRbac.test.ts"
                                                              ],
                                                 "dependencies":  [
                                                                      "cap-session"
                                                                  ],
                                                 "notes":  [
-                                                              "Isolamento estrito entre contextos operacionais."
+                                                              "PACOTE 5.2: Endpoint canônico /api/session/context retornando user, company, roles, permissions, allowedNiches e configuração efetiva."
                                                           ]
                                             },
                                             {
@@ -896,18 +896,18 @@
                                                 "module":  "auth-rbac",
                                                 "weight":  2,
                                                 "mvp":  false,
-                                                "status":  "PLANNED",
+                                                "status":  "IMPLEMENTED",
                                                 "manualValidation":  false,
                                                 "physicalValidation":  false,
                                                 "frozen":  false,
                                                 "evidence":  [
-
+                                                                 "tests/authSessionRbac.test.ts"
                                                              ],
                                                 "dependencies":  [
                                                                      "cap-session"
                                                                  ],
                                                 "notes":  [
-                                                              "Segurança no encerramento de estacas de trabalho."
+                                                              "PACOTE 5.2: Invalidação imediata da sessão no banco de dados e remoção do cookie HttpOnly."
                                                           ]
                                             },
                                             {
@@ -1387,18 +1387,18 @@
                                                 "module":  "admin",
                                                 "weight":  2,
                                                 "mvp":  false,
-                                                "status":  "PLANNED",
+                                                "status":  "IMPLEMENTED",
                                                 "manualValidation":  false,
                                                 "physicalValidation":  false,
                                                 "frozen":  false,
                                                 "evidence":  [
-
+                                                                 "tests/authSessionRbac.test.ts"
                                                              ],
                                                 "dependencies":  [
                                                                      "cap-role-permissions"
                                                                  ],
                                                 "notes":  [
-                                                              "Nenhuma rota protegida executa sem validação estrita."
+                                                              "PACOTE 5.2: Enforcement no backend para devcontrol.view, templates.*, print.*, printers.* e agents.* com CSRF obrigatório em mutações."
                                                           ]
                                             },
                                             {

@@ -1,6 +1,27 @@
 {
   "checkpoints": [
     {
+      "sha": "1cb8ced81386f8cc7a97423f76c26930b876cdc0",
+      "shortSha": "1cb8ced",
+      "date": "2026-09-05T18:00:00Z",
+      "phase": "5",
+      "patch": "5.2.0-candidate",
+      "title": "feat(auth): autenticacao, sessao e effective session context (PACOTE 5.2)",
+      "type": "FEATURE",
+      "capabilities": [
+        "cap-login",
+        "cap-session",
+        "cap-session-context",
+        "cap-logout",
+        "cap-authz-enforcement"
+      ],
+      "testsPassed": true,
+      "deployed": false,
+      "manualValidation": false,
+      "homologated": false,
+      "evidence": "Suíte completa de autenticação bcrypt, sessões com token_hash SHA-256, CSRF tokens, rate limit auditado e /api/session/context"
+    },
+    {
       "sha": "8bf4a733e78eeea75115b7788ac6a598714c1292",
       "shortSha": "8bf4a73",
       "date": "2026-09-04T18:00:00Z",

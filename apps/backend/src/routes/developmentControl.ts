@@ -19,7 +19,11 @@ const devControlGuard = (_req: Request, res: Response, next: NextFunction) => {
   next();
 };
 
+import { requireAuthenticatedUser, requirePermission } from '../middleware/authMiddleware.js';
+
 router.use(devControlGuard);
+router.use(requireAuthenticatedUser);
+router.use(requirePermission('devcontrol.view'));
 
 // GET /api/development-control/overview
 router.get('/overview', (_req: Request, res: Response) => {

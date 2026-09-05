@@ -10,11 +10,13 @@
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.600.0",
+    "@types/bcryptjs": "^3.0.0",
     "@witiquetas/contracts": "file:../../packages/contracts",
     "@witiquetas/label-schema": "file:../../packages/label-schema",
     "@witiquetas/printer-core": "file:../../packages/printer-core",
     "@witiquetas/printer-ppla": "file:../../packages/printer-ppla",
     "@witiquetas/printer-pplb": "file:../../packages/printer-pplb",
+    "bcryptjs": "^3.0.3",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",

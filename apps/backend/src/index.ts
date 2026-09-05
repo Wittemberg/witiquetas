@@ -9,7 +9,13 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.use(cors());
+// Configuração auditada de proxy reverso (Portainer / Traefik / Nginx)
+app.set('trust proxy', 1);
+
+app.use(cors({
+  origin: true,
+  credentials: true,
+}));
 app.use(express.json());
 
 // S3 / MinIO Client Setup
@@ -170,7 +176,7 @@ const handleVersion = (_req: Request, res: Response) => {
 
   res.json({
     name: 'witiquetas-backend',
-    version: '5.1.0-candidate',
+    version: '5.2.0-candidate',
     commit,
     candidateSha: commit,
     runningSha: commit,
@@ -178,7 +184,7 @@ const handleVersion = (_req: Request, res: Response) => {
     shortSha: shortCommit,
     governanceSha,
     status: 'IMPLEMENTED_AWAITING_HOMOLOGATION',
-    package: 'PACOTE 5.1 — Fundação de Administração, Multiempresa e RBAC',
+    package: 'PACOTE 5.2 — Autenticação, Sessão e Effective Session Context',
     phase: 'Fase 5 — Administração e Governança da Aplicação',
     environment: process.env.NODE_ENV || 'development',
     timezone: process.env.TZ || 'America/Sao_Paulo',
@@ -193,11 +199,15 @@ import printersRouter from './routes/printers';
 import printJobsRouter from './routes/printJobs';
 import qrcodesRouter from './routes/qrcodes';
 import authRouter from './routes/auth';
+import sessionRouter from './routes/session';
 import developmentControlRouter from './routes/developmentControl.js';
 
 // Suporta tanto rotas diretas quanto rotas com prefixo /api (conforme Traefik/Nginx)
 app.use('/auth', authRouter);
 app.use('/api/auth', authRouter);
+
+app.use('/session', sessionRouter);
+app.use('/api/session', sessionRouter);
 
 app.use('/development-control', developmentControlRouter);
 app.use('/api/development-control', developmentControlRouter);

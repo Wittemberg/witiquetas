@@ -2,9 +2,11 @@ import { pgPool } from '../db.js';
 import {
   CANONICAL_PERMISSIONS,
   CompanyRepository,
+  UserRepository,
   RoleRepository,
   CompanyConfigurationRepository,
 } from '../repositories/adminRepositories.js';
+import { PasswordService } from './passwordService.js';
 import { NICHES } from '@witiquetas/label-schema';
 
 export const STANDARD_ROLES = [
@@ -147,6 +149,58 @@ export async function bootstrapAdminData(): Promise<void> {
   // 4. Habilitar todos os 11 nichos para a empresa padrão (retrocompatibilidade total)
   for (const niche of NICHES) {
     await CompanyConfigurationRepository.setNicheState(defaultCompanyId, niche.id, 'ENABLED');
+  }
+
+  // 5. Bootstrap de Administrador Inicial (se variáveis de ambiente configuradas)
+  const bootstrapEmail = process.env.BOOTSTRAP_ADMIN_EMAIL?.trim();
+  const bootstrapPassword = process.env.BOOTSTRAP_ADMIN_PASSWORD;
+
+  if ((bootstrapEmail && !bootstrapPassword) || (!bootstrapEmail && bootstrapPassword)) {
+    throw new Error(
+      '[AdminBootstrap] Configuração inválida de bootstrap admin: ambos BOOTSTRAP_ADMIN_EMAIL e BOOTSTRAP_ADMIN_PASSWORD devem ser fornecidos em conjunto. Operação abortada (fail-closed).'
+    );
+  }
+
+  if (bootstrapEmail && bootstrapPassword) {
+    PasswordService.validateEmail(bootstrapEmail);
+    PasswordService.validatePassword(bootstrapPassword);
+
+    const existing = await UserRepository.findByEmail(bootstrapEmail);
+
+    if (existing) {
+      if (existing.companyId !== defaultCompanyId) {
+        console.warn(
+          `[AdminBootstrap] Usuário com email informado já existe associado ao tenant '${existing.companyId}'. Reassociação automática cross-tenant bloqueada por política de segurança.`
+        );
+      } else {
+        console.log(
+          '[AdminBootstrap] Usuário administrador inicial já existe no tenant padrão. Nenhuma credencial foi sobrescrita.'
+        );
+      }
+    } else {
+      const passwordHash = await PasswordService.hash(bootstrapPassword);
+      const newAdmin = await UserRepository.create({
+        id: 'usr-admin-default',
+        companyId: defaultCompanyId,
+        name: 'Administrador do Sistema',
+        email: bootstrapEmail,
+        status: 'ACTIVE',
+      });
+      await UserRepository.setPassword(newAdmin.id, passwordHash);
+
+      const adminRole = (await RoleRepository.listByCompany(defaultCompanyId)).find(
+        (r) => r.code === 'ADMIN'
+      );
+      if (adminRole) {
+        await RoleRepository.assignUserRole(defaultCompanyId, newAdmin.id, adminRole.id);
+      }
+
+      console.log(
+        `[AdminBootstrap] Usuário administrador bootstrap provisionado com sucesso para tenant '${defaultCompanyId}'. AVISO DE SEGURANÇA: BOOTSTRAP_ADMIN_PASSWORD deve ser removida do ambiente após este primeiro provisionamento.`
+      );
+    }
+  } else {
+    console.log('[AdminBootstrap] Nenhuma credencial de bootstrap admin configurada nas variáveis de ambiente.');
   }
 
   console.log('[AdminBootstrap] Bootstrap concluído com sucesso e 100% idempotente.');

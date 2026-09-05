@@ -9,11 +9,22 @@ import {
   ActiveEditingSessionError,
 } from '../repositories/presenceRepository';
 import type { CreateTemplateDTO, UpdateTemplateDTO, RenameTemplateDTO } from '@witiquetas/contracts';
+import {
+  requireAuthenticatedUser,
+  requirePermission,
+  requireCsrf,
+} from '../middleware/authMiddleware.js';
 
 const router = Router();
 
-// Helper para obter companyId da requisição
+// Proteção mandatória de autenticação
+router.use(requireAuthenticatedUser);
+
+// Helper para obter companyId da requisição (prioriza contexto seguro do principal)
 function getCompanyId(req: Request): string {
+  if (req.principal?.company?.id) {
+    return req.principal.company.id;
+  }
   const headerCompany = req.headers['x-company-id'] as string;
   if (headerCompany && headerCompany.trim()) {
     return headerCompany.trim();
@@ -25,7 +36,7 @@ function getCompanyId(req: Request): string {
  * GET /api/templates
  * Retorna resumos leves dos modelos (Sem carregar document_schema JSONB)
  */
-router.get('/', async (req: Request, res: Response) => {
+router.get('/', requirePermission('templates.view'), async (req: Request, res: Response) => {
   try {
     const companyId = getCompanyId(req);
     const search = req.query.search as string;
@@ -44,7 +55,7 @@ router.get('/', async (req: Request, res: Response) => {
  * GET /api/templates/:id/presence
  * Retorna sessões ativas do modelo
  */
-router.get('/:id/presence', async (req: Request, res: Response) => {
+router.get('/:id/presence', requirePermission('templates.view'), async (req: Request, res: Response) => {
   try {
     const companyId = getCompanyId(req);
     const active = await presenceRepository.getActiveSessions(req.params.id, companyId);
@@ -58,7 +69,7 @@ router.get('/:id/presence', async (req: Request, res: Response) => {
  * POST /api/templates/:id/presence/heartbeat
  * Registra ou atualiza heartbeat de uma sessão de edição
  */
-router.post('/:id/presence/heartbeat', async (req: Request, res: Response) => {
+router.post('/:id/presence/heartbeat', requirePermission('templates.view'), async (req: Request, res: Response) => {
   try {
     const companyId = getCompanyId(req);
     const { sessionId, userIdentifier, os, browser, deviceName } = req.body || {};
@@ -87,7 +98,7 @@ router.post('/:id/presence/heartbeat', async (req: Request, res: Response) => {
  * DELETE /api/templates/:id/presence/leave
  * Encerra sessão de edição ao fechar/navegar
  */
-router.delete('/:id/presence/leave', async (req: Request, res: Response) => {
+router.delete('/:id/presence/leave', requirePermission('templates.view'), async (req: Request, res: Response) => {
   try {
     const companyId = getCompanyId(req);
     const { sessionId } = req.body || {};
@@ -112,7 +123,7 @@ router.delete('/:id/presence/leave', async (req: Request, res: Response) => {
  * GET /api/templates/:id
  * Retorna o modelo completo incluindo document_schema
  */
-router.get('/:id', async (req: Request, res: Response) => {
+router.get('/:id', requirePermission('templates.view'), async (req: Request, res: Response) => {
   try {
     const companyId = getCompanyId(req);
     const template = await templateRepository.getTemplateById(req.params.id, companyId);
@@ -135,7 +146,7 @@ router.get('/:id', async (req: Request, res: Response) => {
  * POST /api/templates
  * Criar novo modelo
  */
-router.post('/', async (req: Request, res: Response) => {
+router.post('/', requirePermission('templates.create'), requireCsrf, async (req: Request, res: Response) => {
   try {
     const companyId = getCompanyId(req);
     const body = req.body as CreateTemplateDTO;
@@ -163,7 +174,7 @@ router.post('/', async (req: Request, res: Response) => {
  * PUT /api/templates/:id
  * Atualizar modelo com suporte a Optimistic Locking (expectedVersion -> HTTP 409 Conflict)
  */
-router.put('/:id', async (req: Request, res: Response) => {
+router.put('/:id', requirePermission('templates.edit'), requireCsrf, async (req: Request, res: Response) => {
   const body = req.body as UpdateTemplateDTO;
   try {
     const companyId = getCompanyId(req);
@@ -206,7 +217,7 @@ router.put('/:id', async (req: Request, res: Response) => {
  * POST /api/templates/:id/duplicate
  * Duplicar modelo no servidor
  */
-router.post('/:id/duplicate', async (req: Request, res: Response) => {
+router.post('/:id/duplicate', requirePermission('templates.edit'), requireCsrf, async (req: Request, res: Response) => {
   try {
     const companyId = getCompanyId(req);
     const duplicated = await templateRepository.duplicateTemplate(req.params.id, companyId);
@@ -227,7 +238,7 @@ router.post('/:id/duplicate', async (req: Request, res: Response) => {
  * PATCH /api/templates/:id/name
  * Renomear modelo
  */
-router.patch('/:id/name', async (req: Request, res: Response) => {
+router.patch('/:id/name', requirePermission('templates.edit'), requireCsrf, async (req: Request, res: Response) => {
   try {
     const companyId = getCompanyId(req);
     const body = req.body as RenameTemplateDTO;
@@ -258,7 +269,7 @@ router.patch('/:id/name', async (req: Request, res: Response) => {
  * DELETE /api/templates/:id
  * Soft Delete do modelo (deleted_at = NOW()) com bloqueio contra sessões ativas em edição
  */
-router.delete('/:id', async (req: Request, res: Response) => {
+router.delete('/:id', requirePermission('templates.delete'), requireCsrf, async (req: Request, res: Response) => {
   try {
     const companyId = getCompanyId(req);
     await templateRepository.deleteTemplate(req.params.id, companyId);

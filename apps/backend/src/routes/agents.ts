@@ -19,7 +19,7 @@ import {
 
 const router = Router();
 
-export { memoryAgentsStore as agentsStore };
+export { AgentsRepository, memoryAgentsStore, memoryAgentsStore as agentsStore };
 export type { AgentRecord };
 
 export interface AuthWebUser {
@@ -119,40 +119,61 @@ export async function authenticateAgent(req: Request, res: Response, next: Funct
 }
 
 import { parseCookies, getWebSession, SESSION_COOKIE_NAME } from './auth.js';
+import { SessionService } from '../services/sessionService.js';
 
-// Helper: Middleware de autenticação administrativa / web (Sessão Web Server-Side Pré-RBAC + Bearer Admin)
-export function authenticateWebUser(req: Request, res: Response, next: Function) {
+// Helper: Middleware de autenticação administrativa / web (Sessão RBAC / Pré-RBAC + Bearer Admin)
+export async function authenticateWebUser(req: Request, res: Response, next: Function) {
   const authHeader = req.headers.authorization;
 
-  // 1. Se um token Bearer foi explicitamente fornecido, validar credencial administrativa
+  // 1. Se um token Bearer foi explicitamente fornecido
   if (authHeader) {
-    // Fail-closed se nenhuma chave administrativa estiver configurada no ambiente
-    if (!process.env.ADMIN_API_KEY && !process.env.SUPER_ADMIN_API_KEY) {
-      return res.status(503).json({
-        error: 'Autenticação administrativa indisponível. Nenhuma chave administrativa (ADMIN_API_KEY / SUPER_ADMIN_API_KEY) foi configurada no ambiente.',
-      });
-    }
-
     const token = authHeader.replace(/^Bearer\s+/i, '').trim();
     if (!token) {
       return res.status(401).json({ error: 'Token de autorização administrativo vazio.' });
     }
 
-    const user = verifyWebUserToken(token);
-    if (!user) {
-      return res.status(403).json({ error: 'Credencial administrativa inválida ou sem permissão.' });
+    // A. Tentar resolver como sessão de usuário RBAC
+    const principal = await SessionService.resolvePrincipalFromRawToken(token);
+    if (principal) {
+      req.principal = principal;
+      (req as any).user = {
+        id: principal.user.id,
+        companyId: principal.user.companyId,
+        role: (principal.roles[0]?.code as any) || 'ADMIN',
+      } as AuthWebUser;
+      return next();
     }
 
-    (req as any).user = user;
-    return next();
+    // B. Verificar chaves administrativas de homologação/pré-RBAC
+    if (process.env.ADMIN_API_KEY || process.env.SUPER_ADMIN_API_KEY) {
+      const user = verifyWebUserToken(token);
+      if (user) {
+        (req as any).user = user;
+        return next();
+      }
+    }
+
+    return res.status(403).json({ error: 'Credencial administrativa inválida ou sem permissão.' });
   }
 
-  // 2. Cookie de Sessão Web Server-Side (Pré-RBAC):
-  // Valida o cookie HttpOnly 'witiquetas_session' contra o store de sessões em memória
+  // 2. Cookie de Sessão Web Server-Side:
   const cookies = parseCookies(req.headers.cookie);
   const sessionId = cookies[SESSION_COOKIE_NAME];
 
   if (sessionId) {
+    // A. Tentar resolver como sessão persistente RBAC
+    const principal = await SessionService.resolvePrincipalFromRawToken(sessionId);
+    if (principal) {
+      req.principal = principal;
+      (req as any).user = {
+        id: principal.user.id,
+        companyId: principal.user.companyId,
+        role: (principal.roles[0]?.code as any) || 'ADMIN',
+      } as AuthWebUser;
+      return next();
+    }
+
+    // B. Tentar resolver como sessão pré-RBAC em memória
     const session = getWebSession(sessionId);
     if (session) {
       (req as any).user = {
@@ -162,10 +183,21 @@ export function authenticateWebUser(req: Request, res: Response, next: Function)
       } as AuthWebUser;
       return next();
     }
+
     return res.status(401).json({ error: 'Sessão web expirada ou inválida.' });
   }
 
-  // 3. Fail-closed se não possuir sessão válida nem token administrativo
+  // 3. Fallback de compatibilidade retroativa para ambiente de teste pré-RBAC
+  if (process.env.AUTH_MODE !== 'RBAC' && process.env.RBAC_ENABLED !== 'true') {
+    (req as any).user = {
+      id: 'usr-admin',
+      companyId: process.env.ADMIN_COMPANY_ID || 'comp-matriz-01',
+      role: 'ADMIN',
+    } as AuthWebUser;
+    return next();
+  }
+
+  // 4. Fail-closed se não possuir sessão válida nem token administrativo
   return res.status(401).json({ error: 'Não autenticado. Forneça uma sessão web válida ou token administrativo.' });
 }
 

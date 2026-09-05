@@ -1,7 +1,13 @@
 import { Router, Request, Response } from 'express';
 import type { PrinterDTO, CreatePrinterDTO, PrinterProfileDTO } from '@witiquetas/contracts';
+import {
+  requireAuthenticatedUser,
+  requirePermission,
+  requireCsrf,
+} from '../middleware/authMiddleware.js';
 
 const router = Router();
+router.use(requireAuthenticatedUser);
 
 // Storage em memória inicial com modelos pré-configurados e perfis de capacidades homologadas
 const defaultPrinters: PrinterDTO[] = [
@@ -90,7 +96,7 @@ const printersStore = new Map<string, PrinterDTO>(
 );
 
 // 1. Listar todas as impressoras
-router.get('/', (_req: Request, res: Response) => {
+router.get('/', requirePermission('printers.view'), (_req: Request, res: Response) => {
   const printers = Array.from(printersStore.values());
   res.json({
     total: printers.length,
@@ -99,7 +105,7 @@ router.get('/', (_req: Request, res: Response) => {
 });
 
 // 2. Buscar impressora por ID
-router.get('/:id', (req: Request, res: Response) => {
+router.get('/:id', requirePermission('printers.view'), (req: Request, res: Response) => {
   const printer = printersStore.get(req.params.id);
   if (!printer) {
     return res.status(404).json({ error: 'Impressora não encontrada.' });
@@ -108,7 +114,7 @@ router.get('/:id', (req: Request, res: Response) => {
 });
 
 // 3. Cadastrar nova impressora
-router.post('/', (req: Request, res: Response) => {
+router.post('/', requirePermission('printers.manage'), requireCsrf, (req: Request, res: Response) => {
   const body = req.body as CreatePrinterDTO;
 
   if (!body.name || !body.protocol || !body.language) {
@@ -158,7 +164,7 @@ router.post('/', (req: Request, res: Response) => {
 });
 
 // 4. Atualizar impressora
-router.put('/:id', (req: Request, res: Response) => {
+router.put('/:id', requirePermission('printers.manage'), requireCsrf, (req: Request, res: Response) => {
   const printer = printersStore.get(req.params.id);
   if (!printer) {
     return res.status(404).json({ error: 'Impressora não encontrada.' });
@@ -182,7 +188,7 @@ router.put('/:id', (req: Request, res: Response) => {
 });
 
 // 5. Excluir impressora
-router.delete('/:id', (req: Request, res: Response) => {
+router.delete('/:id', requirePermission('printers.manage'), requireCsrf, (req: Request, res: Response) => {
   if (!printersStore.has(req.params.id)) {
     return res.status(404).json({ error: 'Impressora não encontrada.' });
   }

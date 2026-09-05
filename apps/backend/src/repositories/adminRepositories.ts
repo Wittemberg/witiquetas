@@ -62,6 +62,7 @@ g.__WIT_ADMIN_MEM_ROLE_NICHES__ = g.__WIT_ADMIN_MEM_ROLE_NICHES__ || new Map<str
 g.__WIT_ADMIN_MEM_COMPANY_NICHES__ = g.__WIT_ADMIN_MEM_COMPANY_NICHES__ || new Map<string, CompanyNicheConfigDTO>();
 g.__WIT_ADMIN_MEM_COMPANY_ELEMENTS__ = g.__WIT_ADMIN_MEM_COMPANY_ELEMENTS__ || new Map<string, CompanyElementConfigDTO>();
 g.__WIT_ADMIN_MEM_COMPANY_FIELDS__ = g.__WIT_ADMIN_MEM_COMPANY_FIELDS__ || new Map<string, CompanyFieldConfigDTO>();
+g.__WIT_ADMIN_MEM_USER_PASSWORDS__ = g.__WIT_ADMIN_MEM_USER_PASSWORDS__ || new Map<string, string>();
 
 export const memCompanies: Map<string, CompanyDTO> = g.__WIT_ADMIN_MEM_COMPANIES__;
 export const memUsers: Map<string, UserDTO> = g.__WIT_ADMIN_MEM_USERS__;
@@ -72,6 +73,7 @@ export const memRoleNiches: Map<string, boolean> = g.__WIT_ADMIN_MEM_ROLE_NICHES
 export const memCompanyNiches: Map<string, CompanyNicheConfigDTO> = g.__WIT_ADMIN_MEM_COMPANY_NICHES__;
 export const memCompanyNicheElements: Map<string, CompanyElementConfigDTO> = g.__WIT_ADMIN_MEM_COMPANY_ELEMENTS__;
 export const memCompanyNicheFields: Map<string, CompanyFieldConfigDTO> = g.__WIT_ADMIN_MEM_COMPANY_FIELDS__;
+export const memUserPasswords: Map<string, string> = g.__WIT_ADMIN_MEM_USER_PASSWORDS__;
 
 export function clearAdminMemoryStores(): void {
   memCompanies.clear();
@@ -83,6 +85,7 @@ export function clearAdminMemoryStores(): void {
   memCompanyNiches.clear();
   memCompanyNicheElements.clear();
   memCompanyNicheFields.clear();
+  memUserPasswords.clear();
 }
 
 // ==========================================
@@ -306,6 +309,60 @@ export const UserRepository = {
       if (u.email === emailNorm) return u;
     }
     return null;
+  },
+
+  async setPassword(userId: string, passwordHash: string): Promise<void> {
+    const now = new Date().toISOString();
+    if (pgPool) {
+      await pgPool.query(
+        `UPDATE users SET password_hash = $1, updated_at = $2 WHERE id = $3`,
+        [passwordHash, now, userId]
+      );
+      return;
+    }
+    const user = memUsers.get(userId);
+    if (!user) {
+      throw new Error(`user_not_found: user '${userId}' not found`);
+    }
+    memUserPasswords.set(userId, passwordHash);
+  },
+
+  async findByEmailWithPassword(email: string): Promise<(UserDTO & { passwordHash: string | null }) | null> {
+    const emailNorm = email.toLowerCase().trim();
+    if (pgPool) {
+      const res = await pgPool.query(
+        `SELECT id, company_id AS "companyId", name, email, status, password_hash AS "passwordHash", created_at AS "createdAt", updated_at AS "updatedAt"
+         FROM users WHERE email = $1`,
+        [emailNorm]
+      );
+      return res.rows[0] || null;
+    }
+    for (const u of memUsers.values()) {
+      if (u.email === emailNorm) {
+        return {
+          ...u,
+          passwordHash: memUserPasswords.get(u.id) || null,
+        };
+      }
+    }
+    return null;
+  },
+
+  async findByIdWithPassword(id: string): Promise<(UserDTO & { passwordHash: string | null }) | null> {
+    if (pgPool) {
+      const res = await pgPool.query(
+        `SELECT id, company_id AS "companyId", name, email, status, password_hash AS "passwordHash", created_at AS "createdAt", updated_at AS "updatedAt"
+         FROM users WHERE id = $1`,
+        [id]
+      );
+      return res.rows[0] || null;
+    }
+    const u = memUsers.get(id);
+    if (!u) return null;
+    return {
+      ...u,
+      passwordHash: memUserPasswords.get(id) || null,
+    };
   },
 
   async listByCompany(companyId: string): Promise<UserDTO[]> {

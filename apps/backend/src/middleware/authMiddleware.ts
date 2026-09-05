@@ -31,32 +31,6 @@ export async function requireAuthenticatedUser(req: Request, res: Response, next
   const authMethod: 'cookie' | 'bearer' = cookieToken ? 'cookie' : 'bearer';
 
   if (!rawToken) {
-    if (isPreRbacEnabled()) {
-      req.principal = {
-        sessionId: 'sess-pre-rbac-default',
-        csrfToken: 'legacy-exempt',
-        user: {
-          id: 'usr-admin',
-          companyId: process.env.ADMIN_COMPANY_ID || 'comp-default',
-          name: 'Administrador Pré-RBAC',
-          email: 'admin@witiquetas.local',
-          status: 'ACTIVE',
-        },
-        company: {
-          id: process.env.ADMIN_COMPANY_ID || 'comp-default',
-          name: 'Empresa Padrão',
-          slug: 'default',
-          status: 'ACTIVE',
-        },
-        roles: [],
-        permissions: ['*'],
-      };
-      (req as any).user = req.principal.user;
-      (req as any).company = req.principal.company;
-      req.authMethod = 'cookie';
-      return next();
-    }
-
     return res.status(401).json({
       error: 'Não autenticado. Sessão ausente.',
       code: 'UNAUTHENTICATED',

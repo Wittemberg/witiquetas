@@ -24,7 +24,7 @@ export const SESSION_COOKIE_NAME = 'witiquetas_session';
 export const SESSION_TTL_MS = 8 * 60 * 60 * 1000; // 8 horas
 
 export function isPreRbacEnabled(): boolean {
-  return process.env.AUTH_MODE !== 'RBAC' && process.env.RBAC_ENABLED !== 'true';
+  return process.env.AUTH_MODE === 'PRE_RBAC' || process.env.PRE_RBAC === 'true';
 }
 
 export function parseCookies(cookieHeader?: string): Record<string, string> {

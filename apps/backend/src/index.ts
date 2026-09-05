@@ -133,23 +133,56 @@ const handleHealthCheck = async (_req: Request, res: Response) => {
   });
 };
 
+import { DevelopmentControlService } from './services/developmentControlService.js';
+
 // Version Response Handler
 const handleVersion = (_req: Request, res: Response) => {
+  const envCommit = process.env.GIT_COMMIT || process.env.GITHUB_SHA || process.env.RUNNING_SHA || process.env.CANDIDATE_SHA;
+  let commit = (envCommit && envCommit !== 'unknown') ? envCommit : '';
+  let shortCommit = (process.env.SHORT_SHA && process.env.SHORT_SHA !== 'unknown') ? process.env.SHORT_SHA : '';
+  let governanceSha = '';
+
+  try {
+    const devService = new DevelopmentControlService();
+    const checkpoints = devService.getCheckpoints();
+    if (checkpoints && checkpoints.length > 0) {
+      governanceSha = checkpoints[0].sha;
+      if (!commit) {
+        commit = checkpoints[0].sha;
+      }
+      if (!shortCommit) {
+        shortCommit = checkpoints[0].shortSha || checkpoints[0].sha.slice(0, 7);
+      }
+    }
+  } catch (_e) {
+    // Fallback silencioso se arquivos de controle não estiverem disponíveis
+  }
+
+  if (!commit) {
+    commit = 'unknown';
+  }
+  if (!shortCommit) {
+    shortCommit = commit !== 'unknown' ? commit.slice(0, 7) : 'unknown';
+  }
+  if (!governanceSha) {
+    governanceSha = commit;
+  }
+
   res.json({
     name: 'witiquetas-backend',
     version: '5.1.0-candidate',
-    commit: '8bf4a733e78eeea75115b7788ac6a598714c1292',
-    candidateSha: '8bf4a733e78eeea75115b7788ac6a598714c1292',
-    runningSha: '8bf4a733e78eeea75115b7788ac6a598714c1292',
-    shortCommit: '8bf4a73',
-    shortSha: '8bf4a73',
-    governanceSha: '8bf4a733e78eeea75115b7788ac6a598714c1292',
+    commit,
+    candidateSha: commit,
+    runningSha: commit,
+    shortCommit,
+    shortSha: shortCommit,
+    governanceSha,
     status: 'IMPLEMENTED_AWAITING_HOMOLOGATION',
     package: 'PACOTE 5.1 — Fundação de Administração, Multiempresa e RBAC',
     phase: 'Fase 5 — Administração e Governança da Aplicação',
     environment: process.env.NODE_ENV || 'development',
     timezone: process.env.TZ || 'America/Sao_Paulo',
-    timestamp: new Date().toISOString(),
+    timestamp: (process.env.BUILT_AT && process.env.BUILT_AT !== 'unknown') ? process.env.BUILT_AT : new Date().toISOString(),
   });
 };
 

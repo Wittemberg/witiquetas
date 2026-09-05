@@ -1,6 +1,10 @@
 # Estágio 1: Build
 FROM node:22-alpine AS builder
 
+ARG GITHUB_SHA=unknown
+ARG SHORT_SHA=unknown
+ARG BUILT_AT=unknown
+
 WORKDIR /app
 
 # Copia o monorepo (package.json raiz, pacotes e backend)
@@ -41,11 +45,21 @@ RUN test $(stat -c%s /app/apps/backend/bin/agents/witiquetas-agent-windows-x64.e
 # Estágio 2: Runner de produção
 FROM node:22-alpine AS runner
 
+ARG GITHUB_SHA=unknown
+ARG SHORT_SHA=unknown
+ARG BUILT_AT=unknown
+
 WORKDIR /app
 
 ENV NODE_ENV=production
 ENV PORT=3000
 ENV ENABLE_DEV_CONTROL_CENTER=true
+ENV GITHUB_SHA=$GITHUB_SHA
+ENV GIT_COMMIT=$GITHUB_SHA
+ENV CANDIDATE_SHA=$GITHUB_SHA
+ENV RUNNING_SHA=$GITHUB_SHA
+ENV SHORT_SHA=$SHORT_SHA
+ENV BUILT_AT=$BUILT_AT
 
 # Copia a estrutura completa compilada com as node_modules hoisted do monorepo
 COPY --from=builder /app ./

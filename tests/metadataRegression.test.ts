@@ -93,3 +93,52 @@ test('4. METADATA REGRESSION: Script inject-version-metadata.js injeta SHA de bu
   // Limpeza
   fs.unlinkSync(tmpFile);
 });
+
+test('5. METADATA REGRESSION: Dockerfile do backend aceita build-args e exporta variáveis canônicas de release', () => {
+  const dockerfilePath = path.resolve('apps/backend/Dockerfile');
+  assert.ok(fs.existsSync(dockerfilePath), 'apps/backend/Dockerfile deve existir');
+
+  const dockerfileContent = fs.readFileSync(dockerfilePath, 'utf8');
+
+  assert.ok(dockerfileContent.includes('ARG GITHUB_SHA=unknown'), 'Dockerfile do backend deve declarar ARG GITHUB_SHA');
+  assert.ok(dockerfileContent.includes('ARG SHORT_SHA=unknown'), 'Dockerfile do backend deve declarar ARG SHORT_SHA');
+  assert.ok(dockerfileContent.includes('ARG BUILT_AT=unknown'), 'Dockerfile do backend deve declarar ARG BUILT_AT');
+  assert.ok(dockerfileContent.includes('ENV GIT_COMMIT=$GITHUB_SHA'), 'Dockerfile do backend deve exportar ENV GIT_COMMIT');
+  assert.ok(dockerfileContent.includes('ENV CANDIDATE_SHA=$GITHUB_SHA'), 'Dockerfile do backend deve exportar ENV CANDIDATE_SHA');
+  assert.ok(dockerfileContent.includes('ENV RUNNING_SHA=$GITHUB_SHA'), 'Dockerfile do backend deve exportar ENV RUNNING_SHA');
+  assert.ok(dockerfileContent.includes('ENV SHORT_SHA=$SHORT_SHA'), 'Dockerfile do backend deve exportar ENV SHORT_SHA');
+  assert.ok(dockerfileContent.includes('ENV BUILT_AT=$BUILT_AT'), 'Dockerfile do backend deve exportar ENV BUILT_AT');
+});
+
+test('6. METADATA REGRESSION: docker.yml passa build-args para o backend e valida /api/version', () => {
+  const workflowPath = path.resolve('.github/workflows/docker.yml');
+  assert.ok(fs.existsSync(workflowPath), 'docker.yml deve existir');
+
+  const workflowContent = fs.readFileSync(workflowPath, 'utf8');
+
+  // Backend build-args
+  assert.ok(workflowContent.includes('file: apps/backend/Dockerfile'), 'Deve construir apps/backend/Dockerfile');
+  assert.ok(workflowContent.includes('GITHUB_SHA=${{ github.sha }}'), 'Deve repassar GITHUB_SHA');
+  assert.ok(workflowContent.includes('SHORT_SHA=${{ steps.vars.outputs.short_sha }}'), 'Deve repassar SHORT_SHA');
+  assert.ok(workflowContent.includes('BUILT_AT=${{ steps.vars.outputs.built_at }}'), 'Deve repassar BUILT_AT');
+
+  // Smoke test endpoint /api/version
+  assert.ok(workflowContent.includes('/api/version'), 'docker.yml deve validar o endpoint /api/version');
+  assert.ok(workflowContent.includes('CI_BACKEND_COMMIT'), 'docker.yml deve auditar o commit retornado pelo backend');
+});
+
+test('7. METADATA REGRESSION: backend index.ts resolve metadados dinamicamente sem SHA hardcodado', () => {
+  const indexPath = path.resolve('apps/backend/src/index.ts');
+  assert.ok(fs.existsSync(indexPath), 'apps/backend/src/index.ts deve existir');
+
+  const indexContent = fs.readFileSync(indexPath, 'utf8');
+
+  // Não deve conter SHA hardcodado no handleVersion
+  assert.ok(!indexContent.includes("commit: '8bf4a733e78eeea75115b7788ac6a598714c1292'"), 'NÃO deve ter commit hardcoded');
+  assert.ok(!indexContent.includes("runningSha: '8bf4a733e78eeea75115b7788ac6a598714c1292'"), 'NÃO deve ter runningSha hardcoded');
+  assert.ok(!indexContent.includes("candidateSha: '8bf4a733e78eeea75115b7788ac6a598714c1292'"), 'NÃO deve ter candidateSha hardcoded');
+
+  // Deve ler dinamicamente de env vars e DevelopmentControlService
+  assert.ok(indexContent.includes('process.env.GIT_COMMIT'), 'Deve ler process.env.GIT_COMMIT');
+  assert.ok(indexContent.includes('DevelopmentControlService'), 'Deve utilizar DevelopmentControlService para checkpoints');
+});

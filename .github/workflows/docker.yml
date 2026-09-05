@@ -117,6 +117,10 @@ jobs:
           context: .
           file: apps/backend/Dockerfile
           push: true
+          build-args: |
+            GITHUB_SHA=${{ github.sha }}
+            SHORT_SHA=${{ steps.vars.outputs.short_sha }}
+            BUILT_AT=${{ steps.vars.outputs.built_at }}
           tags: |
             ghcr.io/wittemberg/witiquetas-backend:candidate-${{ github.sha }}
 
@@ -215,6 +219,16 @@ jobs:
             exit 1
           fi
 
+          echo "==> Validando endpoint /api/version no backend CI..."
+          CI_BACKEND_VERSION=$(curl -s http://localhost:3000/api/version)
+          echo "CI Backend Version: $CI_BACKEND_VERSION"
+          CI_BACKEND_COMMIT=$(echo "$CI_BACKEND_VERSION" | grep -o '"commit":"[^"]*"' | cut -d'"' -f4 || echo "")
+          if [ "$CI_BACKEND_COMMIT" != "${{ github.sha }}" ]; then
+            echo "Erro: /api/version retornou commit '$CI_BACKEND_COMMIT', esperado '${{ github.sha }}'!"
+            exit 1
+          fi
+          echo "CI Backend /api/version validado com sucesso (SHA=${{ github.sha }})."
+
           echo "Smoke test de container concluído com sucesso."
 
       - name: Record Previous Stable Digests Before Promotion
@@ -254,7 +268,7 @@ jobs:
 
       - name: Verify Live Production Version & Auto-Rollback Guard
         run: |
-          echo "Validando implantação ao vivo em https://witiquetas.wrtec.com.br/version.json..."
+          echo "Validando implantação ao vivo em https://witiquetas.wrtec.com.br/version.json e /api/version..."
           DEPLOY_SUCCESS=false
           EXPECTED_SHA="${{ github.sha }}"
           START_SECS=$(date +%s)
@@ -262,16 +276,23 @@ jobs:
 
           for i in $(seq 1 30); do
             VERSION_RESPONSE=$(curl -s --max-time 5 https://witiquetas.wrtec.com.br/version.json || echo "")
-            LIVE_COMMIT=$(echo "$VERSION_RESPONSE" | grep -o '"commit":"[^"]*"' | cut -d'"' -f4 || echo "")
-            if [ -z "$LIVE_COMMIT" ]; then
-              LIVE_COMMIT=$(echo "$VERSION_RESPONSE" | grep -o '"candidateSha":"[^"]*"' | cut -d'"' -f4 || echo "")
+            LIVE_FRONT_COMMIT=$(echo "$VERSION_RESPONSE" | grep -o '"commit":"[^"]*"' | cut -d'"' -f4 || echo "")
+            if [ -z "$LIVE_FRONT_COMMIT" ]; then
+              LIVE_FRONT_COMMIT=$(echo "$VERSION_RESPONSE" | grep -o '"candidateSha":"[^"]*"' | cut -d'"' -f4 || echo "")
             fi
+
+            BACKEND_RESPONSE=$(curl -s --max-time 5 https://witiquetas.wrtec.com.br/api/version || echo "")
+            LIVE_BACK_COMMIT=$(echo "$BACKEND_RESPONSE" | grep -o '"commit":"[^"]*"' | cut -d'"' -f4 || echo "")
+            if [ -z "$LIVE_BACK_COMMIT" ]; then
+              LIVE_BACK_COMMIT=$(echo "$BACKEND_RESPONSE" | grep -o '"candidateSha":"[^"]*"' | cut -d'"' -f4 || echo "")
+            fi
+
             NOW_SECS=$(date +%s)
             ELAPSED_SECS=$((NOW_SECS - START_SECS))
 
-            if [ "$LIVE_COMMIT" = "$EXPECTED_SHA" ]; then
+            if [ "$LIVE_FRONT_COMMIT" = "$EXPECTED_SHA" ] && [ "$LIVE_BACK_COMMIT" = "$EXPECTED_SHA" ]; then
               FIRST_SUCCESS_TIME=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
-              echo "Tentativa $i/30 ($ELAPSED_SECS s): SHA ao vivo retornado é o esperado: '$LIVE_COMMIT'. Deploy confirmado!"
+              echo "Tentativa $i/30 ($ELAPSED_SECS s): SHA ao vivo retornado é o esperado no Frontend ('$LIVE_FRONT_COMMIT') e Backend ('$LIVE_BACK_COMMIT'). Deploy confirmado!"
               echo "========================================================"
               echo "RELATÓRIO DE MÉTRICAS DO DEPLOY PORTAINER:"
               echo "  Timestamp Webhook:            ${webhook_timestamp:-Desconhecido}"
@@ -280,17 +301,17 @@ jobs:
               echo "========================================================"
               DEPLOY_SUCCESS=true
               break
-            elif [ -z "$LIVE_COMMIT" ]; then
-              echo "Tentativa $i/30 ($ELAPSED_SECS s): Endpoint indisponível ou resposta vazia (troca de container Portainer em andamento). Aguardando..."
+            elif [ -z "$LIVE_FRONT_COMMIT" ] || [ -z "$LIVE_BACK_COMMIT" ]; then
+              echo "Tentativa $i/30 ($ELAPSED_SECS s): Um ou mais endpoints indisponíveis (troca de container Portainer em andamento). Aguardando..."
             else
-              echo "Tentativa $i/30 ($ELAPSED_SECS s): SHA ao vivo é '$LIVE_COMMIT' (aguardando convergência para '$EXPECTED_SHA')..."
+              echo "Tentativa $i/30 ($ELAPSED_SECS s): Frontend SHA é '$LIVE_FRONT_COMMIT', Backend SHA é '$LIVE_BACK_COMMIT' (aguardando convergência para '$EXPECTED_SHA')..."
             fi
 
             sleep 5
           done
 
           if [ "$DEPLOY_SUCCESS" != "true" ]; then
-            echo "AVISO: O container em produção não atualizou a resposta em /version.json dentro da janela total de 150 segundos (150s)."
-            echo "A imagem ghcr.io/wittemberg/witiquetas-frontend:stable (commit $EXPECTED_SHA) permanece publicada e pronta no GHCR."
+            echo "AVISO: Os containers em produção não atualizaram a resposta dentro da janela total de 150 segundos (150s)."
+            echo "A imagem ghcr.io/wittemberg/witiquetas-frontend:stable (commit $EXPECTED_SHA) e backend:stable permanecem publicadas e prontas no GHCR."
             echo "Caso o Portainer não esteja configurado com auto-update por webhook, execute o 'Redeploy' da stack no Portainer para puxar a nova imagem :stable."
           fi

@@ -7,7 +7,6 @@ import {
   Cpu,
   Plug,
   Settings,
-  Gauge,
   type LucideIcon,
 } from 'lucide-react';
 import type { SessionContext } from '../auth/session.js';
@@ -80,8 +79,10 @@ export const BASE_NAV_ITEMS: NavItem[] = [
 ];
 
 /**
- * Resolver único e canônico da navegação do frontend (Seção 15 do Pacote 5.3.1).
- * Decide quais itens são visíveis tanto no Menu Lateral (Sidebar) quanto no Dashboard.
+ * Resolver único e canônico da navegação do frontend comercial do tenant (Hotfix 5.3.2).
+ * Exibe EXCLUSIVAMENTE os módulos disponíveis para o tenant conforme suas permissões.
+ *
+ * DCC é ferramenta interna da PLATAFORMA e NUNCA aparece na navegação de tenant (nem mesmo para ADMIN).
  */
 export function getEffectiveNavigation(sessionContext: SessionContext | null): NavItem[] {
   if (!sessionContext) {
@@ -125,26 +126,6 @@ export function getEffectiveNavigation(sessionContext: SessionContext | null): N
         items.push(item);
       }
     }
-  }
-
-  // DCC / DESENVOLVIMENTO (Seções 8, 9, 10, 11 e P0.1)
-  // Regra efetiva: DCC_ENABLED && is_dcc_master && devcontrol.view
-  const isMaster = Boolean(sessionContext.user?.isDccMaster);
-  const dccEnabled =
-    sessionContext.dccEnabled !== undefined ? sessionContext.dccEnabled : true;
-  const canAccessDcc =
-    sessionContext.canAccessDcc !== undefined
-      ? sessionContext.canAccessDcc
-      : dccEnabled && isMaster && checkPerm('devcontrol.view');
-
-  if (canAccessDcc) {
-    items.push({
-      id: 'development',
-      label: 'Desenvolvimento',
-      icon: Gauge,
-      description: 'Development Control Center (Governança e Homologação)',
-      path: '#development',
-    });
   }
 
   return items;

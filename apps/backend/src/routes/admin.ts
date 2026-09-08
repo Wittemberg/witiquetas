@@ -9,6 +9,7 @@ import {
   UserRepository,
   RoleRepository,
   CANONICAL_PERMISSIONS,
+  TENANT_MANAGEABLE_PERMISSIONS,
 } from '../repositories/adminRepositories.js';
 import { SessionRepository } from '../repositories/sessionRepository.js';
 import { PasswordService } from '../services/passwordService.js';
@@ -67,10 +68,11 @@ router.put('/company', requirePermission('company.manage'), requireCsrf, async (
 
 /**
  * GET /api/admin/permissions
- * Retorna catálogo canônico de 25 permissões
+ * Retorna catálogo de 23 permissões administráveis pelo tenant
+ * (as 2 permissões devcontrol.* são reservadas exclusivamente à plataforma e não participam do RBAC comercial)
  */
 router.get('/permissions', async (_req: Request, res: Response) => {
-  return res.status(200).json(CANONICAL_PERMISSIONS);
+  return res.status(200).json(TENANT_MANAGEABLE_PERMISSIONS);
 });
 
 // ==========================================
@@ -111,13 +113,9 @@ router.post('/users', requirePermission('users.manage'), requireCsrf, async (req
   const companyId = req.principal!.company.id;
   const { name, email, password, status, roleIds, isDccMaster, is_dcc_master } = req.body;
 
-  // P0.1: Rejeitar tentativa de elevação para Master DCC via API de tenant
-  if (isDccMaster !== undefined || is_dcc_master !== undefined) {
-    return res.status(400).json({
-      error: 'O atributo de plataforma is_dcc_master não pode ser manipulado por administradores de tenant.',
-      code: 'FORBIDDEN_PLATFORM_ATTRIBUTE',
-    });
-  }
+  // Decisão Congelada 5: is_dcc_master é atributo de plataforma/legado.
+  // Ignorar silenciosamente qualquer tentativa de mass-assignment via API de tenant.
+  // Não permitir que o tenant altere ou defina este campo.
 
   if (!name || typeof name !== 'string' || name.trim().length === 0) {
     return res.status(400).json({ error: 'O nome do usuário é obrigatório.', code: 'INVALID_NAME' });
@@ -205,13 +203,8 @@ router.put('/users/:id', requirePermission('users.manage'), requireCsrf, async (
   const targetId = req.params.id;
   const { name, email, status, roleIds, isDccMaster, is_dcc_master } = req.body;
 
-  // P0.1: Rejeitar tentativa de alteração de Master DCC via API de tenant
-  if (isDccMaster !== undefined || is_dcc_master !== undefined) {
-    return res.status(400).json({
-      error: 'O atributo de plataforma is_dcc_master não pode ser manipulado por administradores de tenant.',
-      code: 'FORBIDDEN_PLATFORM_ATTRIBUTE',
-    });
-  }
+  // Decisão Congelada 5: is_dcc_master é atributo de plataforma/legado.
+  // Ignorar silenciosamente tentativas de mass-assignment via API de tenant.
 
   const existing = await UserRepository.findById(targetId);
   if (!existing || existing.companyId !== companyId) {
@@ -396,7 +389,8 @@ router.get('/roles', requirePermission('roles.view'), async (req: Request, res: 
 
   const rolesWithDetails = await Promise.all(
     roles.map(async (r) => {
-      const permissions = await RoleRepository.getRolePermissions(r.id);
+      const rawPermissions = await RoleRepository.getRolePermissions(r.id);
+      const permissions = rawPermissions.filter((p) => !p.startsWith('devcontrol.'));
       const userCount = await RoleRepository.countUsersWithRole(companyId, r.id);
       return {
         ...r,
@@ -433,11 +427,11 @@ router.post('/roles', requirePermission('roles.manage'), requireCsrf, async (req
     return res.status(409).json({ error: `O código de perfil '${normalizedCode}' já existe nesta empresa.`, code: 'ROLE_CODE_ALREADY_EXISTS' });
   }
 
-  // Validar permissões fornecidas
+  // Validar permissões fornecidas (somente as 23 administráveis pelo tenant são aceitas)
   if (Array.isArray(permissions)) {
     for (const perm of permissions) {
-      if (!CANONICAL_PERMISSIONS.some((p) => p.code === perm)) {
-        return res.status(400).json({ error: `Permissão inválida: '${perm}'.`, code: 'INVALID_PERMISSION' });
+      if (!TENANT_MANAGEABLE_PERMISSIONS.some((p) => p.code === perm)) {
+        return res.status(400).json({ error: `Permissão inválida ou não administrável pelo tenant: '${perm}'.`, code: 'INVALID_PERMISSION' });
       }
     }
   }
@@ -536,10 +530,10 @@ router.put('/roles/:id/permissions', requirePermission('roles.manage'), requireC
     return res.status(400).json({ error: 'O campo permissions deve ser uma lista de códigos.', code: 'INVALID_PERMISSIONS_FORMAT' });
   }
 
-  // Validar se todas as permissões existem no catálogo canônico
+  // Validar se todas as permissões existem no catálogo administrável pelo tenant (23 permissões)
   for (const perm of permissions) {
-    if (!CANONICAL_PERMISSIONS.some((p) => p.code === perm)) {
-      return res.status(400).json({ error: `Permissão inválida: '${perm}'.`, code: 'INVALID_PERMISSION' });
+    if (!TENANT_MANAGEABLE_PERMISSIONS.some((p) => p.code === perm)) {
+      return res.status(400).json({ error: `Permissão inválida ou não administrável pelo tenant: '${perm}'.`, code: 'INVALID_PERMISSION' });
     }
   }
 

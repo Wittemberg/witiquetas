@@ -52,6 +52,15 @@ export const CANONICAL_PERMISSIONS: PermissionCatalogItemDTO[] = [
   { code: 'devcontrol.manage', name: 'Gerenciar DevControl', description: 'Executar comandos e configurações no DevControl', category: 'Governança' },
 ];
 
+/**
+ * Catálogo das 23 permissões administráveis pelo tenant (exclui permissões de plataforma do DevControl).
+ * 25 = catálogo completo da plataforma
+ * 23 = catálogo administrável pelo tenant
+ */
+export const TENANT_MANAGEABLE_PERMISSIONS: PermissionCatalogItemDTO[] = CANONICAL_PERMISSIONS.filter(
+  (p) => !p.code.startsWith('devcontrol.')
+);
+
 // Stores em memória para testes offline e execução sem PostgreSQL (garantidos via globalThis contra dual-module hazard)
 const g = globalThis as any;
 g.__WIT_ADMIN_MEM_COMPANIES__ = g.__WIT_ADMIN_MEM_COMPANIES__ || new Map<string, CompanyDTO>();

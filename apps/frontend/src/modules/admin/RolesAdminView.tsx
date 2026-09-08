@@ -34,11 +34,6 @@ const ESSENTIAL_ADMIN_PERMISSIONS = [
   'roles.manage',
 ];
 
-const PLATFORM_RESERVED_PERMISSIONS = [
-  'devcontrol.view',
-  'devcontrol.manage',
-];
-
 export const RolesAdminView: React.FC<RolesAdminViewProps> = ({
   currentUserRoles,
   onSelfAffected,
@@ -195,40 +190,28 @@ export const RolesAdminView: React.FC<RolesAdminViewProps> = ({
       return;
     }
 
-    // Permissões reservadas à plataforma são bloqueadas no contexto comum
-    if (PLATFORM_RESERVED_PERMISSIONS.includes(code)) {
-      return;
-    }
-
     setSelectedPermissions((prev) =>
       prev.includes(code) ? prev.filter((c) => c !== code) : [...prev, code]
     );
   };
 
-  // Batch: Marcar todas (exceto reservadas à plataforma a menos que já estejam ativas)
+  // Batch: Marcar todas as permissões do catálogo do tenant
   const handleSelectAll = () => {
-    setSelectedPermissions(
-      permissionsCatalog
-        .filter((p) => !PLATFORM_RESERVED_PERMISSIONS.includes(p.code) || selectedPermissions.includes(p.code))
-        .map((p) => p.code)
-    );
+    setSelectedPermissions(permissionsCatalog.map((p) => p.code));
   };
 
-  // Batch: Desmarcar todas (mantendo essenciais se for ADMIN e mantendo reservadas intactas)
+  // Batch: Desmarcar todas (mantendo essenciais se for ADMIN)
   const handleDeselectAll = () => {
-    const retained = selectedPermissions.filter((p) => PLATFORM_RESERVED_PERMISSIONS.includes(p));
     if (permissionRole?.code === 'ADMIN') {
-      setSelectedPermissions(Array.from(new Set([...ESSENTIAL_ADMIN_PERMISSIONS, ...retained])));
+      setSelectedPermissions([...ESSENTIAL_ADMIN_PERMISSIONS]);
     } else {
-      setSelectedPermissions(retained);
+      setSelectedPermissions([]);
     }
   };
 
   // Batch por categoria
   const handleSelectCategory = (categoryItems: PermissionCatalogItem[]) => {
-    const codes = categoryItems
-      .filter((c) => !PLATFORM_RESERVED_PERMISSIONS.includes(c.code) || selectedPermissions.includes(c.code))
-      .map((c) => c.code);
+    const codes = categoryItems.map((c) => c.code);
     setSelectedPermissions((prev) => Array.from(new Set([...prev, ...codes])));
   };
 
@@ -237,9 +220,6 @@ export const RolesAdminView: React.FC<RolesAdminViewProps> = ({
     setSelectedPermissions((prev) =>
       prev.filter((c) => {
         if (permissionRole?.code === 'ADMIN' && ESSENTIAL_ADMIN_PERMISSIONS.includes(c)) {
-          return true;
-        }
-        if (PLATFORM_RESERVED_PERMISSIONS.includes(c)) {
           return true;
         }
         return !codes.has(c);
@@ -696,46 +676,63 @@ export const RolesAdminView: React.FC<RolesAdminViewProps> = ({
                           const isEssential =
                             permissionRole.code === 'ADMIN' &&
                             ESSENTIAL_ADMIN_PERMISSIONS.includes(perm.code);
-                          const isPlatformReserved = PLATFORM_RESERVED_PERMISSIONS.includes(perm.code);
                           const isChecked = selectedPermissions.includes(perm.code);
-                          const isDisabled = isEssential || isPlatformReserved;
+                          const isDisabled = isEssential;
 
                           return (
-                            <label
+                            <div
                               key={perm.code}
-                              className={`admin-perm-item ${isChecked ? 'selected' : ''} ${
+                              role="button"
+                              tabIndex={isDisabled ? -1 : 0}
+                              aria-pressed={isChecked}
+                              aria-disabled={isDisabled}
+                              onClick={() => {
+                                if (!isDisabled) togglePermission(perm.code);
+                              }}
+                              onKeyDown={(e) => {
+                                if (isDisabled) return;
+                                if (e.key === ' ' || e.key === 'Enter') {
+                                  e.preventDefault();
+                                  togglePermission(perm.code);
+                                }
+                              }}
+                              className={`admin-perm-item ${isChecked ? 'selected' : 'unselected'} ${
                                 isEssential ? 'locked' : ''
-                              } ${isPlatformReserved ? 'platform-reserved' : ''}`}
+                              }`}
                             >
                               <input
                                 type="checkbox"
                                 checked={isChecked}
                                 disabled={isDisabled}
-                                onChange={() => togglePermission(perm.code)}
+                                onChange={(e) => {
+                                  e.stopPropagation();
+                                  togglePermission(perm.code);
+                                }}
+                                tabIndex={-1}
                               />
                               <div className="admin-perm-item-content">
                                 <div className="admin-perm-item-head">
                                   <span className="admin-perm-name">{perm.name}</span>
                                   {isEssential ? (
-                                    <span className="admin-perm-lock-tag" title="Permissão essencial de segurança">
-                                      <Lock size={10} /> Essencial
+                                    <span className="admin-perm-lock-tag" title="Permissão essencial de segurança anti-lockout">
+                                      <Lock size={11} /> Essencial (Fixa)
                                     </span>
-                                  ) : isPlatformReserved ? (
-                                    <span className="admin-perm-platform-tag" title="Reservado à Plataforma">
-                                      <Lock size={10} /> Reservado à Plataforma
+                                  ) : isChecked ? (
+                                    <span className="admin-perm-status-badge allowed">
+                                      <CheckSquare size={11} /> PERMITIDO
                                     </span>
                                   ) : (
-                                    <span className="admin-perm-code">{perm.code}</span>
+                                    <span className="admin-perm-status-badge blocked">
+                                      <Square size={11} /> BLOQUEADO
+                                    </span>
                                   )}
                                 </div>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', marginBottom: '0.2rem' }}>
+                                  <span className="admin-perm-code">{perm.code}</span>
+                                </div>
                                 <p className="admin-perm-desc">{perm.description}</p>
-                                {isPlatformReserved && (
-                                  <p className="admin-perm-platform-hint">
-                                    Disponível somente para administração da plataforma.
-                                  </p>
-                                )}
                               </div>
-                            </label>
+                            </div>
                           );
                         })}
                       </div>

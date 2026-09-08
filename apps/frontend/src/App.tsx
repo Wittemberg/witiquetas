@@ -322,76 +322,20 @@ export default function App() {
         );
 
       case 'development':
-        if (!canAccessDevControl()) {
-          return (
-            <AccessDeniedView
-              onGoHome={() => {
-                setCurrentModule('home');
-                window.location.hash = '#home';
-              }}
-            />
-          );
-        }
+      case 'developer':
         return (
           <DevControlPage
-            onGoHome={() => setCurrentModule('home')}
+            onGoHome={() => {
+              setCurrentModule('home');
+              window.location.hash = '#home';
+            }}
           />
         );
 
       case 'home':
       default: {
-        const effectiveModules = getEffectiveNavigation(sessionContext).filter((i) => i.id !== 'home');
         return (
           <div className="dashboard-content">
-            {/* Módulos Autorizados do Usuário (Seção 14 do Pacote 5.3.1) */}
-            {effectiveModules.length > 0 && (
-              <div className="dashboard-section" style={{ marginBottom: '2rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
-                  <h3 style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', margin: 0 }}>
-                    Módulos e Recursos Autorizados
-                  </h3>
-                  <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                    {sessionContext?.company?.name} • Perfil: {sessionContext?.roles?.join(', ') || 'Padrão'}
-                  </span>
-                </div>
-                <div className="dashboard-modules-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '1rem' }}>
-                  {effectiveModules.map((mod) => {
-                    const ModIcon = mod.icon;
-                    return (
-                      <div
-                        key={mod.id}
-                        className="card dashboard-module-card"
-                        onClick={() => {
-                          if (mod.id === 'new') {
-                            setIsWizardOpen(true);
-                          } else {
-                            setCurrentModule(mod.id);
-                          }
-                        }}
-                        style={{
-                          cursor: 'pointer',
-                          padding: '1.25rem',
-                          transition: 'all 0.15s ease',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: '0.5rem',
-                        }}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                          <div style={{ padding: '0.5rem', borderRadius: '8px', background: 'rgba(59, 130, 246, 0.1)', color: 'var(--accent-blue)', display: 'flex' }}>
-                            <ModIcon size={20} />
-                          </div>
-                          <span style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text-primary)' }}>{mod.label}</span>
-                        </div>
-                        <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: 0, lineHeight: 1.4 }}>
-                          {mod.description}
-                        </p>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
 
             {error && (
               <div

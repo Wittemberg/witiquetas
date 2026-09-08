@@ -4483,7 +4483,7 @@ body {
 
 .admin-perm-categories-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 1.25rem;
   padding: 1.25rem 1.5rem;
   flex: 1;
@@ -4492,13 +4492,7 @@ body {
   align-items: start;
 }
 
-@media (max-width: 1100px) {
-  .admin-perm-categories-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-@media (max-width: 700px) {
+@media (max-width: 800px) {
   .admin-perm-categories-grid {
     grid-template-columns: 1fr;
   }
@@ -4507,30 +4501,38 @@ body {
 .admin-perm-category-card {
   background: var(--bg-card);
   border: 1px solid var(--border-color);
-  border-radius: 10px;
+  border-radius: 12px;
   overflow: visible;
   display: flex;
   flex-direction: column;
+  height: auto;
   min-height: fit-content;
+  box-shadow: var(--shadow-sm, 0 1px 3px rgba(0,0,0,0.1));
 }
 
 .admin-perm-category-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0.65rem 0.875rem;
+  padding: 0.75rem 1rem;
   background: rgba(255, 255, 255, 0.03);
   border-bottom: 1px solid var(--border-color);
-  border-top-left-radius: 9px;
-  border-top-right-radius: 9px;
+  border-top-left-radius: 11px;
+  border-top-right-radius: 11px;
 }
 
 .admin-perm-category-title {
-  font-size: 0.8125rem;
+  font-size: 0.85rem;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--text-secondary);
+  letter-spacing: 0.05em;
+  color: var(--text-primary);
+}
+
+.admin-perm-category-quick {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .admin-perm-quick-btn {
@@ -4539,67 +4541,85 @@ body {
   color: var(--accent-blue);
   font-size: 0.75rem;
   cursor: pointer;
-  padding: 0;
-  font-weight: 500;
+  padding: 0.2rem 0.4rem;
+  font-weight: 600;
+  border-radius: 4px;
+  transition: all 0.15s ease;
 }
 
 .admin-perm-quick-btn:hover {
-  text-decoration: underline;
+  background: rgba(59, 130, 246, 0.1);
+  text-decoration: none;
 }
 
 .admin-perm-items-list {
-  padding: 0.625rem;
+  padding: 0.75rem;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.6rem;
 }
 
 .admin-perm-item {
   display: flex;
   align-items: flex-start;
-  gap: 0.6rem;
-  padding: 0.625rem;
-  border-radius: 6px;
-  background: transparent;
-  border: 1px solid transparent;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border-color);
   cursor: pointer;
   transition: all 0.15s ease;
+  user-select: none;
 }
 
 .admin-perm-item:hover {
   background: var(--bg-card-hover);
+  border-color: rgba(59, 130, 246, 0.4);
 }
 
 .admin-perm-item.selected {
-  background: rgba(59, 130, 246, 0.06);
-  border-color: rgba(59, 130, 246, 0.2);
+  background: rgba(16, 185, 129, 0.08);
+  border-color: rgba(16, 185, 129, 0.35);
 }
 
-.admin-perm-item.locked {
-  background: rgba(6, 182, 212, 0.05);
-  border-color: rgba(6, 182, 212, 0.25);
-  cursor: not-allowed;
+.admin-perm-item.selected:hover {
+  background: rgba(16, 185, 129, 0.12);
+  border-color: rgba(16, 185, 129, 0.5);
 }
 
-.admin-perm-item.platform-reserved {
-  background: rgba(255, 255, 255, 0.02);
-  border-color: rgba(255, 255, 255, 0.08);
-  cursor: not-allowed;
+.admin-perm-item.unselected {
+  background: rgba(239, 68, 68, 0.03);
+  border-color: rgba(239, 68, 68, 0.15);
   opacity: 0.85;
 }
 
-.admin-perm-item input {
-  margin-top: 0.2rem;
+.admin-perm-item.unselected:hover {
+  opacity: 1;
+  background: rgba(239, 68, 68, 0.06);
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+.admin-perm-item.locked {
+  background: rgba(6, 182, 212, 0.06);
+  border-color: rgba(6, 182, 212, 0.3);
+  cursor: not-allowed;
+}
+
+.admin-perm-item input[type="checkbox"] {
+  margin-top: 0.25rem;
+  width: 16px;
+  height: 16px;
+  accent-color: #10b981;
   cursor: pointer;
 }
 
-.admin-perm-item.locked input,
-.admin-perm-item.platform-reserved input {
+.admin-perm-item.locked input[type="checkbox"] {
   cursor: not-allowed;
 }
 
 .admin-perm-item-content {
   flex: 1;
+  min-width: 0;
 }
 
 .admin-perm-item-head {
@@ -4607,19 +4627,42 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
-  margin-bottom: 0.15rem;
+  margin-bottom: 0.25rem;
+  flex-wrap: wrap;
 }
 
 .admin-perm-name {
-  font-size: 0.8125rem;
-  font-weight: 600;
+  font-size: 0.85rem;
+  font-weight: 700;
   color: var(--text-primary);
 }
 
 .admin-perm-code {
-  font-size: 0.7rem;
+  font-size: 0.72rem;
   color: var(--text-muted);
   font-family: monospace;
+}
+
+.admin-perm-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+}
+
+.admin-perm-status-badge.allowed {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.admin-perm-status-badge.blocked {
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.25);
 }
 
 .admin-perm-lock-tag {
@@ -4627,34 +4670,19 @@ body {
   align-items: center;
   gap: 0.25rem;
   font-size: 0.6875rem;
+  background: rgba(6, 182, 212, 0.15);
   color: var(--accent-cyan);
+  border: 1px solid rgba(6, 182, 212, 0.3);
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
   font-weight: 700;
 }
 
-.admin-perm-platform-tag {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-  font-size: 0.6875rem;
-  color: var(--text-muted);
-  font-weight: 600;
-  background: rgba(255, 255, 255, 0.06);
-  padding: 0.15rem 0.4rem;
-  border-radius: 4px;
-}
-
-.admin-perm-platform-hint {
-  font-size: 0.72rem;
-  color: var(--status-warning, #f59e0b);
-  margin: 0.25rem 0 0 0;
-  line-height: 1.3;
-}
-
 .admin-perm-desc {
-  font-size: 0.75rem;
+  font-size: 0.775rem;
   color: var(--text-muted);
   margin: 0;
-  line-height: 1.3;
+  line-height: 1.35;
 }
 
 /* TELA AMIGÁVEL DE ACESSO NEGADO */

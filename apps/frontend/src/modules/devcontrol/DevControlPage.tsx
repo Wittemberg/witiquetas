@@ -23,6 +23,9 @@ import type {
 import { devControlApi } from '../../services/devControlApi.js';
 import { AccessDeniedView } from '../../shell/AccessDeniedView.js';
 
+import { DeveloperLoginPage } from './DeveloperLoginPage.js';
+import { LogOut } from 'lucide-react';
+
 interface DevControlPageProps {
   onGoHome: () => void;
 }
@@ -31,19 +34,47 @@ export const DevControlPage: React.FC<DevControlPageProps> = ({ onGoHome }) => {
   const [data, setData] = useState<DevelopmentOverviewDTO | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [needsAuth, setNeedsAuth] = useState<boolean>(false);
+  const [developerUsername, setDeveloperUsername] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'overview' | 'modules' | 'frozen' | 'niches'>('overview');
 
   const fetchOverview = async () => {
     try {
       setLoading(true);
       setError(null);
+      setNeedsAuth(false);
+
+      // Checa sessão de desenvolvedor primeiro
+      const authStatus = await devControlApi.checkDeveloperAuth();
+      if (!authStatus.authenticated) {
+        setNeedsAuth(true);
+        setLoading(false);
+        return;
+      }
+      setDeveloperUsername(authStatus.username || 'Marcel');
+
       const overview = await devControlApi.getOverview();
       setData(overview);
     } catch (err: any) {
-      setError(err.message || 'Falha ao carregar dados do Development Control Center.');
+      if (err.status === 401 || err.code === 'DEVELOPER_AUTH_REQUIRED' || err.code === 'DEVELOPER_SESSION_INVALID') {
+        setNeedsAuth(true);
+      } else {
+        setError(err.message || 'Falha ao carregar dados do Development Control Center.');
+      }
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await devControlApi.developerLogout();
+    } catch {
+      // Ignora erro no logout
+    }
+    setNeedsAuth(true);
+    setData(null);
+    setDeveloperUsername(null);
   };
 
   useEffect(() => {
@@ -59,6 +90,10 @@ export const DevControlPage: React.FC<DevControlPageProps> = ({ onGoHome }) => {
         </div>
       </div>
     );
+  }
+
+  if (needsAuth) {
+    return <DeveloperLoginPage onSuccess={fetchOverview} onGoHome={onGoHome} />;
   }
 
   if (error || !data) {
@@ -139,6 +174,26 @@ export const DevControlPage: React.FC<DevControlPageProps> = ({ onGoHome }) => {
             <div className="dev-control-meta-pill">
               Ambiente: <strong>{project.environment ? project.environment.toUpperCase() : 'DEVELOPMENT'}</strong>
             </div>
+            {developerUsername && (
+              <div className="dev-control-meta-pill" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(139, 92, 246, 0.2)', border: '1px solid rgba(139, 92, 246, 0.4)' }}>
+                <span>Dev: <strong>{developerUsername}</strong></span>
+                <button
+                  onClick={handleLogout}
+                  title="Encerrar Sessão Developer"
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: 'var(--text-muted)',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    padding: '2px',
+                  }}
+                >
+                  <LogOut size={14} />
+                </button>
+              </div>
+            )}
           </div>
         </header>
 

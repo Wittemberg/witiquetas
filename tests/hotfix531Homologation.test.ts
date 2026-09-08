@@ -16,6 +16,7 @@ import { PasswordService } from '../apps/backend/src/services/passwordService.js
 import adminRouter from '../apps/backend/src/routes/admin.js';
 import sessionRouter from '../apps/backend/src/routes/session.js';
 import devControlRouter from '../apps/backend/src/routes/developmentControl.js';
+import { developerAuthService } from '../apps/backend/src/services/developerAuthService.js';
 import { SESSION_COOKIE_NAME } from '../apps/backend/src/routes/auth.js';
 import { getEffectiveNavigation, BASE_NAV_ITEMS } from '../apps/frontend/src/shell/navigation.js';
 
@@ -166,7 +167,7 @@ test('HOTFIX 5.3.1: Permissões inventadas ou não-canônicas não existem no ca
   assert.ok(!codes.includes('admin.access'), 'admin.access não deve existir');
 });
 
-test('HOTFIX 5.3.1: GET /api/admin/permissions retorna exatamente as 25 permissões com categoria e descrição', async () => {
+test('HOTFIX 5.3.1 / 5.3.2: GET /api/admin/permissions retorna exatamente as 23 permissões gerenciáveis pelo tenant', async () => {
   clearAdminMemoryStores();
   clearSessionMemoryStores();
   const tenant = await setupTenant('PERMS');
@@ -180,12 +181,13 @@ test('HOTFIX 5.3.1: GET /api/admin/permissions retorna exatamente as 25 permiss�
   });
 
   assert.equal(res.statusCode, 200);
-  assert.equal(res.body.length, 25);
+  assert.equal(res.body.length, 23);
   for (const item of res.body) {
     assert.ok(item.code, 'Permissão deve ter código');
     assert.ok(item.name, 'Permissão deve ter nome');
     assert.ok(item.description, 'Permissão deve ter descrição amigável');
     assert.ok(item.category, 'Permissão deve ter categoria');
+    assert.ok(!item.code.startsWith('devcontrol.'), 'devcontrol.* não deve estar na matriz do tenant');
   }
 });
 
@@ -221,7 +223,7 @@ test('HOTFIX 5.3.1: is_dcc_master é atributo de plataforma e não existe nos DT
   assert.equal(detailRes.body.is_dcc_master, undefined, 'is_dcc_master não deve vazar em detalhe');
 });
 
-test('HOTFIX 5.3.1: POST /api/admin/users rejeita tentativa de auto-elevação para is_dcc_master (Anti-Mass-Assignment)', async () => {
+test('HOTFIX 5.3.1 / 5.3.2: POST /api/admin/users ignora silenciosamente is_dcc_master sem vazar no DTO', async () => {
   const tenant = await setupTenant('POSTELEV');
 
   const res = await callRouter(adminRouter, {
@@ -239,11 +241,11 @@ test('HOTFIX 5.3.1: POST /api/admin/users rejeita tentativa de auto-elevação p
     },
   });
 
-  assert.equal(res.statusCode, 400);
-  assert.equal(res.body.code, 'FORBIDDEN_PLATFORM_ATTRIBUTE');
+  assert.equal(res.statusCode, 201);
+  assert.equal(res.body.isDccMaster, undefined);
 });
 
-test('HOTFIX 5.3.1: PUT /api/admin/users/:id rejeita tentativa de elevação de usuário para is_dcc_master', async () => {
+test('HOTFIX 5.3.1 / 5.3.2: PUT /api/admin/users/:id ignora silenciosamente tentativas de alterar is_dcc_master', async () => {
   const tenant = await setupTenant('PUTELEV');
 
   const res = await callRouter(adminRouter, {
@@ -258,8 +260,8 @@ test('HOTFIX 5.3.1: PUT /api/admin/users/:id rejeita tentativa de elevação de 
     },
   });
 
-  assert.equal(res.statusCode, 400);
-  assert.equal(res.body.code, 'FORBIDDEN_PLATFORM_ATTRIBUTE');
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.isDccMaster, undefined);
 });
 
 test('HOTFIX 5.3.1: Ter devcontrol.view ou devcontrol.manage NÃO torna o usuário Master DCC', async () => {
@@ -282,49 +284,11 @@ test('HOTFIX 5.3.1: Ter devcontrol.view ou devcontrol.manage NÃO torna o usuár
   assert.equal(principal.user.isDccMaster, false, 'Usuário não deve ser isDccMaster mesmo com devcontrol.*');
 });
 
-test('HOTFIX 5.3.1: DevControl router bloqueia com 403 se usuário não for Master DCC', async () => {
+test('HOTFIX 5.3.1 / 5.3.2: DevControl router bloqueia com 401 DEVELOPER_AUTH_REQUIRED qualquer sessão tenant', async () => {
   const tenant = await setupTenant('DCBLOCK');
   process.env.DCC_ENABLED = 'true';
 
-  // Chamar status sem ser master dcc
-  const res = await callRouter(devControlRouter, {
-    method: 'GET',
-    url: '/status',
-    headers: {
-      cookie: `${SESSION_COOKIE_NAME}=${tenant.adminSession.rawToken}`,
-    },
-  });
-
-  assert.equal(res.statusCode, 403);
-  assert.equal(res.body.code, 'FORBIDDEN_NOT_DCC_MASTER');
-});
-
-test('HOTFIX 5.3.1: DevControl router retorna 404 DCC_DISABLED se DCC_ENABLED for false mesmo para Master DCC', async () => {
-  const tenant = await setupTenant('DCDISABLED');
-  process.env.DCC_ENABLED = 'false';
-
-  // Promover internamente para testar
-  await UserRepository.setDccMaster(tenant.adminUser.id, true);
-
-  const res = await callRouter(devControlRouter, {
-    method: 'GET',
-    url: '/status',
-    headers: {
-      cookie: `${SESSION_COOKIE_NAME}=${tenant.adminSession.rawToken}`,
-    },
-  });
-
-  assert.equal(res.statusCode, 404);
-  assert.equal(res.body.code, 'DCC_DISABLED');
-});
-
-test('HOTFIX 5.3.1: DevControl router permite acesso quando DCC_ENABLED=true E usuário é Master DCC', async () => {
-  const tenant = await setupTenant('DCALLOW');
-  process.env.DCC_ENABLED = 'true';
-
-  // Promover internamente
-  await UserRepository.setDccMaster(tenant.adminUser.id, true);
-
+  // Chamar overview sem sessão developer
   const res = await callRouter(devControlRouter, {
     method: 'GET',
     url: '/overview',
@@ -333,30 +297,44 @@ test('HOTFIX 5.3.1: DevControl router permite acesso quando DCC_ENABLED=true E u
     },
   });
 
+  assert.equal(res.statusCode, 401);
+  assert.equal(res.body.code, 'DEVELOPER_AUTH_REQUIRED');
+});
+
+test('HOTFIX 5.3.1 / 5.3.2: DevControl router retorna 404 DCC_DISABLED se DCC_ENABLED for false', async () => {
+  process.env.DCC_ENABLED = 'false';
+
+  const res = await callRouter(devControlRouter, {
+    method: 'GET',
+    url: '/overview',
+    headers: {},
+  });
+
+  assert.equal(res.statusCode, 404);
+  assert.equal(res.body.code, 'DCC_DISABLED');
+});
+
+test('HOTFIX 5.3.1 / 5.3.2: DevControl router permite acesso exclusivamente com sessão de desenvolvedor (Marcel)', async () => {
+  process.env.DCC_ENABLED = 'true';
+  const devSession = developerAuthService.createSession();
+
+  const res = await callRouter(devControlRouter, {
+    method: 'GET',
+    url: '/overview',
+    headers: {
+      cookie: `witiquetas_dcc_session=${devSession.rawToken}`,
+    },
+  });
+
   assert.equal(res.statusCode, 200);
   assert.ok(res.body.phases);
 });
 
-test('HOTFIX 5.3.1: GET /api/session/context retorna dccEnabled e canAccessDcc calculados', async () => {
+test('HOTFIX 5.3.1 / 5.3.2: GET /api/session/context nunca expõe dccEnabled ou canAccessDcc a tenants comerciais', async () => {
   const tenant = await setupTenant('CTX');
   process.env.DCC_ENABLED = 'true';
 
-  // Usuário comum sem master DCC
-  const resNormal = await callRouter(sessionRouter, {
-    method: 'GET',
-    url: '/context',
-    headers: {
-      cookie: `${SESSION_COOKIE_NAME}=${tenant.opSession.rawToken}`,
-    },
-  });
-
-  assert.equal(resNormal.statusCode, 200);
-  assert.equal(resNormal.body.dccEnabled, true);
-  assert.equal(resNormal.body.canAccessDcc, false);
-
-  // Usuário com master DCC
-  await UserRepository.setDccMaster(tenant.adminUser.id, true);
-  const resMaster = await callRouter(sessionRouter, {
+  const res = await callRouter(sessionRouter, {
     method: 'GET',
     url: '/context',
     headers: {
@@ -364,9 +342,9 @@ test('HOTFIX 5.3.1: GET /api/session/context retorna dccEnabled e canAccessDcc c
     },
   });
 
-  assert.equal(resMaster.statusCode, 200);
-  assert.equal(resMaster.body.dccEnabled, true);
-  assert.equal(resMaster.body.canAccessDcc, true);
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.dccEnabled, undefined);
+  assert.equal(res.body.canAccessDcc, undefined);
 });
 
 test('HOTFIX 5.3.1: getEffectiveNavigation oculta DevControl para usuário comum e admin de empresa', () => {
@@ -375,8 +353,6 @@ test('HOTFIX 5.3.1: getEffectiveNavigation oculta DevControl para usuário comum
     company: { id: 'c1', name: 'Empresa', slug: 'emp' },
     roles: ['OPERATOR'],
     permissions: ['templates.view', 'print.execute'],
-    dccEnabled: true,
-    canAccessDcc: false,
   };
 
   const nav = getEffectiveNavigation(commonUserContext);
@@ -386,14 +362,12 @@ test('HOTFIX 5.3.1: getEffectiveNavigation oculta DevControl para usuário comum
   assert.ok(!nav.some((item) => item.id === 'admin'), 'Admin não deve aparecer para operador');
 });
 
-test('HOTFIX 5.3.1: getEffectiveNavigation exibe Administração para admin e oculta DevControl se canAccessDcc for false', () => {
+test('HOTFIX 5.3.1: getEffectiveNavigation exibe Administração para admin e oculta DevControl', () => {
   const tenantAdminContext: any = {
     user: { id: 'u2', name: 'Admin', email: 'adm@emp.com' },
     company: { id: 'c1', name: 'Empresa', slug: 'emp' },
     roles: ['ADMIN'],
     permissions: CANONICAL_PERMISSIONS.map((p) => p.code),
-    dccEnabled: true,
-    canAccessDcc: false,
   };
 
   const nav = getEffectiveNavigation(tenantAdminContext);
@@ -401,16 +375,14 @@ test('HOTFIX 5.3.1: getEffectiveNavigation exibe Administração para admin e oc
   assert.ok(!nav.some((item) => item.id === 'development'), 'DCC não pode aparecer para admin comum');
 });
 
-test('HOTFIX 5.3.1: getEffectiveNavigation exibe DevControl exclusivamente quando canAccessDcc for true', () => {
-  const masterDccContext: any = {
+test('HOTFIX 5.3.1 / 5.3.2: getEffectiveNavigation NUNCA inclui DevControl na navegação do tenant', () => {
+  const anyContext: any = {
     user: { id: 'u3', name: 'Master', email: 'master@witiquetas.com', isDccMaster: true },
     company: { id: 'c1', name: 'Empresa', slug: 'emp' },
     roles: ['ADMIN'],
     permissions: CANONICAL_PERMISSIONS.map((p) => p.code),
-    dccEnabled: true,
-    canAccessDcc: true,
   };
 
-  const nav = getEffectiveNavigation(masterDccContext);
-  assert.ok(nav.some((item) => item.id === 'development'), 'DCC deve aparecer quando canAccessDcc for true');
+  const nav = getEffectiveNavigation(anyContext);
+  assert.ok(!nav.some((item) => item.id === 'development'), 'DCC NUNCA deve aparecer na navegação comercial do tenant');
 });

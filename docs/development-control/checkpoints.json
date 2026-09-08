@@ -1,6 +1,27 @@
 {
   "checkpoints": [
     {
+      "sha": "7454c225bdf043f54ebcf57b5a03e6047e715f38",
+      "shortSha": "7454c22",
+      "date": "2026-09-08T12:00:00Z",
+      "phase": "5",
+      "patch": "5.3.2-candidate",
+      "title": "fix(hotfix-5.3.2): restauracao do dashboard, ux da matriz e acesso exclusivo de desenvolvedor ao dcc",
+      "type": "HOTFIX",
+      "capabilities": [
+        "cap-admin-shell",
+        "cap-admin-roles",
+        "cap-role-management",
+        "cap-developer-auth",
+        "cap-dcc-isolation"
+      ],
+      "testsPassed": true,
+      "deployed": false,
+      "manualValidation": false,
+      "homologated": false,
+      "evidence": "Hotfix 5.3.2 restaurando baseline original do dashboard, matriz de 23 permissoes comerciais sem devcontrol, design de alto contraste e autenticacao developer RFC 6238 TOTP para Marcel"
+    },
+    {
       "sha": "69d53bd8470b6f23ffc05883bee69f4033013156",
       "shortSha": "69d53bd",
       "date": "2026-09-08T10:44:00Z",

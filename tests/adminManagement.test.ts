@@ -300,7 +300,7 @@ test('CENÁRIO 09: [Company] Tenant isolation estrito: requisição /company nun
   assert.notEqual(res.body.id, tenantB.company.id);
 });
 
-test('CENÁRIO 10: [Permissions] GET /permissions retorna catálogo canônico com 25 permissões', async () => {
+test('CENÁRIO 10: [Permissions] GET /permissions retorna catálogo com 23 permissões gerenciáveis pelo tenant', async () => {
   const tenant = await setupTestTenant('T10');
   const res = await callAdminRouter({
     method: 'GET',
@@ -312,10 +312,11 @@ test('CENÁRIO 10: [Permissions] GET /permissions retorna catálogo canônico co
 
   assert.equal(res.statusCode, 200);
   assert.equal(Array.isArray(res.body), true);
-  assert.equal(res.body.length, 25);
+  assert.equal(res.body.length, 23);
   assert.ok(res.body.some((p: any) => p.code === 'company.manage'));
   assert.ok(res.body.some((p: any) => p.code === 'users.manage'));
   assert.ok(res.body.some((p: any) => p.code === 'roles.manage'));
+  assert.ok(!res.body.some((p: any) => p.code.startsWith('devcontrol.')));
 });
 
 test('CENÁRIO 11: [Users] GET /users sem autenticação retorna 401 UNAUTHENTICATED', async () => {

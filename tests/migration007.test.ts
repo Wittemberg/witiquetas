@@ -200,8 +200,8 @@ test('SUÍTE DE MIGRATION 007 — IS_DCC_MASTER PLATFORM FLAG', async (suite) =>
     assert.equal(adminUser.isDccMaster, false, 'Seed comum NÃO deve promover admin default a Master DCC automaticamente');
   });
 
-  // Cenário 9: Session context consegue resolver flag
-  await suite.test('Cenário 9: Session context resolve dccEnabled e canAccessDcc corretamente', async () => {
+  // Cenário 9: Session context protege isolamento e não expõe canAccessDcc a tenants comerciais
+  await suite.test('Cenário 9: Session context não expõe canAccessDcc ou dccEnabled a tenants comerciais', async () => {
     const user = await UserRepository.findByEmail('admin@witiquetas.com.br');
     assert.ok(user);
 
@@ -212,7 +212,7 @@ test('SUÍTE DE MIGRATION 007 — IS_DCC_MASTER PLATFORM FLAG', async (suite) =>
 
     process.env.DCC_ENABLED = 'true';
 
-    // Com usuário normal (isDccMaster = false)
+    // Sessão tenant normal
     const res = await callRouter(sessionRouter, {
       method: 'GET',
       url: '/context',
@@ -222,10 +222,10 @@ test('SUÍTE DE MIGRATION 007 — IS_DCC_MASTER PLATFORM FLAG', async (suite) =>
     });
 
     assert.equal(res.statusCode, 200);
-    assert.equal(res.body.dccEnabled, true);
-    assert.equal(res.body.canAccessDcc, false, 'canAccessDcc deve ser false para usuário sem isDccMaster');
+    assert.equal(res.body.dccEnabled, undefined, 'dccEnabled não deve ser exposto no contexto de tenant');
+    assert.equal(res.body.canAccessDcc, undefined, 'canAccessDcc não deve ser exposto no contexto de tenant');
 
-    // Promovendo explicitamente via controle interno
+    // Promovendo explicitamente via controle interno / legado
     await UserRepository.setDccMaster(user.id, true);
 
     const resMaster = await callRouter(sessionRouter, {
@@ -237,15 +237,15 @@ test('SUÍTE DE MIGRATION 007 — IS_DCC_MASTER PLATFORM FLAG', async (suite) =>
     });
 
     assert.equal(resMaster.statusCode, 200);
-    assert.equal(resMaster.body.dccEnabled, true);
-    assert.equal(resMaster.body.canAccessDcc, true, 'canAccessDcc deve ser true quando isDccMaster=true e DCC_ENABLED=true');
+    assert.equal(resMaster.body.dccEnabled, undefined, 'dccEnabled permanece isolado do tenant');
+    assert.equal(resMaster.body.canAccessDcc, undefined, 'canAccessDcc permanece isolado do tenant');
 
     // Restaurar estado
     await UserRepository.setDccMaster(user.id, false);
   });
 
-  // Cenário 10: Admin API proíbe alteração e vazamento de is_dcc_master
-  await suite.test('Cenário 10: Admin API rejeita alteração de is_dcc_master e não expõe o campo', async () => {
+  // Cenário 10: Admin API proíbe alteração e vazamento de is_dcc_master (ignora mass-assignment de forma segura)
+  await suite.test('Cenário 10: Admin API ignora mass assignment de is_dcc_master e não expõe o campo', async () => {
     const user = await UserRepository.findByEmail('admin@witiquetas.com.br');
     assert.ok(user);
 
@@ -254,7 +254,7 @@ test('SUÍTE DE MIGRATION 007 — IS_DCC_MASTER PLATFORM FLAG', async (suite) =>
       companyId: user.companyId,
     });
 
-    // Tentativa em POST /users
+    // Tentativa em POST /users: aceita a criação do usuário, mas ignora silenciosamente is_dcc_master
     const postRes = await callRouter(adminRouter, {
       method: 'POST',
       url: '/users',
@@ -269,8 +269,8 @@ test('SUÍTE DE MIGRATION 007 — IS_DCC_MASTER PLATFORM FLAG', async (suite) =>
         is_dcc_master: true,
       },
     });
-    assert.equal(postRes.statusCode, 400);
-    assert.equal(postRes.body.code, 'FORBIDDEN_PLATFORM_ATTRIBUTE');
+    assert.equal(postRes.statusCode, 201);
+    assert.equal(postRes.body.isDccMaster, undefined, 'DTO de resposta nunca expõe isDccMaster');
 
     // Tentativa em PUT /users/:id
     const putRes = await callRouter(adminRouter, {
@@ -284,8 +284,8 @@ test('SUÍTE DE MIGRATION 007 — IS_DCC_MASTER PLATFORM FLAG', async (suite) =>
         isDccMaster: true,
       },
     });
-    assert.equal(putRes.statusCode, 400);
-    assert.equal(putRes.body.code, 'FORBIDDEN_PLATFORM_ATTRIBUTE');
+    assert.equal(putRes.statusCode, 200);
+    assert.equal(putRes.body.isDccMaster, undefined, 'DTO de resposta nunca expõe isDccMaster');
 
     // Sanitização de saída
     const listRes = await callRouter(adminRouter, {

@@ -4630,24 +4630,36 @@ body {
 }
 
 .admin-perm-checkbox-col {
-  display: grid;
-  place-items: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
   width: 24px;
   height: 24px;
+  min-width: 24px;
   line-height: 1;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
 }
 
 .admin-perm-checkbox-col input[type="checkbox"],
 .admin-perm-item input[type="checkbox"] {
   width: 18px;
   height: 18px;
+  min-width: 18px;
+  min-height: 18px;
   accent-color: #10b981;
   cursor: pointer;
   margin: 0;
   padding: 0;
+  border: none;
+  border-radius: 4px;
+  transform: none;
+  position: static;
   vertical-align: middle;
   display: block;
+  box-sizing: border-box;
 }
 
 .admin-perm-row.locked input[type="checkbox"],

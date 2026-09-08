@@ -28,11 +28,22 @@ import crypto from 'node:crypto';
  */
 
 export const DCC_SESSION_COOKIE_NAME = 'witiquetas_dcc_session';
-export const DCC_SESSION_TTL_MS = 2 * 60 * 60 * 1000; // 2 horas de validade
+export const DCC_SESSION_TTL_MS = 45 * 60 * 1000; // 45 minutos de validade (conforme Seção 15 do Hotfix 5.3.5)
 
 export const DEVELOPER_IDENTITY = {
   username: 'Marcel',
 };
+
+/**
+ * Normaliza e verifica se um identificador informado corresponde estritamente
+ * à identidade de desenvolvedor da plataforma (case-insensitive, sem substring).
+ */
+export function isDeveloperIdentity(identifier?: string | null): boolean {
+  if (!identifier || typeof identifier !== 'string') return false;
+  const normalized = identifier.trim().toLowerCase();
+  const configured = (process.env.DCC_DEVELOPER_USERNAME || DEVELOPER_IDENTITY.username).trim().toLowerCase();
+  return normalized === configured;
+}
 
 export interface DeveloperSessionData {
   username: string;

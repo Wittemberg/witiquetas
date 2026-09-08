@@ -1,6 +1,30 @@
 {
   "checkpoints": [
     {
+      "sha": "5.3.5-candidate",
+      "shortSha": "5.3.5",
+      "date": "2026-09-08T19:45:00Z",
+      "phase": "5",
+      "patch": "5.3.5-candidate",
+      "title": "fix(hotfix-5.3.5): login unificado, ciclo de sessao dcc e ajuste final do checkbox",
+      "type": "HOTFIX",
+      "capabilities": [
+        "cap-admin-shell",
+        "cap-admin-roles",
+        "cap-role-management",
+        "cap-permission-matrix-single-col",
+        "cap-unified-login",
+        "cap-developer-auth",
+        "cap-dcc-isolation",
+        "cap-dcc-session-lifecycle"
+      ],
+      "testsPassed": true,
+      "deployed": false,
+      "manualValidation": false,
+      "homologated": false,
+      "evidence": "Hotfix 5.3.5 com login unificado server-authoritative (POST /api/auth/resolve-mode), desafio TOTP para Marcel na tela principal sem URL especial, ciclo de sessao DCC com TTL de 45m, logout com revocacao server-side e cookie Max-Age=0, headers Cache-Control no-store, alinhamento flexbox perfeito do checkbox e isolamento anti-double-toggle"
+    },
+    {
       "sha": "5.3.4-candidate",
       "shortSha": "5.3.4",
       "date": "2026-09-08T16:20:00Z",

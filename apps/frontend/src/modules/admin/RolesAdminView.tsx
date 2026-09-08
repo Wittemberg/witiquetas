@@ -706,6 +706,9 @@ export const RolesAdminView: React.FC<RolesAdminViewProps> = ({
                                     type="checkbox"
                                     checked={isChecked}
                                     disabled={isDisabled}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                    }}
                                     onChange={(e) => {
                                       e.stopPropagation();
                                       togglePermission(perm.code);

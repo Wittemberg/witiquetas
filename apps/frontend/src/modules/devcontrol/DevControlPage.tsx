@@ -75,6 +75,7 @@ export const DevControlPage: React.FC<DevControlPageProps> = ({ onGoHome }) => {
     setNeedsAuth(true);
     setData(null);
     setDeveloperUsername(null);
+    onGoHome();
   };
 
   useEffect(() => {

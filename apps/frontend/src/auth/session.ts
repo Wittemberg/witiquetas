@@ -107,6 +107,37 @@ export async function fetchSessionContext(): Promise<SessionContext | null> {
 }
 
 /**
+ * Resolve o modo de autenticação de forma server-authoritative (Hotfix 5.3.5)
+ * POST /api/auth/resolve-mode
+ */
+export async function resolveLoginMode(
+  identifier: string
+): Promise<{ authMode: 'DEVELOPER_TOTP' | 'TENANT_PASSWORD'; identifier?: string }> {
+  try {
+    const res = await fetch('/api/auth/resolve-mode', {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ identifier: identifier.trim() }),
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      return {
+        authMode: data.authMode === 'DEVELOPER_TOTP' ? 'DEVELOPER_TOTP' : 'TENANT_PASSWORD',
+        identifier: data.identifier,
+      };
+    }
+  } catch (err) {
+    console.warn('[Session] Falha ao resolver modo de autenticação:', err);
+  }
+
+  return { authMode: 'TENANT_PASSWORD' };
+}
+
+/**
  * Realiza login canônico no backend
  */
 export async function loginUser(

@@ -21,8 +21,13 @@ export const isDccEnabled = (): boolean => {
   );
 };
 
-// Middleware de proteção de ambiente (Seção 10 do Pacote 5.3.1 / Hotfix 5.3.2)
+// Middleware de proteção de ambiente e prevenção de cache (Seção 6 e 9 do Hotfix 5.3.5)
 const devControlGuard = (_req: Request, res: Response, next: NextFunction) => {
+  // Impede armazenamento em cache de respostas de governança/autenticação interna
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+
   if (!isDccEnabled()) {
     res.status(404).json({
       error: 'Módulo indisponível.',
@@ -138,8 +143,14 @@ router.post('/auth/logout', (req: Request, res: Response) => {
       developerAuthService.revokeSession(token);
     }
 
+    const isProduction = process.env.NODE_ENV === 'production';
     res.clearCookie(DCC_SESSION_COOKIE_NAME, {
       path: '/',
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: 'lax',
+      maxAge: 0,
+      expires: new Date(0),
     });
 
     res.json({ success: true, message: 'Sessão de desenvolvedor encerrada.' });

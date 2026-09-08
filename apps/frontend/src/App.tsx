@@ -651,6 +651,10 @@ export default function App() {
             window.location.hash = '#home';
             await fetchData();
           }}
+          onDeveloperLoginSuccess={() => {
+            setCurrentModule('developer');
+            window.location.hash = '#developer';
+          }}
         />
       </div>
     );

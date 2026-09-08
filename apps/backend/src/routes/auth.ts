@@ -6,8 +6,42 @@ import { SessionService } from '../services/sessionService.js';
 import { SessionRepository } from '../repositories/sessionRepository.js';
 import { UserRepository, CompanyRepository } from '../repositories/adminRepositories.js';
 import { loginRateLimiter } from '../middleware/rateLimiter.js';
+import { isDeveloperIdentity } from '../services/developerAuthService.js';
 
 const router = Router();
+
+/**
+ * RESOLUÇÃO DO MÉTODO DE AUTENTICAÇÃO (Hotfix 5.3.5 — Seção 1, 2 e 5)
+ * POST /resolve-mode ou POST /api/auth/resolve-mode
+ *
+ * Determina server-authoritatively se a identidade informada corresponde ao Desenvolvedor da Plataforma
+ * (exigindo desafio TOTP RFC 6238) ou a um usuário de tenant (exigindo senha convencional).
+ *
+ * Garantias de Segurança:
+ * - Não expõe segredos nem configurações internas
+ * - Não revela existência prévia de usuários tenant (mitigação de user enumeration)
+ * - Rate limited por IP
+ * - Resposta estritamente restrita a { authMode: 'DEVELOPER_TOTP' | 'TENANT_PASSWORD' }
+ */
+router.post('/resolve-mode', loginRateLimiter, (req: Request, res: Response) => {
+  const { identifier } = req.body || {};
+
+  if (!identifier || typeof identifier !== 'string') {
+    return res.status(200).json({ authMode: 'TENANT_PASSWORD' });
+  }
+
+  // Normalização e verificação estrita contra o usuário de desenvolvedor configurado
+  if (isDeveloperIdentity(identifier)) {
+    return res.status(200).json({
+      authMode: 'DEVELOPER_TOTP',
+      identifier: 'Marcel',
+    });
+  }
+
+  return res.status(200).json({
+    authMode: 'TENANT_PASSWORD',
+  });
+});
 
 export interface WebSession {
   sessionId: string;

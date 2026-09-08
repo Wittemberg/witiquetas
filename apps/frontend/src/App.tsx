@@ -28,6 +28,7 @@ import { ModelsPage } from './modules/models/ModelsPage.js';
 import PrintCenterPage from './modules/printcenter/PrintCenterPage.js';
 import { PlaceholderModulePage } from './modules/common/PlaceholderModulePage.js';
 import { DevControlPage } from './modules/devcontrol/DevControlPage.js';
+import { AdminPage } from './modules/admin/AdminPage.js';
 import { templatesApi } from './services/templatesApi.js';
 import { useEditorStore } from './editor/useEditorStore.js';
 
@@ -290,10 +291,9 @@ export default function App() {
 
       case 'admin':
         return (
-          <PlaceholderModulePage
-            title="Administração"
-            icon={Settings}
-            description="Gerencie configurações e recursos da sua organização."
+          <AdminPage
+            sessionContext={sessionContext}
+            onUpdateSessionContext={setSessionContext}
             onGoHome={() => setCurrentModule('home')}
           />
         );

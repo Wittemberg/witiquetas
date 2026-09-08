@@ -411,6 +411,48 @@ export const UserRepository = {
     memUsers.set(id, existing);
     return existing;
   },
+
+  async countActiveAdmins(companyId: string): Promise<number> {
+    if (pgPool) {
+      const res = await pgPool.query(
+        `SELECT COUNT(DISTINCT u.id)::int AS count
+         FROM users u
+         JOIN user_roles ur ON ur.user_id = u.id AND ur.company_id = u.company_id
+         JOIN roles r ON r.id = ur.role_id AND r.company_id = ur.company_id
+         WHERE u.company_id = $1 AND u.status = 'ACTIVE' AND r.code = 'ADMIN'`,
+        [companyId]
+      );
+      return res.rows[0]?.count || 0;
+    }
+
+    let count = 0;
+    for (const u of memUsers.values()) {
+      if (u.companyId === companyId && u.status === 'ACTIVE') {
+        const roles = await RoleRepository.getUserRoles(companyId, u.id);
+        if (roles.some((r) => r.code === 'ADMIN')) {
+          count++;
+        }
+      }
+    }
+    return count;
+  },
+
+  async delete(companyId: string, id: string): Promise<boolean> {
+    if (pgPool) {
+      const res = await pgPool.query('DELETE FROM users WHERE id = $1 AND company_id = $2', [id, companyId]);
+      return (res.rowCount || 0) > 0;
+    }
+    const existing = memUsers.get(id);
+    if (!existing || existing.companyId !== companyId) return false;
+    memUsers.delete(id);
+    memUserPasswords.delete(id);
+    for (const key of Array.from(memUserRoles)) {
+      if (key.startsWith(`${companyId}:${id}:`)) {
+        memUserRoles.delete(key);
+      }
+    }
+    return true;
+  },
 };
 
 // ==========================================
@@ -481,6 +523,22 @@ export const RoleRepository = {
       return res.rows;
     }
     return Array.from(memRoles.values()).filter((r) => r.companyId === companyId);
+  },
+
+  async findByCode(companyId: string, code: string): Promise<RoleDTO | null> {
+    const codeNorm = code.toUpperCase().trim();
+    if (pgPool) {
+      const res = await pgPool.query(
+        `SELECT id, company_id AS "companyId", code, name, description, is_system AS "isSystem", created_at AS "createdAt", updated_at AS "updatedAt"
+         FROM roles WHERE company_id = $1 AND code = $2`,
+        [companyId, codeNorm]
+      );
+      return res.rows[0] || null;
+    }
+    for (const r of memRoles.values()) {
+      if (r.companyId === companyId && r.code === codeNorm) return r;
+    }
+    return null;
   },
 
   async assignPermission(roleId: string, permissionCode: string): Promise<void> {
@@ -629,6 +687,112 @@ export const RoleRepository = {
       }
     }
     return map;
+  },
+
+  async countUsersWithRole(companyId: string, roleId: string): Promise<number> {
+    if (pgPool) {
+      const res = await pgPool.query(
+        `SELECT COUNT(*)::int AS count
+         FROM user_roles
+         WHERE company_id = $1 AND role_id = $2`,
+        [companyId, roleId]
+      );
+      return res.rows[0]?.count || 0;
+    }
+
+    let count = 0;
+    const prefix = `${companyId}:`;
+    const suffix = `:${roleId}`;
+    for (const key of memUserRoles) {
+      if (key.startsWith(prefix) && key.endsWith(suffix)) {
+        count++;
+      }
+    }
+    return count;
+  },
+
+  async update(companyId: string, roleId: string, data: { name?: string; description?: string }): Promise<RoleDTO | null> {
+    const existing = await this.findById(roleId);
+    if (!existing || existing.companyId !== companyId) return null;
+    const now = new Date().toISOString();
+
+    if (pgPool) {
+      const res = await pgPool.query(
+        `UPDATE roles
+         SET name = COALESCE($1, name),
+             description = COALESCE($2, description),
+             updated_at = $3
+         WHERE id = $4 AND company_id = $5
+         RETURNING id, company_id AS "companyId", code, name, description, is_system AS "isSystem", created_at AS "createdAt", updated_at AS "updatedAt"`,
+        [data.name ?? null, data.description ?? null, now, roleId, companyId]
+      );
+      return res.rows[0] || null;
+    }
+
+    const updated: RoleDTO = {
+      ...existing,
+      name: data.name ?? existing.name,
+      description: data.description !== undefined ? data.description : existing.description,
+      updatedAt: now,
+    };
+    memRoles.set(roleId, updated);
+    return updated;
+  },
+
+  async delete(companyId: string, roleId: string): Promise<boolean> {
+    const existing = await this.findById(roleId);
+    if (!existing || existing.companyId !== companyId) return false;
+    if (existing.isSystem) {
+      throw new Error(`cannot_delete_system_role: role '${roleId}' is a system role`);
+    }
+
+    if (pgPool) {
+      const res = await pgPool.query(
+        'DELETE FROM roles WHERE id = $1 AND company_id = $2 AND is_system = false',
+        [roleId, companyId]
+      );
+      return (res.rowCount || 0) > 0;
+    }
+
+    memRoles.delete(roleId);
+    for (const perm of CANONICAL_PERMISSIONS) {
+      memRolePermissions.delete(`${roleId}:${perm.code}`);
+    }
+    for (const key of Array.from(memUserRoles)) {
+      if (key.startsWith(`${companyId}:`) && key.endsWith(`:${roleId}`)) {
+        memUserRoles.delete(key);
+      }
+    }
+    return true;
+  },
+
+  async setRolePermissions(roleId: string, permissions: string[]): Promise<void> {
+    const role = await this.findById(roleId);
+    if (!role) throw new Error(`role_not_found: role '${roleId}' not found`);
+
+    for (const perm of permissions) {
+      if (!CANONICAL_PERMISSIONS.some((p) => p.code === perm)) {
+        throw new Error(`invalid_permission: '${perm}' does not exist in canonical catalog`);
+      }
+    }
+
+    if (pgPool) {
+      await pgPool.query('DELETE FROM role_permissions WHERE role_id = $1', [roleId]);
+      for (const perm of permissions) {
+        await pgPool.query(
+          'INSERT INTO role_permissions (role_id, permission_code) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+          [roleId, perm]
+        );
+      }
+      return;
+    }
+
+    for (const perm of CANONICAL_PERMISSIONS) {
+      memRolePermissions.delete(`${roleId}:${perm.code}`);
+    }
+    for (const perm of permissions) {
+      memRolePermissions.add(`${roleId}:${perm}`);
+    }
   },
 };
 

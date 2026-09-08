@@ -53,6 +53,13 @@ export function hasPermission(permissionCode: string): boolean {
   return permissions.includes('*') || permissions.includes(permissionCode);
 }
 
+export function hasAnyPermission(permissionCodes: string[]): boolean {
+  if (!activeSessionContext) return false;
+  const { permissions } = activeSessionContext;
+  if (permissions.includes('*')) return true;
+  return permissionCodes.some((code) => permissions.includes(code));
+}
+
 /**
  * Consulta o contexto de sessão efetivo no backend via GET /api/session/context
  */

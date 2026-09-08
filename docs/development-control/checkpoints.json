@@ -1,6 +1,30 @@
 {
   "checkpoints": [
     {
+      "sha": "dec7bdb19aea2d9db4180be26b059150794f2684",
+      "shortSha": "dec7bdb",
+      "date": "2026-09-08T08:50:00Z",
+      "phase": "5",
+      "patch": "5.3.0-candidate",
+      "title": "feat(admin): administracao de empresa, usuarios, papeis e permissoes (PACOTE 5.3)",
+      "type": "FEATURE",
+      "capabilities": [
+        "cap-admin-shell",
+        "cap-admin-company",
+        "cap-admin-users",
+        "cap-admin-roles",
+        "cap-user-management",
+        "cap-user-status",
+        "cap-role-management",
+        "cap-user-company-assignment"
+      ],
+      "testsPassed": true,
+      "deployed": false,
+      "manualValidation": false,
+      "homologated": false,
+      "evidence": "CRUD e governança multi-tenant para /api/admin (Company, Users, Roles, Permissions), interface visual com abas, matriz de 25 permissões e proteção contra auto-bloqueio"
+    },
+    {
       "sha": "1cb8ced81386f8cc7a97423f76c26930b876cdc0",
       "shortSha": "1cb8ced",
       "date": "2026-09-05T18:00:00Z",
@@ -16,10 +40,10 @@
         "cap-authz-enforcement"
       ],
       "testsPassed": true,
-      "deployed": false,
-      "manualValidation": false,
-      "homologated": false,
-      "evidence": "Suíte completa de autenticação bcrypt, sessões com token_hash SHA-256, CSRF tokens, rate limit auditado e /api/session/context"
+      "deployed": true,
+      "manualValidation": true,
+      "homologated": true,
+      "evidence": "Suíte completa de autenticação bcrypt, sessões com token_hash SHA-256, CSRF tokens, rate limit auditado, /api/session/context e homologação manual completa em produção."
     },
     {
       "sha": "8bf4a733e78eeea75115b7788ac6a598714c1292",

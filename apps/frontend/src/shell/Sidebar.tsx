@@ -13,6 +13,7 @@ import {
   Gauge,
 } from 'lucide-react';
 import { isDevControlCenterEnabled } from '../services/devControlApi.js';
+import { hasAnyPermission } from '../auth/session.js';
 
 export interface NavItem {
   id: string;
@@ -76,13 +77,26 @@ export const BASE_NAV_ITEMS: NavItem[] = [
     id: 'admin',
     label: 'Administração',
     icon: Settings,
-    description: 'Administração — Em desenvolvimento',
+    description: 'Gestão de Empresa, Usuários e Perfis de Acesso',
     path: '/admin',
   },
 ];
 
 export const getNavItems = (): NavItem[] => {
-  const items = [...BASE_NAV_ITEMS];
+  const items = BASE_NAV_ITEMS.filter((item) => {
+    if (item.id === 'admin') {
+      return hasAnyPermission([
+        'company.view',
+        'company.manage',
+        'users.view',
+        'users.manage',
+        'roles.view',
+        'roles.manage',
+      ]);
+    }
+    return true;
+  });
+
   if (isDevControlCenterEnabled()) {
     items.push({
       id: 'development',

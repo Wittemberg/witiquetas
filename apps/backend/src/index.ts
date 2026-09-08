@@ -184,7 +184,7 @@ const handleVersion = (_req: Request, res: Response) => {
     shortSha: shortCommit,
     governanceSha,
     status: 'IMPLEMENTED_AWAITING_HOMOLOGATION',
-    package: 'PACOTE 5.2 — Autenticação, Sessão e Effective Session Context',
+    package: 'PACOTE 5.3 — Administração: Empresa, Usuários e Perfis',
     phase: 'Fase 5 — Administração e Governança da Aplicação',
     environment: process.env.NODE_ENV || 'development',
     timezone: process.env.TZ || 'America/Sao_Paulo',
@@ -201,6 +201,7 @@ import qrcodesRouter from './routes/qrcodes';
 import authRouter from './routes/auth';
 import sessionRouter from './routes/session';
 import developmentControlRouter from './routes/developmentControl.js';
+import adminRouter from './routes/admin.js';
 
 // Suporta tanto rotas diretas quanto rotas com prefixo /api (conforme Traefik/Nginx)
 app.use('/auth', authRouter);
@@ -208,6 +209,9 @@ app.use('/api/auth', authRouter);
 
 app.use('/session', sessionRouter);
 app.use('/api/session', sessionRouter);
+
+app.use('/admin', adminRouter);
+app.use('/api/admin', adminRouter);
 
 app.use('/development-control', developmentControlRouter);
 app.use('/api/development-control', developmentControlRouter);

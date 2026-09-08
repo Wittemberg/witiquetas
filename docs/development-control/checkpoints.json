@@ -1,6 +1,25 @@
 {
   "checkpoints": [
     {
+      "sha": "69d53bd8470b6f23ffc05883bee69f4033013156",
+      "shortSha": "69d53bd",
+      "date": "2026-09-08T10:44:00Z",
+      "phase": "5",
+      "patch": "5.3.1-candidate",
+      "title": "fix(hotfix-5.3.1): homologacao visual, dashboard default, matriz permissoes e isolamento dcc",
+      "type": "HOTFIX",
+      "capabilities": [
+        "cap-admin-shell",
+        "cap-admin-roles",
+        "cap-role-management"
+      ],
+      "testsPassed": true,
+      "deployed": false,
+      "manualValidation": false,
+      "homologated": false,
+      "evidence": "Hotfix 5.3.1 corrigindo matriz de permissões responsiva, tela amigável de acesso negado, isolamento rigoroso de plataforma para is_dcc_master e migration 007 para PostgreSQL"
+    },
+    {
       "sha": "68098383c96a623d5d5655fe9e0d9092ec9b61c6",
       "shortSha": "6809838",
       "date": "2026-09-08T08:50:00Z",

@@ -1,14 +1,14 @@
 {
   "name": "witiquetas-frontend",
   "version": "5.3.1-candidate",
-  "commit": "68098383c96a623d5d5655fe9e0d9092ec9b61c6",
-  "candidateSha": "68098383c96a623d5d5655fe9e0d9092ec9b61c6",
-  "runningSha": "68098383c96a623d5d5655fe9e0d9092ec9b61c6",
-  "shortCommit": "6809838",
-  "shortSha": "6809838",
-  "governanceSha": "68098383c96a623d5d5655fe9e0d9092ec9b61c6",
+  "commit": "69d53bd8470b6f23ffc05883bee69f4033013156",
+  "candidateSha": "69d53bd8470b6f23ffc05883bee69f4033013156",
+  "runningSha": "69d53bd8470b6f23ffc05883bee69f4033013156",
+  "shortCommit": "69d53bd",
+  "shortSha": "69d53bd",
+  "governanceSha": "69d53bd8470b6f23ffc05883bee69f4033013156",
   "status": "IMPLEMENTED_AWAITING_HOMOLOGATION",
   "package": "PACOTE 5.3.1 — Hotfix de Homologação do Pacote 5.3",
   "phase": "Fase 5 — Administração e Governança da Aplicação",
-  "timestamp": "2026-09-08T08:50:00Z"
+  "timestamp": "2026-09-08T10:44:00Z"
 }

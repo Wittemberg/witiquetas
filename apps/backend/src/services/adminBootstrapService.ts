@@ -167,9 +167,8 @@ export async function bootstrapAdminData(): Promise<void> {
           `[AdminBootstrap] Usuário com email informado já existe associado ao tenant '${existing.companyId}'. Reassociação automática cross-tenant bloqueada por política de segurança.`
         );
       } else {
-        await UserRepository.setDccMaster(existing.id, true);
         console.log(
-          '[AdminBootstrap] Usuário administrador inicial já existe no tenant padrão. Flag Master DCC confirmada.'
+          '[AdminBootstrap] Usuário administrador inicial já existe no tenant padrão.'
         );
       }
     } else {
@@ -180,10 +179,9 @@ export async function bootstrapAdminData(): Promise<void> {
         name: 'Administrador do Sistema',
         email: bootstrapEmail,
         status: 'ACTIVE',
-        isDccMaster: true,
+        isDccMaster: false,
       });
       await UserRepository.setPassword(newAdmin.id, passwordHash);
-      await UserRepository.setDccMaster(newAdmin.id, true);
 
       const adminRole = (await RoleRepository.listByCompany(defaultCompanyId)).find(
         (r) => r.code === 'ADMIN'
@@ -198,6 +196,18 @@ export async function bootstrapAdminData(): Promise<void> {
     }
   } else {
     console.log('[AdminBootstrap] Nenhuma credencial de bootstrap admin configurada nas variáveis de ambiente.');
+  }
+
+  // 6. Atribuição controlada de Master DCC exclusivamente via configuração explícita de plataforma
+  const platformMasterEmail = (process.env.PLATFORM_MASTER_DCC_EMAIL || process.env.MASTER_DCC_EMAIL)?.trim();
+  if (platformMasterEmail) {
+    const userToPromote = await UserRepository.findByEmail(platformMasterEmail);
+    if (userToPromote) {
+      await UserRepository.setDccMaster(userToPromote.id, true);
+      console.log(
+        `[AdminBootstrap] Usuário '${platformMasterEmail}' configurado como Master DCC via controle de plataforma.`
+      );
+    }
   }
 
   console.log('[AdminBootstrap] Bootstrap concluído com sucesso e 100% idempotente.');

@@ -178,13 +178,16 @@ function getMigrationsList(): Array<{ filename: string; sql: string }> {
           name VARCHAR(255) NOT NULL,
           email VARCHAR(255) UNIQUE NOT NULL,
           status VARCHAR(32) NOT NULL DEFAULT 'ACTIVE',
+          is_dcc_master BOOLEAN NOT NULL DEFAULT FALSE,
           created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
           updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
           CONSTRAINT uq_users_company_id UNIQUE (company_id, id)
         );
+        ALTER TABLE users ADD COLUMN IF NOT EXISTS is_dcc_master BOOLEAN NOT NULL DEFAULT FALSE;
         CREATE INDEX IF NOT EXISTS idx_users_company_id ON users (company_id);
         CREATE INDEX IF NOT EXISTS idx_users_email ON users (email);
         CREATE INDEX IF NOT EXISTS idx_users_status ON users (status);
+        CREATE INDEX IF NOT EXISTS idx_users_dcc_master ON users (is_dcc_master);
 
         CREATE TABLE IF NOT EXISTS roles (
           id VARCHAR(64) PRIMARY KEY,

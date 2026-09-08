@@ -21,7 +21,8 @@ import type {
 } from '@witiquetas/contracts';
 
 // ==========================================
-// CANONICAL PERMISSION CATALOG (24 PERMISSÕES OFICIAIS)
+// ==========================================
+// CANONICAL PERMISSION CATALOG (25 PERMISSÕES OFICIAIS)
 // ==========================================
 export const CANONICAL_PERMISSIONS: PermissionCatalogItemDTO[] = [
   { code: 'company.view', name: 'Visualizar Empresa', description: 'Visualizar dados e configurações da empresa', category: 'Empresa' },
@@ -242,9 +243,10 @@ export const CompanyRepository = {
 // 2. USER REPOSITORY
 // ==========================================
 export const UserRepository = {
-  async create(data: CreateUserDTO): Promise<UserDTO> {
+  async create(data: CreateUserDTO & { isDccMaster?: boolean }): Promise<UserDTO> {
     const id = data.id || `usr-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
     const status = data.status || 'ACTIVE';
+    const isDccMaster = Boolean(data.isDccMaster);
     const now = new Date().toISOString();
 
     // Validação da empresa existente
@@ -255,10 +257,10 @@ export const UserRepository = {
 
     if (pgPool) {
       const res = await pgPool.query(
-        `INSERT INTO users (id, company_id, name, email, status, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)
-         RETURNING id, company_id AS "companyId", name, email, status, created_at AS "createdAt", updated_at AS "updatedAt"`,
-        [id, data.companyId, data.name, data.email.toLowerCase().trim(), status, now, now]
+        `INSERT INTO users (id, company_id, name, email, status, is_dcc_master, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+         RETURNING id, company_id AS "companyId", name, email, status, is_dcc_master AS "isDccMaster", created_at AS "createdAt", updated_at AS "updatedAt"`,
+        [id, data.companyId, data.name, data.email.toLowerCase().trim(), status, isDccMaster, now, now]
       );
       return res.rows[0];
     }
@@ -276,6 +278,7 @@ export const UserRepository = {
       name: data.name,
       email: emailNorm,
       status,
+      isDccMaster,
       createdAt: now,
       updatedAt: now,
     };
@@ -286,7 +289,7 @@ export const UserRepository = {
   async findById(id: string): Promise<UserDTO | null> {
     if (pgPool) {
       const res = await pgPool.query(
-        `SELECT id, company_id AS "companyId", name, email, status, created_at AS "createdAt", updated_at AS "updatedAt"
+        `SELECT id, company_id AS "companyId", name, email, status, is_dcc_master AS "isDccMaster", created_at AS "createdAt", updated_at AS "updatedAt"
          FROM users WHERE id = $1`,
         [id]
       );
@@ -299,7 +302,7 @@ export const UserRepository = {
     const emailNorm = email.toLowerCase().trim();
     if (pgPool) {
       const res = await pgPool.query(
-        `SELECT id, company_id AS "companyId", name, email, status, created_at AS "createdAt", updated_at AS "updatedAt"
+        `SELECT id, company_id AS "companyId", name, email, status, is_dcc_master AS "isDccMaster", created_at AS "createdAt", updated_at AS "updatedAt"
          FROM users WHERE email = $1`,
         [emailNorm]
       );
@@ -327,11 +330,27 @@ export const UserRepository = {
     memUserPasswords.set(userId, passwordHash);
   },
 
+  async setDccMaster(userId: string, isMaster: boolean): Promise<void> {
+    const now = new Date().toISOString();
+    if (pgPool) {
+      await pgPool.query(
+        `UPDATE users SET is_dcc_master = $1, updated_at = $2 WHERE id = $3`,
+        [isMaster, now, userId]
+      );
+      return;
+    }
+    const user = memUsers.get(userId);
+    if (user) {
+      user.isDccMaster = isMaster;
+      user.updatedAt = now;
+    }
+  },
+
   async findByEmailWithPassword(email: string): Promise<(UserDTO & { passwordHash: string | null }) | null> {
     const emailNorm = email.toLowerCase().trim();
     if (pgPool) {
       const res = await pgPool.query(
-        `SELECT id, company_id AS "companyId", name, email, status, password_hash AS "passwordHash", created_at AS "createdAt", updated_at AS "updatedAt"
+        `SELECT id, company_id AS "companyId", name, email, status, is_dcc_master AS "isDccMaster", password_hash AS "passwordHash", created_at AS "createdAt", updated_at AS "updatedAt"
          FROM users WHERE email = $1`,
         [emailNorm]
       );
@@ -351,7 +370,7 @@ export const UserRepository = {
   async findByIdWithPassword(id: string): Promise<(UserDTO & { passwordHash: string | null }) | null> {
     if (pgPool) {
       const res = await pgPool.query(
-        `SELECT id, company_id AS "companyId", name, email, status, password_hash AS "passwordHash", created_at AS "createdAt", updated_at AS "updatedAt"
+        `SELECT id, company_id AS "companyId", name, email, status, is_dcc_master AS "isDccMaster", password_hash AS "passwordHash", created_at AS "createdAt", updated_at AS "updatedAt"
          FROM users WHERE id = $1`,
         [id]
       );
@@ -368,7 +387,7 @@ export const UserRepository = {
   async listByCompany(companyId: string): Promise<UserDTO[]> {
     if (pgPool) {
       const res = await pgPool.query(
-        `SELECT id, company_id AS "companyId", name, email, status, created_at AS "createdAt", updated_at AS "updatedAt"
+        `SELECT id, company_id AS "companyId", name, email, status, is_dcc_master AS "isDccMaster", created_at AS "createdAt", updated_at AS "updatedAt"
          FROM users WHERE company_id = $1 ORDER BY created_at ASC`,
         [companyId]
       );
@@ -390,7 +409,7 @@ export const UserRepository = {
              status = COALESCE($3, status),
              updated_at = $4
          WHERE id = $5
-         RETURNING id, company_id AS "companyId", name, email, status, created_at AS "createdAt", updated_at AS "updatedAt"`,
+         RETURNING id, company_id AS "companyId", name, email, status, is_dcc_master AS "isDccMaster", created_at AS "createdAt", updated_at AS "updatedAt"`,
         [data.name ?? null, data.email ? data.email.toLowerCase().trim() : null, data.status ?? null, now, id]
       );
       return res.rows[0] || null;

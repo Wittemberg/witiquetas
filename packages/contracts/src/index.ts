@@ -543,6 +543,7 @@ export interface UserDTO {
   name: string;
   email: string;
   status: UserStatus;
+  isDccMaster?: boolean;
   createdAt: string;
   updatedAt: string;
 }

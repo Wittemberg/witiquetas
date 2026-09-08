@@ -15,98 +15,19 @@ import {
 import { isDevControlCenterEnabled } from '../services/devControlApi.js';
 import { hasAnyPermission } from '../auth/session.js';
 
-export interface NavItem {
-  id: string;
-  label: string;
-  icon: React.ComponentType<any>;
-  description: string;
-  path: string;
-}
+import {
+  getEffectiveNavigation,
+  type NavItem,
+  BASE_NAV_ITEMS,
+} from './navigation.js';
+import type { SessionContext } from '../auth/session.js';
+import { getCachedSessionContext } from '../auth/session.js';
 
-export const BASE_NAV_ITEMS: NavItem[] = [
-  {
-    id: 'home',
-    label: 'Início',
-    icon: Home,
-    description: 'Painel principal e visões gerais',
-    path: '/',
-  },
-  {
-    id: 'models',
-    label: 'Meus Modelos',
-    icon: LayoutTemplate,
-    description: 'Gerenciador de modelos de etiquetas',
-    path: '/models',
-  },
-  {
-    id: 'new',
-    label: 'Nova Etiqueta',
-    icon: PlusSquare,
-    description: 'Criar novo modelo assistido pelo Wizard',
-    path: '/new',
-  },
-  {
-    id: 'print-center',
-    label: 'Central de Impressão',
-    icon: ListOrdered,
-    description: 'Central de Impressão — Em desenvolvimento',
-    path: '/print-center',
-  },
-  {
-    id: 'printers',
-    label: 'Impressoras',
-    icon: Printer,
-    description: 'Impressoras — Em desenvolvimento',
-    path: '/printers',
-  },
-  {
-    id: 'agents',
-    label: 'Agents de Impressão',
-    icon: Cpu,
-    description: 'Status e gerenciamento de agentes locais',
-    path: '/agents',
-  },
-  {
-    id: 'integrations',
-    label: 'Integrações',
-    icon: Plug,
-    description: 'Integrações — Em desenvolvimento',
-    path: '/integrations',
-  },
-  {
-    id: 'admin',
-    label: 'Administração',
-    icon: Settings,
-    description: 'Gestão de Empresa, Usuários e Perfis de Acesso',
-    path: '/admin',
-  },
-];
+export type { NavItem };
+export { BASE_NAV_ITEMS };
 
 export const getNavItems = (): NavItem[] => {
-  const items = BASE_NAV_ITEMS.filter((item) => {
-    if (item.id === 'admin') {
-      return hasAnyPermission([
-        'company.view',
-        'company.manage',
-        'users.view',
-        'users.manage',
-        'roles.view',
-        'roles.manage',
-      ]);
-    }
-    return true;
-  });
-
-  if (isDevControlCenterEnabled()) {
-    items.push({
-      id: 'development',
-      label: 'Desenvolvimento',
-      icon: Gauge,
-      description: 'Development Control Center',
-      path: '#development',
-    });
-  }
-  return items;
+  return getEffectiveNavigation(getCachedSessionContext());
 };
 
 export const NAV_ITEMS = getNavItems();
@@ -118,6 +39,7 @@ interface SidebarProps {
   onToggleCollapse: () => void;
   isMobileOpen?: boolean;
   onCloseMobile?: () => void;
+  sessionContext?: SessionContext | null;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -127,7 +49,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onToggleCollapse,
   isMobileOpen,
   onCloseMobile,
+  sessionContext,
 }) => {
+  const effectiveItems = getEffectiveNavigation(sessionContext ?? getCachedSessionContext());
   return (
     <>
       {/* Overlay para mobile drawer */}
@@ -183,7 +107,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
 
         <nav className="sidebar-nav">
-          {getNavItems().map((item) => {
+          {effectiveItems.map((item) => {
             const isActive = currentModule === item.id;
             const IconComponent = item.icon;
             return (

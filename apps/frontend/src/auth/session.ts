@@ -15,6 +15,7 @@ export interface SessionUser {
   name: string;
   email: string;
   status: string;
+  isDccMaster?: boolean;
 }
 
 export interface SessionCompany {
@@ -34,6 +35,8 @@ export interface SessionContext {
   enabledElementsByNiche?: Record<string, string[]>;
   enabledFieldsByNiche?: Record<string, string[]>;
   csrfToken: string;
+  dccEnabled?: boolean;
+  canAccessDcc?: boolean;
 }
 
 // Armazena o contexto em memória local da aba
@@ -58,6 +61,21 @@ export function hasAnyPermission(permissionCodes: string[]): boolean {
   const { permissions } = activeSessionContext;
   if (permissions.includes('*')) return true;
   return permissionCodes.some((code) => permissions.includes(code));
+}
+
+/**
+ * Regra efetiva de acesso ao DCC (Seção 10 do Pacote 5.3.1):
+ * effectiveDccAccess = DCC_ENABLED AND user.is_dcc_master AND devcontrol.view
+ */
+export function canAccessDevControl(): boolean {
+  if (!activeSessionContext) return false;
+  if (activeSessionContext.canAccessDcc !== undefined) {
+    return activeSessionContext.canAccessDcc;
+  }
+  const isMaster = Boolean(activeSessionContext.user?.isDccMaster);
+  const dccEnabled = activeSessionContext.dccEnabled ?? true;
+  const hasPerm = hasPermission('devcontrol.view');
+  return dccEnabled && isMaster && hasPerm;
 }
 
 /**

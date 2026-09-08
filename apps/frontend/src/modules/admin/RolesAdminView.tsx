@@ -34,6 +34,11 @@ const ESSENTIAL_ADMIN_PERMISSIONS = [
   'roles.manage',
 ];
 
+const PLATFORM_RESERVED_PERMISSIONS = [
+  'devcontrol.view',
+  'devcontrol.manage',
+];
+
 export const RolesAdminView: React.FC<RolesAdminViewProps> = ({
   currentUserRoles,
   onSelfAffected,
@@ -190,28 +195,40 @@ export const RolesAdminView: React.FC<RolesAdminViewProps> = ({
       return;
     }
 
+    // Permissões reservadas à plataforma são bloqueadas no contexto comum
+    if (PLATFORM_RESERVED_PERMISSIONS.includes(code)) {
+      return;
+    }
+
     setSelectedPermissions((prev) =>
       prev.includes(code) ? prev.filter((c) => c !== code) : [...prev, code]
     );
   };
 
-  // Batch: Marcar todas
+  // Batch: Marcar todas (exceto reservadas à plataforma a menos que já estejam ativas)
   const handleSelectAll = () => {
-    setSelectedPermissions(permissionsCatalog.map((p) => p.code));
+    setSelectedPermissions(
+      permissionsCatalog
+        .filter((p) => !PLATFORM_RESERVED_PERMISSIONS.includes(p.code) || selectedPermissions.includes(p.code))
+        .map((p) => p.code)
+    );
   };
 
-  // Batch: Desmarcar todas (mantendo essenciais se for ADMIN)
+  // Batch: Desmarcar todas (mantendo essenciais se for ADMIN e mantendo reservadas intactas)
   const handleDeselectAll = () => {
+    const retained = selectedPermissions.filter((p) => PLATFORM_RESERVED_PERMISSIONS.includes(p));
     if (permissionRole?.code === 'ADMIN') {
-      setSelectedPermissions([...ESSENTIAL_ADMIN_PERMISSIONS]);
+      setSelectedPermissions(Array.from(new Set([...ESSENTIAL_ADMIN_PERMISSIONS, ...retained])));
     } else {
-      setSelectedPermissions([]);
+      setSelectedPermissions(retained);
     }
   };
 
   // Batch por categoria
   const handleSelectCategory = (categoryItems: PermissionCatalogItem[]) => {
-    const codes = categoryItems.map((c) => c.code);
+    const codes = categoryItems
+      .filter((c) => !PLATFORM_RESERVED_PERMISSIONS.includes(c.code) || selectedPermissions.includes(c.code))
+      .map((c) => c.code);
     setSelectedPermissions((prev) => Array.from(new Set([...prev, ...codes])));
   };
 
@@ -220,6 +237,9 @@ export const RolesAdminView: React.FC<RolesAdminViewProps> = ({
     setSelectedPermissions((prev) =>
       prev.filter((c) => {
         if (permissionRole?.code === 'ADMIN' && ESSENTIAL_ADMIN_PERMISSIONS.includes(c)) {
+          return true;
+        }
+        if (PLATFORM_RESERVED_PERMISSIONS.includes(c)) {
           return true;
         }
         return !codes.has(c);
@@ -676,19 +696,21 @@ export const RolesAdminView: React.FC<RolesAdminViewProps> = ({
                           const isEssential =
                             permissionRole.code === 'ADMIN' &&
                             ESSENTIAL_ADMIN_PERMISSIONS.includes(perm.code);
+                          const isPlatformReserved = PLATFORM_RESERVED_PERMISSIONS.includes(perm.code);
                           const isChecked = selectedPermissions.includes(perm.code);
+                          const isDisabled = isEssential || isPlatformReserved;
 
                           return (
                             <label
                               key={perm.code}
                               className={`admin-perm-item ${isChecked ? 'selected' : ''} ${
                                 isEssential ? 'locked' : ''
-                              }`}
+                              } ${isPlatformReserved ? 'platform-reserved' : ''}`}
                             >
                               <input
                                 type="checkbox"
                                 checked={isChecked}
-                                disabled={isEssential}
+                                disabled={isDisabled}
                                 onChange={() => togglePermission(perm.code)}
                               />
                               <div className="admin-perm-item-content">
@@ -698,11 +720,20 @@ export const RolesAdminView: React.FC<RolesAdminViewProps> = ({
                                     <span className="admin-perm-lock-tag" title="Permissão essencial de segurança">
                                       <Lock size={10} /> Essencial
                                     </span>
+                                  ) : isPlatformReserved ? (
+                                    <span className="admin-perm-platform-tag" title="Reservado à Plataforma">
+                                      <Lock size={10} /> Reservado à Plataforma
+                                    </span>
                                   ) : (
                                     <span className="admin-perm-code">{perm.code}</span>
                                   )}
                                 </div>
                                 <p className="admin-perm-desc">{perm.description}</p>
+                                {isPlatformReserved && (
+                                  <p className="admin-perm-platform-hint">
+                                    Disponível somente para administração da plataforma.
+                                  </p>
+                                )}
                               </div>
                             </label>
                           );

@@ -4,15 +4,23 @@ import { DevelopmentControlService } from '../services/developmentControlService
 const router = Router();
 const service = new DevelopmentControlService();
 
-// Middleware de proteção de ambiente (Seção 3 e 35 das regras)
-const devControlGuard = (_req: Request, res: Response, next: NextFunction) => {
-  const isDev = process.env.NODE_ENV !== 'production';
-  const isExplicitlyEnabled = process.env.ENABLE_DEV_CONTROL_CENTER === 'true' || process.env.VITE_ENABLE_DEV_CONTROL_CENTER === 'true';
+export const isDccEnabled = (): boolean => {
+  if (process.env.DCC_ENABLED !== undefined) {
+    return process.env.DCC_ENABLED === 'true';
+  }
+  return (
+    process.env.ENABLE_DEV_CONTROL_CENTER === 'true' ||
+    process.env.VITE_ENABLE_DEV_CONTROL_CENTER === 'true' ||
+    process.env.NODE_ENV !== 'production'
+  );
+};
 
-  if (!isDev && !isExplicitlyEnabled) {
+// Middleware de proteção de ambiente (Seção 10 do Pacote 5.3.1)
+const devControlGuard = (_req: Request, res: Response, next: NextFunction) => {
+  if (!isDccEnabled()) {
     res.status(404).json({
       error: 'Módulo indisponível.',
-      message: 'O Development Control Center está restrito aos ambientes de desenvolvimento e homologação.',
+      code: 'DCC_DISABLED',
     });
     return;
   }
@@ -21,8 +29,22 @@ const devControlGuard = (_req: Request, res: Response, next: NextFunction) => {
 
 import { requireAuthenticatedUser, requirePermission } from '../middleware/authMiddleware.js';
 
+// Middleware de autorização de plataforma: Master DCC (P0.1)
+const requireMasterDcc = (req: Request, res: Response, next: NextFunction) => {
+  const principal = req.principal;
+  if (!principal || !principal.user.isDccMaster) {
+    res.status(403).json({
+      error: 'Acesso negado. Recurso restrito à plataforma.',
+      code: 'FORBIDDEN_NOT_DCC_MASTER',
+    });
+    return;
+  }
+  next();
+};
+
 router.use(devControlGuard);
 router.use(requireAuthenticatedUser);
+router.use(requireMasterDcc);
 router.use(requirePermission('devcontrol.view'));
 
 // GET /api/development-control/overview

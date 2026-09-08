@@ -167,8 +167,9 @@ export async function bootstrapAdminData(): Promise<void> {
           `[AdminBootstrap] Usuário com email informado já existe associado ao tenant '${existing.companyId}'. Reassociação automática cross-tenant bloqueada por política de segurança.`
         );
       } else {
+        await UserRepository.setDccMaster(existing.id, true);
         console.log(
-          '[AdminBootstrap] Usuário administrador inicial já existe no tenant padrão. Nenhuma credencial foi sobrescrita.'
+          '[AdminBootstrap] Usuário administrador inicial já existe no tenant padrão. Flag Master DCC confirmada.'
         );
       }
     } else {
@@ -179,8 +180,10 @@ export async function bootstrapAdminData(): Promise<void> {
         name: 'Administrador do Sistema',
         email: bootstrapEmail,
         status: 'ACTIVE',
+        isDccMaster: true,
       });
       await UserRepository.setPassword(newAdmin.id, passwordHash);
+      await UserRepository.setDccMaster(newAdmin.id, true);
 
       const adminRole = (await RoleRepository.listByCompany(defaultCompanyId)).find(
         (r) => r.code === 'ADMIN'

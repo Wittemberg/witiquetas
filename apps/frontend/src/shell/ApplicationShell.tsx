@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Sidebar, NAV_ITEMS } from './Sidebar.js';
+import { Sidebar } from './Sidebar.js';
+import { getEffectiveNavigation } from './navigation.js';
 import { GlobalHeader } from './GlobalHeader.js';
 import type { SessionContext } from '../auth/session.js';
 
@@ -47,7 +48,8 @@ export const ApplicationShell: React.FC<ApplicationShellProps> = ({
     }
   }, [currentModule]);
 
-  const activeItem = NAV_ITEMS.find((item) => item.id === currentModule);
+  const navItems = getEffectiveNavigation(sessionContext ?? null);
+  const activeItem = navItems.find((item) => item.id === currentModule);
   const moduleTitle = activeItem ? activeItem.label : currentModule === 'editor' ? 'Editor de Etiquetas' : 'Início';
 
   const isEditor = currentModule === 'editor';
@@ -73,6 +75,7 @@ export const ApplicationShell: React.FC<ApplicationShellProps> = ({
           onToggleCollapse={() => setCollapsed(!collapsed)}
           isMobileOpen={isMobileOpen}
           onCloseMobile={() => setIsMobileOpen(false)}
+          sessionContext={sessionContext}
         />
 
         <main className="app-main-content" id="main-content">

@@ -77,6 +77,14 @@ router.get('/permissions', async (_req: Request, res: Response) => {
 // 3. USUÁRIOS (Users)
 // ==========================================
 
+function sanitizeTenantUser(u: any, roles?: any[]) {
+  const { isDccMaster, ...rest } = u;
+  return {
+    ...rest,
+    ...(roles !== undefined ? { roles } : {}),
+  };
+}
+
 /**
  * GET /api/admin/users
  * Lista usuários da empresa com seus papéis
@@ -88,10 +96,7 @@ router.get('/users', requirePermission('users.view'), async (req: Request, res: 
   const usersWithRoles = await Promise.all(
     users.map(async (u) => {
       const roles = await RoleRepository.getUserRoles(companyId, u.id);
-      return {
-        ...u,
-        roles,
-      };
+      return sanitizeTenantUser(u, roles);
     })
   );
 
@@ -104,7 +109,15 @@ router.get('/users', requirePermission('users.view'), async (req: Request, res: 
  */
 router.post('/users', requirePermission('users.manage'), requireCsrf, async (req: Request, res: Response) => {
   const companyId = req.principal!.company.id;
-  const { name, email, password, status, roleIds } = req.body;
+  const { name, email, password, status, roleIds, isDccMaster, is_dcc_master } = req.body;
+
+  // P0.1: Rejeitar tentativa de elevação para Master DCC via API de tenant
+  if (isDccMaster !== undefined || is_dcc_master !== undefined) {
+    return res.status(400).json({
+      error: 'O atributo de plataforma is_dcc_master não pode ser manipulado por administradores de tenant.',
+      code: 'FORBIDDEN_PLATFORM_ATTRIBUTE',
+    });
+  }
 
   if (!name || typeof name !== 'string' || name.trim().length === 0) {
     return res.status(400).json({ error: 'O nome do usuário é obrigatório.', code: 'INVALID_NAME' });
@@ -162,10 +175,7 @@ router.post('/users', requirePermission('users.manage'), requireCsrf, async (req
 
   const roles = await RoleRepository.getUserRoles(companyId, user.id);
 
-  return res.status(201).json({
-    ...user,
-    roles,
-  });
+  return res.status(201).json(sanitizeTenantUser(user, roles));
 });
 
 /**
@@ -183,10 +193,7 @@ router.get('/users/:id', requirePermission('users.view'), async (req: Request, r
 
   const roles = await RoleRepository.getUserRoles(companyId, user.id);
 
-  return res.status(200).json({
-    ...user,
-    roles,
-  });
+  return res.status(200).json(sanitizeTenantUser(user, roles));
 });
 
 /**
@@ -196,7 +203,15 @@ router.get('/users/:id', requirePermission('users.view'), async (req: Request, r
 router.put('/users/:id', requirePermission('users.manage'), requireCsrf, async (req: Request, res: Response) => {
   const companyId = req.principal!.company.id;
   const targetId = req.params.id;
-  const { name, email, status, roleIds } = req.body;
+  const { name, email, status, roleIds, isDccMaster, is_dcc_master } = req.body;
+
+  // P0.1: Rejeitar tentativa de alteração de Master DCC via API de tenant
+  if (isDccMaster !== undefined || is_dcc_master !== undefined) {
+    return res.status(400).json({
+      error: 'O atributo de plataforma is_dcc_master não pode ser manipulado por administradores de tenant.',
+      code: 'FORBIDDEN_PLATFORM_ATTRIBUTE',
+    });
+  }
 
   const existing = await UserRepository.findById(targetId);
   if (!existing || existing.companyId !== companyId) {
@@ -300,10 +315,7 @@ router.put('/users/:id', requirePermission('users.manage'), requireCsrf, async (
 
   const updatedRoles = await RoleRepository.getUserRoles(companyId, targetId);
 
-  return res.status(200).json({
-    ...updatedUser,
-    roles: updatedRoles,
-  });
+  return res.status(200).json(sanitizeTenantUser(updatedUser, updatedRoles));
 });
 
 /**

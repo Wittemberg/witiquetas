@@ -14,6 +14,7 @@ export interface AuthenticatedPrincipal {
     name: string;
     email: string;
     status: string;
+    isDccMaster?: boolean;
   };
   company: {
     id: string;
@@ -145,6 +146,7 @@ export class SessionService {
         name: user.name,
         email: user.email,
         status: user.status,
+        isDccMaster: Boolean(user.isDccMaster),
       },
       company: {
         id: company.id,

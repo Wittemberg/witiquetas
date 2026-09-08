@@ -21,6 +21,7 @@ import type {
   ProjectHealthStatus,
 } from '@witiquetas/contracts';
 import { devControlApi } from '../../services/devControlApi.js';
+import { AccessDeniedView } from '../../shell/AccessDeniedView.js';
 
 interface DevControlPageProps {
   onGoHome: () => void;
@@ -63,14 +64,7 @@ export const DevControlPage: React.FC<DevControlPageProps> = ({ onGoHome }) => {
   if (error || !data) {
     return (
       <div className="dev-control-page">
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', gap: '1.25rem', textAlign: 'center' }}>
-          <AlertTriangle style={{ width: 48, height: 48, color: 'var(--status-warning)' }} />
-          <h2 style={{ fontSize: '1.25rem', fontWeight: 800 }}>Acesso Restrito ou Indisponível</h2>
-          <p style={{ maxWidth: 460, fontSize: '0.875rem', color: 'var(--text-muted)' }}>{error || 'Não foi possível carregar os dados.'}</p>
-          <button onClick={onGoHome} className="btn btn-primary">
-            <ArrowLeft style={{ width: 16, height: 16 }} /> Voltar ao Início
-          </button>
-        </div>
+        <AccessDeniedView onGoHome={onGoHome} />
       </div>
     );
   }

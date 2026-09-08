@@ -176,7 +176,7 @@ const handleVersion = (_req: Request, res: Response) => {
 
   res.json({
     name: 'witiquetas-backend',
-    version: '5.3.0-candidate',
+    version: '5.3.1-candidate',
     commit,
     candidateSha: commit,
     runningSha: commit,
@@ -184,7 +184,7 @@ const handleVersion = (_req: Request, res: Response) => {
     shortSha: shortCommit,
     governanceSha,
     status: 'IMPLEMENTED_AWAITING_HOMOLOGATION',
-    package: 'PACOTE 5.3 — Administração: Empresa, Usuários e Perfis',
+    package: 'PACOTE 5.3.1 — Hotfix de Homologação do Pacote 5.3',
     phase: 'Fase 5 — Administração e Governança da Aplicação',
     environment: process.env.NODE_ENV || 'development',
     timezone: process.env.TZ || 'America/Sao_Paulo',

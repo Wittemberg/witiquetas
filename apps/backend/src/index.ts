@@ -176,7 +176,7 @@ const handleVersion = (_req: Request, res: Response) => {
 
   res.json({
     name: 'witiquetas-backend',
-    version: '5.2.0-candidate',
+    version: '5.3.0-candidate',
     commit,
     candidateSha: commit,
     runningSha: commit,

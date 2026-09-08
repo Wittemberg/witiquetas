@@ -176,7 +176,7 @@ const handleVersion = (_req: Request, res: Response) => {
 
   res.json({
     name: 'witiquetas-backend',
-    version: '5.3.2-candidate',
+    version: '5.3.3-candidate',
     commit,
     candidateSha: commit,
     runningSha: commit,
@@ -184,7 +184,7 @@ const handleVersion = (_req: Request, res: Response) => {
     shortSha: shortCommit,
     governanceSha,
     status: 'IMPLEMENTED_AWAITING_HOMOLOGATION',
-    package: 'PACOTE 5.3.2 — Hotfix de Restauração de Dashboard, Matriz e Autenticação Developer DCC',
+    package: 'PACOTE 5.3.3 — Hotfix de Correção Definitiva da Matriz de Permissões',
     phase: 'Fase 5 — Administração e Governança da Aplicação',
     environment: process.env.NODE_ENV || 'development',
     timezone: process.env.TZ || 'America/Sao_Paulo',

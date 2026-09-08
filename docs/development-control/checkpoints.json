@@ -1,6 +1,26 @@
 {
   "checkpoints": [
     {
+      "sha": "5702a9e69cb5c9150e27c284745605eb929351f6",
+      "shortSha": "5702a9e",
+      "date": "2026-09-08T14:30:00Z",
+      "phase": "5",
+      "patch": "5.3.3-candidate",
+      "title": "fix(hotfix-5.3.3): correcao definitiva da matriz de permissoes em coluna unica",
+      "type": "HOTFIX",
+      "capabilities": [
+        "cap-admin-shell",
+        "cap-admin-roles",
+        "cap-role-management",
+        "cap-permission-matrix-single-col"
+      ],
+      "testsPassed": true,
+      "deployed": false,
+      "manualValidation": false,
+      "homologated": false,
+      "evidence": "Hotfix 5.3.3 corrigindo definitivamente a matriz de permissoes em coluna unica sem quebras visuais, cards empilhados com altura automatica, 23 permissoes comerciais e protecao anti-lockout"
+    },
+    {
       "sha": "d8bf345b3e63a459968d2525ec1d0211236bec62",
       "shortSha": "d8bf345",
       "date": "2026-09-08T12:00:00Z",

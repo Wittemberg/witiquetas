@@ -641,104 +641,113 @@ export const RolesAdminView: React.FC<RolesAdminViewProps> = ({
             </div>
 
             <form onSubmit={handlePermissionsSubmit} className="admin-perm-matrix-form">
-              <div className="admin-perm-categories-grid">
-                {groupedPermissions.map(([category, items]) => {
-                  const allCategorySelected = items.every((i) =>
-                    selectedPermissions.includes(i.code)
-                  );
-                  return (
-                    <div key={category} className="admin-perm-category-card">
-                      <div className="admin-perm-category-header">
-                        <span className="admin-perm-category-title">{category}</span>
-                        <div className="admin-perm-category-quick">
-                          {allCategorySelected ? (
-                            <button
-                              type="button"
-                              className="admin-perm-quick-btn"
-                              onClick={() => handleDeselectCategory(items)}
-                            >
-                              Desmarcar
-                            </button>
-                          ) : (
-                            <button
-                              type="button"
-                              className="admin-perm-quick-btn"
-                              onClick={() => handleSelectCategory(items)}
-                            >
-                              Marcar todas
-                            </button>
-                          )}
+              <div className="admin-perm-matrix-body">
+                <div className="admin-perm-categories-list">
+                  {groupedPermissions.map(([category, items]) => {
+                    const allCategorySelected = items.every((i) =>
+                      selectedPermissions.includes(i.code)
+                    );
+                    return (
+                      <div key={category} className="admin-perm-category-card admin-perm-category-block">
+                        <div className="admin-perm-category-header">
+                          <span className="admin-perm-category-title">{category}</span>
+                          <div className="admin-perm-category-quick">
+                            {allCategorySelected ? (
+                              <button
+                                type="button"
+                                className="admin-perm-quick-btn"
+                                onClick={() => handleDeselectCategory(items)}
+                              >
+                                Desmarcar
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                className="admin-perm-quick-btn"
+                                onClick={() => handleSelectCategory(items)}
+                              >
+                                Marcar todas
+                              </button>
+                            )}
+                          </div>
                         </div>
-                      </div>
 
-                      <div className="admin-perm-items-list">
-                        {items.map((perm) => {
-                          const isEssential =
-                            permissionRole.code === 'ADMIN' &&
-                            ESSENTIAL_ADMIN_PERMISSIONS.includes(perm.code);
-                          const isChecked = selectedPermissions.includes(perm.code);
-                          const isDisabled = isEssential;
+                        <div className="admin-perm-items-list">
+                          {items.map((perm) => {
+                            const isEssential =
+                              permissionRole.code === 'ADMIN' &&
+                              ESSENTIAL_ADMIN_PERMISSIONS.includes(perm.code);
+                            const isChecked = selectedPermissions.includes(perm.code);
+                            const isDisabled = isEssential;
 
-                          return (
-                            <div
-                              key={perm.code}
-                              role="button"
-                              tabIndex={isDisabled ? -1 : 0}
-                              aria-pressed={isChecked}
-                              aria-disabled={isDisabled}
-                              onClick={() => {
-                                if (!isDisabled) togglePermission(perm.code);
-                              }}
-                              onKeyDown={(e) => {
-                                if (isDisabled) return;
-                                if (e.key === ' ' || e.key === 'Enter') {
-                                  e.preventDefault();
-                                  togglePermission(perm.code);
-                                }
-                              }}
-                              className={`admin-perm-item ${isChecked ? 'selected' : 'unselected'} ${
-                                isEssential ? 'locked' : ''
-                              }`}
-                            >
-                              <input
-                                type="checkbox"
-                                checked={isChecked}
-                                disabled={isDisabled}
-                                onChange={(e) => {
-                                  e.stopPropagation();
-                                  togglePermission(perm.code);
+                            return (
+                              <div
+                                key={perm.code}
+                                role="button"
+                                tabIndex={isDisabled ? -1 : 0}
+                                aria-pressed={isChecked}
+                                aria-disabled={isDisabled}
+                                onClick={() => {
+                                  if (!isDisabled) togglePermission(perm.code);
                                 }}
-                                tabIndex={-1}
-                              />
-                              <div className="admin-perm-item-content">
-                                <div className="admin-perm-item-head">
-                                  <span className="admin-perm-name">{perm.name}</span>
+                                onKeyDown={(e) => {
+                                  if (isDisabled) return;
+                                  if (e.key === ' ' || e.key === 'Enter') {
+                                    e.preventDefault();
+                                    togglePermission(perm.code);
+                                  }
+                                }}
+                                className={`admin-perm-row admin-perm-item ${
+                                  isChecked ? 'selected' : 'unselected'
+                                } ${isEssential ? 'locked' : ''}`}
+                              >
+                                <div className="admin-perm-checkbox-col">
+                                  <input
+                                    type="checkbox"
+                                    checked={isChecked}
+                                    disabled={isDisabled}
+                                    onChange={(e) => {
+                                      e.stopPropagation();
+                                      togglePermission(perm.code);
+                                    }}
+                                    tabIndex={-1}
+                                  />
+                                </div>
+
+                                <div className="admin-perm-content-col admin-perm-item-content">
+                                  <div className="admin-perm-title-row admin-perm-item-head">
+                                    <span className="admin-perm-name">{perm.name}</span>
+                                    <span className="admin-perm-code">{perm.code}</span>
+                                  </div>
+                                  <p className="admin-perm-desc">{perm.description}</p>
+                                </div>
+
+                                <div className="admin-perm-status-col">
                                   {isEssential ? (
-                                    <span className="admin-perm-lock-tag" title="Permissão essencial de segurança anti-lockout">
-                                      <Lock size={11} /> Essencial (Fixa)
+                                    <span
+                                      className="admin-perm-status-badge locked admin-perm-lock-tag"
+                                      title="Permissão essencial de segurança anti-lockout"
+                                    >
+                                      <Lock size={12} /> ESSENCIAL
                                     </span>
                                   ) : isChecked ? (
                                     <span className="admin-perm-status-badge allowed">
-                                      <CheckSquare size={11} /> PERMITIDO
+                                      <CheckSquare size={12} /> PERMITIDO
                                     </span>
                                   ) : (
                                     <span className="admin-perm-status-badge blocked">
-                                      <Square size={11} /> BLOQUEADO
+                                      <Square size={12} /> BLOQUEADO
                                     </span>
                                   )}
                                 </div>
-                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', marginBottom: '0.2rem' }}>
-                                  <span className="admin-perm-code">{perm.code}</span>
-                                </div>
-                                <p className="admin-perm-desc">{perm.description}</p>
                               </div>
-                            </div>
-                          );
-                        })}
+                            );
+                          })}
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
 
               <div className="admin-modal-footer">

@@ -1,8 +1,8 @@
 {
   "checkpoints": [
     {
-      "sha": "dec7bdb19aea2d9db4180be26b059150794f2684",
-      "shortSha": "dec7bdb",
+      "sha": "68098383c96a623d5d5655fe9e0d9092ec9b61c6",
+      "shortSha": "6809838",
       "date": "2026-09-08T08:50:00Z",
       "phase": "5",
       "patch": "5.3.0-candidate",

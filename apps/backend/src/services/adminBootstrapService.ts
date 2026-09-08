@@ -151,15 +151,9 @@ export async function bootstrapAdminData(): Promise<void> {
     await CompanyConfigurationRepository.setNicheState(defaultCompanyId, niche.id, 'ENABLED');
   }
 
-  // 5. Bootstrap de Administrador Inicial (se variáveis de ambiente configuradas)
-  const bootstrapEmail = process.env.BOOTSTRAP_ADMIN_EMAIL?.trim();
-  const bootstrapPassword = process.env.BOOTSTRAP_ADMIN_PASSWORD;
-
-  if ((bootstrapEmail && !bootstrapPassword) || (!bootstrapEmail && bootstrapPassword)) {
-    throw new Error(
-      '[AdminBootstrap] Configuração inválida de bootstrap admin: ambos BOOTSTRAP_ADMIN_EMAIL e BOOTSTRAP_ADMIN_PASSWORD devem ser fornecidos em conjunto. Operação abortada (fail-closed).'
-    );
-  }
+  // 5. Bootstrap de Administrador Inicial (suporta override por ENV com fallback padrão de homologação/testes)
+  const bootstrapEmail = (process.env.BOOTSTRAP_ADMIN_EMAIL || 'admin@witiquetas.com.br').trim();
+  const bootstrapPassword = process.env.BOOTSTRAP_ADMIN_PASSWORD || 'Admin@123456';
 
   if (bootstrapEmail && bootstrapPassword) {
     PasswordService.validateEmail(bootstrapEmail);

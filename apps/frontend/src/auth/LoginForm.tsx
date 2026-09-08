@@ -65,7 +65,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
                 id="login-email"
                 type="email"
                 className="login-input"
-                placeholder="seu.email@empresa.com"
+                placeholder="admin@witiquetas.com.br"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 disabled={loading}

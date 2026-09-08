@@ -1,14 +1,14 @@
 {
   "name": "witiquetas-frontend",
-  "version": "5.3.3-candidate",
-  "commit": "5702a9e69cb5c9150e27c284745605eb929351f6",
-  "candidateSha": "5702a9e69cb5c9150e27c284745605eb929351f6",
-  "runningSha": "5702a9e69cb5c9150e27c284745605eb929351f6",
-  "shortCommit": "5702a9e",
-  "shortSha": "5702a9e",
-  "governanceSha": "5702a9e69cb5c9150e27c284745605eb929351f6",
+  "version": "5.3.4-candidate",
+  "commit": "5.3.4-candidate",
+  "candidateSha": "5.3.4-candidate",
+  "runningSha": "5.3.4-candidate",
+  "shortCommit": "5.3.4",
+  "shortSha": "5.3.4",
+  "governanceSha": "5.3.4-candidate",
   "status": "IMPLEMENTED_AWAITING_HOMOLOGATION",
-  "package": "PACOTE 5.3.3 — Hotfix de Correção Definitiva da Matriz de Permissões",
+  "package": "PACOTE 5.3.4 — Hotfix de Convergência Final de Permissões e DCC Developer Auth",
   "phase": "Fase 5 — Administração e Governança da Aplicação",
-  "timestamp": "2026-09-08T14:30:00Z"
+  "timestamp": "2026-09-08T16:20:00Z"
 }

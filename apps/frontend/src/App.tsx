@@ -63,21 +63,29 @@ interface VersionResponse {
 }
 
 const parseHash = (hashStr: string) => {
-  const clean = (hashStr || '').replace(/^#/, '');
-  if (!clean) return { module: 'home', templateId: null };
+  // Reconhece rotas via hash (#developer) ou via pathname (/developer)
+  const pathname = (window.location.pathname || '').replace(/^\/+|\/+$/g, '');
+  const clean = (hashStr || '').replace(/^#/, '').replace(/^\/+|\/+$/g, '');
 
-  if (clean.startsWith('editor/')) {
-    const id = clean.substring(7);
+  const effective = clean || pathname;
+  if (!effective) return { module: 'home', templateId: null };
+
+  if (effective === 'developer' || effective === 'development') {
+    return { module: 'developer', templateId: null };
+  }
+
+  if (effective.startsWith('editor/')) {
+    const id = effective.substring(7);
     return { module: 'editor', templateId: id || null };
   }
-  if (clean.startsWith('editor?template=')) {
-    const id = clean.split('template=')[1];
+  if (effective.startsWith('editor?template=')) {
+    const id = effective.split('template=')[1];
     return { module: 'editor', templateId: id || null };
   }
-  if (clean === 'editor') {
+  if (effective === 'editor') {
     return { module: 'editor', templateId: null };
   }
-  return { module: clean, templateId: null };
+  return { module: effective, templateId: null };
 };
 
 export default function App() {
@@ -151,7 +159,7 @@ export default function App() {
     }
   }, [currentModule]);
 
-  // Sincronizar modelo pela rota de hash (#editor/:templateId) para duplicação de aba/F5
+  // Sincronizar modelo e módulos pela rota de hash (#editor/:templateId, #developer, etc) para duplicação de aba/F5
   useEffect(() => {
     const handleHashSync = async () => {
       const parsed = parseHash(window.location.hash);
@@ -170,14 +178,18 @@ export default function App() {
         const store = useEditorStore.getState();
         if (store.currentTemplateId) {
           setCurrentModule(`editor/${store.currentTemplateId}`);
+        } else {
+          setCurrentModule('editor');
         }
+      } else if (parsed.module && parsed.module !== currentModule) {
+        setCurrentModule(parsed.module);
       }
     };
 
     handleHashSync();
     window.addEventListener('hashchange', handleHashSync);
     return () => window.removeEventListener('hashchange', handleHashSync);
-  }, []);
+  }, [currentModule]);
 
   const toggleTheme = () => {
     setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
@@ -617,6 +629,19 @@ export default function App() {
   }
 
   if (!sessionContext) {
+    if (currentModule === 'developer' || currentModule === 'development') {
+      return (
+        <div className={`app-shell-container theme-${theme}`}>
+          <DevControlPage
+            onGoHome={() => {
+              setCurrentModule('home');
+              window.location.hash = '#home';
+            }}
+          />
+        </div>
+      );
+    }
+
     return (
       <div className={`app-shell-container theme-${theme}`}>
         <LoginForm

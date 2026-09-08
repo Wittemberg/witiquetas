@@ -22,5 +22,8 @@
   },
   "keywords": [],
   "author": "WR Tecnologia",
-  "license": "UNLICENSED"
+  "license": "UNLICENSED",
+  "devDependencies": {
+    "qrcode": "^1.5.4"
+  }
 }

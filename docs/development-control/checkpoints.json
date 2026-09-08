@@ -1,6 +1,28 @@
 {
   "checkpoints": [
     {
+      "sha": "5.3.4-candidate",
+      "shortSha": "5.3.4",
+      "date": "2026-09-08T16:20:00Z",
+      "phase": "5",
+      "patch": "5.3.4-candidate",
+      "title": "fix(hotfix-5.3.4): convergencia final de permissoes e dcc developer auth",
+      "type": "HOTFIX",
+      "capabilities": [
+        "cap-admin-shell",
+        "cap-admin-roles",
+        "cap-role-management",
+        "cap-permission-matrix-single-col",
+        "cap-developer-auth",
+        "cap-dcc-isolation"
+      ],
+      "testsPassed": true,
+      "deployed": false,
+      "manualValidation": false,
+      "homologated": false,
+      "evidence": "Hotfix 5.3.4 com catalogo canonico restrito a 25/23 permissoes (print.history presente, audit.export inexistente), hitbox do checkbox alinhado, rota developer isolada da sessao tenant e script de provisionamento seguro TOTP RFC 6238"
+    },
+    {
       "sha": "5702a9e69cb5c9150e27c284745605eb929351f6",
       "shortSha": "5702a9e",
       "date": "2026-09-08T14:30:00Z",

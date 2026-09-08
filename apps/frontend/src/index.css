@@ -4630,11 +4630,12 @@ body {
 }
 
 .admin-perm-checkbox-col {
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: grid;
+  place-items: center;
   flex-shrink: 0;
   width: 24px;
+  height: 24px;
+  line-height: 1;
 }
 
 .admin-perm-checkbox-col input[type="checkbox"],
@@ -4644,6 +4645,9 @@ body {
   accent-color: #10b981;
   cursor: pointer;
   margin: 0;
+  padding: 0;
+  vertical-align: middle;
+  display: block;
 }
 
 .admin-perm-row.locked input[type="checkbox"],

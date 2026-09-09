@@ -142,7 +142,7 @@ export function isElementAllowed(arg1?: string, arg2?: string): boolean {
  * Campos do sistema 'system.*' são SEMPRE permitidos e resolvidos pela plataforma.
  * Suporta tanto (nicheId, fieldId) quanto (fieldId, nicheId).
  */
-export function isFieldAllowed(arg1?: string, arg2?: string): boolean {
+export function isFieldAllowed(arg1?: string, arg2?: string, source?: 'manual' | 'integration' | 'system'): boolean {
   let nicheId = arg1;
   let fieldId = arg2;
 
@@ -157,7 +157,19 @@ export function isFieldAllowed(arg1?: string, arg2?: string): boolean {
   }
 
   if (!fieldId) return false;
-  if (fieldId.startsWith('system.')) return true;
+  if (fieldId.startsWith('system.')) {
+    return source ? source === 'system' : true;
+  }
+
+  if (source === 'manual') {
+    return getFieldAvailability(nicheId, fieldId).manual;
+  }
+  if (source === 'integration') {
+    return getFieldAvailability(nicheId, fieldId).integration;
+  }
+  if (source === 'system') {
+    return fieldId.startsWith('system.');
+  }
 
   // Fail-safe: se carregando, em erro ou sem contexto, nunca desabilita tudo
   if (currentConfigStatus !== 'READY' || !activeSessionContext) {

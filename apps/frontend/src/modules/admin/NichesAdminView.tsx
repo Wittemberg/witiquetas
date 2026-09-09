@@ -462,12 +462,19 @@ export const NichesAdminView: React.FC<NichesAdminViewProps> = ({ onConfigChange
                   {!niche.isDefault && niche.enabled && canManageNiches && (
                     <button
                       type="button"
-                      className="btn-link"
+                      className="admin-niche-default-btn"
                       onClick={() => handleSetDefaultNiche(niche.id)}
+                      title="Definir como nicho padrão da organização"
                     >
-                      <Star size={12} />
+                      <Star size={12} className="admin-niche-default-btn-icon" />
                       <span>Tornar Padrão</span>
                     </button>
+                  )}
+                  {!niche.enabled && (
+                    <span className="text-muted text-xs">Inativo na organização</span>
+                  )}
+                  {niche.isDefault && (
+                    <span className="text-success text-xs font-semibold">Nicho padrão ativo</span>
                   )}
                   {isSelected && <span className="admin-selected-tag">Configurando</span>}
                 </div>

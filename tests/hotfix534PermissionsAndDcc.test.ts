@@ -135,7 +135,7 @@ test('HOTFIX 5.3.4: Suíte Canônica de Permissões e DCC Developer Auth (20 Gat
     const cssContent = fs.readFileSync(cssPath, 'utf8');
 
     assert.ok(cssContent.includes('.admin-perm-checkbox-col {'), 'deve conter .admin-perm-checkbox-col');
-    assert.ok(cssContent.includes('place-items: center;'), '.admin-perm-checkbox-col deve usar place-items: center');
+    assert.ok(cssContent.includes('place-items: center;') || (cssContent.includes('align-items: center;') && cssContent.includes('justify-content: center;')), '.admin-perm-checkbox-col deve estar centralizado');
     assert.ok(cssContent.includes('line-height: 1;'), '.admin-perm-checkbox-col deve usar line-height: 1');
   });
 
@@ -297,9 +297,9 @@ test('HOTFIX 5.3.4: Suíte Canônica de Permissões e DCC Developer Auth (20 Gat
     assert.strictEqual(res.body.code, 'DEVELOPER_AUTH_REQUIRED');
   });
 
-  // 17. Developer session não acessa Admin tenant
-  await t.test('17. Developer session não vira Admin tenant nem acessa rotas de tenant', async () => {
-    const session = developerAuthService.createSession();
+  // 17. Developer session como PLATFORM_DEVELOPER acessa produto na empresa configurada (Evolução 5.3.5)
+  await t.test('17. Developer session autenticada como PLATFORM_DEVELOPER acessa rotas do produto na empresa configurada', async () => {
+    const session = developerAuthService.createSession('Marcel');
     const req: any = {
       method: 'GET',
       url: '/permissions',
@@ -308,7 +308,7 @@ test('HOTFIX 5.3.4: Suíte Canônica de Permissões e DCC Developer Auth (20 Gat
       ip: '127.0.0.1',
     };
     const res = await callRouter(adminRouter, req);
-    assert.strictEqual(res.statusCode, 401);
+    assert.strictEqual(res.statusCode, 200);
   });
 
   // 18. Dashboard regressão intacta

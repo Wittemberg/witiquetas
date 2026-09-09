@@ -37,6 +37,7 @@ export interface SessionContext {
   csrfToken: string;
   dccEnabled?: boolean;
   canAccessDcc?: boolean;
+  isDeveloper?: boolean;
 }
 
 // Armazena o contexto em memória local da aba
@@ -64,13 +65,13 @@ export function hasAnyPermission(permissionCodes: string[]): boolean {
 }
 
 /**
- * Regra efetiva de acesso ao DCC (Seção 10 do Pacote 5.3.1):
- * effectiveDccAccess = DCC_ENABLED AND user.is_dcc_master AND devcontrol.view
+ * Regra efetiva de acesso ao DCC (Seção 10 do Pacote 5.3.1 / Hotfix 5.3.5):
+ * Desenvolvedor de plataforma autenticado acessa diretamente o DCC na mesma sessão.
  */
 export function canAccessDevControl(): boolean {
   if (!activeSessionContext) return false;
-  if (activeSessionContext.canAccessDcc !== undefined) {
-    return activeSessionContext.canAccessDcc;
+  if (activeSessionContext.isDeveloper || activeSessionContext.canAccessDcc) {
+    return true;
   }
   const isMaster = Boolean(activeSessionContext.user?.isDccMaster);
   const dccEnabled = activeSessionContext.dccEnabled ?? true;

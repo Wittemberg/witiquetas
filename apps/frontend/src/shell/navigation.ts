@@ -7,6 +7,7 @@ import {
   Cpu,
   Plug,
   Settings,
+  Terminal,
   type LucideIcon,
 } from 'lucide-react';
 import type { SessionContext } from '../auth/session.js';
@@ -126,6 +127,17 @@ export function getEffectiveNavigation(sessionContext: SessionContext | null): N
         items.push(item);
       }
     }
+  }
+
+  // PLATFORM_DEVELOPER (Hotfix 5.3.5): Acesso ao DCC diretamente no mesmo Shell sem segundo login
+  if (sessionContext.canAccessDcc || sessionContext.isDeveloper) {
+    items.push({
+      id: 'developer',
+      label: 'Desenvolvimento',
+      icon: Terminal,
+      description: 'Development Control Center (DCC)',
+      path: '/developer',
+    });
   }
 
   return items;

@@ -36,6 +36,10 @@ services:
       - S3_ACCESS_KEY=${S3_ACCESS_KEY}
       - S3_SECRET_KEY=${S3_SECRET_KEY}
       - S3_FORCE_PATH_STYLE=true
+      - DCC_ENABLED=${DCC_ENABLED:-true}
+      - DCC_DEVELOPER_USERNAME=${DCC_DEVELOPER_USERNAME:-Marcel}
+      - DCC_TOTP_SECRET=${DCC_TOTP_SECRET}
+      - DCC_DEVELOPER_COMPANY_ID=${DCC_DEVELOPER_COMPANY_ID:-comp-default}
     deploy:
       replicas: 1
       labels:

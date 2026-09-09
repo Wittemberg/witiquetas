@@ -33,6 +33,7 @@ import { DevControlPage } from './modules/devcontrol/DevControlPage.js';
 import { AdminPage } from './modules/admin/AdminPage.js';
 import { templatesApi } from './services/templatesApi.js';
 import { useEditorStore } from './editor/useEditorStore.js';
+import { devControlApi } from './services/devControlApi.js';
 
 interface ServiceStatus {
   status: string;
@@ -146,6 +147,11 @@ export default function App() {
   }, []);
 
   const handleLogout = async () => {
+    if (sessionContext?.isDeveloper || sessionContext?.canAccessDcc) {
+      try {
+        await devControlApi.developerLogout();
+      } catch {}
+    }
     await logoutUser();
     setSessionContext(null);
     setCurrentModule('home');
@@ -651,9 +657,17 @@ export default function App() {
             window.location.hash = '#home';
             await fetchData();
           }}
-          onDeveloperLoginSuccess={() => {
-            setCurrentModule('developer');
-            window.location.hash = '#developer';
+          onDeveloperLoginSuccess={async () => {
+            const ctx = await fetchSessionContext();
+            if (ctx) {
+              setSessionContext(ctx);
+              setCurrentModule('home');
+              window.location.hash = '#home';
+              await fetchData();
+            } else {
+              setCurrentModule('developer');
+              window.location.hash = '#developer';
+            }
           }}
         />
       </div>

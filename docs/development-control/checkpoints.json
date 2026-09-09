@@ -22,7 +22,7 @@
       "deployed": false,
       "manualValidation": false,
       "homologated": false,
-      "evidence": "Hotfix 5.3.5 com login unificado server-authoritative (POST /api/auth/resolve-mode), desafio TOTP para Marcel na tela principal sem URL especial, ciclo de sessao DCC com TTL de 45m, logout com revocacao server-side e cookie Max-Age=0, headers Cache-Control no-store, alinhamento flexbox perfeito do checkbox e isolamento anti-double-toggle"
+      "evidence": "Hotfix 5.3.5 com login unificado server-authoritative (POST /api/auth/resolve-mode), desafio TOTP para Marcel na tela principal sem URL especial, reconhecimento como PLATFORM_DEVELOPER com acesso ao produto completo no Application Shell e DCC na mesma sessão sem segundo login, ciclo de sessao DCC com TTL de 45m, logout com revogacao server-side e cookie Max-Age=0, headers Cache-Control no-store, alinhamento flexbox perfeito do checkbox e isolamento anti-double-toggle"
     },
     {
       "sha": "5.3.4-candidate",

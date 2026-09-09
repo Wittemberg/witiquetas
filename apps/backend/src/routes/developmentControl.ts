@@ -128,6 +128,7 @@ router.post('/auth/login', async (req: Request, res: Response) => {
       success: true,
       username: DEVELOPER_IDENTITY.username,
       token: authResult.sessionToken,
+      csrfToken: authResult.csrfToken,
       expiresAt: authResult.expiresAt,
     });
   } catch (err: any) {

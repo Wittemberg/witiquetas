@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ShieldCheck, ShieldAlert, Lock, Mail, AlertCircle, Loader2, KeyRound, ArrowLeft } from 'lucide-react';
-import { loginUser, resolveLoginMode, SessionContext } from './session.js';
+import { loginUser, resolveLoginMode, fetchSessionContext, SessionContext } from './session.js';
 import { devControlApi } from '../services/devControlApi.js';
 
 interface LoginFormProps {
@@ -87,10 +87,14 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess, onDevelope
 
     try {
       await devControlApi.developerLogin(developerName, totpCode.trim());
-      if (onDeveloperLoginSuccess) {
+      // Plataforma Developer: carrega o SessionContext e entra diretamente no Dashboard / Shell
+      const context = await fetchSessionContext();
+      if (context) {
+        onLoginSuccess(context);
+      } else if (onDeveloperLoginSuccess) {
         onDeveloperLoginSuccess();
       } else {
-        window.location.hash = '#developer';
+        window.location.hash = '#home';
         window.location.reload();
       }
     } catch (err: any) {
@@ -117,7 +121,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess, onDevelope
             {mode === 'DEVELOPER_TOTP' ? 'Acesso do Desenvolvedor' : 'Witiquetas'}
           </h1>
           <p className="login-subtitle">
-            {mode === 'DEVELOPER_TOTP' ? 'Development Control Center (DCC)' : 'Acesso ao Sistema'}
+            {mode === 'DEVELOPER_TOTP' ? 'Identidade de Plataforma' : 'Acesso ao Sistema'}
           </p>
         </div>
 
@@ -183,7 +187,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess, onDevelope
                   <span>Validando Código...</span>
                 </>
               ) : (
-                <span>Entrar no DCC</span>
+                <span>Acessar o Sistema</span>
               )}
             </button>
 

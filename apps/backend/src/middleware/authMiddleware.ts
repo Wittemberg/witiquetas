@@ -1,6 +1,12 @@
 import { Request, Response, NextFunction } from 'express';
 import { SessionService, AuthenticatedPrincipal } from '../services/sessionService.js';
 import { parseCookies, SESSION_COOKIE_NAME, getWebSession, isPreRbacEnabled } from '../routes/auth.js';
+import {
+  developerAuthService,
+  DCC_SESSION_COOKIE_NAME,
+  getDeveloperCompanyId,
+} from '../services/developerAuthService.js';
+import { CompanyRepository } from '../repositories/adminRepositories.js';
 
 declare global {
   namespace Express {
@@ -13,12 +19,16 @@ declare global {
 
 /**
  * Middleware: Exige que a requisição venha de um usuário autenticado com sessão válida.
- * Suporta Cookie HttpOnly (witiquetas_session) e Header Authorization (Bearer <token>).
+ * Suporta:
+ * 1. Cookie HttpOnly de tenant (witiquetas_session) e Header Authorization (Bearer <token>);
+ * 2. Cookie HttpOnly de desenvolvedor da plataforma (witiquetas_dcc_session) e Header x-dcc-session
+ *    concedendo identidade PLATFORM_DEVELOPER com acesso integral ao produto na empresa configurada.
  * Valida status ativo de usuário e empresa com revogação imediata em caso de inativação.
  */
 export async function requireAuthenticatedUser(req: Request, res: Response, next: NextFunction) {
-  // 1. Verificar Cookie HttpOnly
   const cookies = parseCookies(req.headers.cookie);
+
+  // 1. Verificar Sessão Tenant Comercial (Cookie HttpOnly)
   const cookieToken = cookies[SESSION_COOKIE_NAME];
 
   // 2. Verificar Header Authorization (Bearer)
@@ -27,54 +37,105 @@ export async function requireAuthenticatedUser(req: Request, res: Response, next
     ? authHeader.substring(7).trim()
     : undefined;
 
-  const rawToken = cookieToken || bearerToken;
-  const authMethod: 'cookie' | 'bearer' = cookieToken ? 'cookie' : 'bearer';
+  const rawTenantToken = cookieToken || bearerToken;
 
-  if (!rawToken) {
+  if (rawTenantToken) {
+    // Resolver principal tenant via SessionService (Persistente / Hash no banco)
+    const principal = await SessionService.resolvePrincipalFromRawToken(rawTenantToken);
+    if (principal) {
+      req.principal = principal;
+      (req as any).user = principal.user;
+      (req as any).company = principal.company;
+      req.authMethod = cookieToken ? 'cookie' : 'bearer';
+      return next();
+    }
+
+    // Fallback de compatibilidade retroativa para sessões em memória pré-RBAC
+    const legacySession = getWebSession(rawTenantToken);
+    if (legacySession) {
+      req.principal = {
+        sessionId: legacySession.sessionId,
+        csrfToken: 'legacy-exempt',
+        user: {
+          id: legacySession.userId,
+          companyId: legacySession.companyId,
+          name: legacySession.userId,
+          email: `${legacySession.userId}@local`,
+          status: 'ACTIVE',
+        },
+        company: {
+          id: legacySession.companyId,
+          name: 'Default Company',
+          slug: 'default',
+          status: 'ACTIVE',
+        },
+        roles: [],
+        permissions: ['*'],
+      };
+      (req as any).user = req.principal.user;
+      (req as any).company = req.principal.company;
+      req.authMethod = cookieToken ? 'cookie' : 'bearer';
+      return next();
+    }
+  }
+
+  // 3. Verificar Sessão de Desenvolvedor da Plataforma (PLATFORM_DEVELOPER)
+  const dccCookieToken = cookies[DCC_SESSION_COOKIE_NAME];
+  const dccHeaderToken = typeof req.headers['x-dcc-session'] === 'string' ? req.headers['x-dcc-session'].trim() : undefined;
+  const rawDccToken = dccCookieToken || dccHeaderToken;
+
+  if (rawDccToken) {
+    const dccSession = developerAuthService.validateSession(rawDccToken);
+    if (dccSession) {
+      const devCompanyId = getDeveloperCompanyId();
+      const foundCompany = await CompanyRepository.findById(devCompanyId);
+      const now = new Date().toISOString();
+      const company = foundCompany || {
+        id: devCompanyId,
+        name: 'Empresa Principal',
+        legalName: null,
+        document: null,
+        slug: 'default',
+        status: 'ACTIVE' as const,
+        createdAt: now,
+        updatedAt: now,
+      };
+
+      req.principal = {
+        sessionId: `dcc-${dccSession.username.toLowerCase()}`,
+        csrfToken: dccSession.csrfToken || 'dcc-csrf-exempt',
+        user: {
+          id: 'developer-marcel',
+          companyId: company.id,
+          name: dccSession.username,
+          email: 'developer@witiquetas.local',
+          status: 'ACTIVE',
+          isDccMaster: true,
+        },
+        company: {
+          id: company.id,
+          name: company.name,
+          slug: company.slug,
+          status: company.status,
+        },
+        roles: [], // Sem roles fakes de tenant
+        permissions: ['*'], // Acesso ao produto completo dentro da empresa configurada
+      };
+
+      (req as any).user = req.principal.user;
+      (req as any).company = req.principal.company;
+      (req as any).isPlatformDeveloper = true;
+      req.authMethod = dccCookieToken ? 'cookie' : 'bearer';
+      return next();
+    }
+  }
+
+  // Se nenhuma sessão válida foi fornecida
+  if (!rawTenantToken && !rawDccToken) {
     return res.status(401).json({
       error: 'Não autenticado. Sessão ausente.',
       code: 'UNAUTHENTICATED',
     });
-  }
-
-  // 3. Resolver principal via SessionService (Persistente / Hash no banco)
-  const principal = await SessionService.resolvePrincipalFromRawToken(rawToken);
-
-  if (principal) {
-    req.principal = principal;
-    (req as any).user = principal.user;
-    (req as any).company = principal.company;
-    req.authMethod = authMethod;
-    return next();
-  }
-
-  // 4. Fallback de compatibilidade retroativa para sessões em memória pré-RBAC
-  const legacySession = getWebSession(rawToken);
-  if (legacySession) {
-    // Principal sintetizado para compatibilidade
-    req.principal = {
-      sessionId: legacySession.sessionId,
-      csrfToken: 'legacy-exempt',
-      user: {
-        id: legacySession.userId,
-        companyId: legacySession.companyId,
-        name: legacySession.userId,
-        email: `${legacySession.userId}@local`,
-        status: 'ACTIVE',
-      },
-      company: {
-        id: legacySession.companyId,
-        name: 'Default Company',
-        slug: 'default',
-        status: 'ACTIVE',
-      },
-      roles: [],
-      permissions: ['*'], // Modo pré-rbac concede acesso total
-    };
-    (req as any).user = req.principal.user;
-    (req as any).company = req.principal.company;
-    req.authMethod = authMethod;
-    return next();
   }
 
   // Se a sessão expirou, foi revogada ou usuário/empresa foi inativado

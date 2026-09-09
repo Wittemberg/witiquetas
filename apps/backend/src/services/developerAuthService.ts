@@ -45,10 +45,19 @@ export function isDeveloperIdentity(identifier?: string | null): boolean {
   return normalized === configured;
 }
 
+/**
+ * Retorna o ID da empresa associada à sessão do desenvolvedor de plataforma
+ * (padrão 'comp-default', configurável via DCC_DEVELOPER_COMPANY_ID).
+ */
+export function getDeveloperCompanyId(): string {
+  return (process.env.DCC_DEVELOPER_COMPANY_ID || 'comp-default').trim();
+}
+
 export interface DeveloperSessionData {
   username: string;
   createdAt: Date;
   expiresAt: Date;
+  csrfToken: string;
 }
 
 // Armazenamento em memória das sessões ativas do desenvolvedor (token_hash -> data)
@@ -180,6 +189,7 @@ export class DeveloperAuthService {
   ): Promise<{
     success: boolean;
     sessionToken?: string;
+    csrfToken?: string;
     expiresAt?: string;
     error?: string;
     code?: string;
@@ -244,26 +254,29 @@ export class DeveloperAuthService {
     return {
       success: true,
       sessionToken: session.token,
+      csrfToken: session.csrfToken,
       expiresAt: session.expiresAt.toISOString(),
     };
   }
 
   /**
-   * Cria uma nova sessão segura de 256 bits
+   * Cria uma nova sessão segura de 256 bits com token CSRF dedicado
    */
-  createSession(username = DEVELOPER_IDENTITY.username): { token: string; rawToken: string; expiresAt: Date } {
+  createSession(username = DEVELOPER_IDENTITY.username): { token: string; rawToken: string; csrfToken: string; expiresAt: Date } {
     const rawToken = crypto.randomBytes(32).toString('hex');
     const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+    const csrfToken = crypto.randomBytes(32).toString('hex');
     const expiresAt = new Date(Date.now() + DCC_SESSION_TTL_MS);
 
     const sessionData: DeveloperSessionData = {
       username,
       createdAt: new Date(),
       expiresAt,
+      csrfToken,
     };
 
     activeDeveloperSessions.set(tokenHash, sessionData);
-    return { token: rawToken, rawToken, expiresAt };
+    return { token: rawToken, rawToken, csrfToken, expiresAt };
   }
 
   /**

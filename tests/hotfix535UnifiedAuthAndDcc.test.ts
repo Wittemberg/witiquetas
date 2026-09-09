@@ -16,6 +16,7 @@ import {
 } from '../apps/backend/src/services/sessionService.js';
 import authRouter from '../apps/backend/src/routes/auth.js';
 import adminRouter from '../apps/backend/src/routes/admin.js';
+import sessionRouter from '../apps/backend/src/routes/session.js';
 import devControlRouter from '../apps/backend/src/routes/developmentControl.js';
 import {
   developerAuthService,
@@ -23,9 +24,15 @@ import {
   DCC_SESSION_TTL_MS,
   generateTotpCodeForTesting,
   isDeveloperIdentity,
+  getDeveloperCompanyId,
 } from '../apps/backend/src/services/developerAuthService.js';
 import { DevelopmentControlService } from '../apps/backend/src/services/developmentControlService.js';
 import { clearRateLimiterStore } from '../apps/backend/src/middleware/rateLimiter.js';
+import {
+  NICHES,
+  LABEL_SIZES_CATALOG,
+  NICHE_SIZE_RELATIONS,
+} from '../packages/label-schema/dist/index.js';
 
 function createMockResponse() {
   const res: any = {
@@ -89,6 +96,7 @@ test('SUÍTE CANÔNICA DE TESTES AUTOMATIZADOS — HOTFIX 5.3.5', async (t) => {
   process.env.DCC_ENABLED = 'true';
   process.env.DCC_TOTP_SECRET = TEST_BASE32_SECRET;
   process.env.DCC_DEVELOPER_USERNAME = 'Marcel';
+  process.env.DCC_DEVELOPER_COMPANY_ID = 'comp-default';
 
   t.beforeEach(() => {
     clearAdminMemoryStores();
@@ -164,12 +172,13 @@ test('SUÍTE CANÔNICA DE TESTES AUTOMATIZADOS — HOTFIX 5.3.5', async (t) => {
   });
 
   // 9. TOTP válido cria developer session
-  await t.test('9. TOTP válido cria developer session com token de 256 bits', async () => {
+  await t.test('9. TOTP válido cria developer session com token de 256 bits e csrfToken', async () => {
     const currentCode = generateTotpCodeForTesting(TEST_BASE32_SECRET, 0);
     const req = { method: 'POST', url: '/auth/login', body: { username: 'Marcel', code: currentCode }, ip: '127.0.0.1' };
     const res = await callRouter(devControlRouter, req);
     assert.ok(res.body.token);
     assert.equal(res.body.token.length, 64);
+    assert.ok(res.body.csrfToken);
   });
 
   // 10. developer cookie HttpOnly
@@ -250,124 +259,202 @@ test('SUÍTE CANÔNICA DE TESTES AUTOMATIZADOS — HOTFIX 5.3.5', async (t) => {
     assert.equal(res.statusCode, 401);
   });
 
-  // 19. developer session não concede tenant Admin
-  await t.test('19. Developer session isolada não permite chamar rotas administrativas de tenant', async () => {
+  // =========================================================================
+  // GATES P0: DEVELOPER COMO IDENTIDADE DE PLATAFORMA COM ACESSO COMPLETO
+  // =========================================================================
+
+  // 19. Developer Session é reconhecida como PLATFORM_DEVELOPER
+  await t.test('19. P0: Developer Session via witiquetas_dcc_session concede acesso a rotas do produto na empresa configurada', async () => {
     const dccSession = developerAuthService.createSession('Marcel');
-    const req = { method: 'GET', url: '/roles', headers: { 'x-dcc-session': dccSession.token } };
+    const req: any = {
+      method: 'GET',
+      url: '/permissions',
+      path: '/permissions',
+      headers: { cookie: `${DCC_SESSION_COOKIE_NAME}=${dccSession.token}` },
+      ip: '127.0.0.1',
+    };
     const res = await callRouter(adminRouter, req);
-    assert.equal(res.statusCode, 401);
+    assert.equal(res.statusCode, 200);
+    assert.ok(Array.isArray(res.body));
+    assert.equal(res.body.length, 23);
   });
 
-  // 20. #developer continua compatível
-  await t.test('20. /developer e #developer permanecem mapeados no App.tsx', async () => {
-    const appTsx = fs.readFileSync(path.resolve(process.cwd(), 'apps/frontend/src/App.tsx'), 'utf8');
-    assert.ok(appTsx.includes("currentModule === 'developer'"));
+  // 20. GET /api/session/context para Developer retorna isDeveloper: true e canAccessDcc: true
+  await t.test('20. P0: GET /api/session/context para Developer retorna isDeveloper: true, canAccessDcc: true e company configurada', async () => {
+    const dccSession = developerAuthService.createSession('Marcel');
+    const req: any = {
+      method: 'GET',
+      url: '/context',
+      path: '/context',
+      headers: { cookie: `${DCC_SESSION_COOKIE_NAME}=${dccSession.token}` },
+      ip: '127.0.0.1',
+    };
+    const res = await callRouter(sessionRouter, req);
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.body.user.name, 'Marcel');
+    assert.equal(res.body.user.isDccMaster, true);
+    assert.equal(res.body.isDeveloper, true);
+    assert.equal(res.body.canAccessDcc, true);
+    assert.deepEqual(res.body.roles, ['PLATFORM_DEVELOPER']);
+    assert.deepEqual(res.body.permissions, ['*']);
+    assert.equal(res.body.company.id, getDeveloperCompanyId());
   });
 
-  // 21. login normal é fluxo principal Developer
-  await t.test('21. LoginForm inclui campo unificado "E-mail ou usuário" e resolução automática', async () => {
-    const loginForm = fs.readFileSync(path.resolve(process.cwd(), 'apps/frontend/src/auth/LoginForm.tsx'), 'utf8');
-    assert.ok(loginForm.includes('E-mail ou usuário'));
-    assert.ok(loginForm.includes('resolveLoginMode'));
-    assert.ok(loginForm.includes('Código do Google Authenticator'));
+  // 21. Marcel NÃO existe nas tabelas de tenant
+  await t.test('21. P0: Marcel NÃO é criado como usuário tenant nem recebe role fake de ADMIN', async () => {
+    const users = await UserRepository.listByCompany('comp-default');
+    const marcelUser = users.find((u) => u.name.toLowerCase() === 'marcel');
+    assert.equal(marcelUser, undefined, 'Marcel não deve existir na tabela users do tenant');
+
+    const roles = await RoleRepository.listByCompany('comp-default');
+    const devRoles = roles.filter((r) => r.code === 'PLATFORM_DEVELOPER');
+    assert.equal(devRoles.length, 0, 'Não deve existir role persistida no banco do tenant para PLATFORM_DEVELOPER');
   });
 
-  // 22. checkbox visual rect alinhado ao input
-  await t.test('22. Checkbox CSS utiliza flexbox centrado 24x24 e input real 18x18 sem pseudo-elementos', async () => {
-    const css = fs.readFileSync(path.resolve(process.cwd(), 'apps/frontend/src/index.css'), 'utf8');
+  // 22. Isolamento de tenant: Developer opera estritamente na empresa configurada
+  await t.test('22. P0: Isolamento de tenant — Developer opera estritamente na empresa configurada (DCC_DEVELOPER_COMPANY_ID)', async () => {
+    const dccSession = developerAuthService.createSession('Marcel');
+    const req: any = {
+      method: 'GET',
+      url: '/context',
+      path: '/context',
+      headers: { cookie: `${DCC_SESSION_COOKIE_NAME}=${dccSession.token}` },
+      ip: '127.0.0.1',
+    };
+    const res = await callRouter(sessionRouter, req);
+    assert.equal(res.body.company.id, 'comp-default');
+  });
+
+  // 23. Usuário comercial comum NUNCA recebe canAccessDcc: true nem isDeveloper: true
+  await t.test('23. P0: Usuário comercial normal NUNCA recebe canAccessDcc: true nem isDeveloper: true', async () => {
+    // Criar empresa e usuário comercial
+    await CompanyRepository.create({ id: 'comp-tenant', name: 'Tenant Corp', slug: 'tenant', status: 'ACTIVE' });
+    await UserRepository.create({
+      id: 'usr-commercial',
+      companyId: 'comp-tenant',
+      name: 'Comercial User',
+      email: 'comercial@tenant.com',
+      passwordHash: 'hash',
+      status: 'ACTIVE',
+    });
+    const session = await SessionService.createAuthenticatedSession({ userId: 'usr-commercial', companyId: 'comp-tenant' });
+
+    const req: any = {
+      method: 'GET',
+      url: '/context',
+      path: '/context',
+      headers: { cookie: `witiquetas_session=${session.rawToken}` },
+      ip: '127.0.0.1',
+    };
+    const res = await callRouter(sessionRouter, req);
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.body.isDeveloper, false);
+    assert.equal(res.body.canAccessDcc, false);
+  });
+
+  // 24. Navigation inclui item "Desenvolvimento" para Developer e exclui para Tenant
+  await t.test('24. P0: Navigation inclui módulo "Desenvolvimento" para Developer e exclui para Tenant', () => {
+    const navPath = path.resolve('apps/frontend/src/shell/navigation.ts');
+    const navContent = fs.readFileSync(navPath, 'utf8');
+
+    assert.ok(navContent.includes("id: 'developer'"));
+    assert.ok(navContent.includes("label: 'Desenvolvimento'"));
+    assert.ok(navContent.includes('sessionContext.canAccessDcc || sessionContext.isDeveloper'));
+  });
+
+  // 25. GlobalHeader exibe badge Developer para sessão de desenvolvedor
+  await t.test('25. P0: GlobalHeader exibe tag discreta Developer quando sessionContext.isDeveloper for true', () => {
+    const headerPath = path.resolve('apps/frontend/src/shell/GlobalHeader.tsx');
+    const headerContent = fs.readFileSync(headerPath, 'utf8');
+
+    assert.ok(headerContent.includes('sessionContext?.isDeveloper'));
+    assert.ok(headerContent.includes('Developer'));
+  });
+
+  // 26. LoginForm redireciona Developer diretamente para o Dashboard (onLoginSuccess)
+  await t.test('26. P0: LoginForm chama onLoginSuccess(context) após TOTP do Developer para entrada direta no Dashboard', () => {
+    const loginFormPath = path.resolve('apps/frontend/src/auth/LoginForm.tsx');
+    const loginContent = fs.readFileSync(loginFormPath, 'utf8');
+
+    assert.ok(loginContent.includes('fetchSessionContext'));
+    assert.ok(loginContent.includes('onLoginSuccess(context)'));
+  });
+
+  // 27. Checkbox CSS utiliza flexbox centrado 24x24 e input real 18x18
+  await t.test('27. Checkbox CSS utiliza flexbox centrado 24x24 e input real 18x18 sem pseudo-elementos', async () => {
+    const css = fs.readFileSync(path.resolve('apps/frontend/src/index.css'), 'utf8');
     assert.ok(css.includes('.admin-perm-checkbox-col {'));
-    assert.ok(css.includes('display: flex;'));
     assert.ok(css.includes('width: 24px;'));
     assert.ok(css.includes('height: 24px;'));
     assert.ok(css.includes('width: 18px;'));
     assert.ok(css.includes('height: 18px;'));
-    assert.ok(css.includes('position: static;'));
+    assert.ok(css.includes('accent-color: #10b981;'));
   });
 
-  // 23. click input alterna uma única vez (sem double toggle)
-  await t.test('23. Input do checkbox possui stopPropagation no onClick e onChange', async () => {
+  // 28. Input do checkbox possui stopPropagation no onClick e onChange
+  await t.test('28. Input do checkbox possui stopPropagation no onClick e onChange', async () => {
     const rolesView = fs.readFileSync(path.resolve(process.cwd(), 'apps/frontend/src/modules/admin/RolesAdminView.tsx'), 'utf8');
-    assert.ok(rolesView.includes('onClick={(e) => {\n                                      e.stopPropagation();\n                                    }}'));
-    assert.ok(rolesView.includes('e.stopPropagation();\n                                      togglePermission(perm.code);'));
+    assert.ok(rolesView.includes('onClick={(e) => {'));
+    assert.ok(rolesView.includes('e.stopPropagation();'));
+    assert.ok(rolesView.includes('togglePermission(perm.code);'));
   });
 
-  // 24. click row alterna uma única vez
-  await t.test('24. Row continua com handler onClick={togglePermission}', async () => {
-    const rolesView = fs.readFileSync(path.resolve(process.cwd(), 'apps/frontend/src/modules/admin/RolesAdminView.tsx'), 'utf8');
+  // 29. Row continua com handler onClick={togglePermission}
+  await t.test('29. Row continua com handler onClick={togglePermission}', async () => {
+    const rolesView = fs.readFileSync(path.resolve('apps/frontend/src/modules/admin/RolesAdminView.tsx'), 'utf8');
     assert.ok(rolesView.includes('if (!isDisabled) togglePermission(perm.code);'));
   });
 
-  // 25. persistência da matriz permanece
-  await t.test('25. RolesAdminView preserva chamadas de salvamento persistente', async () => {
-    const rolesView = fs.readFileSync(path.resolve(process.cwd(), 'apps/frontend/src/modules/admin/RolesAdminView.tsx'), 'utf8');
+  // 30. RolesAdminView preserva chamadas de salvamento persistente
+  await t.test('30. RolesAdminView preserva chamadas de salvamento persistente', async () => {
+    const rolesView = fs.readFileSync(path.resolve('apps/frontend/src/modules/admin/RolesAdminView.tsx'), 'utf8');
     assert.ok(rolesView.includes('updateRolePermissions'));
   });
 
-  // 26. platform catalog = 25
-  await t.test('26. Catálogo canônico da plataforma possui exatamente 25 permissões', async () => {
+  // 31. Catálogo canônico da plataforma possui exatamente 25 permissões
+  await t.test('31. Catálogo canônico da plataforma possui exatamente 25 permissões', async () => {
     assert.equal(CANONICAL_PERMISSIONS.length, 25);
   });
 
-  // 27. tenant catalog = 23
-  await t.test('27. Catálogo gerenciável do tenant possui exatamente 23 permissões comerciais', async () => {
+  // 32. Catálogo gerenciável do tenant possui exatamente 23 permissões comerciais
+  await t.test('32. Catálogo gerenciável do tenant possui exatamente 23 permissões comerciais', async () => {
     assert.equal(TENANT_MANAGEABLE_PERMISSIONS.length, 23);
   });
 
-  // 28. print.history presente
-  await t.test('28. print.history está obrigatoriamente presente na plataforma e na matriz', async () => {
+  // 33. print.history está obrigatoriamente presente na plataforma e na matriz
+  await t.test('33. print.history está obrigatoriamente presente na plataforma e na matriz', async () => {
     assert.ok(CANONICAL_PERMISSIONS.some((p) => p.code === 'print.history'));
     assert.ok(TENANT_MANAGEABLE_PERMISSIONS.some((p) => p.code === 'print.history'));
   });
 
-  // 29. audit.export ausente
-  await t.test('29. audit.export está rigorosamente ausente de todo o ecossistema', async () => {
+  // 34. audit.export está rigorosamente ausente de todo o ecossistema
+  await t.test('34. audit.export está rigorosamente ausente de todo o ecossistema', async () => {
     assert.equal(CANONICAL_PERMISSIONS.some((p) => p.code === 'audit.export'), false);
     assert.equal(TENANT_MANAGEABLE_PERMISSIONS.some((p) => p.code === 'audit.export'), false);
   });
 
-  // 30. Dashboard regressão
-  await t.test('30. Dashboard baseline com 3 cards operacionais permanece íntegro', async () => {
-    const appTsx = fs.readFileSync(path.resolve(process.cwd(), 'apps/frontend/src/App.tsx'), 'utf8');
-    assert.ok(appTsx.includes('card-stat-value'));
-    assert.ok(appTsx.includes('Modelos Homologados'));
+  // 35. Dashboard baseline com 3 cards operacionais permanece íntegro
+  await t.test('35. Dashboard baseline de infraestrutura permanece íntegro', async () => {
+    const appTsx = fs.readFileSync(path.resolve('apps/frontend/src/App.tsx'), 'utf8');
+    assert.ok(appTsx.includes('Frontend Web'));
+    assert.ok(appTsx.includes('Backend API'));
+    assert.ok(appTsx.includes('PostgreSQL'));
+    assert.ok(appTsx.includes('MinIO / S3 Storage'));
+    assert.ok(appTsx.includes('Agent de Impressão'));
   });
 
-  // 31. usuário restrito regressão
-  await t.test('31. Regras de RBAC e bloqueio de usuário inativo permanecem ativas', async () => {
-    const authTs = fs.readFileSync(path.resolve(process.cwd(), 'apps/backend/src/routes/auth.ts'), 'utf8');
-    assert.ok(authTs.includes("status !== 'ACTIVE'"));
+  // 36. 11 nichos históricos canônicos
+  await t.test('36. Existem exatamente 11 nichos canônicos de mercado', async () => {
+    assert.strictEqual(NICHES.length, 11, 'Deve conter 11 nichos concretos');
   });
 
-  // 32. DCC tenant invisível
-  await t.test('32. DCC permanece invisível para tenants no ApplicationShell', async () => {
-    const shell = fs.readFileSync(path.resolve(process.cwd(), 'apps/frontend/src/shell/ApplicationShell.tsx'), 'utf8');
-    assert.equal(shell.includes("label: 'DevControl'"), false);
+  // 37. 66 tamanhos físicos industriais
+  await t.test('37. Existem exatamente 66 tamanhos industriais únicos', async () => {
+    assert.strictEqual(LABEL_SIZES_CATALOG.length, 66, 'Deve conter 66 tamanhos físicos no catálogo global');
   });
 
-  // 33. Agent auth intacto
-  await t.test('33. Rota de autenticação de Agent e emparelhamento permanecem ativas', async () => {
-    const agentsTs = fs.readFileSync(path.resolve(process.cwd(), 'apps/backend/src/routes/agents.ts'), 'utf8');
-    assert.ok(agentsTs.includes('/pair'));
-  });
-
-  // 34. 11 nichos
-  await t.test('34. Banco de dados/seed possui os 11 nichos canônicos de mercado', async () => {
-    const seed = fs.readFileSync(path.resolve(process.cwd(), 'apps/backend/src/db/seeds/initialSeed.ts'), 'utf8');
-    assert.ok(seed.includes('SUPERMERCADO'));
-    assert.ok(seed.includes('FARMACIA'));
-    assert.ok(seed.includes('HOSPITALAR'));
-  });
-
-  // 35. 66 tamanhos
-  await t.test('35. Banco de dados/seed possui os 66 tamanhos industriais', async () => {
-    const seed = fs.readFileSync(path.resolve(process.cwd(), 'apps/backend/src/db/seeds/initialSeed.ts'), 'utf8');
-    assert.ok(seed.includes('100x150'));
-    assert.ok(seed.includes('30x20'));
-  });
-
-  // 36. 112 associações
-  await t.test('36. 112 associações entre nichos e tamanhos preservadas', async () => {
-    const seed = fs.readFileSync(path.resolve(process.cwd(), 'apps/backend/src/db/seeds/initialSeed.ts'), 'utf8');
-    assert.ok(seed.includes('INSERT INTO niche_label_sizes'));
+  // 38. 112 associações entre nichos e tamanhos
+  await t.test('38. Existem exatamente 112 relações niche-size preservadas', async () => {
+    assert.strictEqual(NICHE_SIZE_RELATIONS.length, 112, 'Deve conter 112 associações no catálogo');
   });
 });

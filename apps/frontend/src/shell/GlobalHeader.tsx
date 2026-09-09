@@ -63,10 +63,28 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({
         </button>
 
         {/* Perfil do Usuário e Logout */}
-        <div className="header-profile-badge" title={`Usuário: ${userName}`}>
-          <div className="user-avatar" title={userName}>
+        <div className="header-profile-badge" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }} title={`Usuário: ${userName}${sessionContext?.isDeveloper ? ' (Platform Developer)' : ''}`}>
+          <div className="user-avatar" title={userName} style={sessionContext?.isDeveloper ? { background: 'linear-gradient(135deg, #7c3aed, #4f46e5)' } : undefined}>
             {userInitials}
           </div>
+          {sessionContext?.isDeveloper && (
+            <span
+              className="developer-tag-badge"
+              style={{
+                fontSize: '0.7rem',
+                fontWeight: 700,
+                padding: '0.15rem 0.45rem',
+                borderRadius: '4px',
+                background: 'rgba(139, 92, 246, 0.15)',
+                color: '#a855f7',
+                border: '1px solid rgba(139, 92, 246, 0.3)',
+                letterSpacing: '0.04em',
+                textTransform: 'uppercase',
+              }}
+            >
+              Developer
+            </span>
+          )}
         </div>
 
         {onLogout && (

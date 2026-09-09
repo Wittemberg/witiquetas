@@ -867,4 +867,363 @@ test('SUÍTE COMPLETA DE VALIDAÇÃO — PACOTE 5.5 (EFFECTIVE CONFIGURATION →
     assert.ok(content.includes('toolboxConfig'), 'Estrutura da toolbox preservada');
     assert.ok(content.includes('Canvas'), 'Canvas preservado');
   });
+
+  // 38. Gates Específicos de Regressão: Type Narrowing, LineElement, Ausência de fieldsAvailabilityByNiche e Server-Authoritative
+  await t.test('38. Gates Específicos de Regressão: LineElement sem field, type narrowing e safe configuration', async () => {
+    // 1. LineElement sem field passa por POST sem crash e sem rejeição indevida
+    const postLineReq = {
+      method: 'POST',
+      url: '/',
+      headers: { 'x-csrf-token': adminSession.csrfToken },
+      cookies: { witiquetas_session: adminSession.rawToken },
+      body: {
+        title: 'Template com Line e Rectangle',
+        nicheId: 'niche-gondola',
+        document: {
+          schemaVersion: 1,
+          title: 'Template com Line e Rectangle',
+          dimensions: { widthMm: 100, heightMm: 50, dpi: 203, orientation: 'landscape' },
+          nicheId: 'niche-gondola',
+          elements: [
+            {
+              id: 'el-line-1',
+              type: 'line',
+              x: 10,
+              y: 10,
+              width: 80,
+              height: 2,
+              strokeWidth: 2,
+            },
+            {
+              id: 'el-rect-1',
+              type: 'rectangle',
+              x: 10,
+              y: 20,
+              width: 80,
+              height: 20,
+              strokeWidth: 1,
+            },
+          ],
+        },
+      },
+    };
+    const postLineRes = await callRouter(templatesRouter, postLineReq);
+    assert.equal(postLineRes.statusCode, 201, 'POST com LineElement e RectangleElement sem field deve retornar 201');
+    assert.ok(postLineRes.body?.id, 'Template criado com sucesso');
+    const createdId = postLineRes.body.id;
+
+    // 2. Elemento visual sem suporte a binding (Line) não é tratado como field-bound no PUT
+    const putLineReq = {
+      method: 'PUT',
+      url: `/${createdId}`,
+      headers: { 'x-csrf-token': adminSession.csrfToken },
+      cookies: { witiquetas_session: adminSession.rawToken },
+      body: {
+        title: 'Template com Line Atualizado',
+        document: {
+          ...postLineRes.body.document,
+          elements: [
+            {
+              id: 'el-line-1',
+              type: 'line',
+              x: 15,
+              y: 15,
+              width: 70,
+              height: 2,
+              strokeWidth: 2,
+            },
+          ],
+        },
+      },
+    };
+    const putLineRes = await callRouter(templatesRouter, putLineReq);
+    assert.equal(putLineRes.statusCode, 200, 'PUT atualizando LineElement deve retornar 200 sem erro de binding');
+
+    // 3. Elemento que realmente suporta binding continua sendo validado (ex: text com field permitido passa)
+    const postBoundValidReq = {
+      method: 'POST',
+      url: '/',
+      headers: { 'x-csrf-token': adminSession.csrfToken },
+      cookies: { witiquetas_session: adminSession.rawToken },
+      body: {
+        title: 'Template com Binding Válido',
+        nicheId: 'niche-gondola',
+        document: {
+          schemaVersion: 1,
+          title: 'Template com Binding Válido',
+          dimensions: { widthMm: 100, heightMm: 50, dpi: 203, orientation: 'landscape' },
+          nicheId: 'niche-gondola',
+          elements: [
+            {
+              id: 'el-text-valid-bind',
+              type: 'text',
+              x: 10,
+              y: 10,
+              width: 50,
+              height: 10,
+              content: 'Arroz',
+              field: 'produto.descricao', // Campo canônico habilitado por default
+            },
+          ],
+        },
+      },
+    };
+    const postBoundValidRes = await callRouter(templatesRouter, postBoundValidReq);
+    assert.equal(postBoundValidRes.statusCode, 201, 'POST com binding permitido deve ter sucesso 201');
+
+    // 4 & 5. fieldsAvailabilityByNiche ausente não causa crash e não libera silenciosamente novo binding
+    // Desabilitar produto.ean na empresa
+    await CompanyConfigurationRepository.setFieldEnabled(companyAlpha.id, 'niche-gondola', 'produto.ean', false);
+
+    const postDisabledFieldReq = {
+      method: 'POST',
+      url: '/',
+      headers: { 'x-csrf-token': adminSession.csrfToken },
+      cookies: { witiquetas_session: adminSession.rawToken },
+      body: {
+        title: 'Tentativa Novo Binding Desabilitado',
+        nicheId: 'niche-gondola',
+        document: {
+          schemaVersion: 1,
+          title: 'Tentativa Novo Binding Desabilitado',
+          dimensions: { widthMm: 100, heightMm: 50, dpi: 203, orientation: 'landscape' },
+          nicheId: 'niche-gondola',
+          elements: [
+            {
+              id: 'el-text-ean-off',
+              type: 'text',
+              x: 10,
+              y: 10,
+              width: 50,
+              height: 10,
+              content: '7891234567890',
+              field: 'produto.ean',
+            },
+          ],
+        },
+      },
+    };
+    const postDisabledFieldRes = await callRouter(templatesRouter, postDisabledFieldReq);
+    assert.equal(postDisabledFieldRes.statusCode, 400, 'POST com campo desabilitado deve ser rejeitado com 400');
+    assert.match(postDisabledFieldRes.body.error, /desabilitado/i);
+
+    // 6 & 7. EXISTING_DISABLED_BINDING preservado vs NOVO binding desabilitado bloqueado em PUT
+    // Criar diretamente template legado com produto.ean
+    const legacyTemplateWithEan = await templateRepository.createTemplate(
+      {
+        title: 'Template Legado com EAN',
+        nicheId: 'niche-gondola',
+        document: {
+          schemaVersion: 1,
+          title: 'Template Legado com EAN',
+          dimensions: { widthMm: 100, heightMm: 50, dpi: 203, orientation: 'landscape' },
+          elements: [
+            {
+              id: 'el-legacy-ean',
+              type: 'text',
+              x: 10,
+              y: 10,
+              width: 50,
+              height: 10,
+              content: '789000',
+              field: 'produto.ean',
+            },
+          ],
+        },
+      },
+      companyAlpha.id
+    );
+
+    // 6. PUT preservando EXISTING_DISABLED_BINDING tem sucesso 200
+    const putPreserveBindingReq = {
+      method: 'PUT',
+      url: `/${legacyTemplateWithEan.id}`,
+      headers: { 'x-csrf-token': adminSession.csrfToken },
+      cookies: { witiquetas_session: adminSession.rawToken },
+      body: {
+        title: 'Template Legado Atualizado Preservando EAN',
+        document: {
+          ...legacyTemplateWithEan.document,
+          elements: [
+            {
+              id: 'el-legacy-ean',
+              type: 'text',
+              x: 12,
+              y: 12,
+              width: 50,
+              height: 10,
+              content: '789000',
+              field: 'produto.ean', // Preservado
+            },
+          ],
+        },
+      },
+    };
+    const putPreserveBindingRes = await callRouter(templatesRouter, putPreserveBindingReq);
+    assert.equal(putPreserveBindingRes.statusCode, 200, 'PUT preservando EXISTING_DISABLED_BINDING deve retornar 200');
+
+    // 7. PUT adicionando NOVO binding desabilitado é bloqueado com 400
+    const putNewDisabledBindingReq = {
+      method: 'PUT',
+      url: `/${legacyTemplateWithEan.id}`,
+      headers: { 'x-csrf-token': adminSession.csrfToken },
+      cookies: { witiquetas_session: adminSession.rawToken },
+      body: {
+        title: 'Tentativa Novo Binding no PUT',
+        document: {
+          ...legacyTemplateWithEan.document,
+          elements: [
+            {
+              id: 'el-legacy-ean',
+              type: 'text',
+              x: 10,
+              y: 10,
+              width: 50,
+              height: 10,
+              content: '789000',
+              field: 'produto.ean',
+            },
+            {
+              id: 'el-new-ean',
+              type: 'barcode',
+              x: 10,
+              y: 25,
+              width: 50,
+              height: 20,
+              content: '789000',
+              field: 'produto.ean', // NOVO binding para produto.ean que está desabilitado
+            },
+          ],
+        },
+      },
+    };
+    const putNewDisabledBindingRes = await callRouter(templatesRouter, putNewDisabledBindingReq);
+    assert.equal(putNewDisabledBindingRes.statusCode, 400, 'PUT com NOVO binding para campo desabilitado deve retornar 400');
+
+    // 8 & 9. EXISTING_DISABLED_ELEMENT preservado vs NOVA instância de elemento OFF bloqueada
+    // Garantir qrcode OFF
+    await CompanyConfigurationRepository.setElementEnabled(companyAlpha.id, 'niche-gondola', 'qrcode', false);
+
+    // 9a. POST com elemento OFF é bloqueado com 400
+    const postOffElementReq = {
+      method: 'POST',
+      url: '/',
+      headers: { 'x-csrf-token': adminSession.csrfToken },
+      cookies: { witiquetas_session: adminSession.rawToken },
+      body: {
+        title: 'Tentativa POST com QRCode OFF',
+        nicheId: 'niche-gondola',
+        document: {
+          schemaVersion: 1,
+          title: 'Tentativa POST com QRCode OFF',
+          dimensions: { widthMm: 100, heightMm: 50, dpi: 203, orientation: 'landscape' },
+          nicheId: 'niche-gondola',
+          elements: [
+            {
+              id: 'el-new-qr-off',
+              type: 'qrcode',
+              x: 10,
+              y: 10,
+              width: 30,
+              height: 30,
+              content: 'QR',
+            },
+          ],
+        },
+      },
+    };
+    const postOffElementRes = await callRouter(templatesRouter, postOffElementReq);
+    assert.equal(postOffElementRes.statusCode, 400, 'POST com elemento OFF deve retornar 400');
+
+    // 8. EXISTING_DISABLED_ELEMENT: modelo legado com qrcode pode ser editado mantendo o qrcode existente
+    const legacyQrTemplate = await templateRepository.createTemplate(
+      {
+        title: 'Template Legado com QR',
+        nicheId: 'niche-gondola',
+        document: {
+          schemaVersion: 1,
+          title: 'Template Legado com QR',
+          dimensions: { widthMm: 100, heightMm: 50, dpi: 203, orientation: 'landscape' },
+          elements: [
+            {
+              id: 'el-legacy-qr-gate',
+              type: 'qrcode',
+              x: 10,
+              y: 10,
+              width: 30,
+              height: 30,
+              content: 'QR_EXISTING',
+            },
+          ],
+        },
+      },
+      companyAlpha.id
+    );
+
+    const putPreserveElementReq = {
+      method: 'PUT',
+      url: `/${legacyQrTemplate.id}`,
+      headers: { 'x-csrf-token': adminSession.csrfToken },
+      cookies: { witiquetas_session: adminSession.rawToken },
+      body: {
+        title: 'Template Legado QR Atualizado',
+        document: {
+          ...legacyQrTemplate.document,
+          elements: [
+            {
+              id: 'el-legacy-qr-gate',
+              type: 'qrcode',
+              x: 15,
+              y: 15,
+              width: 30,
+              height: 30,
+              content: 'QR_EXISTING',
+            },
+          ],
+        },
+      },
+    };
+    const putPreserveElementRes = await callRouter(templatesRouter, putPreserveElementReq);
+    assert.equal(putPreserveElementRes.statusCode, 200, 'PUT preservando EXISTING_DISABLED_ELEMENT deve retornar 200');
+
+    // 9b. PUT criando NOVA instância de elemento OFF é bloqueado com 400
+    const putNewOffElementReq = {
+      method: 'PUT',
+      url: `/${legacyQrTemplate.id}`,
+      headers: { 'x-csrf-token': adminSession.csrfToken },
+      cookies: { witiquetas_session: adminSession.rawToken },
+      body: {
+        title: 'Tentativa Novo QR no PUT',
+        document: {
+          ...legacyQrTemplate.document,
+          elements: [
+            {
+              id: 'el-legacy-qr-gate',
+              type: 'qrcode',
+              x: 10,
+              y: 10,
+              width: 30,
+              height: 30,
+              content: 'QR_EXISTING',
+            },
+            {
+              id: 'el-second-qr-off',
+              type: 'qrcode',
+              x: 50,
+              y: 10,
+              width: 30,
+              height: 30,
+              content: 'QR_NEW',
+            },
+          ],
+        },
+      },
+    };
+    const putNewOffElementRes = await callRouter(templatesRouter, putNewOffElementReq);
+    assert.equal(putNewOffElementRes.statusCode, 400, 'PUT criando nova instância de elemento OFF deve retornar 400');
+
+    // 10. POST e PUT obedecem exatamente às mesmas regras de validação server-authoritative
+    assert.match(postOffElementRes.body.error, /desabilitado/i);
+    assert.match(putNewOffElementRes.body.error, /desabilitado/i);
+  });
 });

@@ -1,5 +1,14 @@
 import { Router, Request, Response } from 'express';
-import { LabelDocumentSchema, NICHES, normalizeNicheId } from '@witiquetas/label-schema';
+import {
+  LabelDocumentSchema,
+  NICHES,
+  normalizeNicheId,
+  type LabelElement,
+  type TextElement,
+  type PriceElement,
+  type BarcodeElement,
+  type QrCodeElement,
+} from '@witiquetas/label-schema';
 import {
   templateRepository,
   MismatchedVersionError,
@@ -15,6 +24,68 @@ import {
   requireCsrf,
 } from '../middleware/authMiddleware.js';
 import { EffectiveConfigurationService } from '../services/effectiveConfigurationService.js';
+
+type FieldBoundElement = TextElement | PriceElement | BarcodeElement | QrCodeElement;
+
+function isFieldBoundElement(element: LabelElement): element is FieldBoundElement {
+  return (
+    element.type === 'text' ||
+    element.type === 'price' ||
+    element.type === 'barcode' ||
+    element.type === 'qrcode'
+  );
+}
+
+function getElementField(element: LabelElement): string | undefined {
+  if (isFieldBoundElement(element)) {
+    const rawField = element.field;
+    if (typeof rawField === 'string' && rawField.trim().length > 0) {
+      return rawField.trim();
+    }
+  }
+  const bindingField = element.binding?.fieldId || element.binding?.field;
+  if (typeof bindingField === 'string' && bindingField.trim().length > 0) {
+    return bindingField.trim();
+  }
+  return undefined;
+}
+
+interface BindingValidationError {
+  error: string;
+  code: string;
+}
+
+function validateElementBinding(
+  element: LabelElement,
+  allowedFields: string[],
+  nicheAvailability: Record<string, { manual: boolean; integration: boolean }>,
+  targetNicheId: string,
+  isNewBinding: boolean
+): BindingValidationError | null {
+  const field = getElementField(element);
+  if (!field || field.startsWith('system.')) {
+    return null;
+  }
+
+  if (!allowedFields.includes(field)) {
+    return {
+      error: isNewBinding
+        ? `Novo binding para o campo '${field}' está desabilitado na política atual do nicho.`
+        : `Campo canônico '${field}' está desabilitado na política atual do nicho '${targetNicheId}'.`,
+      code: isNewBinding ? 'NEW_DISABLED_BINDING_FORBIDDEN' : 'CANONICAL_FIELD_DISABLED',
+    };
+  }
+
+  const fieldAvail = nicheAvailability[field];
+  if (element.binding?.source === 'manual' && fieldAvail && fieldAvail.manual === false) {
+    return {
+      error: `Entrada manual para o campo '${field}' está desabilitada na política do nicho.`,
+      code: 'MANUAL_INPUT_DISABLED',
+    };
+  }
+
+  return null;
+}
 
 function resolveCanonicalNicheId(nicheIdOrSlug?: string): string {
   if (!nicheIdOrSlug) return 'niche-gondola';
@@ -174,8 +245,11 @@ router.post('/', requirePermission('templates.create'), requireCsrf, async (req:
     }
 
     // Validação Server-Authoritative (Pacote 5.5)
-    const principal = req.principal!;
-    const isDev = Boolean((req as any).isPlatformDeveloper || principal.user.id === 'developer-marcel');
+    const principal = req.principal;
+    if (!principal) {
+      return res.status(401).json({ error: 'Não autenticado.' });
+    }
+    const isDev = Boolean(req.isPlatformDeveloper || principal.user.id === 'developer-marcel');
     const effectiveConfig = await EffectiveConfigurationService.resolve({
       companyId,
       userId: isDev ? undefined : principal.user.id,
@@ -194,7 +268,8 @@ router.post('/', requirePermission('templates.create'), requireCsrf, async (req:
     // 2. Validação de Elementos e Bindings
     const allowedElements = effectiveConfig.enabledElementsByNiche[targetNicheId] || [];
     const allowedFields = effectiveConfig.enabledFieldsByNiche[targetNicheId] || [];
-    const availMap = effectiveConfig.fieldsAvailabilityByNiche[targetNicheId] || {};
+    const fieldsAvailability = effectiveConfig.fieldsAvailabilityByNiche ?? {};
+    const nicheAvailability = fieldsAvailability[targetNicheId] ?? {};
 
     for (const el of body.document.elements || []) {
       if (!allowedElements.includes(el.type)) {
@@ -204,19 +279,9 @@ router.post('/', requirePermission('templates.create'), requireCsrf, async (req:
         });
       }
 
-      if (el.field && !el.field.startsWith('system.')) {
-        if (!allowedFields.includes(el.field)) {
-          return res.status(400).json({
-            error: `Campo canônico '${el.field}' está desabilitado na política atual do nicho '${targetNicheId}'.`,
-            code: 'CANONICAL_FIELD_DISABLED',
-          });
-        }
-        if (el.binding?.source === 'manual' && availMap[el.field] && availMap[el.field].manual === false) {
-          return res.status(400).json({
-            error: `Entrada manual para o campo '${el.field}' está desabilitada na política do nicho.`,
-            code: 'MANUAL_INPUT_DISABLED',
-          });
-        }
+      const bindingError = validateElementBinding(el, allowedFields, nicheAvailability, targetNicheId, false);
+      if (bindingError) {
+        return res.status(400).json(bindingError);
       }
     }
 
@@ -248,8 +313,11 @@ router.put('/:id', requirePermission('templates.edit'), requireCsrf, async (req:
       // Validação Server-Authoritative P0: Distinção de legado existente vs nova criação
       const existing = await templateRepository.getTemplateById(req.params.id, companyId);
       if (existing && existing.document) {
-        const principal = req.principal!;
-        const isDev = Boolean((req as any).isPlatformDeveloper || principal.user.id === 'developer-marcel');
+        const principal = req.principal;
+        if (!principal) {
+          return res.status(401).json({ error: 'Não autenticado.' });
+        }
+        const isDev = Boolean(req.isPlatformDeveloper || principal.user.id === 'developer-marcel');
         const effectiveConfig = await EffectiveConfigurationService.resolve({
           companyId,
           userId: isDev ? undefined : principal.user.id,
@@ -260,10 +328,11 @@ router.put('/:id', requirePermission('templates.edit'), requireCsrf, async (req:
         );
         const allowedElements = effectiveConfig.enabledElementsByNiche[targetNicheId] || [];
         const allowedFields = effectiveConfig.enabledFieldsByNiche[targetNicheId] || [];
-        const availMap = effectiveConfig.fieldsAvailabilityByNiche[targetNicheId] || {};
+        const fieldsAvailability = effectiveConfig.fieldsAvailabilityByNiche ?? {};
+        const nicheAvailability = fieldsAvailability[targetNicheId] ?? {};
 
-        const existingElementsMap = new Map(
-          (existing.document.elements || []).map((e: any) => [e.id, e])
+        const existingElementsMap = new Map<string, LabelElement>(
+          (existing.document.elements || []).map((e) => [e.id, e])
         );
 
         for (const el of body.document.elements || []) {
@@ -276,19 +345,9 @@ router.put('/:id', requirePermission('templates.edit'), requireCsrf, async (req:
                 code: 'NEW_DISABLED_ELEMENT_FORBIDDEN',
               });
             }
-            if (el.field && !el.field.startsWith('system.')) {
-              if (!allowedFields.includes(el.field)) {
-                return res.status(400).json({
-                  error: `Novo binding para o campo '${el.field}' está desabilitado na política atual do nicho.`,
-                  code: 'NEW_DISABLED_BINDING_FORBIDDEN',
-                });
-              }
-              if (el.binding?.source === 'manual' && availMap[el.field] && availMap[el.field].manual === false) {
-                return res.status(400).json({
-                  error: `Entrada manual para o campo '${el.field}' está desabilitada na política do nicho.`,
-                  code: 'MANUAL_INPUT_DISABLED',
-                });
-              }
+            const bindingError = validateElementBinding(el, allowedFields, nicheAvailability, targetNicheId, true);
+            if (bindingError) {
+              return res.status(400).json(bindingError);
             }
           } else {
             // ELEMENTO PRÉ-EXISTENTE (EXISTING_DISABLED_ELEMENT):
@@ -301,18 +360,12 @@ router.put('/:id', requirePermission('templates.edit'), requireCsrf, async (req:
             }
             // BINDING PRÉ-EXISTENTE (EXISTING_DISABLED_BINDING):
             // Permitido manter o binding antigo mesmo que atualmente OFF. Mas se criar NOVO binding ou trocar para campo OFF:
-            if (el.field && el.field !== prevEl.field && !el.field.startsWith('system.')) {
-              if (!allowedFields.includes(el.field)) {
-                return res.status(400).json({
-                  error: `Novo binding para o campo '${el.field}' está desabilitado na política atual do nicho.`,
-                  code: 'NEW_DISABLED_BINDING_FORBIDDEN',
-                });
-              }
-              if (el.binding?.source === 'manual' && availMap[el.field] && availMap[el.field].manual === false) {
-                return res.status(400).json({
-                  error: `Entrada manual para o campo '${el.field}' está desabilitada na política do nicho.`,
-                  code: 'MANUAL_INPUT_DISABLED',
-                });
+            const currentField = getElementField(el);
+            const prevField = getElementField(prevEl);
+            if (currentField && currentField !== prevField) {
+              const bindingError = validateElementBinding(el, allowedFields, nicheAvailability, targetNicheId, true);
+              if (bindingError) {
+                return res.status(400).json(bindingError);
               }
             }
           }
@@ -360,8 +413,11 @@ router.post('/:id/duplicate', requirePermission('templates.edit'), requireCsrf, 
       });
     }
 
-    const principal = req.principal!;
-    const isDev = Boolean((req as any).isPlatformDeveloper || principal.user.id === 'developer-marcel');
+    const principal = req.principal;
+    if (!principal) {
+      return res.status(401).json({ error: 'Não autenticado.' });
+    }
+    const isDev = Boolean(req.isPlatformDeveloper || principal.user.id === 'developer-marcel');
     const effectiveConfig = await EffectiveConfigurationService.resolve({
       companyId,
       userId: isDev ? undefined : principal.user.id,

@@ -13,6 +13,7 @@ declare global {
     interface Request {
       principal?: AuthenticatedPrincipal;
       authMethod?: 'cookie' | 'bearer';
+      isPlatformDeveloper?: boolean;
     }
   }
 }

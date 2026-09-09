@@ -829,23 +829,76 @@ export const RoleRepository = {
 // ==========================================
 export const CompanyConfigurationRepository = {
   // NICHES
-  async setNicheState(companyId: string, nicheId: string, state: 'ENABLED' | 'DISABLED'): Promise<CompanyNicheConfigDTO> {
+  async setNicheState(
+    companyId: string,
+    nicheId: string,
+    state: 'ENABLED' | 'DISABLED',
+    isDefault?: boolean
+  ): Promise<CompanyNicheConfigDTO> {
     const comp = await CompanyRepository.findById(companyId);
     if (!comp) throw new Error(`company_not_found: company '${companyId}' not found`);
     if (!NICHES.some((n) => n.id === nicheId)) {
       throw new Error(`invalid_niche: niche '${nicheId}' does not exist in platform`);
     }
+
+    // Regra: se tentar marcar como default, o nicho precisa ser ENABLED
+    let finalState = state;
+    if (isDefault === true) {
+      finalState = 'ENABLED';
+    }
+
+    // Regra de Consistência: Não permitir zero nichos ativos
+    if (finalState === 'DISABLED') {
+      const existingNiches = await this.getNiches(companyId);
+      // Se não houver configuração prévia, todos os 11 estão ativos por padrão.
+      const currentActive = existingNiches.length === 0
+        ? NICHES.map((n) => n.id)
+        : existingNiches.filter((n) => n.state === 'ENABLED').map((n) => n.nicheId);
+
+      const remainingActive = currentActive.filter((id) => id !== nicheId);
+      if (remainingActive.length === 0) {
+        throw new Error('cannot_disable_all_niches: A empresa deve manter pelo menos 1 nicho habilitado.');
+      }
+
+      // Regra: não desativar o nicho padrão
+      const currentDefault = existingNiches.find((n) => n.isDefault);
+      if (currentDefault && currentDefault.nicheId === nicheId && isDefault !== false) {
+        throw new Error('cannot_disable_default_niche: O nicho padrão da empresa não pode ser desativado. Defina outro nicho como padrão antes.');
+      }
+    }
+
     const now = new Date().toISOString();
 
     if (pgPool) {
+      if (isDefault === true) {
+        // Zera is_default de todos os outros nichos da empresa
+        await pgPool.query(
+          'UPDATE company_niches SET is_default = FALSE, updated_at = $1 WHERE company_id = $2',
+          [now, companyId]
+        );
+      }
+
       const res = await pgPool.query(
-        `INSERT INTO company_niches (company_id, niche_id, state, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, $5)
-         ON CONFLICT (company_id, niche_id) DO UPDATE SET state = EXCLUDED.state, updated_at = EXCLUDED.updated_at
-         RETURNING company_id AS "companyId", niche_id AS "nicheId", state, created_at AS "createdAt", updated_at AS "updatedAt"`,
-        [companyId, nicheId, state, now, now]
+        `INSERT INTO company_niches (company_id, niche_id, state, is_default, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         ON CONFLICT (company_id, niche_id) DO UPDATE SET
+           state = EXCLUDED.state,
+           is_default = CASE WHEN $4 IS NULL THEN company_niches.is_default ELSE EXCLUDED.is_default END,
+           updated_at = EXCLUDED.updated_at
+         RETURNING company_id AS "companyId", niche_id AS "nicheId", state, is_default AS "isDefault", created_at AS "createdAt", updated_at AS "updatedAt"`,
+        [companyId, nicheId, finalState, isDefault === true, now, now]
       );
       return res.rows[0];
+    }
+
+    // Armazenamento em memória (dev/test)
+    if (isDefault === true) {
+      const prefix = `${companyId}:`;
+      for (const [k, v] of memCompanyNiches.entries()) {
+        if (k.startsWith(prefix)) {
+          v.isDefault = false;
+        }
+      }
     }
 
     const key = `${companyId}:${nicheId}`;
@@ -853,7 +906,8 @@ export const CompanyConfigurationRepository = {
     const dto: CompanyNicheConfigDTO = {
       companyId,
       nicheId,
-      state,
+      state: finalState,
+      isDefault: isDefault !== undefined ? isDefault : existing?.isDefault || false,
       createdAt: existing ? existing.createdAt : now,
       updatedAt: now,
     };
@@ -861,10 +915,14 @@ export const CompanyConfigurationRepository = {
     return dto;
   },
 
+  async setDefaultNiche(companyId: string, nicheId: string): Promise<CompanyNicheConfigDTO> {
+    return this.setNicheState(companyId, nicheId, 'ENABLED', true);
+  },
+
   async getNiches(companyId: string): Promise<CompanyNicheConfigDTO[]> {
     if (pgPool) {
       const res = await pgPool.query(
-        `SELECT company_id AS "companyId", niche_id AS "nicheId", state, created_at AS "createdAt", updated_at AS "updatedAt"
+        `SELECT company_id AS "companyId", niche_id AS "nicheId", state, COALESCE(is_default, false) AS "isDefault", created_at AS "createdAt", updated_at AS "updatedAt"
          FROM company_niches WHERE company_id = $1`,
         [companyId]
       );
@@ -890,6 +948,10 @@ export const CompanyConfigurationRepository = {
       ...toolbox.recommendedTools.map((t) => t.elementType),
       ...toolbox.availableTools.map((t) => t.elementType),
       'text',
+      'price',
+      'date',
+      'barcode',
+      'qrcode',
       'line',
       'rectangle',
       'image',
@@ -945,7 +1007,16 @@ export const CompanyConfigurationRepository = {
   },
 
   // FIELDS
-  async setFieldEnabled(companyId: string, nicheId: string, canonicalFieldId: string, enabled: boolean): Promise<CompanyFieldConfigDTO> {
+  async setFieldConfig(
+    companyId: string,
+    nicheId: string,
+    canonicalFieldId: string,
+    config: {
+      enabled?: boolean;
+      availableForManual?: boolean;
+      availableForIntegration?: boolean;
+    }
+  ): Promise<CompanyFieldConfigDTO> {
     const comp = await CompanyRepository.findById(companyId);
     if (!comp) throw new Error(`company_not_found: company '${companyId}' not found`);
     if (!NICHES.some((n) => n.id === nicheId)) {
@@ -958,15 +1029,27 @@ export const CompanyConfigurationRepository = {
     if (!validFields.has(canonicalFieldId)) {
       throw new Error(`invalid_canonical_field: field '${canonicalFieldId}' is not valid for niche '${nicheId}'`);
     }
+
+    const isSystemField = SYSTEM_FIELDS.some((f) => f.id === canonicalFieldId);
+
+    // Campos de sistema são mantidos manual: false e integration: false
+    const enabled = config.enabled !== undefined ? config.enabled : true;
+    const availableForManual = isSystemField ? false : (config.availableForManual !== undefined ? config.availableForManual : true);
+    const availableForIntegration = isSystemField ? false : (config.availableForIntegration !== undefined ? config.availableForIntegration : true);
+
     const now = new Date().toISOString();
 
     if (pgPool) {
       const res = await pgPool.query(
-        `INSERT INTO company_niche_fields (company_id, niche_id, canonical_field_id, enabled, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, $5, $6)
-         ON CONFLICT (company_id, niche_id, canonical_field_id) DO UPDATE SET enabled = EXCLUDED.enabled, updated_at = EXCLUDED.updated_at
-         RETURNING company_id AS "companyId", niche_id AS "nicheId", canonical_field_id AS "canonicalFieldId", enabled, created_at AS "createdAt", updated_at AS "updatedAt"`,
-        [companyId, nicheId, canonicalFieldId, enabled, now, now]
+        `INSERT INTO company_niche_fields (company_id, niche_id, canonical_field_id, enabled, available_for_manual, available_for_integration, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+         ON CONFLICT (company_id, niche_id, canonical_field_id) DO UPDATE SET
+           enabled = EXCLUDED.enabled,
+           available_for_manual = EXCLUDED.available_for_manual,
+           available_for_integration = EXCLUDED.available_for_integration,
+           updated_at = EXCLUDED.updated_at
+         RETURNING company_id AS "companyId", niche_id AS "nicheId", canonical_field_id AS "canonicalFieldId", enabled, available_for_manual AS "availableForManual", available_for_integration AS "availableForIntegration", created_at AS "createdAt", updated_at AS "updatedAt"`,
+        [companyId, nicheId, canonicalFieldId, enabled, availableForManual, availableForIntegration, now, now]
       );
       return res.rows[0];
     }
@@ -978,6 +1061,8 @@ export const CompanyConfigurationRepository = {
       nicheId,
       canonicalFieldId,
       enabled,
+      availableForManual,
+      availableForIntegration,
       createdAt: existing ? existing.createdAt : now,
       updatedAt: now,
     };
@@ -985,9 +1070,13 @@ export const CompanyConfigurationRepository = {
     return dto;
   },
 
+  async setFieldEnabled(companyId: string, nicheId: string, canonicalFieldId: string, enabled: boolean): Promise<CompanyFieldConfigDTO> {
+    return this.setFieldConfig(companyId, nicheId, canonicalFieldId, { enabled });
+  },
+
   async getFields(companyId: string, nicheId?: string): Promise<CompanyFieldConfigDTO[]> {
     if (pgPool) {
-      let query = `SELECT company_id AS "companyId", niche_id AS "nicheId", canonical_field_id AS "canonicalFieldId", enabled, created_at AS "createdAt", updated_at AS "updatedAt"
+      let query = `SELECT company_id AS "companyId", niche_id AS "nicheId", canonical_field_id AS "canonicalFieldId", enabled, COALESCE(available_for_manual, true) AS "availableForManual", COALESCE(available_for_integration, true) AS "availableForIntegration", created_at AS "createdAt", updated_at AS "updatedAt"
                    FROM company_niche_fields WHERE company_id = $1`;
       const params: any[] = [companyId];
       if (nicheId) {

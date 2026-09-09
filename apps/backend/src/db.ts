@@ -304,6 +304,15 @@ function getMigrationsList(): Array<{ filename: string; sql: string }> {
         CREATE INDEX IF NOT EXISTS idx_users_dcc_master ON users (is_dcc_master);
       `,
     },
+    {
+      filename: '008_add_niche_defaults_and_field_availability.sql',
+      sql: `
+        ALTER TABLE company_niches ADD COLUMN IF NOT EXISTS is_default BOOLEAN NOT NULL DEFAULT FALSE;
+        CREATE INDEX IF NOT EXISTS idx_company_niches_default ON company_niches (company_id, is_default);
+        ALTER TABLE company_niche_fields ADD COLUMN IF NOT EXISTS available_for_manual BOOLEAN NOT NULL DEFAULT TRUE;
+        ALTER TABLE company_niche_fields ADD COLUMN IF NOT EXISTS available_for_integration BOOLEAN NOT NULL DEFAULT TRUE;
+      `,
+    },
   ];
 }
 

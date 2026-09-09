@@ -47,8 +47,10 @@ router.get('/context', requireAuthenticatedUser, async (req: Request, res: Respo
       canAccessDcc: isDev,
       allowedNiches: effectiveConfig.allowedNiches,
       enabledNiches: effectiveConfig.enabledNiches,
+      defaultNicheId: effectiveConfig.defaultNicheId,
       enabledElementsByNiche: effectiveConfig.enabledElementsByNiche,
       enabledFieldsByNiche: effectiveConfig.enabledFieldsByNiche,
+      fieldsAvailabilityByNiche: effectiveConfig.fieldsAvailabilityByNiche,
       csrfToken: principal.csrfToken,
     });
   } catch (err: any) {

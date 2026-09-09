@@ -12,6 +12,7 @@ import {
   CheckSquare,
   Square,
   Users,
+  Layers,
 } from 'lucide-react';
 import {
   AdminApi,
@@ -48,6 +49,9 @@ export const RolesAdminView: React.FC<RolesAdminViewProps> = ({
   const [editingRole, setEditingRole] = useState<RoleDTO | null>(null);
   const [permissionRole, setPermissionRole] = useState<RoleDTO | null>(null);
   const [deletingRole, setDeletingRole] = useState<RoleDTO | null>(null);
+  const [nicheRole, setNicheRole] = useState<RoleDTO | null>(null);
+  const [roleNichesAccess, setRoleNichesAccess] = useState<Record<string, boolean>>({});
+  const [nichesList, setNichesList] = useState<{ id: string; name: string }[]>([]);
 
   // Form states - Create
   const [createCode, setCreateCode] = useState<string>('');
@@ -392,6 +396,14 @@ export const RolesAdminView: React.FC<RolesAdminViewProps> = ({
                             onClick={() => openPermissionModal(r)}
                           >
                             <Key size={16} />
+                          </button>
+                          <button
+                            type="button"
+                            className="admin-action-btn"
+                            title="Gerenciar Nichos Permitidos"
+                            onClick={() => openRoleNichesModal(r)}
+                          >
+                            <Layers size={16} />
                           </button>
                           {!r.isSystem && (
                             <button
@@ -820,6 +832,73 @@ export const RolesAdminView: React.FC<RolesAdminViewProps> = ({
                 {modalSubmitting ? 'Excluindo...' : 'Sim, Excluir Perfil'}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: NICHOS DO PERFIL */}
+      {nicheRole && (
+        <div className="admin-modal-overlay">
+          <div className="admin-modal">
+            <div className="admin-modal-header">
+              <h3>Nichos Autorizados — {nicheRole.name}</h3>
+              <button
+                type="button"
+                className="admin-modal-close"
+                onClick={() => setNicheRole(null)}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <p className="admin-modal-description">
+              Defina os nichos operacionais em que usuários com o perfil <strong>{nicheRole.name}</strong> ({nicheRole.code}) podem criar e emitir etiquetas.
+            </p>
+
+            {modalError && (
+              <div className="admin-feedback-banner error">
+                <AlertCircle size={16} />
+                <span>{modalError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleRoleNichesSubmit} className="admin-modal-form">
+              <div className="admin-roles-checklist" style={{ maxHeight: '280px' }}>
+                {nichesList.map((n) => (
+                  <label key={n.id} className="admin-checkbox-label">
+                    <input
+                      type="checkbox"
+                      checked={roleNichesAccess[n.id] ?? true}
+                      onChange={(e) =>
+                        setRoleNichesAccess((prev) => ({
+                          ...prev,
+                          [n.id]: e.target.checked,
+                        }))
+                      }
+                    />
+                    <span>{n.name}</span>
+                  </label>
+                ))}
+              </div>
+
+              <div className="admin-modal-footer">
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => setNicheRole(null)}
+                  disabled={modalSubmitting}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={modalSubmitting}
+                >
+                  {modalSubmitting ? 'Salvando...' : 'Salvar Nichos Autorizados'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

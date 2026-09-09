@@ -4838,4 +4838,400 @@ body {
   color: var(--text-secondary);
 }
 
+/* ==========================================================================
+   PACOTE 5.4 — NICHOS & ELEMENTOS ADMIN STYLES
+   ========================================================================== */
+
+.admin-niches-view {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+/* Switch Toggle Customizado */
+.admin-switch {
+  position: relative;
+  display: inline-block;
+  width: 38px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+.admin-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.admin-slider {
+  position: absolute;
+  cursor: pointer;
+  inset: 0;
+  background-color: rgba(255, 255, 255, 0.15);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: 20px;
+  border: 1px solid var(--border-color);
+}
+
+.admin-slider:before {
+  position: absolute;
+  content: "";
+  height: 14px;
+  width: 14px;
+  left: 2px;
+  bottom: 2px;
+  background-color: var(--text-muted);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: 50%;
+}
+
+.admin-switch input:checked + .admin-slider {
+  background-color: var(--accent-blue);
+  border-color: var(--accent-blue);
+}
+
+.admin-switch input:checked + .admin-slider:before {
+  transform: translateX(18px);
+  background-color: #ffffff;
+}
+
+.admin-switch input:disabled + .admin-slider {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Grid dos 11 Nichos */
+.admin-niches-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.admin-niche-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.admin-niche-card:hover {
+  border-color: rgba(59, 130, 246, 0.4);
+  background: var(--bg-card-hover);
+  transform: translateY(-1px);
+}
+
+.admin-niche-card.selected {
+  border-color: var(--accent-blue);
+  box-shadow: 0 0 0 1px var(--accent-blue), 0 4px 12px rgba(59, 130, 246, 0.15);
+  background: rgba(59, 130, 246, 0.04);
+}
+
+.admin-niche-card.disabled {
+  opacity: 0.6;
+}
+
+.admin-niche-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.admin-niche-card-title-group {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.admin-niche-card-title {
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--text-primary);
+}
+
+.admin-niche-card-desc {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin: 0.5rem 0 0.75rem;
+  line-height: 1.4;
+  flex: 1;
+}
+
+.admin-niche-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 24px;
+  font-size: 0.75rem;
+}
+
+.admin-selected-tag {
+  color: var(--accent-blue);
+  font-weight: 600;
+  font-size: 0.725rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Painel de Detalhes do Nicho */
+.admin-niche-detail-panel {
+  margin-top: 0.5rem;
+}
+
+.admin-niche-detail-heading {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.admin-icon-accent {
+  color: var(--accent-blue);
+}
+
+.admin-subtabs-nav {
+  display: flex;
+  gap: 0.5rem;
+  border-bottom: 1px solid var(--border-color);
+  padding: 0.75rem 1.5rem 0;
+  background: rgba(0, 0, 0, 0.15);
+  overflow-x: auto;
+}
+
+.admin-subtab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.65rem 1rem;
+  border-radius: 6px 6px 0 0;
+  background: transparent;
+  border: 1px solid transparent;
+  border-bottom: none;
+  color: var(--text-secondary);
+  font-size: 0.825rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.admin-subtab-btn:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.admin-subtab-btn.active {
+  color: var(--accent-blue);
+  background: var(--bg-card);
+  border-color: var(--border-color);
+  border-bottom-color: var(--bg-card);
+  margin-bottom: -1px;
+  font-weight: 600;
+}
+
+.admin-subtab-content {
+  padding: 1.5rem;
+}
+
+.admin-section-actions-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.admin-hint-text {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin: 0;
+  line-height: 1.4;
+}
+
+/* Grid de Elementos Visuais */
+.admin-elements-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 1rem;
+}
+
+.admin-element-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.admin-element-card:hover {
+  background: var(--bg-card-hover);
+  border-color: rgba(59, 130, 246, 0.3);
+}
+
+.admin-element-card.inactive {
+  opacity: 0.55;
+}
+
+.admin-element-card-left {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+}
+
+.admin-element-icon-box {
+  width: 38px;
+  height: 38px;
+  border-radius: 8px;
+  background: rgba(59, 130, 246, 0.1);
+  color: var(--accent-blue);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.admin-element-card.inactive .admin-element-icon-box {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-muted);
+}
+
+.admin-element-title {
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin: 0;
+  color: var(--text-primary);
+}
+
+.admin-element-desc {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin: 0.2rem 0 0;
+  line-height: 1.3;
+}
+
+/* Tabela de Campos */
+.admin-field-name-cell {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.admin-field-name {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.admin-field-desc {
+  font-size: 0.775rem;
+  color: var(--text-muted);
+  display: block;
+  margin-top: 0.15rem;
+}
+
+.admin-field-type-badge {
+  font-size: 0.725rem;
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  font-family: monospace;
+}
+
+.admin-system-field-hint {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.admin-role-name-cell {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.admin-icon-muted {
+  color: var(--text-muted);
+}
+
+/* Preview Efetivo */
+.admin-notice-box {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 1rem 1.25rem;
+  border-radius: 8px;
+  background: rgba(59, 130, 246, 0.08);
+  border: 1px solid rgba(59, 130, 246, 0.25);
+  color: var(--accent-cyan);
+  font-size: 0.85rem;
+  line-height: 1.4;
+  margin-bottom: 1.5rem;
+}
+
+.admin-notice-box strong {
+  display: block;
+  font-size: 0.9rem;
+  margin-bottom: 0.25rem;
+}
+
+.admin-notice-box p {
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+.admin-preview-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1rem;
+}
+
+.admin-preview-metric-card {
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+}
+
+.admin-preview-metric-label {
+  font-size: 0.775rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  margin-bottom: 0.5rem;
+}
+
+.admin-preview-metric-value {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 0.35rem;
+}
+
+.admin-preview-metric-sub {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+/* Badge Dourado para Nicho Padrão */
+.badge-gold {
+  background: rgba(234, 179, 8, 0.15);
+  color: #facc15;
+  border: 1px solid rgba(234, 179, 8, 0.35);
+}
+
 

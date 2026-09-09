@@ -611,6 +611,7 @@ export interface CompanyNicheConfigDTO {
   companyId: string;
   nicheId: string;
   state: CompanyNicheState;
+  isDefault?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -629,6 +630,8 @@ export interface CompanyFieldConfigDTO {
   nicheId: string;
   canonicalFieldId: string;
   enabled: boolean;
+  availableForManual?: boolean;
+  availableForIntegration?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -637,7 +640,9 @@ export interface EffectiveCompanyConfigurationDTO {
   company: CompanyDTO;
   enabledNiches: string[];
   allowedNiches: string[];
+  defaultNicheId?: string;
   enabledElementsByNiche: Record<string, string[]>;
   enabledFieldsByNiche: Record<string, string[]>;
+  fieldsAvailabilityByNiche?: Record<string, Record<string, { manual: boolean; integration: boolean }>>;
   permissions: string[];
 }

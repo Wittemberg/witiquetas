@@ -187,4 +187,100 @@ export const AdminApi = {
       method: 'DELETE',
     });
   },
+
+  // Nichos
+  async fetchNiches(): Promise<NicheAdminItemDTO[]> {
+    return request<NicheAdminItemDTO[]>('/niches');
+  },
+
+  async updateNiches(
+    niches: { nicheId: string; enabled: boolean }[],
+    defaultNicheId?: string
+  ): Promise<any[]> {
+    return request<any[]>('/niches', {
+      method: 'PUT',
+      body: JSON.stringify({ niches, defaultNicheId }),
+    });
+  },
+
+  // Elementos Visuais por Nicho
+  async fetchNicheElements(nicheId: string): Promise<ElementAdminItemDTO[]> {
+    return request<ElementAdminItemDTO[]>(`/niches/${encodeURIComponent(nicheId)}/elements`);
+  },
+
+  async updateNicheElements(
+    nicheId: string,
+    elements: { elementType: string; enabled: boolean }[]
+  ): Promise<any[]> {
+    return request<any[]>(`/niches/${encodeURIComponent(nicheId)}/elements`, {
+      method: 'PUT',
+      body: JSON.stringify({ elements }),
+    });
+  },
+
+  // Campos Canônicos de Dados por Nicho
+  async fetchNicheFields(nicheId: string): Promise<FieldAdminItemDTO[]> {
+    return request<FieldAdminItemDTO[]>(`/niches/${encodeURIComponent(nicheId)}/fields`);
+  },
+
+  async updateNicheFields(
+    nicheId: string,
+    fields: {
+      fieldId: string;
+      enabled?: boolean;
+      availableForManual?: boolean;
+      availableForIntegration?: boolean;
+    }[]
+  ): Promise<any[]> {
+    return request<any[]>(`/niches/${encodeURIComponent(nicheId)}/fields`, {
+      method: 'PUT',
+      body: JSON.stringify({ fields }),
+    });
+  },
+
+  // Preview de Configuração Efetiva
+  async fetchEffectivePreview(): Promise<any> {
+    return request<any>('/niches/effective-preview');
+  },
+
+  // Nichos por Papel (Role Niches)
+  async fetchRoleNiches(roleId: string): Promise<{ roleId: string; nicheAccess: Record<string, boolean> }> {
+    return request<{ roleId: string; nicheAccess: Record<string, boolean> }>(`/roles/${encodeURIComponent(roleId)}/niches`);
+  },
+
+  async updateRoleNiches(
+    roleId: string,
+    nicheAccess: Record<string, boolean>
+  ): Promise<{ roleId: string; nicheAccess: Record<string, boolean> }> {
+    return request<{ roleId: string; nicheAccess: Record<string, boolean> }>(`/roles/${encodeURIComponent(roleId)}/niches`, {
+      method: 'PUT',
+      body: JSON.stringify({ nicheAccess }),
+    });
+  },
 };
+
+export interface NicheAdminItemDTO {
+  id: string;
+  name: string;
+  description: string;
+  tagline?: string;
+  enabled: boolean;
+  isDefault: boolean;
+}
+
+export interface ElementAdminItemDTO {
+  elementType: string;
+  name: string;
+  enabled: boolean;
+}
+
+export interface FieldAdminItemDTO {
+  fieldId: string;
+  name: string;
+  description: string;
+  type: string;
+  isSystem: boolean;
+  enabled: boolean;
+  availableForManual: boolean;
+  availableForIntegration: boolean;
+}

@@ -5,14 +5,21 @@ import {
   requireCsrf,
 } from '../middleware/authMiddleware.js';
 import {
+  NICHES,
+  getIntegrationFieldsByNiche,
+  SYSTEM_FIELDS,
+} from '@witiquetas/label-schema';
+import {
   CompanyRepository,
   UserRepository,
   RoleRepository,
+  CompanyConfigurationRepository,
   CANONICAL_PERMISSIONS,
   TENANT_MANAGEABLE_PERMISSIONS,
 } from '../repositories/adminRepositories.js';
 import { SessionRepository } from '../repositories/sessionRepository.js';
 import { PasswordService } from '../services/passwordService.js';
+import { EffectiveConfigurationService } from '../services/effectiveConfigurationService.js';
 
 const router = Router();
 
@@ -597,6 +604,363 @@ router.delete('/roles/:id', requirePermission('roles.manage'), requireCsrf, asyn
   await RoleRepository.delete(companyId, role.id);
 
   return res.status(200).json({ success: true, message: 'Perfil excluído com sucesso.' });
+});
+
+// ==========================================
+// 5. NICHOS DA EMPRESA (Niches)
+// ==========================================
+
+const CANONICAL_ELEMENT_TYPES = [
+  { type: 'text', name: 'Texto' },
+  { type: 'price', name: 'Preço' },
+  { type: 'date', name: 'Data de Validade/Fabricação' },
+  { type: 'barcode', name: 'Código de Barras' },
+  { type: 'qrcode', name: 'QR Code' },
+  { type: 'line', name: 'Linha Divisória' },
+  { type: 'rectangle', name: 'Retângulo / Moldura' },
+  { type: 'image', name: 'Imagem / Logomarca' },
+];
+
+/**
+ * GET /api/admin/niches
+ * Lista os 11 nichos da plataforma com o status de habilitação para a empresa ativa
+ */
+router.get('/niches', requirePermission('niches.view'), async (req: Request, res: Response) => {
+  const companyId = req.principal!.company.id;
+  const configured = await CompanyConfigurationRepository.getNiches(companyId);
+
+  const configMap = new Map<string, { enabled: boolean; isDefault: boolean }>();
+  for (const c of configured) {
+    configMap.set(c.nicheId, {
+      enabled: c.state === 'ENABLED',
+      isDefault: Boolean(c.isDefault),
+    });
+  }
+
+  // Se nenhum nicho tiver sido configurado ainda, todos os 11 iniciam ativos e 'varejo' como default
+  const hasConfig = configured.length > 0;
+
+  const result = NICHES.map((n) => {
+    const cfg = configMap.get(n.id);
+    const enabled = hasConfig ? (cfg ? cfg.enabled : false) : true;
+    const isDefault = hasConfig ? (cfg ? cfg.isDefault : false) : n.id === 'niche-gondola';
+    return {
+      id: n.id,
+      name: n.name,
+      description: n.description,
+      enabled,
+      isDefault,
+    };
+  });
+
+  return res.status(200).json(result);
+});
+
+/**
+ * PUT /api/admin/niches
+ * Atualiza nichos habilitados e nicho padrão da empresa
+ */
+router.put('/niches', requirePermission('niches.manage'), requireCsrf, async (req: Request, res: Response) => {
+  const companyId = req.principal!.company.id;
+  const { niches, defaultNicheId } = req.body;
+
+  if (!Array.isArray(niches) || niches.length === 0) {
+    return res.status(400).json({ error: 'A lista de nichos deve ser fornecida.', code: 'INVALID_NICHES_LIST' });
+  }
+
+  // Validar se todos os nicheIds pertencem aos 11 nichos canônicos
+  for (const item of niches) {
+    if (!NICHES.some((n) => n.id === item.nicheId)) {
+      return res.status(400).json({ error: `Nicho inválido ou desconhecido: '${item.nicheId}'.`, code: 'INVALID_NICHE' });
+    }
+  }
+
+  // Regra: pelo menos 1 nicho deve permanecer habilitado
+  const willBeEnabled = niches.filter((item) => item.enabled === true);
+  if (willBeEnabled.length === 0) {
+    return res.status(400).json({ error: 'A empresa deve manter pelo menos 1 nicho habilitado.', code: 'CANNOT_DISABLE_ALL_NICHES' });
+  }
+
+  // Se defaultNicheId foi especificado, validar que pertence à plataforma e estará habilitado
+  if (defaultNicheId) {
+    if (!NICHES.some((n) => n.id === defaultNicheId)) {
+      return res.status(400).json({ error: `Nicho padrão inválido: '${defaultNicheId}'.`, code: 'INVALID_DEFAULT_NICHE' });
+    }
+    const defaultItem = niches.find((item) => item.nicheId === defaultNicheId);
+    if (defaultItem && defaultItem.enabled === false) {
+      return res.status(400).json({ error: 'O nicho padrão da empresa não pode ser desabilitado.', code: 'DEFAULT_NICHE_MUST_BE_ENABLED' });
+    }
+  }
+
+  // Persistir alterações
+  for (const item of niches) {
+    const isDefault = defaultNicheId ? item.nicheId === defaultNicheId : undefined;
+    await CompanyConfigurationRepository.setNicheState(
+      companyId,
+      item.nicheId,
+      item.enabled ? 'ENABLED' : 'DISABLED',
+      isDefault
+    );
+  }
+
+  // Se defaultNicheId foi passado explicitamente, assegura
+  if (defaultNicheId) {
+    await CompanyConfigurationRepository.setDefaultNiche(companyId, defaultNicheId);
+  }
+
+  const configured = await CompanyConfigurationRepository.getNiches(companyId);
+  const configMap = new Map<string, { enabled: boolean; isDefault: boolean }>();
+  for (const c of configured) {
+    configMap.set(c.nicheId, {
+      enabled: c.state === 'ENABLED',
+      isDefault: Boolean(c.isDefault),
+    });
+  }
+
+  const result = NICHES.map((n) => {
+    const cfg = configMap.get(n.id);
+    return {
+      id: n.id,
+      name: n.name,
+      description: n.description,
+      enabled: cfg ? cfg.enabled : false,
+      isDefault: cfg ? cfg.isDefault : false,
+    };
+  });
+
+  return res.status(200).json(result);
+});
+
+// ==========================================
+// 6. ELEMENTOS VISUAIS POR NICHO (Elements)
+// ==========================================
+
+/**
+ * GET /api/admin/niches/:nicheId/elements
+ * Retorna os 8 elementos visuais canônicos com status de habilitação no nicho
+ */
+router.get('/niches/:nicheId/elements', requirePermission('elements.view'), async (req: Request, res: Response) => {
+  const companyId = req.principal!.company.id;
+  const { nicheId } = req.params;
+
+  if (!NICHES.some((n) => n.id === nicheId)) {
+    return res.status(404).json({ error: `Nicho '${nicheId}' não encontrado.`, code: 'NICHE_NOT_FOUND' });
+  }
+
+  const configured = await CompanyConfigurationRepository.getElements(companyId, nicheId);
+  const configMap = new Map<string, boolean>();
+  for (const c of configured) {
+    configMap.set(c.elementType, c.enabled);
+  }
+
+  const result = CANONICAL_ELEMENT_TYPES.map((el) => ({
+    elementType: el.type,
+    name: el.name,
+    enabled: configMap.has(el.type) ? configMap.get(el.type)! : true,
+  }));
+
+  return res.status(200).json(result);
+});
+
+/**
+ * PUT /api/admin/niches/:nicheId/elements
+ * Habilita ou desabilita elementos visuais no nicho
+ */
+router.put('/niches/:nicheId/elements', requirePermission('elements.manage'), requireCsrf, async (req: Request, res: Response) => {
+  const companyId = req.principal!.company.id;
+  const { nicheId } = req.params;
+  const { elements } = req.body;
+
+  if (!NICHES.some((n) => n.id === nicheId)) {
+    return res.status(404).json({ error: `Nicho '${nicheId}' não encontrado.`, code: 'NICHE_NOT_FOUND' });
+  }
+
+  if (!Array.isArray(elements)) {
+    return res.status(400).json({ error: 'A lista de elementos deve ser fornecida.', code: 'INVALID_ELEMENTS_LIST' });
+  }
+
+  // Validar se todos os elementos pertencem aos 8 canônicos conhecidos
+  for (const item of elements) {
+    if (!CANONICAL_ELEMENT_TYPES.some((el) => el.type === item.elementType)) {
+      return res.status(400).json({ error: `Elemento visual inválido ou desconhecido: '${item.elementType}'.`, code: 'INVALID_ELEMENT' });
+    }
+  }
+
+  // Persistir alterações
+  for (const item of elements) {
+    await CompanyConfigurationRepository.setElementEnabled(
+      companyId,
+      nicheId,
+      item.elementType,
+      Boolean(item.enabled)
+    );
+  }
+
+  const updated = await CompanyConfigurationRepository.getElements(companyId, nicheId);
+  return res.status(200).json(updated);
+});
+
+// ==========================================
+// 7. CAMPOS CANÔNICOS DE DADOS POR NICHO (Fields)
+// ==========================================
+
+/**
+ * GET /api/admin/niches/:nicheId/fields
+ * Retorna os campos canônicos do nicho com flags de ativação, entrada manual e integração
+ */
+router.get('/niches/:nicheId/fields', requirePermission('niches.view'), async (req: Request, res: Response) => {
+  const companyId = req.principal!.company.id;
+  const { nicheId } = req.params;
+
+  if (!NICHES.some((n) => n.id === nicheId)) {
+    return res.status(404).json({ error: `Nicho '${nicheId}' não encontrado.`, code: 'NICHE_NOT_FOUND' });
+  }
+
+  const integrationFields = getIntegrationFieldsByNiche(nicheId);
+  const allAvailableFields = [...integrationFields, ...SYSTEM_FIELDS];
+
+  const configured = await CompanyConfigurationRepository.getFields(companyId, nicheId);
+  const configMap = new Map<string, { enabled: boolean; manual: boolean; integration: boolean }>();
+  for (const c of configured) {
+    configMap.set(c.canonicalFieldId, {
+      enabled: c.enabled,
+      manual: c.availableForManual !== undefined ? c.availableForManual : true,
+      integration: c.availableForIntegration !== undefined ? c.availableForIntegration : true,
+    });
+  }
+
+  const result = allAvailableFields.map((f: any) => {
+    const isSystem = SYSTEM_FIELDS.some((sf) => sf.id === f.id);
+    const cfg = configMap.get(f.id);
+    return {
+      fieldId: f.id,
+      name: f.label || f.id,
+      description: f.description || (isSystem ? 'Campo gerado automaticamente pela plataforma' : f.example || ''),
+      type: f.type || (isSystem ? 'system' : 'string'),
+      isSystem,
+      enabled: cfg ? cfg.enabled : true,
+      availableForManual: isSystem ? false : (cfg ? cfg.manual : true),
+      availableForIntegration: isSystem ? false : (cfg ? cfg.integration : true),
+    };
+  });
+
+  return res.status(200).json(result);
+});
+
+/**
+ * PUT /api/admin/niches/:nicheId/fields
+ * Atualiza governança de campos canônicos (ativação, entrada manual e via integração)
+ */
+router.put('/niches/:nicheId/fields', requirePermission('niches.manage'), requireCsrf, async (req: Request, res: Response) => {
+  const companyId = req.principal!.company.id;
+  const { nicheId } = req.params;
+  const { fields } = req.body;
+
+  if (!NICHES.some((n) => n.id === nicheId)) {
+    return res.status(404).json({ error: `Nicho '${nicheId}' não encontrado.`, code: 'NICHE_NOT_FOUND' });
+  }
+
+  if (!Array.isArray(fields)) {
+    return res.status(400).json({ error: 'A lista de campos deve ser fornecida.', code: 'INVALID_FIELDS_LIST' });
+  }
+
+  const integrationFields = getIntegrationFieldsByNiche(nicheId);
+  const validFields = new Set<string>([
+    ...integrationFields.map((f) => f.id),
+    ...SYSTEM_FIELDS.map((f) => f.id),
+  ]);
+
+  for (const item of fields) {
+    if (!validFields.has(item.fieldId)) {
+      return res.status(400).json({ error: `Campo canônico inválido para o nicho '${nicheId}': '${item.fieldId}'.`, code: 'INVALID_FIELD' });
+    }
+  }
+
+  // Persistir alterações
+  for (const item of fields) {
+    await CompanyConfigurationRepository.setFieldConfig(companyId, nicheId, item.fieldId, {
+      enabled: item.enabled,
+      availableForManual: item.availableForManual,
+      availableForIntegration: item.availableForIntegration,
+    });
+  }
+
+  const updated = await CompanyConfigurationRepository.getFields(companyId, nicheId);
+  return res.status(200).json(updated);
+});
+
+// ==========================================
+// 8. PREVIEW DE CONFIGURAÇÃO EFETIVA (Effective Preview)
+// ==========================================
+
+/**
+ * GET /api/admin/niches/effective-preview
+ * Retorna o snapshot da configuração efetiva da empresa para validação visual antes de publicar
+ */
+router.get('/niches/effective-preview', requirePermission('niches.view'), async (req: Request, res: Response) => {
+  const companyId = req.principal!.company.id;
+  const effectiveConfig = await EffectiveConfigurationService.resolve({ companyId });
+  return res.status(200).json(effectiveConfig);
+});
+
+// ==========================================
+// 9. NICHOS PERMITIDOS POR PERFIL (Role Niches)
+// ==========================================
+
+/**
+ * GET /api/admin/roles/:id/niches
+ * Retorna restrição de nichos permitidos por papel (Anti-IDOR)
+ */
+router.get('/roles/:id/niches', requirePermission('roles.view'), async (req: Request, res: Response) => {
+  const companyId = req.principal!.company.id;
+  const roleId = req.params.id;
+
+  const role = await RoleRepository.findById(roleId);
+  if (!role || role.companyId !== companyId) {
+    return res.status(404).json({ error: 'Perfil não encontrado.', code: 'ROLE_NOT_FOUND' });
+  }
+
+  const nicheAccess = await RoleRepository.getRoleNicheAccess(role.id);
+  return res.status(200).json({
+    roleId: role.id,
+    nicheAccess,
+  });
+});
+
+/**
+ * PUT /api/admin/roles/:id/niches
+ * Atualiza nichos permitidos por papel (Anti-IDOR)
+ */
+router.put('/roles/:id/niches', requirePermission('roles.manage'), requireCsrf, async (req: Request, res: Response) => {
+  const companyId = req.principal!.company.id;
+  const roleId = req.params.id;
+  const { nicheAccess } = req.body;
+
+  const role = await RoleRepository.findById(roleId);
+  if (!role || role.companyId !== companyId) {
+    return res.status(404).json({ error: 'Perfil não encontrado.', code: 'ROLE_NOT_FOUND' });
+  }
+
+  if (!nicheAccess || typeof nicheAccess !== 'object') {
+    return res.status(400).json({ error: 'nicheAccess deve ser um objeto com mapeamento de nichos.', code: 'INVALID_NICHE_ACCESS_FORMAT' });
+  }
+
+  // Validar se todas as chaves pertencem aos 11 nichos canônicos
+  for (const nid of Object.keys(nicheAccess)) {
+    if (!NICHES.some((n) => n.id === nid)) {
+      return res.status(400).json({ error: `Nicho inválido ou desconhecido: '${nid}'.`, code: 'INVALID_NICHE' });
+    }
+  }
+
+  for (const [nid, allowed] of Object.entries(nicheAccess)) {
+    await RoleRepository.setRoleNicheAccess(role.id, nid, Boolean(allowed));
+  }
+
+  const updated = await RoleRepository.getRoleNicheAccess(role.id);
+  return res.status(200).json({
+    roleId: role.id,
+    nicheAccess: updated,
+  });
 });
 
 export default router;

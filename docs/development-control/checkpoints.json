@@ -1,6 +1,28 @@
 {
   "checkpoints": [
     {
+      "sha": "dad1c0ebd34886b234fbd1e1dde68eb54f375b3e",
+      "shortSha": "dad1c0e",
+      "date": "2026-09-09T12:15:00Z",
+      "phase": "5",
+      "patch": "5.4.0-candidate",
+      "title": "feat(admin): administracao de nichos, elementos visuais e campos canonicos (PACOTE 5.4)",
+      "type": "FEATURE",
+      "capabilities": [
+        "cap-admin-shell",
+        "cap-admin-niches-elements",
+        "cap-enabled-niches",
+        "cap-enabled-elements",
+        "cap-enabled-fields",
+        "cap-effective-configuration"
+      ],
+      "testsPassed": true,
+      "deployed": false,
+      "manualValidation": false,
+      "homologated": false,
+      "evidence": "Pacote 5.4 implementado com sucesso. 30/30 testes P0 aprovados. Gestao dos 11 nichos, nicho padrao, elementos visuais, campos canonicos, disponibilidade manual/integracao, role_niches e EffectiveConfigurationService sem restart. Aguardando homologacao manual."
+    },
+    {
       "sha": "caae3aa26f85964195f39aa32978ee2217e4c022",
       "shortSha": "caae3aa",
       "date": "2026-09-08T19:45:00Z",
@@ -264,7 +286,9 @@
       "patch": "4.5.4",
       "title": "fix(editor): HOTFIX UX 4.5.4 — Toolbox Compacta Completa em Lista + Fluxo Vertical Natural",
       "type": "HOTFIX",
-      "capabilities": ["cap-compact-toolbox-flow"],
+      "capabilities": [
+        "cap-compact-toolbox-flow"
+      ],
       "testsPassed": true,
       "deployed": true,
       "manualValidation": false
@@ -277,7 +301,9 @@
       "patch": "4.5.2",
       "title": "fix(frontend): HOTFIX 4.5.2 — frontend runtime crash getIntegrationFieldsByNiche import",
       "type": "HOTFIX",
-      "capabilities": ["cap-multiniche-profiles"],
+      "capabilities": [
+        "cap-multiniche-profiles"
+      ],
       "testsPassed": true,
       "deployed": true,
       "manualValidation": false
@@ -290,7 +316,9 @@
       "patch": "4.5.1",
       "title": "fix(backend): HOTFIX P0 — restaurar build do backend em tsc",
       "type": "HOTFIX",
-      "capabilities": ["cap-multiniche-profiles"],
+      "capabilities": [
+        "cap-multiniche-profiles"
+      ],
       "testsPassed": true,
       "deployed": true,
       "manualValidation": false
@@ -303,7 +331,9 @@
       "patch": "4.5.1",
       "title": "fix(niche): HOTFIX 4.5.1 — UI/runtime multiniche integration",
       "type": "HOTFIX",
-      "capabilities": ["cap-multiniche-profiles"],
+      "capabilities": [
+        "cap-multiniche-profiles"
+      ],
       "testsPassed": true,
       "deployed": true,
       "manualValidation": false
@@ -316,7 +346,9 @@
       "patch": "4.5.0",
       "title": "feat(niche): implementar PACOTE 4.5 — Perfis Multi-Nicho + Modelos e Dados de Homologação",
       "type": "FEATURE",
-      "capabilities": ["cap-multiniche-profiles"],
+      "capabilities": [
+        "cap-multiniche-profiles"
+      ],
       "testsPassed": true,
       "deployed": true,
       "manualValidation": false
@@ -329,7 +361,9 @@
       "patch": "4.4.0",
       "title": "feat(editor): implementar multiseleção via lista de camadas com Ctrl/Cmd + clique (PACOTE 4.4)",
       "type": "FEATURE",
-      "capabilities": ["cap-layers-multiselect"],
+      "capabilities": [
+        "cap-layers-multiselect"
+      ],
       "testsPassed": true,
       "deployed": true,
       "manualValidation": true
@@ -342,7 +376,10 @@
       "patch": "4.3.0",
       "title": "feat(editor): publicar candidato de homologação para PACOTE 4.3 — Shape + Imagem/Logo",
       "type": "FEATURE",
-      "capabilities": ["cap-shape-element", "cap-logo-element"],
+      "capabilities": [
+        "cap-shape-element",
+        "cap-logo-element"
+      ],
       "testsPassed": true,
       "deployed": true,
       "manualValidation": false
@@ -355,7 +392,9 @@
       "patch": "4.1.3",
       "title": "feat(print-center): adicionar prévia real de impressão com renderer homologado do Editor",
       "type": "FEATURE",
-      "capabilities": ["cap-universal-print-center"],
+      "capabilities": [
+        "cap-universal-print-center"
+      ],
       "testsPassed": true,
       "deployed": false,
       "manualValidation": true
@@ -368,7 +407,9 @@
       "patch": "4.1.2",
       "title": "fix(print-center): aplicar visual system canônico à Central",
       "type": "HOTFIX",
-      "capabilities": ["cap-universal-print-center"],
+      "capabilities": [
+        "cap-universal-print-center"
+      ],
       "testsPassed": true,
       "deployed": false,
       "manualValidation": true
@@ -381,7 +422,9 @@
       "patch": "4.1.1",
       "title": "fix(print-center): corrigir carregamento do modelo completo com getTemplateById",
       "type": "HOTFIX",
-      "capabilities": ["cap-universal-print-center"],
+      "capabilities": [
+        "cap-universal-print-center"
+      ],
       "testsPassed": true,
       "deployed": false,
       "manualValidation": true
@@ -394,7 +437,9 @@
       "patch": "4.1.2",
       "title": "feat(printcenter): implementação funcional da Central de Impressão Universal (Etapa 2)",
       "type": "FEATURE",
-      "capabilities": ["cap-universal-print-center"],
+      "capabilities": [
+        "cap-universal-print-center"
+      ],
       "testsPassed": true,
       "deployed": false,
       "manualValidation": true
@@ -407,7 +452,9 @@
       "patch": "4.1.0",
       "title": "docs(devcontrol): iniciar Fase 4 — Central de Impressão Universal (Diagnóstico, Contrato e Baseline)",
       "type": "GOVERNANCE",
-      "capabilities": ["cap-universal-print-center"],
+      "capabilities": [
+        "cap-universal-print-center"
+      ],
       "testsPassed": true,
       "deployed": false,
       "manualValidation": true
@@ -420,7 +467,10 @@
       "patch": "3.2.8.4",
       "title": "ci(workflow): adicionar suporte a workflow_dispatch e estabilização de toolbar",
       "type": "INFRA",
-      "capabilities": ["cap-toolbar-geometry-stabilization", "cap-docker-cicd"],
+      "capabilities": [
+        "cap-toolbar-geometry-stabilization",
+        "cap-docker-cicd"
+      ],
       "testsPassed": true,
       "deployed": true,
       "manualValidation": true
@@ -433,7 +483,9 @@
       "patch": "3.2.8.4",
       "title": "fix(editor): estabilizar largura do status na toolbar",
       "type": "UX",
-      "capabilities": ["cap-toolbar-geometry-stabilization"],
+      "capabilities": [
+        "cap-toolbar-geometry-stabilization"
+      ],
       "testsPassed": true,
       "deployed": true,
       "manualValidation": true
@@ -446,7 +498,9 @@
       "patch": "3.2.8.3",
       "title": "fix(concurrency): corrigir resolução e contexto de abas",
       "type": "FIX",
-      "capabilities": ["cap-concurrency-presence"],
+      "capabilities": [
+        "cap-concurrency-presence"
+      ],
       "testsPassed": true,
       "deployed": true,
       "manualValidation": true
@@ -459,7 +513,9 @@
       "patch": "3.2.8.2",
       "title": "fix(concurrency): corrigir resolução de conflitos e modais",
       "type": "FIX",
-      "capabilities": ["cap-concurrency-presence"],
+      "capabilities": [
+        "cap-concurrency-presence"
+      ],
       "testsPassed": true,
       "deployed": true,
       "manualValidation": true
@@ -472,7 +528,9 @@
       "patch": "3.2.8.1",
       "title": "fix(editor): corrigir runtime do modal de conflito",
       "type": "HOTFIX",
-      "capabilities": ["cap-concurrency-presence"],
+      "capabilities": [
+        "cap-concurrency-presence"
+      ],
       "testsPassed": true,
       "deployed": true,
       "manualValidation": true
@@ -485,7 +543,9 @@
       "patch": "3.2.8",
       "title": "fix(ci): ampliar janela de validação do deploy Portainer",
       "type": "INFRA",
-      "capabilities": ["cap-docker-cicd"],
+      "capabilities": [
+        "cap-docker-cicd"
+      ],
       "testsPassed": true,
       "deployed": true,
       "manualValidation": true
@@ -498,7 +558,9 @@
       "patch": "3.2.8",
       "title": "feat(models): adicionar presença de edição e resolução de conflitos",
       "type": "FEATURE",
-      "capabilities": ["cap-concurrency-presence"],
+      "capabilities": [
+        "cap-concurrency-presence"
+      ],
       "testsPassed": true,
       "deployed": true,
       "manualValidation": true
@@ -511,7 +573,9 @@
       "patch": "4.5.3",
       "title": "fix(multiniche): HOTFIX 4.5.3 - restauração integral do catálogo de 11 nichos, 66 tamanhos e toolbox especializada",
       "type": "HOTFIX",
-      "capabilities": ["cap-multiniche-profiles"],
+      "capabilities": [
+        "cap-multiniche-profiles"
+      ],
       "testsPassed": true,
       "deployed": true,
       "manualValidation": false

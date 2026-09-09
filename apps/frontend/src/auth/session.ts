@@ -32,8 +32,10 @@ export interface SessionContext {
   permissions: string[];
   allowedNiches: string[];
   enabledNiches?: string[];
+  defaultNicheId?: string;
   enabledElementsByNiche?: Record<string, string[]>;
   enabledFieldsByNiche?: Record<string, string[]>;
+  fieldsAvailabilityByNiche?: Record<string, Record<string, { manual: boolean; integration: boolean }>>;
   csrfToken: string;
   dccEnabled?: boolean;
   canAccessDcc?: boolean;

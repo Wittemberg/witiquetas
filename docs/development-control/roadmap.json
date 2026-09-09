@@ -1244,17 +1244,21 @@
           "module": "admin",
           "weight": 2,
           "mvp": false,
-          "status": "PLANNED",
+          "status": "IMPLEMENTED",
           "manualValidation": false,
           "physicalValidation": false,
           "frozen": false,
-          "evidence": [],
+          "evidence": [
+            "apps/frontend/src/modules/admin/NichesAdminView.tsx",
+            "apps/backend/src/routes/admin.ts",
+            "tests/package54NichesElementsFields.test.ts"
+          ],
           "dependencies": [
             "cap-admin-shell",
             "cap-enabled-elements"
           ],
           "notes": [
-            "Configuração visual contextual do editor por filial."
+            "Implementado Pacote 5.4 com ativacao de nichos, nicho padrao, elementos visuais, campos canonicos, disponibilidade manual/integracao, role_niches e effective configuration"
           ]
         },
         {

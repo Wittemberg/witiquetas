@@ -99,7 +99,7 @@ test('10. DCC ROBUSTNESS: Totais de Roadmap e MVP permanecem consistentes', () =
   const overview = service.getOverview();
 
   assert.ok([354, 356].includes(overview.progress.fullRoadmap.totalWeight), 'Roadmap totalWeight deve ser 354 ou 356');
-  assert.ok([252, 262, 278].includes(overview.progress.fullRoadmap.implementedWeight), 'Roadmap implementedWeight deve ser 252, 262 ou 278');
+  assert.ok([252, 262, 278, 280].includes(overview.progress.fullRoadmap.implementedWeight), 'Roadmap implementedWeight deve ser 252, 262, 278 ou 280');
   assert.ok([204, 232, 248].includes(overview.progress.fullRoadmap.homologatedWeight), 'Roadmap homologatedWeight deve ser 204, 232 ou 248');
   assert.ok([71, 74, 78, 79].includes(overview.progress.fullRoadmap.implementationPercent), 'Roadmap implementationPercent deve ser 71%, 74%, 78% ou 79%');
   assert.ok([58, 66, 70].includes(overview.progress.fullRoadmap.readinessPercent), 'Roadmap readinessPercent deve ser 58%, 66% ou 70%');

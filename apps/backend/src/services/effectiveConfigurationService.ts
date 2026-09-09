@@ -117,6 +117,12 @@ export const EffectiveConfigurationService = {
       }
     }
 
+    // Nicho padrão da empresa
+    const configuredDefault = companyNichesConfigs.find((c) => c.isDefault && enabledNiches.includes(c.nicheId));
+    const defaultNicheId = configuredDefault
+      ? configuredDefault.nicheId
+      : (enabledNiches.includes('niche-gondola') ? 'niche-gondola' : enabledNiches[0] || 'niche-gondola');
+
     // 2. Elementos Efetivos por Nicho
     const enabledElementsByNiche: Record<string, string[]> = {};
     const companyElementConfigs = await CompanyConfigurationRepository.getElements(companyId);
@@ -136,6 +142,10 @@ export const EffectiveConfigurationService = {
 
       // Adicionar explicitamente as formas manuais suportadas
       platformToolTypes.add('text');
+      platformToolTypes.add('price');
+      platformToolTypes.add('date');
+      platformToolTypes.add('barcode');
+      platformToolTypes.add('qrcode');
       platformToolTypes.add('line');
       platformToolTypes.add('rectangle');
       platformToolTypes.add('image');
@@ -153,14 +163,19 @@ export const EffectiveConfigurationService = {
       enabledElementsByNiche[nicheId] = effectiveElements;
     }
 
-    // 3. Campos Efetivos por Nicho
+    // 3. Campos Efetivos por Nicho e Disponibilidade
     const enabledFieldsByNiche: Record<string, string[]> = {};
+    const fieldsAvailabilityByNiche: Record<string, Record<string, { manual: boolean; integration: boolean }>> = {};
     const companyFieldConfigs = await CompanyConfigurationRepository.getFields(companyId);
 
-    // Mapear campos explicitamente desabilitados/habilitados: key = "nicheId:fieldId"
-    const fieldConfigMap = new Map<string, boolean>();
+    // Mapear campos explicitamente configurados: key = "nicheId:fieldId"
+    const fieldConfigMap = new Map<string, { enabled: boolean; manual: boolean; integration: boolean }>();
     for (const fc of companyFieldConfigs) {
-      fieldConfigMap.set(`${fc.nicheId}:${fc.canonicalFieldId}`, fc.enabled);
+      fieldConfigMap.set(`${fc.nicheId}:${fc.canonicalFieldId}`, {
+        enabled: fc.enabled,
+        manual: fc.availableForManual !== undefined ? fc.availableForManual : true,
+        integration: fc.availableForIntegration !== undefined ? fc.availableForIntegration : true,
+      });
     }
 
     for (const nicheId of enabledNiches) {
@@ -168,24 +183,35 @@ export const EffectiveConfigurationService = {
       const allAvailableFields = [...integrationFields, ...SYSTEM_FIELDS];
 
       const effectiveFields: string[] = [];
+      const availabilityMap: Record<string, { manual: boolean; integration: boolean }> = {};
+
       for (const f of allAvailableFields) {
         const configKey = `${nicheId}:${f.id}`;
-        const isConfigured = fieldConfigMap.has(configKey);
-        // Default é habilitado se não desabilitado explicitamente
-        const isEnabled = isConfigured ? fieldConfigMap.get(configKey)! : true;
+        const cfg = fieldConfigMap.get(configKey);
+        const isSystem = SYSTEM_FIELDS.some((sf) => sf.id === f.id);
+
+        const isEnabled = cfg ? cfg.enabled : true;
         if (isEnabled) {
           effectiveFields.push(f.id);
         }
+
+        availabilityMap[f.id] = {
+          manual: isSystem ? false : (cfg ? cfg.manual : true),
+          integration: isSystem ? false : (cfg ? cfg.integration : true),
+        };
       }
       enabledFieldsByNiche[nicheId] = effectiveFields;
+      fieldsAvailabilityByNiche[nicheId] = availabilityMap;
     }
 
     return {
       company,
       enabledNiches,
       allowedNiches,
+      defaultNicheId,
       enabledElementsByNiche,
       enabledFieldsByNiche,
+      fieldsAvailabilityByNiche,
       permissions: Array.from(userPermissions),
     };
   },

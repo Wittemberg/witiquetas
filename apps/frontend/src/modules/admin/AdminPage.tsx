@@ -7,11 +7,13 @@ import {
   ChevronRight,
   Home,
   ShieldAlert,
+  Layers,
 } from 'lucide-react';
 import { SessionContext, fetchSessionContext, hasAnyPermission } from '../../auth/session.js';
 import { CompanyAdminView } from './CompanyAdminView.js';
 import { UsersAdminView } from './UsersAdminView.js';
 import { RolesAdminView } from './RolesAdminView.js';
+import { NichesAdminView } from './NichesAdminView.js';
 
 interface AdminPageProps {
   sessionContext: SessionContext;
@@ -19,7 +21,7 @@ interface AdminPageProps {
   onGoHome: () => void;
 }
 
-type AdminTab = 'company' | 'users' | 'roles';
+type AdminTab = 'company' | 'users' | 'roles' | 'niches';
 
 export const AdminPage: React.FC<AdminPageProps> = ({
   sessionContext,
@@ -29,11 +31,13 @@ export const AdminPage: React.FC<AdminPageProps> = ({
   const canViewCompany = hasAnyPermission(['company.view', 'company.manage']);
   const canViewUsers = hasAnyPermission(['users.view', 'users.manage']);
   const canViewRoles = hasAnyPermission(['roles.view', 'roles.manage']);
+  const canViewNiches = hasAnyPermission(['niches.view', 'niches.manage', 'elements.view', 'elements.manage']);
 
   const getDefaultTab = (): AdminTab => {
     if (canViewCompany) return 'company';
     if (canViewUsers) return 'users';
     if (canViewRoles) return 'roles';
+    if (canViewNiches) return 'niches';
     return 'company';
   };
 
@@ -44,19 +48,26 @@ export const AdminPage: React.FC<AdminPageProps> = ({
     if (activeTab === 'company' && !canViewCompany) {
       if (canViewUsers) setActiveTab('users');
       else if (canViewRoles) setActiveTab('roles');
+      else if (canViewNiches) setActiveTab('niches');
     } else if (activeTab === 'users' && !canViewUsers) {
       if (canViewRoles) setActiveTab('roles');
       else if (canViewCompany) setActiveTab('company');
+      else if (canViewNiches) setActiveTab('niches');
     } else if (activeTab === 'roles' && !canViewRoles) {
       if (canViewCompany) setActiveTab('company');
       else if (canViewUsers) setActiveTab('users');
+      else if (canViewNiches) setActiveTab('niches');
+    } else if (activeTab === 'niches' && !canViewNiches) {
+      if (canViewCompany) setActiveTab('company');
+      else if (canViewUsers) setActiveTab('users');
+      else if (canViewRoles) setActiveTab('roles');
     }
-  }, [canViewCompany, canViewUsers, canViewRoles, activeTab]);
+  }, [canViewCompany, canViewUsers, canViewRoles, canViewNiches, activeTab]);
 
-  // REQUISITO P0: SELF-PERMISSION REFRESH
+  // REQUISITO P0: SELF-PERMISSION REFRESH & SESSION SYNC
   // Invalida e recarrega imediatamente o contexto canônico
   const handleSelfAffected = async () => {
-    console.log('[AdminShell] Alteração cadastral/perfil detectada no usuário logado. Recarregando contexto canônico...');
+    console.log('[AdminShell] Alteração de configuração/perfil detectada. Recarregando contexto canônico...');
     const refreshed = await fetchSessionContext();
 
     if (!refreshed || refreshed.user.status !== 'ACTIVE') {
@@ -80,26 +91,40 @@ export const AdminPage: React.FC<AdminPageProps> = ({
       refreshed.permissions.includes('*') ||
       refreshed.permissions.includes('roles.view') ||
       refreshed.permissions.includes('roles.manage');
+    const stillCanViewNiches =
+      refreshed.permissions.includes('*') ||
+      refreshed.permissions.includes('niches.view') ||
+      refreshed.permissions.includes('niches.manage') ||
+      refreshed.permissions.includes('elements.view') ||
+      refreshed.permissions.includes('elements.manage');
 
-    if (!stillCanViewCompany && !stillCanViewUsers && !stillCanViewRoles) {
+    if (!stillCanViewCompany && !stillCanViewUsers && !stillCanViewRoles && !stillCanViewNiches) {
       console.warn('[AdminShell] Permissões administrativas revogadas por completo. Redirecionando para rota autorizada...');
       onGoHome();
     } else if (activeTab === 'company' && !stillCanViewCompany) {
       if (stillCanViewUsers) setActiveTab('users');
       else if (stillCanViewRoles) setActiveTab('roles');
+      else if (stillCanViewNiches) setActiveTab('niches');
       else onGoHome();
     } else if (activeTab === 'users' && !stillCanViewUsers) {
       if (stillCanViewRoles) setActiveTab('roles');
       else if (stillCanViewCompany) setActiveTab('company');
+      else if (stillCanViewNiches) setActiveTab('niches');
       else onGoHome();
     } else if (activeTab === 'roles' && !stillCanViewRoles) {
       if (stillCanViewCompany) setActiveTab('company');
       else if (stillCanViewUsers) setActiveTab('users');
+      else if (stillCanViewNiches) setActiveTab('niches');
+      else onGoHome();
+    } else if (activeTab === 'niches' && !stillCanViewNiches) {
+      if (stillCanViewCompany) setActiveTab('company');
+      else if (stillCanViewUsers) setActiveTab('users');
+      else if (stillCanViewRoles) setActiveTab('roles');
       else onGoHome();
     }
   };
 
-  const hasAnyAdminAccess = canViewCompany || canViewUsers || canViewRoles;
+  const hasAnyAdminAccess = canViewCompany || canViewUsers || canViewRoles || canViewNiches;
 
   if (!hasAnyAdminAccess) {
     return (
@@ -136,6 +161,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({
             {activeTab === 'company' && 'Empresa'}
             {activeTab === 'users' && 'Usuários'}
             {activeTab === 'roles' && 'Perfis e Permissões'}
+            {activeTab === 'niches' && 'Nichos & Elementos'}
           </span>
         </div>
       </div>
@@ -144,7 +170,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({
         <div className="admin-page-title-group">
           <h2 className="admin-page-title">Administração</h2>
           <p className="admin-page-subtitle">
-            Gerenciamento de dados cadastrais da organização, catálogo de usuários e matriz RBAC de perfis e permissões.
+            Gerenciamento de dados cadastrais da organização, catálogo de usuários, matriz RBAC de perfis e parametrização de nichos, elementos visuais e campos canônicos.
           </p>
         </div>
       </div>
@@ -183,6 +209,17 @@ export const AdminPage: React.FC<AdminPageProps> = ({
             <span>Perfis e Permissões</span>
           </button>
         )}
+
+        {canViewNiches && (
+          <button
+            type="button"
+            className={`admin-tab-btn ${activeTab === 'niches' ? 'active' : ''}`}
+            onClick={() => setActiveTab('niches')}
+          >
+            <Layers size={16} />
+            <span>Nichos & Elementos</span>
+          </button>
+        )}
       </div>
 
       {/* Conteúdo da Aba Ativa */}
@@ -203,6 +240,10 @@ export const AdminPage: React.FC<AdminPageProps> = ({
             currentUserRoles={sessionContext.roles}
             onSelfAffected={handleSelfAffected}
           />
+        )}
+
+        {activeTab === 'niches' && canViewNiches && (
+          <NichesAdminView onConfigChanged={handleSelfAffected} />
         )}
       </div>
     </div>

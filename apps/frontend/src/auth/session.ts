@@ -9,6 +9,8 @@
  * - CSRF Token para mutações com cookie
  */
 
+import { NICHES, normalizeNicheId } from '@witiquetas/label-schema';
+
 export interface SessionUser {
   id: string;
   companyId: string;
@@ -42,11 +44,214 @@ export interface SessionContext {
   isDeveloper?: boolean;
 }
 
+// Estados conceituais da configuração efetiva (Fail-Safe P0)
+export type ConfigStatus = 'LOADING' | 'READY' | 'ERROR';
+
 // Armazena o contexto em memória local da aba
 let activeSessionContext: SessionContext | null = null;
+let currentConfigStatus: ConfigStatus = 'READY';
+
+type SessionListener = (context: SessionContext | null, status: ConfigStatus) => void;
+const listeners = new Set<SessionListener>();
 
 export function getCachedSessionContext(): SessionContext | null {
   return activeSessionContext;
+}
+
+export function getConfigStatus(): ConfigStatus {
+  return currentConfigStatus;
+}
+
+export function subscribeSessionContext(listener: SessionListener): () => void {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+}
+
+export function setManualSessionContext(ctx: any, status: ConfigStatus = 'READY'): void {
+  if (ctx && ctx.effectiveConfiguration) {
+    activeSessionContext = {
+      ...ctx,
+      ...ctx.effectiveConfiguration,
+      user: ctx.user || ctx.principal?.user,
+      company: ctx.company || ctx.principal?.company,
+    };
+  } else {
+    activeSessionContext = ctx;
+  }
+  currentConfigStatus = status;
+  notifyListeners();
+}
+
+function notifyListeners() {
+  for (const listener of listeners) {
+    try {
+      listener(activeSessionContext, currentConfigStatus);
+    } catch (e) {
+      console.error('[Session] Error in listener:', e);
+    }
+  }
+}
+
+export function resolveCanonicalNicheId(nicheIdOrSlug?: string): string {
+  if (!nicheIdOrSlug) return 'niche-gondola';
+  const match = NICHES.find((n) => n.id === nicheIdOrSlug || n.slug === nicheIdOrSlug);
+  if (match) return match.id;
+  const slug = normalizeNicheId(nicheIdOrSlug);
+  const bySlug = NICHES.find((n) => n.slug === slug);
+  return bySlug ? bySlug.id : 'niche-gondola';
+}
+
+/**
+ * Fail-Safe: Verifica se um tipo de elemento é permitido no nicho.
+ * Se status for LOADING ou ERROR, preserva permissão (Fail-Safe: UNKNOWN != EVERYTHING DISABLED).
+ * Suporta tanto (nicheId, elementType) quanto (elementType, nicheId).
+ */
+export function isElementAllowed(arg1?: string, arg2?: string): boolean {
+  let nicheId = arg1;
+  let elementType = arg2;
+
+  if (arg1 && !arg2) {
+    elementType = arg1;
+    nicheId = undefined;
+  } else if (arg1 && arg2) {
+    if (arg2.startsWith('niche-') || ['text', 'price', 'barcode', 'qrcode', 'line', 'rectangle', 'image', 'table', 'date', 'promotional-price'].includes(arg1)) {
+      elementType = arg1;
+      nicheId = arg2;
+    }
+  }
+
+  if (!elementType) return false;
+  // Fail-safe: se carregando, em erro ou sem contexto, nunca desabilita tudo
+  if (currentConfigStatus !== 'READY' || !activeSessionContext) {
+    return true;
+  }
+  const canonicalNiche = resolveCanonicalNicheId(nicheId);
+  const allowedMap = activeSessionContext.enabledElementsByNiche;
+  if (!allowedMap) return true;
+
+  const allowedList = allowedMap[canonicalNiche] || (nicheId ? allowedMap[nicheId] : undefined);
+  if (!allowedList) return true;
+
+  return allowedList.includes(elementType);
+}
+
+/**
+ * Fail-Safe: Verifica se um campo canônico é permitido no nicho.
+ * Campos do sistema 'system.*' são SEMPRE permitidos e resolvidos pela plataforma.
+ * Suporta tanto (nicheId, fieldId) quanto (fieldId, nicheId).
+ */
+export function isFieldAllowed(arg1?: string, arg2?: string): boolean {
+  let nicheId = arg1;
+  let fieldId = arg2;
+
+  if (arg1 && !arg2) {
+    fieldId = arg1;
+    nicheId = undefined;
+  } else if (arg1 && arg2) {
+    if (arg2.startsWith('niche-') || arg1.includes('.') || !arg1.startsWith('niche-')) {
+      fieldId = arg1;
+      nicheId = arg2;
+    }
+  }
+
+  if (!fieldId) return false;
+  if (fieldId.startsWith('system.')) return true;
+
+  // Fail-safe: se carregando, em erro ou sem contexto, nunca desabilita tudo
+  if (currentConfigStatus !== 'READY' || !activeSessionContext) {
+    return true;
+  }
+  const canonicalNiche = resolveCanonicalNicheId(nicheId);
+
+  // 1. Checa enabledFieldsByNiche se fornecido
+  const allowedMap = activeSessionContext.enabledFieldsByNiche;
+  if (allowedMap) {
+    const allowedList = allowedMap[canonicalNiche] || (nicheId ? allowedMap[nicheId] : undefined);
+    if (allowedList) {
+      return allowedList.includes(fieldId);
+    }
+  }
+
+  // 2. Checa fieldsAvailabilityByNiche se fornecido
+  const availMap = activeSessionContext.fieldsAvailabilityByNiche;
+  if (availMap) {
+    const nicheAvail = availMap[canonicalNiche] || (nicheId ? availMap[nicheId] : undefined);
+    if (nicheAvail && nicheAvail[fieldId]) {
+      const raw = nicheAvail[fieldId] as any;
+      const manual = Boolean(raw.manual ?? raw.availableForManual);
+      const integration = Boolean(raw.integration ?? raw.availableForIntegration);
+      return manual || integration;
+    }
+  }
+
+  return true;
+}
+
+/**
+ * Fail-Safe: Verifica disponibilidade de fontes do campo (MANUAL vs INTEGRATION).
+ * Suporta tanto (nicheId, fieldId) quanto (fieldId, nicheId).
+ */
+export function getFieldAvailability(arg1?: string, arg2?: string): { availableForManual: boolean; availableForIntegration: boolean; manual: boolean; integration: boolean } {
+  let nicheId = arg1;
+  let fieldId = arg2;
+
+  if (arg1 && !arg2) {
+    fieldId = arg1;
+    nicheId = undefined;
+  } else if (arg1 && arg2) {
+    if (arg2.startsWith('niche-') || arg1.includes('.') || !arg1.startsWith('niche-')) {
+      fieldId = arg1;
+      nicheId = arg2;
+    }
+  }
+
+  const defaultTrue = { availableForManual: true, availableForIntegration: true, manual: true, integration: true };
+  if (!fieldId) return defaultTrue;
+  if (fieldId.startsWith('system.')) {
+    return { availableForManual: true, availableForIntegration: true, manual: true, integration: true };
+  }
+
+  if (currentConfigStatus !== 'READY' || !activeSessionContext) {
+    return defaultTrue;
+  }
+
+  const canonicalNiche = resolveCanonicalNicheId(nicheId);
+  const availMap = activeSessionContext.fieldsAvailabilityByNiche;
+  if (!availMap) return defaultTrue;
+
+  const nicheAvail = availMap[canonicalNiche] || (nicheId ? availMap[nicheId] : undefined);
+  if (!nicheAvail || !nicheAvail[fieldId]) {
+    return defaultTrue;
+  }
+
+  const raw = nicheAvail[fieldId] as any;
+  const manual = Boolean(raw.manual ?? raw.availableForManual);
+  const integration = Boolean(raw.integration ?? raw.availableForIntegration);
+
+  return {
+    availableForManual: manual,
+    availableForIntegration: integration,
+    manual,
+    integration,
+  };
+}
+
+/**
+ * Fail-Safe: Verifica se um nicho é autorizado para o perfil/usuário.
+ */
+export function isNicheAllowed(nicheId?: string): boolean {
+  if (!nicheId) return true;
+  if (currentConfigStatus !== 'READY' || !activeSessionContext) {
+    return true;
+  }
+  const allowedNiches = activeSessionContext.allowedNiches;
+  if (!allowedNiches || allowedNiches.length === 0) {
+    return true;
+  }
+  const canonical = resolveCanonicalNicheId(nicheId);
+  return allowedNiches.includes(nicheId) || allowedNiches.includes(canonical);
 }
 
 export function getCsrfToken(): string | null {
@@ -85,6 +290,8 @@ export function canAccessDevControl(): boolean {
  * Consulta o contexto de sessão efetivo no backend via GET /api/session/context
  */
 export async function fetchSessionContext(): Promise<SessionContext | null> {
+  currentConfigStatus = 'LOADING';
+  notifyListeners();
   try {
     const res = await fetch('/api/session/context', {
       method: 'GET',
@@ -94,15 +301,23 @@ export async function fetchSessionContext(): Promise<SessionContext | null> {
     if (res.status === 200) {
       const data: SessionContext = await res.json();
       activeSessionContext = data;
+      currentConfigStatus = 'READY';
+      notifyListeners();
       return data;
     }
 
     if (res.status === 401 || res.status === 403) {
       activeSessionContext = null;
+      currentConfigStatus = 'READY';
+      notifyListeners();
       return null;
     }
+    currentConfigStatus = 'ERROR';
+    notifyListeners();
   } catch (err) {
     console.warn('[Session] Falha ao consultar contexto de sessão:', err);
+    currentConfigStatus = 'ERROR';
+    notifyListeners();
   }
 
   activeSessionContext = null;

@@ -7,6 +7,7 @@ import {
   calculateOrientation,
   formatDimensionLabel,
 } from '@witiquetas/label-schema';
+import { isNicheAllowed } from '../auth/session.js';
 import { useEditorStore, formatDimensionBR } from './useEditorStore';
 import {
   Sparkles,
@@ -98,11 +99,12 @@ export default function NewTemplateWizard({ isOpen, onClose, onSuccess }: Wizard
     }
   };
 
-  // Filtragem dos 11 nichos
+  // Filtragem dos nichos autorizados para o perfil / empresa (Fail-Safe)
   const filteredNiches = useMemo(() => {
-    if (!searchNiche.trim()) return NICHES;
+    const allowed = NICHES.filter((n) => isNicheAllowed(n.id));
+    if (!searchNiche.trim()) return allowed;
     const term = searchNiche.toLowerCase();
-    return NICHES.filter(
+    return allowed.filter(
       (n) =>
         n.name.toLowerCase().includes(term) ||
         n.description.toLowerCase().includes(term) ||

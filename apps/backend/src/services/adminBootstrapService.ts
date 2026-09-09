@@ -7,7 +7,12 @@ import {
   CompanyConfigurationRepository,
 } from '../repositories/adminRepositories.js';
 import { PasswordService } from './passwordService.js';
-import { NICHES } from '@witiquetas/label-schema';
+import {
+  NICHES,
+  DEFAULT_NICHE_PROFILES,
+  getAllDefaultNicheProfiles,
+  CanonicalElementType,
+} from '@witiquetas/label-schema';
 
 export const STANDARD_ROLES = [
   {
@@ -146,10 +151,8 @@ export async function bootstrapAdminData(): Promise<void> {
     }
   }
 
-  // 4. Habilitar todos os 11 nichos para a empresa padrão (retrocompatibilidade total)
-  for (const niche of NICHES) {
-    await CompanyConfigurationRepository.setNicheState(defaultCompanyId, niche.id, 'ENABLED');
-  }
+  // 4. Bootstrap Não-Destrutivo de Nichos, Elementos, Campos e role_niches (Pacote 5.5)
+  await bootstrapCompanyNicheProfiles(defaultCompanyId);
 
   // 5. Bootstrap de Administrador Inicial (suporta override por ENV com fallback padrão de homologação/testes)
   const bootstrapEmail = (process.env.BOOTSTRAP_ADMIN_EMAIL || 'admin@witiquetas.com.br').trim();
@@ -211,4 +214,77 @@ export async function bootstrapAdminData(): Promise<void> {
   }
 
   console.log('[AdminBootstrap] Bootstrap concluído com sucesso e 100% idempotente.');
+}
+
+/**
+ * Bootstrap Não-Destrutivo e Idempotente dos Perfis Padrão (Default Niche Profiles - Pacote 5.5)
+ *
+ * Popula nichos, elementos visuais, campos canônicos e role_niches para empresas novas ou não configuradas.
+ * NUNCA sobrescreve parametrizações manuais de empresas já configuradas.
+ */
+export async function bootstrapCompanyNicheProfiles(companyId: string): Promise<void> {
+  const allProfiles = getAllDefaultNicheProfiles();
+
+  // 1. Nichos Efetivos da Empresa (Idempotente: apenas se a empresa ainda não tiver nichos configurados)
+  const existingNiches = await CompanyConfigurationRepository.getNiches(companyId);
+  if (existingNiches.length === 0) {
+    for (const profile of allProfiles) {
+      await CompanyConfigurationRepository.setNicheState(companyId, profile.nicheId, 'ENABLED');
+    }
+    await CompanyConfigurationRepository.setDefaultNiche(companyId, 'niche-gondola');
+    console.log(`[AdminBootstrap] 11 nichos padrão habilitados para empresa '${companyId}' (Default: niche-gondola).`);
+  }
+
+  // 2. Elementos Visuais por Nicho (Idempotente: apenas se não houver elementos salvos para a empresa)
+  const existingElements = await CompanyConfigurationRepository.getElements(companyId);
+  if (existingElements.length === 0) {
+    const allElementTypes: CanonicalElementType[] = [
+      'text',
+      'price',
+      'barcode',
+      'qrcode',
+      'line',
+      'rectangle',
+      'image',
+    ];
+    for (const profile of allProfiles) {
+      for (const elType of allElementTypes) {
+        const enabled = profile.defaultElements.includes(elType);
+        await CompanyConfigurationRepository.setElementEnabled(companyId, profile.nicheId, elType, enabled);
+      }
+    }
+    console.log(`[AdminBootstrap] Elementos visuais default provisionados para os 11 nichos da empresa '${companyId}'.`);
+  }
+
+  // 3. Campos Canônicos por Nicho (Idempotente: apenas se não houver campos salvos para a empresa)
+  const existingFields = await CompanyConfigurationRepository.getFields(companyId);
+  if (existingFields.length === 0) {
+    for (const profile of allProfiles) {
+      for (const field of profile.defaultFields) {
+        await CompanyConfigurationRepository.setFieldConfig(companyId, profile.nicheId, field.fieldId, {
+          enabled: true,
+          availableForManual: field.availableForManual,
+          availableForIntegration: field.availableForIntegration,
+        });
+      }
+    }
+    console.log(`[AdminBootstrap] Campos canônicos default provisionados para os 11 nichos da empresa '${companyId}'.`);
+  }
+
+  // 4. Perfis Padrão e Acesso a Nichos (role_niches - Idempotente)
+  const roles = await RoleRepository.listByCompany(companyId);
+  for (const role of roles) {
+    const existingNicheAccess = await RoleRepository.getRoleNicheAccess(role.id);
+    if (Object.keys(existingNicheAccess).length === 0) {
+      if (role.code === 'ADMIN' || role.code === 'DESIGNER' || role.code === 'SUPERVISOR') {
+        for (const profile of allProfiles) {
+          await RoleRepository.setRoleNicheAccess(role.id, profile.nicheId, true);
+        }
+      } else if (role.code === 'OPERATOR') {
+        for (const profile of allProfiles) {
+          await RoleRepository.setRoleNicheAccess(role.id, profile.nicheId, profile.operationalForOperator);
+        }
+      }
+    }
+  }
 }

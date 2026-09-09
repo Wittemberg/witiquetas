@@ -6,6 +6,7 @@ import {
   getIntegrationFieldsByNiche,
   getFieldDefinition,
 } from '@witiquetas/label-schema';
+import { isFieldAllowed, getFieldAvailability } from '../auth/session.js';
 
 export interface FieldPickerProps {
   value: string;
@@ -35,11 +36,17 @@ export const FieldPicker: React.FC<FieldPickerProps> = ({
   nicheId,
   activeFields,
 }) => {
-  const fields = useMemo(() => {
+  const rawFields = useMemo(() => {
     if (activeFields && activeFields.length > 0) return activeFields;
     return getIntegrationFieldsByNiche(nicheId);
   }, [activeFields, nicheId]);
 
+  // Filtra campos de integração habilitados na configuração efetiva para o nicho (Fail-Safe)
+  const fields = useMemo(() => {
+    return rawFields.filter((f) => isFieldAllowed(nicheId, f.id));
+  }, [rawFields, nicheId]);
+
+  // Preservação de Binding Existente Desabilitado (EXISTING_DISABLED_BINDING - Regra P0)
   const knownExtra = useMemo(() => {
     if (!value || fields.some((f) => f.id === value) || SYSTEM_FIELDS.some((f) => f.id === value)) return null;
     return getFieldDefinition(value);
@@ -65,15 +72,23 @@ export const FieldPicker: React.FC<FieldPickerProps> = ({
         onChange={(e) => onChange(e.target.value)}
       >
         {allowStatic && <option value="">{staticLabel}</option>}
-        {knownExtra && <option value={value}>{knownExtra.label} ({value})</option>}
+        {knownExtra && (
+          <option value={value} style={{ color: 'var(--status-warning)' }}>
+            {knownExtra.label} ({value}) — Desabilitado na política
+          </option>
+        )}
         {!isKnown && <option value={value}>{value} (Campo Personalizado)</option>}
 
         <optgroup label="Campos da Integração">
-          {fields.map((f) => (
-            <option key={f.id} value={f.id}>
-              {f.label} ({f.id})
-            </option>
-          ))}
+          {fields.map((f) => {
+            const avail = getFieldAvailability(nicheId, f.id);
+            const integrationTag = avail.integration ? ' [Integração]' : '';
+            return (
+              <option key={f.id} value={f.id}>
+                {f.label} ({f.id}){integrationTag}
+              </option>
+            );
+          })}
         </optgroup>
 
         <optgroup label="Campos do Sistema Witiquetas">

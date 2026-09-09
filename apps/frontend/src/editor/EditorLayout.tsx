@@ -6,6 +6,7 @@ import NewTemplateWizard from './NewTemplateWizard';
 import CompileModal from './CompileModal';
 import ImportModal from './ImportModal';
 import { getNicheToolboxConfig, NicheToolItem } from '@witiquetas/label-schema';
+import { isElementAllowed } from '../auth/session.js';
 import {
   Sparkles,
   Printer,
@@ -144,7 +145,18 @@ export default function EditorLayout({
 
   const activeNicheId = document?.nicheId || document?.nicheName || 'gondola-supermercado';
   const toolboxConfig = React.useMemo(() => {
-    return getNicheToolboxConfig(activeNicheId);
+    const raw = getNicheToolboxConfig(activeNicheId);
+    const filterTool = (tool: NicheToolItem) => {
+      if (tool.toolId === 'shape' || tool.elementType === 'shape') {
+        return isElementAllowed(activeNicheId, 'line') || isElementAllowed(activeNicheId, 'rectangle');
+      }
+      return isElementAllowed(activeNicheId, tool.elementType);
+    };
+    return {
+      ...raw,
+      recommendedTools: raw.recommendedTools.filter(filterTool),
+      availableTools: raw.availableTools.filter(filterTool),
+    };
   }, [activeNicheId]);
 
   const getToolIcon = (iconName: string) => {
@@ -185,8 +197,14 @@ export default function EditorLayout({
   };
 
   const handleToolClick = (tool: NicheToolItem) => {
-    if (tool.toolId === 'shape') {
+    if (tool.toolId === 'shape' || tool.elementType === 'shape') {
+      if (!isElementAllowed(activeNicheId, 'line') && !isElementAllowed(activeNicheId, 'rectangle')) {
+        return;
+      }
       setIsShapePopoverOpen(!isShapePopoverOpen);
+      return;
+    }
+    if (!isElementAllowed(activeNicheId, tool.elementType)) {
       return;
     }
     if (tool.toolId === 'image') {
@@ -860,28 +878,32 @@ export default function EditorLayout({
                               minWidth: '160px',
                             }}
                           >
-                            <button
-                              className="btn"
-                              style={{ flex: 1, justifyContent: 'center', fontSize: '0.75rem', padding: '0.35rem 0.5rem' }}
-                              onClick={() => {
-                                addElement('line');
-                                setIsShapePopoverOpen(false);
-                              }}
-                            >
-                              <Minus size={14} color="var(--accent-purple)" />
-                              <span>Linha</span>
-                            </button>
-                            <button
-                              className="btn"
-                              style={{ flex: 1, justifyContent: 'center', fontSize: '0.75rem', padding: '0.35rem 0.5rem' }}
-                              onClick={() => {
-                                addElement('rectangle');
-                                setIsShapePopoverOpen(false);
-                              }}
-                            >
-                              <Square size={14} color="var(--status-warning)" />
-                              <span>Retângulo</span>
-                            </button>
+                            {isElementAllowed(activeNicheId, 'line') && (
+                              <button
+                                className="btn"
+                                style={{ flex: 1, justifyContent: 'center', fontSize: '0.75rem', padding: '0.35rem 0.5rem' }}
+                                onClick={() => {
+                                  addElement('line');
+                                  setIsShapePopoverOpen(false);
+                                }}
+                              >
+                                <Minus size={14} color="var(--accent-purple)" />
+                                <span>Linha</span>
+                              </button>
+                            )}
+                            {isElementAllowed(activeNicheId, 'rectangle') && (
+                              <button
+                                className="btn"
+                                style={{ flex: 1, justifyContent: 'center', fontSize: '0.75rem', padding: '0.35rem 0.5rem' }}
+                                onClick={() => {
+                                  addElement('rectangle');
+                                  setIsShapePopoverOpen(false);
+                                }}
+                              >
+                                <Square size={14} color="var(--status-warning)" />
+                                <span>Retângulo</span>
+                              </button>
+                            )}
                           </div>
                         )}
                       </div>

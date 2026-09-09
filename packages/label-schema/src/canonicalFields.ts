@@ -129,9 +129,6 @@ export function getIntegrationFieldsByNiche(nicheId?: string): IntegrationFieldD
   return DEFAULT_RETAIL_CATALOG;
 }
 
-export type CanonicalFieldDefinition = IntegrationFieldDefinition | SystemFieldDefinition;
-export const CANONICAL_FIELDS: IntegrationFieldDefinition[] = DEFAULT_RETAIL_CATALOG;
-
 export const ALL_KNOWN_INTEGRATION_FIELDS: IntegrationFieldDefinition[] = [
   ...DEFAULT_RETAIL_CATALOG,
   ...DEFAULT_HOSPITAL_CATALOG,
@@ -141,6 +138,9 @@ export const ALL_KNOWN_INTEGRATION_FIELDS: IntegrationFieldDefinition[] = [
   ...DEFAULT_FOOD_CATALOG,
   ...DEFAULT_PHARMACY_CATALOG,
 ];
+
+export type CanonicalFieldDefinition = IntegrationFieldDefinition | SystemFieldDefinition;
+export const CANONICAL_FIELDS: IntegrationFieldDefinition[] = ALL_KNOWN_INTEGRATION_FIELDS;
 
 export function getFieldDefinition(fieldId?: string): CanonicalFieldDefinition | undefined {
   if (!fieldId) return undefined;

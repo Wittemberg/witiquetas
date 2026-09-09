@@ -51,6 +51,7 @@ router.get('/context', requireAuthenticatedUser, async (req: Request, res: Respo
       enabledElementsByNiche: effectiveConfig.enabledElementsByNiche,
       enabledFieldsByNiche: effectiveConfig.enabledFieldsByNiche,
       fieldsAvailabilityByNiche: effectiveConfig.fieldsAvailabilityByNiche,
+      effectiveConfiguration: effectiveConfig,
       csrfToken: principal.csrfToken,
     });
   } catch (err: any) {

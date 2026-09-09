@@ -7,6 +7,7 @@ import {
 } from '@witiquetas/label-schema';
 import { type QRCodeLibraryItemDTO, type PrinterDTO } from '@witiquetas/contracts';
 import { normalizeElementGeometry, normalizeDocumentGeometry, constrainElementToLabel, constrainGroupMovement, validateDocumentBounds, SAFE_AREA_MARGIN_MM } from './bounds.ts';
+import { isElementAllowed } from '../auth/session.js';
 
 // Converter Milímetros ➔ Pixels com base no DPI (ex: 203 DPI = ~8 dots/mm)
 export function mmToPx(mm: number, dpi: number = 203): number {
@@ -701,8 +702,15 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setQRCodeLibrary: (items) => set({ qrCodeLibrary: items }),
   addQRCodeToLibrary: (item) => set((state) => ({ qrCodeLibrary: [item, ...state.qrCodeLibrary] })),
 
-  addElement: (type, overrides) => {
+  addElement: (typeOrElement: any, overrides?: any) => {
+    const type: ElementType = typeof typeOrElement === 'string' ? typeOrElement : typeOrElement?.type;
+    const actualOverrides = typeof typeOrElement === 'string' ? overrides : { ...typeOrElement, ...overrides };
     const { document, pushHistory } = get();
+    const activeNicheId = document?.nicheId || document?.nicheName || 'gondola-supermercado';
+    if (!isElementAllowed(activeNicheId, type)) {
+      console.warn(`[Editor] Inserção bloqueada: elemento '${type}' desabilitado na política atual do nicho '${activeNicheId}'.`);
+      return;
+    }
     const newId = `elem-${Date.now()}`;
     let newElem: LabelElement;
 
@@ -834,8 +842,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         return;
     }
 
-    if (overrides) {
-      newElem = { ...newElem, ...overrides };
+    if (actualOverrides) {
+      newElem = { ...newElem, ...actualOverrides };
     }
 
     newElem = constrainElementToLabel(newElem, document.dimensions);
@@ -923,11 +931,16 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const { document, selectedElementIds, pushHistory } = get();
     if (selectedElementIds.length === 0) return;
 
+    const activeNicheId = document?.nicheId || document?.nicheName || 'gondola-supermercado';
     const newClones: LabelElement[] = [];
     const newSelectedIds: string[] = [];
 
     document.elements.forEach((el) => {
       if (selectedElementIds.includes(el.id)) {
+        if (!isElementAllowed(activeNicheId, el.type)) {
+          console.warn(`[Editor] Duplicação bloqueada: elemento '${el.id}' (${el.type}) está desabilitado na política atual do nicho '${activeNicheId}'.`);
+          return;
+        }
         const newId = `elem-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`;
         let clone: LabelElement = {
           ...JSON.parse(JSON.stringify(el)),
@@ -941,6 +954,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         newSelectedIds.push(newId);
       }
     });
+
+    if (newClones.length === 0) return;
 
     set({
       document: { ...document, elements: [...document.elements, ...newClones] },
@@ -1033,10 +1048,15 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const { document, clipboard, pushHistory } = get();
     if (clipboard.length === 0) return;
 
+    const activeNicheId = document?.nicheId || document?.nicheName || 'gondola-supermercado';
     const newClones: LabelElement[] = [];
     const newSelectedIds: string[] = [];
 
     clipboard.forEach((el) => {
+      if (!isElementAllowed(activeNicheId, el.type)) {
+        console.warn(`[Editor] Colagem bloqueada: elemento '${el.id}' (${el.type}) está desabilitado na política atual do nicho '${activeNicheId}'.`);
+        return;
+      }
       const newId = `elem-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`;
       let clone: LabelElement = {
         ...JSON.parse(JSON.stringify(el)),
@@ -1048,6 +1068,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       newClones.push(clone);
       newSelectedIds.push(newId);
     });
+
+    if (newClones.length === 0) return;
 
     set({
       document: { ...document, elements: [...document.elements, ...newClones] },

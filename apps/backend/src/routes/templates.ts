@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { LabelDocumentSchema } from '@witiquetas/label-schema';
+import { LabelDocumentSchema, NICHES, normalizeNicheId } from '@witiquetas/label-schema';
 import {
   templateRepository,
   MismatchedVersionError,
@@ -14,6 +14,16 @@ import {
   requirePermission,
   requireCsrf,
 } from '../middleware/authMiddleware.js';
+import { EffectiveConfigurationService } from '../services/effectiveConfigurationService.js';
+
+function resolveCanonicalNicheId(nicheIdOrSlug?: string): string {
+  if (!nicheIdOrSlug) return 'niche-gondola';
+  const match = NICHES.find((n) => n.id === nicheIdOrSlug || n.slug === nicheIdOrSlug);
+  if (match) return match.id;
+  const slug = normalizeNicheId(nicheIdOrSlug);
+  const bySlug = NICHES.find((n) => n.slug === slug);
+  return bySlug ? bySlug.id : 'niche-gondola';
+}
 
 const router = Router();
 
@@ -163,6 +173,53 @@ router.post('/', requirePermission('templates.create'), requireCsrf, async (req:
       });
     }
 
+    // Validação Server-Authoritative (Pacote 5.5)
+    const principal = req.principal!;
+    const isDev = Boolean((req as any).isPlatformDeveloper || principal.user.id === 'developer-marcel');
+    const effectiveConfig = await EffectiveConfigurationService.resolve({
+      companyId,
+      userId: isDev ? undefined : principal.user.id,
+    });
+
+    const targetNicheId = resolveCanonicalNicheId(body.nicheId || body.document?.nicheId);
+
+    // 1. Validação de Nicho Autorizado
+    if (!isDev && !effectiveConfig.allowedNiches.includes(targetNicheId)) {
+      return res.status(403).json({
+        error: `Nicho '${targetNicheId}' não está autorizado para este perfil ou está desabilitado na empresa.`,
+        code: 'NICHE_NOT_ALLOWED',
+      });
+    }
+
+    // 2. Validação de Elementos e Bindings
+    const allowedElements = effectiveConfig.enabledElementsByNiche[targetNicheId] || [];
+    const allowedFields = effectiveConfig.enabledFieldsByNiche[targetNicheId] || [];
+    const availMap = effectiveConfig.fieldsAvailabilityByNiche[targetNicheId] || {};
+
+    for (const el of body.document.elements || []) {
+      if (!allowedElements.includes(el.type)) {
+        return res.status(400).json({
+          error: `Elemento visual '${el.type}' está desabilitado na política atual do nicho '${targetNicheId}'.`,
+          code: 'ELEMENT_TYPE_DISABLED',
+        });
+      }
+
+      if (el.field && !el.field.startsWith('system.')) {
+        if (!allowedFields.includes(el.field)) {
+          return res.status(400).json({
+            error: `Campo canônico '${el.field}' está desabilitado na política atual do nicho '${targetNicheId}'.`,
+            code: 'CANONICAL_FIELD_DISABLED',
+          });
+        }
+        if (el.binding?.source === 'manual' && availMap[el.field] && availMap[el.field].manual === false) {
+          return res.status(400).json({
+            error: `Entrada manual para o campo '${el.field}' está desabilitada na política do nicho.`,
+            code: 'MANUAL_INPUT_DISABLED',
+          });
+        }
+      }
+    }
+
     const created = await templateRepository.createTemplate(body, companyId);
     res.status(201).json(created);
   } catch (err: any) {
@@ -172,7 +229,7 @@ router.post('/', requirePermission('templates.create'), requireCsrf, async (req:
 
 /**
  * PUT /api/templates/:id
- * Atualizar modelo com suporte a Optimistic Locking (expectedVersion -> HTTP 409 Conflict)
+ * Atualizar modelo com suporte a Optimistic Locking e distinção entre PRESERVAÇÃO LEGADA vs NOVA CRIAÇÃO PROIBIDA
  */
 router.put('/:id', requirePermission('templates.edit'), requireCsrf, async (req: Request, res: Response) => {
   const body = req.body as UpdateTemplateDTO;
@@ -186,6 +243,80 @@ router.put('/:id', requirePermission('templates.edit'), requireCsrf, async (req:
           error: 'Documento de etiqueta inválido.',
           details: validation.error.format(),
         });
+      }
+
+      // Validação Server-Authoritative P0: Distinção de legado existente vs nova criação
+      const existing = await templateRepository.getTemplateById(req.params.id, companyId);
+      if (existing && existing.document) {
+        const principal = req.principal!;
+        const isDev = Boolean((req as any).isPlatformDeveloper || principal.user.id === 'developer-marcel');
+        const effectiveConfig = await EffectiveConfigurationService.resolve({
+          companyId,
+          userId: isDev ? undefined : principal.user.id,
+        });
+
+        const targetNicheId = resolveCanonicalNicheId(
+          body.nicheId || body.document.nicheId || existing.nicheId || existing.document.nicheId
+        );
+        const allowedElements = effectiveConfig.enabledElementsByNiche[targetNicheId] || [];
+        const allowedFields = effectiveConfig.enabledFieldsByNiche[targetNicheId] || [];
+        const availMap = effectiveConfig.fieldsAvailabilityByNiche[targetNicheId] || {};
+
+        const existingElementsMap = new Map(
+          (existing.document.elements || []).map((e: any) => [e.id, e])
+        );
+
+        for (const el of body.document.elements || []) {
+          const prevEl = existingElementsMap.get(el.id);
+          if (!prevEl) {
+            // NOVO elemento adicionado: tipo NÃO pode ser desabilitado na política atual
+            if (!allowedElements.includes(el.type)) {
+              return res.status(400).json({
+                error: `Elemento visual '${el.type}' está desabilitado na política atual do nicho e não pode ser adicionado.`,
+                code: 'NEW_DISABLED_ELEMENT_FORBIDDEN',
+              });
+            }
+            if (el.field && !el.field.startsWith('system.')) {
+              if (!allowedFields.includes(el.field)) {
+                return res.status(400).json({
+                  error: `Novo binding para o campo '${el.field}' está desabilitado na política atual do nicho.`,
+                  code: 'NEW_DISABLED_BINDING_FORBIDDEN',
+                });
+              }
+              if (el.binding?.source === 'manual' && availMap[el.field] && availMap[el.field].manual === false) {
+                return res.status(400).json({
+                  error: `Entrada manual para o campo '${el.field}' está desabilitada na política do nicho.`,
+                  code: 'MANUAL_INPUT_DISABLED',
+                });
+              }
+            }
+          } else {
+            // ELEMENTO PRÉ-EXISTENTE (EXISTING_DISABLED_ELEMENT):
+            // Permitido manter o tipo antigo mesmo que atualmente OFF, mas se mudar o tipo para outro desabilitado:
+            if (el.type !== prevEl.type && !allowedElements.includes(el.type)) {
+              return res.status(400).json({
+                error: `Tipo de elemento alterado para '${el.type}', que está desabilitado na política atual.`,
+                code: 'ELEMENT_TYPE_DISABLED',
+              });
+            }
+            // BINDING PRÉ-EXISTENTE (EXISTING_DISABLED_BINDING):
+            // Permitido manter o binding antigo mesmo que atualmente OFF. Mas se criar NOVO binding ou trocar para campo OFF:
+            if (el.field && el.field !== prevEl.field && !el.field.startsWith('system.')) {
+              if (!allowedFields.includes(el.field)) {
+                return res.status(400).json({
+                  error: `Novo binding para o campo '${el.field}' está desabilitado na política atual do nicho.`,
+                  code: 'NEW_DISABLED_BINDING_FORBIDDEN',
+                });
+              }
+              if (el.binding?.source === 'manual' && availMap[el.field] && availMap[el.field].manual === false) {
+                return res.status(400).json({
+                  error: `Entrada manual para o campo '${el.field}' está desabilitada na política do nicho.`,
+                  code: 'MANUAL_INPUT_DISABLED',
+                });
+              }
+            }
+          }
+        }
       }
     }
 
@@ -220,6 +351,40 @@ router.put('/:id', requirePermission('templates.edit'), requireCsrf, async (req:
 router.post('/:id/duplicate', requirePermission('templates.edit'), requireCsrf, async (req: Request, res: Response) => {
   try {
     const companyId = getCompanyId(req);
+    const existing = await templateRepository.getTemplateById(req.params.id, companyId);
+    if (!existing) {
+      return res.status(404).json({
+        code: 'MODEL_NOT_FOUND',
+        error: 'MODELO_NÃO_ENCONTRADO',
+        message: `Modelo '${req.params.id}' não encontrado.`,
+      });
+    }
+
+    const principal = req.principal!;
+    const isDev = Boolean((req as any).isPlatformDeveloper || principal.user.id === 'developer-marcel');
+    const effectiveConfig = await EffectiveConfigurationService.resolve({
+      companyId,
+      userId: isDev ? undefined : principal.user.id,
+    });
+
+    const targetNicheId = resolveCanonicalNicheId(existing.nicheId || existing.document?.nicheId);
+    if (!isDev && !effectiveConfig.allowedNiches.includes(targetNicheId)) {
+      return res.status(403).json({
+        error: `Nicho '${targetNicheId}' não está autorizado para este perfil.`,
+        code: 'NICHE_NOT_ALLOWED',
+      });
+    }
+
+    const allowedElements = effectiveConfig.enabledElementsByNiche[targetNicheId] || [];
+    for (const el of existing.document?.elements || []) {
+      if (!allowedElements.includes(el.type)) {
+        return res.status(400).json({
+          error: `O modelo contém elemento do tipo '${el.type}', que está desabilitado na política atual e não pode ser duplicado.`,
+          code: 'DUPLICATE_DISABLED_ELEMENT_FORBIDDEN',
+        });
+      }
+    }
+
     const duplicated = await templateRepository.duplicateTemplate(req.params.id, companyId);
     res.status(201).json(duplicated);
   } catch (err: any) {

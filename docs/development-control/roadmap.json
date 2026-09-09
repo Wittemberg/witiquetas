@@ -810,14 +810,16 @@
           "physicalValidation": false,
           "frozen": false,
           "evidence": [
-            "tests/adminRbacFoundation.test.ts"
+            "tests/adminRbacFoundation.test.ts",
+            "tests/package55EffectiveConfigEditor.test.ts"
           ],
           "dependencies": [
             "cap-enabled-elements",
             "cap-enabled-fields"
           ],
           "notes": [
-            "Implementa os algoritmos canônicos de intersecção."
+            "Implementa os algoritmos canônicos de intersecção.",
+            "PACOTE 5.5: Entrega da configuração efetiva ao Editor visual via GET /api/session/context, governança dinâmica de Toolbox e FieldPicker, regras P0 de preservação de modelos legados (EXISTING_DISABLED_ELEMENT e EXISTING_DISABLED_BINDING), fail-safe e bootstrap não-destrutivo dos 11 nichos."
           ]
         },
         {

@@ -4,6 +4,9 @@ import {
   getNicheToolboxConfig,
   getIntegrationFieldsByNiche,
   SYSTEM_FIELDS,
+  DEFAULT_NICHE_PROFILES,
+  getDefaultNicheProfile,
+  getAllDefaultNicheProfiles,
 } from '@witiquetas/label-schema';
 import {
   CompanyRepository,
@@ -15,6 +18,7 @@ import {
 export interface EffectiveConfigurationOptions {
   companyId: string;
   userId?: string;
+  roleCode?: string;
 }
 
 export const EffectiveConfigurationService = {
@@ -24,7 +28,7 @@ export const EffectiveConfigurationService = {
    * 1. Empresa deve existir e estar ACTIVE.
    * 2. Se userId for passado, usuário deve pertencer a esta empresa e estar ACTIVE.
    * 3. Nichos Efetivos = Nichos da Plataforma ∩ Nichos Habilitados pela Empresa (state === 'ENABLED')
-   *    Se usuário for passado: ∩ Nichos Permitidos pelos papéis do usuário (role_niches).
+   *    Se usuário/papel for passado: ∩ Nichos Permitidos pelos papéis do usuário (role_niches).
    * 4. Elementos Efetivos por Nicho = Elementos suportados pela plataforma para o nicho ∩ Elementos Habilitados pela Empresa.
    *    (Elementos manuais gráficos 'text', 'line', 'rectangle', 'image' nunca são bloqueados por integrações externas/ERP).
    * 5. Campos Efetivos por Nicho = Campos do catálogo (integração + sistema) ∩ Campos Habilitados pela Empresa.
@@ -32,7 +36,7 @@ export const EffectiveConfigurationService = {
    * 6. Permissões = União de todas as permissões concedidas aos papéis do usuário na empresa.
    */
   async resolve(options: EffectiveConfigurationOptions): Promise<EffectiveCompanyConfigurationDTO> {
-    const { companyId, userId } = options;
+    const { companyId, userId, roleCode } = options;
 
     const company = await CompanyRepository.findById(companyId);
     if (!company) {
@@ -60,8 +64,14 @@ export const EffectiveConfigurationService = {
 
       userRoles = await RoleRepository.getUserRoles(companyId, userId);
       roleAllowedNiches = new Set<string>();
+    } else if (roleCode) {
+      const allRoles = await RoleRepository.listByCompany(companyId);
+      userRoles = allRoles.filter((r) => r.code === roleCode);
+      roleAllowedNiches = new Set<string>();
+    }
 
-      // Se o usuário tiver papéis, agrega permissões e restrições de nichos
+    if (userRoles.length > 0) {
+      // Agrega permissões e restrições de nichos
       for (const role of userRoles) {
         const perms = await RoleRepository.getRolePermissions(role.id);
         for (const p of perms) {
@@ -71,14 +81,24 @@ export const EffectiveConfigurationService = {
         const nicheAccess = await RoleRepository.getRoleNicheAccess(role.id);
         const configuredNicheIds = Object.keys(nicheAccess);
         if (configuredNicheIds.length === 0) {
-          // Se o papel não tem restrições explícitas cadastradas em role_niches, permite todos por padrão
-          for (const n of NICHES) {
-            roleAllowedNiches.add(n.id);
+          // Se o papel não tem restrições explícitas cadastradas em role_niches, aplica defaults canônicos
+          if (role.code === 'OPERATOR') {
+            const allProfiles = getAllDefaultNicheProfiles();
+            for (const p of allProfiles) {
+              if (p.operationalForOperator) {
+                roleAllowedNiches!.add(p.nicheId);
+              }
+            }
+          } else {
+            // ADMIN, DESIGNER, SUPERVISOR: acesso a todos os nichos
+            for (const n of NICHES) {
+              roleAllowedNiches!.add(n.id);
+            }
           }
         } else {
           for (const [nid, allowed] of Object.entries(nicheAccess)) {
             if (allowed) {
-              roleAllowedNiches.add(nid);
+              roleAllowedNiches!.add(nid);
             }
           }
         }
@@ -151,11 +171,14 @@ export const EffectiveConfigurationService = {
       platformToolTypes.add('image');
 
       const effectiveElements: string[] = [];
+      const profilePreset = getDefaultNicheProfile(nicheId);
       for (const elType of platformToolTypes) {
         const configKey = `${nicheId}:${elType}`;
         const isConfigured = elementConfigMap.has(configKey);
-        // Se configurado, obedece. Se não configurado, default é true (habilitado)
-        const isEnabled = isConfigured ? elementConfigMap.get(configKey)! : true;
+        // Se configurado pela empresa, obedece. Se não configurado, obedece ao preset padrão do nicho
+        const isEnabled = isConfigured
+          ? elementConfigMap.get(configKey)!
+          : (profilePreset ? profilePreset.defaultElements.includes(elType as any) : true);
         if (isEnabled) {
           effectiveElements.push(elType);
         }
@@ -181,6 +204,7 @@ export const EffectiveConfigurationService = {
     for (const nicheId of enabledNiches) {
       const integrationFields = getIntegrationFieldsByNiche(nicheId);
       const allAvailableFields = [...integrationFields, ...SYSTEM_FIELDS];
+      const profilePreset = getDefaultNicheProfile(nicheId);
 
       const effectiveFields: string[] = [];
       const availabilityMap: Record<string, { manual: boolean; integration: boolean }> = {};
@@ -189,15 +213,20 @@ export const EffectiveConfigurationService = {
         const configKey = `${nicheId}:${f.id}`;
         const cfg = fieldConfigMap.get(configKey);
         const isSystem = SYSTEM_FIELDS.some((sf) => sf.id === f.id);
+        const fieldPreset = profilePreset?.defaultFields.find((df) => df.fieldId === f.id);
 
-        const isEnabled = cfg ? cfg.enabled : true;
+        const isEnabled = cfg
+          ? (cfg.enabled && (isSystem || cfg.manual || cfg.integration))
+          : isSystem
+            ? true
+            : (fieldPreset ? true : true);
         if (isEnabled) {
           effectiveFields.push(f.id);
         }
 
         availabilityMap[f.id] = {
-          manual: isSystem ? false : (cfg ? cfg.manual : true),
-          integration: isSystem ? false : (cfg ? cfg.integration : true),
+          manual: isSystem ? false : (cfg ? cfg.manual : (fieldPreset ? fieldPreset.availableForManual : true)),
+          integration: isSystem ? false : (cfg ? cfg.integration : (fieldPreset ? fieldPreset.availableForIntegration : true)),
         };
       }
       enabledFieldsByNiche[nicheId] = effectiveFields;

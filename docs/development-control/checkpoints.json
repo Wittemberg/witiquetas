@@ -1,11 +1,32 @@
 {
   "checkpoints": [
     {
+      "sha": "5.5.0-candidate",
+      "shortSha": "5.5.0",
+      "date": "2026-09-09T15:05:00Z",
+      "phase": "5",
+      "patch": "5.5.0-candidate",
+      "title": "feat(editor): effective configuration integration into editor and default niche profiles (PACOTE 5.5)",
+      "type": "FEATURE",
+      "capabilities": [
+        "cap-effective-configuration",
+        "cap-niche-access-control",
+        "cap-enabled-niches",
+        "cap-enabled-elements",
+        "cap-enabled-fields"
+      ],
+      "testsPassed": true,
+      "deployed": false,
+      "manualValidation": false,
+      "homologated": false,
+      "evidence": "Pacote 5.5 implementado e validado. 27/27 testes P0 aprovados. Effective Configuration integrada ao Editor (Toolbox dinâmica, FieldPicker governado, preservação P0 de elementos legados EXISTING_DISABLED_ELEMENT e EXISTING_DISABLED_BINDING, duplicate/copy/paste bloqueados para elementos desabilitados, fail-safe LOADING/READY/ERROR, backend server-authoritative em POST/PUT/duplicate, bootstrap idempotente e não-destrutivo dos 11 nichos e role_niches). Aguardando homologação manual."
+    },
+    {
       "sha": "dad1c0ebd34886b234fbd1e1dde68eb54f375b3e",
       "shortSha": "dad1c0e",
       "date": "2026-09-09T12:15:00Z",
       "phase": "5",
-      "patch": "5.4.0-candidate",
+      "patch": "5.4.0",
       "title": "feat(admin): administracao de nichos, elementos visuais e campos canonicos (PACOTE 5.4)",
       "type": "FEATURE",
       "capabilities": [

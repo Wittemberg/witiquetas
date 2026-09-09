@@ -3,6 +3,7 @@ import { useEditorStore, formatDimensionBR } from './useEditorStore';
 import FieldPicker from './FieldPicker';
 import { CANONICAL_FIELDS, TextElement, PriceElement, BarcodeElement, QrCodeElement, RectangleElement, LineElement, ImageElement, getFieldDefinition } from '@witiquetas/label-schema';
 import { CURATED_FONTS, getFontCompatibility } from './fontsCatalog';
+import { isElementAllowed } from '../auth/session.js';
 import { QRCodeLibraryItemDTO } from '@witiquetas/contracts';
 import { validateCheckDigit, BarcodeFormat } from './barcodeEngine';
 import { normalizeRotation } from './bounds';
@@ -81,6 +82,16 @@ export default function PropertyInspector() {
   }, [document?.elements, selectedElementIds]);
 
   const primarySelected = selectedElements.length > 0 ? selectedElements[0] : null;
+
+  const isElementDisabledInPolicy = useMemo(() => {
+    if (!primarySelected) return false;
+    return !isElementAllowed(activeNicheId, primarySelected.type);
+  }, [primarySelected, activeNicheId]);
+
+  const isAnySelectedDisabled = useMemo(() => {
+    if (selectedElements.length === 0) return false;
+    return selectedElements.some((el) => !isElementAllowed(activeNicheId, el.type));
+  }, [selectedElements, activeNicheId]);
 
   // Filtragem de fontes
   const filteredFonts = useMemo(() => {
@@ -189,7 +200,22 @@ export default function PropertyInspector() {
             <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--accent-blue)' }}>
               {selectedElements.length} ELEMENTOS SELECIONADOS
             </span>
-            <button className="btn" style={{ padding: '0.25rem 0.5rem', color: 'var(--status-danger)' }} onClick={duplicateSelectedElements}>
+            <button
+              className="btn"
+              style={{
+                padding: '0.25rem 0.5rem',
+                color: 'var(--status-danger)',
+                opacity: isAnySelectedDisabled ? 0.4 : 1,
+                cursor: isAnySelectedDisabled ? 'not-allowed' : 'pointer',
+              }}
+              onClick={isAnySelectedDisabled ? undefined : duplicateSelectedElements}
+              disabled={isAnySelectedDisabled}
+              title={
+                isAnySelectedDisabled
+                  ? 'Contém elemento desabilitado na política atual e não pode ser duplicado.'
+                  : 'Duplicar elementos selecionados'
+              }
+            >
               <Copy size={13} /> Duplicar
             </button>
           </div>
@@ -252,7 +278,23 @@ export default function PropertyInspector() {
           onChange={(e) => updateElement(elem.id, { name: e.target.value })}
         />
 
-        <div style={{ display: 'flex', gap: '0.25rem' }}>
+        <div style={{ display: 'flex', gap: '0.25rem', alignItems: 'center' }}>
+          {isElementDisabledInPolicy && (
+            <span
+              style={{
+                fontSize: '0.65rem',
+                fontWeight: 700,
+                color: 'var(--status-warning)',
+                background: 'rgba(234, 179, 8, 0.1)',
+                padding: '0.1rem 0.35rem',
+                borderRadius: '4px',
+                border: '1px solid rgba(234, 179, 8, 0.3)',
+              }}
+              title="Elemento legado: tipo desabilitado na política atual para novas inserções"
+            >
+              Legado
+            </span>
+          )}
           <button
             className="btn"
             style={{ padding: '0.3rem', border: 'none' }}
@@ -263,9 +305,19 @@ export default function PropertyInspector() {
           </button>
           <button
             className="btn"
-            style={{ padding: '0.3rem', border: 'none' }}
-            title="Duplicar (Ctrl+D)"
-            onClick={duplicateSelectedElements}
+            style={{
+              padding: '0.3rem',
+              border: 'none',
+              opacity: isElementDisabledInPolicy ? 0.4 : 1,
+              cursor: isElementDisabledInPolicy ? 'not-allowed' : 'pointer',
+            }}
+            title={
+              isElementDisabledInPolicy
+                ? 'Este tipo de elemento está desabilitado na política atual do nicho e não pode ser duplicado.'
+                : 'Duplicar (Ctrl+D)'
+            }
+            onClick={isElementDisabledInPolicy ? undefined : duplicateSelectedElements}
+            disabled={isElementDisabledInPolicy}
           >
             <Copy size={14} />
           </button>

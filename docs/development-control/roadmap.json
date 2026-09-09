@@ -911,11 +911,15 @@
           "module": "auth-rbac",
           "weight": 2,
           "mvp": false,
-          "status": "IMPLEMENTED",
-          "manualValidation": false,
+          "status": "HOMOLOGATED",
+          "manualValidation": true,
           "physicalValidation": false,
           "frozen": false,
-          "evidence": [],
+          "evidence": [
+            "tests/adminRbacFoundation.test.ts",
+            "tests/authSessionRbac.test.ts",
+            "Homologação manual concluída pelo usuário no Pacote 5.3"
+          ],
           "dependencies": [
             "cap-session"
           ],
@@ -930,11 +934,14 @@
           "module": "auth-rbac",
           "weight": 2,
           "mvp": false,
-          "status": "IMPLEMENTED",
-          "manualValidation": false,
+          "status": "HOMOLOGATED",
+          "manualValidation": true,
           "physicalValidation": false,
           "frozen": false,
-          "evidence": [],
+          "evidence": [
+            "tests/adminRbacFoundation.test.ts",
+            "Homologação manual concluída pelo usuário no Pacote 5.3"
+          ],
           "dependencies": [
             "cap-user-management"
           ],
@@ -949,11 +956,14 @@
           "module": "auth-rbac",
           "weight": 2,
           "mvp": false,
-          "status": "IMPLEMENTED",
-          "manualValidation": false,
+          "status": "HOMOLOGATED",
+          "manualValidation": true,
           "physicalValidation": false,
           "frozen": false,
-          "evidence": [],
+          "evidence": [
+            "tests/adminRbacFoundation.test.ts",
+            "Homologação manual concluída pelo usuário no Pacote 5.3"
+          ],
           "dependencies": [
             "cap-user-management"
           ],
@@ -968,11 +978,15 @@
           "module": "auth-rbac",
           "weight": 2,
           "mvp": false,
-          "status": "IMPLEMENTED",
-          "manualValidation": false,
+          "status": "HOMOLOGATED",
+          "manualValidation": true,
           "physicalValidation": false,
           "frozen": false,
-          "evidence": [],
+          "evidence": [
+            "tests/adminRbacFoundation.test.ts",
+            "tests/hotfix534PermissionsAndDcc.test.ts",
+            "Homologação manual concluída pelo usuário no Pacote 5.3"
+          ],
           "dependencies": [
             "cap-session"
           ],
@@ -1185,11 +1199,14 @@
           "module": "admin",
           "weight": 2,
           "mvp": false,
-          "status": "IMPLEMENTED",
-          "manualValidation": false,
+          "status": "HOMOLOGATED",
+          "manualValidation": true,
           "physicalValidation": false,
           "frozen": false,
-          "evidence": [],
+          "evidence": [
+            "tests/adminRbacFoundation.test.ts",
+            "Homologação manual concluída pelo usuário no Pacote 5.3"
+          ],
           "dependencies": [
             "cap-session-context"
           ],
@@ -1204,11 +1221,14 @@
           "module": "admin",
           "weight": 2,
           "mvp": false,
-          "status": "IMPLEMENTED",
-          "manualValidation": false,
+          "status": "HOMOLOGATED",
+          "manualValidation": true,
           "physicalValidation": false,
           "frozen": false,
-          "evidence": [],
+          "evidence": [
+            "tests/adminRbacFoundation.test.ts",
+            "Homologação manual concluída pelo usuário no Pacote 5.3"
+          ],
           "dependencies": [
             "cap-admin-shell",
             "cap-company-settings"
@@ -1244,11 +1264,14 @@
           "module": "admin",
           "weight": 2,
           "mvp": false,
-          "status": "IMPLEMENTED",
-          "manualValidation": false,
+          "status": "HOMOLOGATED",
+          "manualValidation": true,
           "physicalValidation": false,
           "frozen": false,
-          "evidence": [],
+          "evidence": [
+            "tests/adminRbacFoundation.test.ts",
+            "Homologação manual concluída pelo usuário no Pacote 5.3"
+          ],
           "dependencies": [
             "cap-admin-shell",
             "cap-user-management"
@@ -1264,11 +1287,17 @@
           "module": "admin",
           "weight": 2,
           "mvp": false,
-          "status": "IMPLEMENTED",
-          "manualValidation": false,
+          "status": "HOMOLOGATED",
+          "manualValidation": true,
           "physicalValidation": false,
           "frozen": false,
-          "evidence": [],
+          "evidence": [
+            "tests/adminRbacFoundation.test.ts",
+            "tests/hotfix533PermissionMatrix.test.ts",
+            "tests/hotfix534PermissionsAndDcc.test.ts",
+            "tests/hotfix535UnifiedAuthAndDcc.test.ts",
+            "Homologação manual concluída pelo usuário no Pacote 5.3"
+          ],
           "dependencies": [
             "cap-admin-shell",
             "cap-role-permissions"
@@ -1486,6 +1515,25 @@
           ],
           "notes": [
             "Calcula o preço final a exibir na etiqueta de acordo com a data/condição."
+          ]
+        },
+        {
+          "id": "cap-maintenance-center",
+          "name": "Central de Manutenção da Plataforma (Maintenance Center)",
+          "description": "Painel de operações de manutenção de plataforma, developer-only por padrão (Desenvolvimento -> Manutenção), abrangendo diagnósticos, health operacional, migrations, schema checks, sessões, cache, modelos inconsistentes, MinIO, jobs de impressão, Agents e reparos versionados com dry-run e auditoria. Proibido terminal ou execução arbitrária de scripts/SQL.",
+          "module": "admin",
+          "weight": 2,
+          "mvp": false,
+          "status": "PLANNED",
+          "manualValidation": false,
+          "physicalValidation": false,
+          "frozen": false,
+          "evidence": [],
+          "dependencies": [
+            "cap-development-control-center-backend"
+          ],
+          "notes": [
+            "Operações estritamente cadastradas, tipadas, versionadas e auditáveis classificadas em DIAGNOSTIC, SAFE_MAINTENANCE e CRITICAL_MAINTENANCE. Operações críticas com dry-run, impacto estimado, confirmação explícita, motivo e reautenticação TOTP. Proibido terminal/shell/SQL arbitrário."
           ]
         }
       ]

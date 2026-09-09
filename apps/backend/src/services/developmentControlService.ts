@@ -238,6 +238,7 @@ export class DevelopmentControlService {
       { id: 'concurrency-engine', name: 'Concorrência & Presence Engine', description: 'Presença atômica no DB com expiração 45s e Lock Otimista 409', frozenSincePatch: '3.2.8.3', reason: 'Integridade multi-aba e multi-navegador' },
       { id: 'editor-baseline', name: 'Editor Baseline (EDITOR_BASELINE_FREEZE)', description: 'Canvas, Toolbox compacta, Layers, multiselect Ctrl/Cmd+click, Text, Price, Date, Barcode, QRCode, Line, Rectangle, Image, rotação canônica, resize, save/reload e catálogo de 11 nichos, 66 tamanhos e 112 relações', frozenSincePatch: '4.5.5.1', reason: 'Editor funcional homologado antes da fase de Administração' },
       { id: 'print-center-baseline', name: 'Central de Impressão Baseline (PRINT_CENTER_BASELINE_FREEZE)', description: 'Templates/modelos, preview, datasets, seleção de impressora, print jobs, histórico, batch, fluxo Agent e transport semantics', frozenSincePatch: '4.5.5.1', reason: 'Fluxo suficientemente maduro para retomada posterior após Administração e configuração contextual' },
+      { id: 'admin-auth-baseline', name: 'Administração & Autenticação Baseline (ADMIN_AUTH_BASELINE_FREEZE)', description: 'Login tenant, Login PLATFORM_DEVELOPER, TOTP, sessão Developer, Dashboard, Application Shell, Sidebar, Empresa, Usuários, Perfis, Matriz de Permissões, isolamento DCC, catálogo 25/23', frozenSincePatch: '5.3.5', reason: 'Baseline homologado da Administração/Auth e Governança do Witiquetas' },
     ];
   }
 

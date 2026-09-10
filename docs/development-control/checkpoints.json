@@ -1,11 +1,11 @@
 {
   "checkpoints": [
     {
-      "sha": "5.5.1-candidate",
-      "shortSha": "5.5.1",
+      "sha": "8ff884ef6609174ef3e9d8ae93c928c80ebdc99a",
+      "shortSha": "8ff884e",
       "date": "2026-09-10T11:45:00Z",
       "phase": "5",
-      "patch": "5.5.1-candidate",
+      "patch": "5.5.1",
       "title": "fix(hotfix-5.5.1): sincronização de effective configuration, autorização frontend templates.create e correção do fieldpicker manual",
       "type": "HOTFIX",
       "capabilities": [

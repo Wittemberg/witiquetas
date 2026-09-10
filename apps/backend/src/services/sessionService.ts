@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import { SessionRepository, SessionRecord, clearSessionMemoryStores } from '../repositories/sessionRepository.js';
+import { SessionRepository, type SessionRecord, clearSessionMemoryStores } from '../repositories/sessionRepository.js';
 import { UserRepository, CompanyRepository, RoleRepository } from '../repositories/adminRepositories.js';
 import type { RoleDTO } from '@witiquetas/contracts';
 

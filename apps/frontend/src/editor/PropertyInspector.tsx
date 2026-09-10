@@ -343,14 +343,18 @@ export default function PropertyInspector() {
           'manual'
         );
 
-        const fieldDef = getFieldDefinition(textElem.field);
+        const activeField = textElem.field || textElem.binding?.fieldId;
+        const fieldAvail = activeField ? getFieldAvailability(activeNicheId, activeField) : { manual: true, integration: true };
+        const canSelectManual = fieldAvail.manual !== false;
+
+        const fieldDef = getFieldDefinition(activeField);
         const isDateField =
           (fieldDef && 'type' in fieldDef && (fieldDef as any).type === 'date') ||
           (fieldDef && 'format' in fieldDef && (fieldDef as any).format === 'date') ||
-          textElem.field === 'system.printDate' ||
-          textElem.field === 'system.printDateTime' ||
-          textElem.field?.includes('validade') ||
-          textElem.field?.includes('expiration') ||
+          activeField === 'system.printDate' ||
+          activeField === 'system.printDateTime' ||
+          activeField?.includes('validade') ||
+          activeField?.includes('expiration') ||
           textElem.format === 'DD/MM/YYYY' ||
           textElem.format === 'DD/MM/YY' ||
           textElem.format === 'YYYY-MM-DD';
@@ -367,10 +371,106 @@ export default function PropertyInspector() {
           source === 'integration' ? 'Campo da Integração' :
           'Campo da Integração / Sistema';
 
+        const handleSwitchToManual = () => {
+          if (!canSelectManual) return;
+          const preservedText = textElem.text || textElem.binding?.value || 'Texto';
+          updateElement(elem.id, {
+            field: undefined,
+            binding: {
+              source: 'manual',
+              fieldId: activeField,
+              value: preservedText,
+            },
+            text: preservedText,
+          });
+        };
+
+        const handleSwitchToIntegration = () => {
+          const targetField = (activeField && !activeField.startsWith('system.')) ? activeField : 'produto.descricao';
+          updateElement(elem.id, {
+            field: targetField,
+            binding: {
+              source: 'integration',
+              fieldId: targetField,
+              namespace: targetField.includes('.') ? targetField.split('.')[0] : undefined,
+            },
+          });
+        };
+
+        const handleSwitchToSystem = () => {
+          updateElement(elem.id, {
+            field: 'system.printDate',
+            binding: {
+              source: 'system',
+              fieldId: 'system.printDate',
+              namespace: 'system',
+            },
+            format: 'DD/MM/YYYY',
+          });
+        };
+
         return (
           <>
             <div className="inspector-section">
               <div className="inspector-section-title">{sectionTitle}</div>
+
+              {/* Seletor de Origem do Dado (MANUAL / INTEGRAÇÃO / SISTEMA) */}
+              <div style={{ marginBottom: '0.65rem' }}>
+                <label className="metric-label" style={{ marginBottom: '0.3rem', display: 'block' }}>
+                  Origem do Dado
+                </label>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.3rem' }}>
+                  <button
+                    type="button"
+                    className={`btn ${source === 'manual' ? 'btn-primary' : ''}`}
+                    style={{
+                      justifyContent: 'center',
+                      padding: '0.35rem 0.25rem',
+                      fontSize: '0.72rem',
+                      fontWeight: 600,
+                      opacity: !canSelectManual && source !== 'manual' ? 0.4 : 1,
+                      cursor: !canSelectManual && source !== 'manual' ? 'not-allowed' : 'pointer',
+                    }}
+                    disabled={!canSelectManual && source !== 'manual'}
+                    title={
+                      !canSelectManual && source !== 'manual'
+                        ? 'Origem manual desabilitada pela governança do nicho.'
+                        : 'Texto Manual editável'
+                    }
+                    onClick={handleSwitchToManual}
+                  >
+                    Manual
+                  </button>
+                  <button
+                    type="button"
+                    className={`btn ${source === 'integration' ? 'btn-primary' : ''}`}
+                    style={{
+                      justifyContent: 'center',
+                      padding: '0.35rem 0.25rem',
+                      fontSize: '0.72rem',
+                      fontWeight: 600,
+                    }}
+                    title="Origem Integração (ERP / Catálogo)"
+                    onClick={handleSwitchToIntegration}
+                  >
+                    Integração
+                  </button>
+                  <button
+                    type="button"
+                    className={`btn ${source === 'system' ? 'btn-primary' : ''}`}
+                    style={{
+                      justifyContent: 'center',
+                      padding: '0.35rem 0.25rem',
+                      fontSize: '0.72rem',
+                      fontWeight: 600,
+                    }}
+                    title="Origem Sistema (Data / Hora automática)"
+                    onClick={handleSwitchToSystem}
+                  >
+                    Sistema
+                  </button>
+                </div>
+              </div>
 
               {/* Badges de Origem e Tipo */}
               <div style={{ display: 'flex', gap: '0.4rem', marginBottom: '0.5rem' }}>
@@ -410,6 +510,7 @@ export default function PropertyInspector() {
                 label={pickerLabel}
                 nicheId={activeNicheId}
                 value={textElem.field || ''}
+                canSwitchToManual={canSelectManual}
                 onChange={(val) => {
                   if (val) {
                     const isSystem = val.startsWith('system.');
@@ -429,12 +530,7 @@ export default function PropertyInspector() {
                       format: isValDate ? (textElem.format || 'DD/MM/YYYY') : textElem.format,
                     });
                   } else {
-                    updateElement(elem.id, {
-                      field: undefined,
-                      binding: {
-                        source: 'manual',
-                      },
-                    });
+                    handleSwitchToManual();
                   }
                 }}
               />
@@ -461,19 +557,46 @@ export default function PropertyInspector() {
                 </div>
               )}
 
-              {/* Campo de Texto Manual SOMENTE quando a origem for MANUAL */}
-              {source === 'manual' && (
-                <div style={{ marginTop: '0.5rem' }}>
-                  <label className="metric-label">Texto Manual</label>
-                  <input
-                    type="text"
-                    className="inspector-input"
-                    placeholder="Digite o texto..."
-                    value={textElem.text || ''}
-                    onChange={(e) => updateElement(elem.id, { text: e.target.value })}
-                  />
-                </div>
-              )}
+              {/* Campo de Texto Manual: habilitado em MANUAL, desabilitado em INTEGRATION e SYSTEM */}
+              <div style={{ marginTop: '0.5rem' }}>
+                <label className="metric-label">Texto Manual</label>
+                <input
+                  type="text"
+                  className="inspector-input"
+                  placeholder={source === 'manual' ? 'Digite o texto...' : 'Valor resolvido pela integração/sistema...'}
+                  value={textElem.text || ''}
+                  disabled={source !== 'manual'}
+                  style={source !== 'manual' ? { opacity: 0.6, cursor: 'not-allowed', background: 'var(--bg-muted, #1e293b)' } : undefined}
+                  title={
+                    source === 'integration'
+                      ? "Origem ativa: Integração. Alterne para 'Manual' para editar o texto diretamente."
+                      : source === 'system'
+                      ? 'Origem ativa: Sistema (Data/Hora gerada automaticamente pela plataforma).'
+                      : 'Texto manual editável'
+                  }
+                  onChange={(e) => {
+                    const newText = e.target.value;
+                    updateElement(elem.id, {
+                      text: newText,
+                      binding: {
+                        source: 'manual',
+                        fieldId: textElem.binding?.fieldId,
+                        value: newText,
+                      },
+                    });
+                  }}
+                />
+                {source === 'integration' && (
+                  <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
+                    Origem ativa: Integração. Entrada manual desabilitada.
+                  </div>
+                )}
+                {source === 'system' && (
+                  <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
+                    Origem ativa: Sistema. Campo gerado automaticamente pela plataforma.
+                  </div>
+                )}
+              </div>
             </div>
 
           <div className="inspector-section">
@@ -655,22 +778,51 @@ export default function PropertyInspector() {
       {elem.type === 'price' && (() => {
         const priceElem = elem as PriceElement;
         const currentPrefix = priceElem.prefix !== undefined ? priceElem.prefix : 'R$';
+        const isPriceIntegration = Boolean(priceElem.field);
+        const activePriceField = priceElem.field || 'produto.preco';
+        const priceFieldAvail = getFieldAvailability(activeNicheId, activePriceField);
+        const canPriceManual = priceFieldAvail.manual !== false;
+
+        const handlePriceFieldChange = (val: string) => {
+          if (val) {
+            updateElement(elem.id, {
+              field: val,
+              binding: {
+                source: 'integration',
+                fieldId: val,
+                namespace: val.includes('.') ? val.split('.')[0] : undefined,
+              },
+            });
+          } else {
+            if (!canPriceManual) return;
+            updateElement(elem.id, {
+              field: undefined,
+              binding: {
+                source: 'manual',
+                fieldId: activePriceField,
+                value: priceElem.sampleValue || '9,99',
+              },
+            });
+          }
+        };
 
         return (
           <div className="inspector-section">
             <div className="inspector-section-title">Formatação do Preço</div>
 
             <div>
-              <label className="metric-label">Vínculo ERP (Fonte da Verdade)</label>
+              <label className="metric-label">Vínculo ERP (Preço Dinâmico)</label>
               <select
                 className="inspector-select"
-                value={priceElem.field || 'produto.preco'}
-                onChange={(e) => updateElement(elem.id, { field: e.target.value })}
+                value={priceElem.field || ''}
+                onChange={(e) => handlePriceFieldChange(e.target.value)}
               >
                 <option value="produto.preco">Preço Normal (produto.preco)</option>
                 <option value="produto.promocao.preco">Preço Promocional (produto.promocao.preco)</option>
                 <option value="produto.referencia.preco">Preço por Unidade Referência</option>
-                <option value="">-- Sem vínculo (Manual) --</option>
+                <option value="" disabled={!canPriceManual}>
+                  -- Sem vínculo (Manual) -- {!canPriceManual ? '(Manual bloqueado)' : ''}
+                </option>
               </select>
               {priceElem.field && (
                 <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
@@ -680,14 +832,24 @@ export default function PropertyInspector() {
             </div>
 
             <div>
-              <label className="metric-label">Valor para visualização / exemplo</label>
+              <label className="metric-label">
+                {isPriceIntegration ? 'Valor para visualização / exemplo' : 'Preço Manual'}
+              </label>
               <input
                 type="text"
                 className="inspector-input"
                 value={priceElem.sampleValue || '9,99'}
                 placeholder="Ex: 9,99"
+                disabled={isPriceIntegration}
+                style={isPriceIntegration ? { opacity: 0.6, cursor: 'not-allowed', background: 'var(--bg-muted, #1e293b)' } : undefined}
+                title={isPriceIntegration ? "Origem ativa: Integração. Alterne para '-- Sem vínculo (Manual) --' para editar o preço manualmente." : 'Preço manual editável'}
                 onChange={(e) => updateElement(elem.id, { sampleValue: e.target.value })}
               />
+              {isPriceIntegration && (
+                <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
+                  Origem ativa: Integração. Entrada manual desabilitada.
+                </div>
+              )}
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
@@ -779,6 +941,33 @@ export default function PropertyInspector() {
         const currentFormat = barcodeElem.format || 'AUTO';
         const currentValue = barcodeElem.value || '7894900011517';
         const checkResult = validateCheckDigit(currentFormat, currentValue);
+        const isBarcodeIntegration = Boolean(barcodeElem.field);
+        const activeBarcodeField = barcodeElem.field || 'produto.ean';
+        const barcodeFieldAvail = getFieldAvailability(activeNicheId, activeBarcodeField);
+        const canBarcodeManual = barcodeFieldAvail.manual !== false;
+
+        const handleBarcodeFieldChange = (val: string) => {
+          if (val) {
+            updateElement(elem.id, {
+              field: val,
+              binding: {
+                source: 'integration',
+                fieldId: val,
+                namespace: val.includes('.') ? val.split('.')[0] : undefined,
+              },
+            });
+          } else {
+            if (!canBarcodeManual) return;
+            updateElement(elem.id, {
+              field: undefined,
+              binding: {
+                source: 'manual',
+                fieldId: activeBarcodeField,
+                value: currentValue,
+              },
+            });
+          }
+        };
 
         return (
           <div className="inspector-section">
@@ -788,12 +977,14 @@ export default function PropertyInspector() {
               <label className="metric-label">Vínculo ERP (Fonte da Verdade)</label>
               <select
                 className="inspector-select"
-                value={barcodeElem.field || 'produto.ean'}
-                onChange={(e) => updateElement(elem.id, { field: e.target.value })}
+                value={barcodeElem.field || ''}
+                onChange={(e) => handleBarcodeFieldChange(e.target.value)}
               >
                 <option value="produto.ean">Código EAN do Produto (produto.ean)</option>
                 <option value="produto.codigo">Código Interno (produto.codigo)</option>
-                <option value="">-- Sem vínculo (Manual) --</option>
+                <option value="" disabled={!canBarcodeManual}>
+                  -- Sem vínculo (Manual) -- {!canBarcodeManual ? '(Manual bloqueado)' : ''}
+                </option>
               </select>
               {barcodeElem.field && (
                 <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
@@ -820,14 +1011,24 @@ export default function PropertyInspector() {
             </div>
 
             <div>
-              <label className="metric-label">Valor para visualização / exemplo</label>
+              <label className="metric-label">
+                {isBarcodeIntegration ? 'Valor para visualização / exemplo' : 'Código de Barras Manual'}
+              </label>
               <input
                 type="text"
                 className="inspector-input"
                 value={currentValue}
                 placeholder="Ex: 7894900011517"
+                disabled={isBarcodeIntegration}
+                style={isBarcodeIntegration ? { opacity: 0.6, cursor: 'not-allowed', background: 'var(--bg-muted, #1e293b)' } : undefined}
+                title={isBarcodeIntegration ? "Origem ativa: Integração. Alterne para '-- Sem vínculo (Manual) --' para editar o código manualmente." : 'Código de barras manual editável'}
                 onChange={(e) => updateElement(elem.id, { value: e.target.value })}
               />
+              {isBarcodeIntegration && (
+                <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
+                  Origem ativa: Integração. Entrada manual desabilitada.
+                </div>
+              )}
             </div>
 
             {/* Validação de Check Digit e Simbologia */}

@@ -11,7 +11,7 @@ import {
   NICHES,
   DEFAULT_NICHE_PROFILES,
   getAllDefaultNicheProfiles,
-  CanonicalElementType,
+  type CanonicalElementType,
 } from '@witiquetas/label-schema';
 
 export const STANDARD_ROLES = [

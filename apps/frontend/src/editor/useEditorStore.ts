@@ -376,6 +376,7 @@ interface EditorState {
   mockProductData: Record<string, string>;
   isDirty: boolean;
   saveStatus: 'saved' | 'unsaved' | 'saving' | 'error' | 'conflict' | 'deleted';
+  saveErrorMessage: string | null;
   conflictInfo: { expectedVersion?: number; currentVersion?: number; updatedAt?: string } | null;
   editingSessionId: string | null;
   currentTemplateId: string | null;
@@ -481,6 +482,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   mockProductData: { ...MOCK_PRODUCT_DATA },
   isDirty: false,
   saveStatus: 'saved',
+  saveErrorMessage: null,
   conflictInfo: null,
   editingSessionId: null,
   currentTemplateId: null,
@@ -1264,6 +1266,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         set({
           currentTemplateVersion: updated.version,
           saveStatus: 'saved',
+          saveErrorMessage: null,
           isDirty: false,
           conflictInfo: null,
         });
@@ -1278,6 +1281,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           currentTemplateId: created.id,
           currentTemplateVersion: created.version,
           saveStatus: 'saved',
+          saveErrorMessage: null,
           isDirty: false,
           conflictInfo: null,
         });
@@ -1285,9 +1289,16 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       return true;
     } catch (err: any) {
       console.error('[EditorStore] Falha no salvamento no backend:', err);
+      const message =
+        err?.data?.error ||
+        err?.data?.message ||
+        err?.message ||
+        'Erro ao salvar modelo no servidor.';
+
       if (err?.data?.code === 'MODEL_VERSION_CONFLICT' || err?.status === 409) {
         set({
           saveStatus: 'conflict',
+          saveErrorMessage: message,
           isDirty: true,
           conflictInfo: {
             expectedVersion: err.data?.expectedVersion || currentTemplateVersion || 1,
@@ -1298,12 +1309,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       } else if (err?.data?.code === 'MODEL_NOT_FOUND' || err?.status === 404) {
         set({
           saveStatus: 'deleted',
+          saveErrorMessage: message,
           isDirty: true,
           conflictInfo: null,
         });
       } else {
         set({
           saveStatus: 'error',
+          saveErrorMessage: message,
           isDirty: true,
           conflictInfo: null,
         });

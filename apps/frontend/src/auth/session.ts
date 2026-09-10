@@ -9,6 +9,7 @@
  * - CSRF Token para mutações com cookie
  */
 
+import { useState, useEffect } from 'react';
 import { NICHES, normalizeNicheId } from '@witiquetas/label-schema';
 
 export interface SessionUser {
@@ -50,6 +51,7 @@ export type ConfigStatus = 'LOADING' | 'READY' | 'ERROR';
 // Armazena o contexto em memória local da aba
 let activeSessionContext: SessionContext | null = null;
 let currentConfigStatus: ConfigStatus = 'READY';
+let sessionContextVersion = 0;
 
 type SessionListener = (context: SessionContext | null, status: ConfigStatus) => void;
 const listeners = new Set<SessionListener>();
@@ -60,6 +62,10 @@ export function getCachedSessionContext(): SessionContext | null {
 
 export function getConfigStatus(): ConfigStatus {
   return currentConfigStatus;
+}
+
+export function getSessionContextVersion(): number {
+  return sessionContextVersion;
 }
 
 export function subscribeSessionContext(listener: SessionListener): () => void {
@@ -85,6 +91,7 @@ export function setManualSessionContext(ctx: any, status: ConfigStatus = 'READY'
 }
 
 function notifyListeners() {
+  sessionContextVersion++;
   for (const listener of listeners) {
     try {
       listener(activeSessionContext, currentConfigStatus);
@@ -92,6 +99,149 @@ function notifyListeners() {
       console.error('[Session] Error in listener:', e);
     }
   }
+}
+
+/**
+ * Hook do React para sincronização reativa com o contexto de sessão.
+ */
+export function useSessionContext(): { context: SessionContext | null; status: ConfigStatus; version: number } {
+  const [state, setState] = useState(() => ({
+    context: activeSessionContext,
+    status: currentConfigStatus,
+    version: sessionContextVersion,
+  }));
+
+  useEffect(() => {
+    return subscribeSessionContext((context, status) => {
+      setState({ context, status, version: sessionContextVersion });
+    });
+  }, []);
+
+  return state;
+}
+
+/**
+ * Canal Multi-Aba (BroadcastChannel + Fallback localStorage)
+ */
+export const SESSION_SYNC_CHANNEL = 'witiquetas_session_sync';
+let syncChannel: BroadcastChannel | null = null;
+if (typeof BroadcastChannel !== 'undefined') {
+  try {
+    syncChannel = new BroadcastChannel(SESSION_SYNC_CHANNEL);
+    if (typeof (syncChannel as any).unref === 'function') {
+      (syncChannel as any).unref();
+    }
+    syncChannel.onmessage = (ev) => {
+      if (ev?.data?.type === 'SESSION_CONFIG_INVALIDATED') {
+        revalidateSessionContext(true);
+      }
+    };
+  } catch {
+    // BroadcastChannel não suportado ou restrito
+  }
+}
+
+/**
+ * Dispara sinal de invalidação para outras abas abertas
+ */
+export function broadcastSessionContextInvalidation(): void {
+  try {
+    if (syncChannel) {
+      syncChannel.postMessage({ type: 'SESSION_CONFIG_INVALIDATED', timestamp: Date.now() });
+    }
+  } catch {
+    // ignore
+  }
+  try {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(SESSION_SYNC_CHANNEL, Date.now().toString());
+    }
+  } catch {
+    // ignore
+  }
+}
+
+let lastRevalidateTime = 0;
+const REVALIDATE_THROTTLE_MS = 300;
+
+/**
+ * Revalida o contexto da sessão (/api/session/context) de forma segura e não destrutiva.
+ */
+export async function revalidateSessionContext(force = false): Promise<SessionContext | null> {
+  const now = Date.now();
+  if (!force && now - lastRevalidateTime < REVALIDATE_THROTTLE_MS) {
+    return activeSessionContext;
+  }
+  lastRevalidateTime = now;
+
+  try {
+    const res = await fetch('/api/session/context', {
+      method: 'GET',
+      credentials: 'include',
+    });
+
+    if (res.status === 200) {
+      const data: SessionContext = await res.json();
+      activeSessionContext = data;
+      currentConfigStatus = 'READY';
+      notifyListeners();
+      return data;
+    }
+
+    if (res.status === 401 || res.status === 403) {
+      activeSessionContext = null;
+      currentConfigStatus = 'READY';
+      notifyListeners();
+      return null;
+    }
+
+    // Fail-Safe: Erro 5xx ou inesperado preserva activeSessionContext existente
+    currentConfigStatus = 'ERROR';
+    notifyListeners();
+    return activeSessionContext;
+  } catch (err) {
+    console.warn('[Session] Falha de rede ao revalidar contexto:', err);
+    currentConfigStatus = 'ERROR';
+    notifyListeners();
+    return activeSessionContext;
+  }
+}
+
+let isSyncInitialized = false;
+
+/**
+ * Inicializa ouvintes automáticos de foco, visibilidade de aba e storage multi-aba.
+ */
+export function initSessionSync(): () => void {
+  if (typeof window === 'undefined' || isSyncInitialized) return () => {};
+  isSyncInitialized = true;
+
+  const handleFocus = () => {
+    revalidateSessionContext();
+  };
+
+  const handleVisibilityChange = () => {
+    if (document.visibilityState === 'visible') {
+      revalidateSessionContext();
+    }
+  };
+
+  const handleStorage = (ev: StorageEvent) => {
+    if (ev.key === SESSION_SYNC_CHANNEL) {
+      revalidateSessionContext(true);
+    }
+  };
+
+  window.addEventListener('focus', handleFocus);
+  document.addEventListener('visibilitychange', handleVisibilityChange);
+  window.addEventListener('storage', handleStorage);
+
+  return () => {
+    window.removeEventListener('focus', handleFocus);
+    document.removeEventListener('visibilitychange', handleVisibilityChange);
+    window.removeEventListener('storage', handleStorage);
+    isSyncInitialized = false;
+  };
 }
 
 export function resolveCanonicalNicheId(nicheIdOrSlug?: string): string {
@@ -138,23 +288,30 @@ export function isElementAllowed(arg1?: string, arg2?: string): boolean {
 }
 
 /**
- * Fail-Safe: Verifica se um campo canônico é permitido no nicho.
- * Campos do sistema 'system.*' são SEMPRE permitidos e resolvidos pela plataforma.
+ * Auxiliar: normaliza argumentos (nicheId, fieldId) ou (fieldId, nicheId).
+ */
+function parseNicheAndField(arg1?: string, arg2?: string): { nicheId?: string; fieldId?: string } {
+  if (!arg1 && !arg2) return {};
+  if (arg1 && !arg2) {
+    if (arg1.includes('.') || arg1.startsWith('system.')) {
+      return { fieldId: arg1 };
+    }
+    return { nicheId: arg1 };
+  }
+  // Se arg1 possui ponto (ex: product.description) e arg2 não, foi passado como (fieldId, nicheId)
+  if (arg1 && arg2 && (arg1.includes('.') || arg1.startsWith('system.')) && !arg2.includes('.')) {
+    return { fieldId: arg1, nicheId: arg2 };
+  }
+  // Caso padrão canônico: (nicheId, fieldId)
+  return { nicheId: arg1, fieldId: arg2 };
+}
+
+/**
+ * Fail-Safe: Verifica se um campo de dados está habilitado para o nicho atual.
  * Suporta tanto (nicheId, fieldId) quanto (fieldId, nicheId).
  */
 export function isFieldAllowed(arg1?: string, arg2?: string, source?: 'manual' | 'integration' | 'system'): boolean {
-  let nicheId = arg1;
-  let fieldId = arg2;
-
-  if (arg1 && !arg2) {
-    fieldId = arg1;
-    nicheId = undefined;
-  } else if (arg1 && arg2) {
-    if (arg2.startsWith('niche-') || arg1.includes('.') || !arg1.startsWith('niche-')) {
-      fieldId = arg1;
-      nicheId = arg2;
-    }
-  }
+  const { nicheId, fieldId } = parseNicheAndField(arg1, arg2);
 
   if (!fieldId) return false;
   if (fieldId.startsWith('system.')) {
@@ -206,18 +363,7 @@ export function isFieldAllowed(arg1?: string, arg2?: string, source?: 'manual' |
  * Suporta tanto (nicheId, fieldId) quanto (fieldId, nicheId).
  */
 export function getFieldAvailability(arg1?: string, arg2?: string): { availableForManual: boolean; availableForIntegration: boolean; manual: boolean; integration: boolean } {
-  let nicheId = arg1;
-  let fieldId = arg2;
-
-  if (arg1 && !arg2) {
-    fieldId = arg1;
-    nicheId = undefined;
-  } else if (arg1 && arg2) {
-    if (arg2.startsWith('niche-') || arg1.includes('.') || !arg1.startsWith('niche-')) {
-      fieldId = arg1;
-      nicheId = arg2;
-    }
-  }
+  const { nicheId, fieldId } = parseNicheAndField(arg1, arg2);
 
   const defaultTrue = { availableForManual: true, availableForIntegration: true, manual: true, integration: true };
   if (!fieldId) return defaultTrue;
@@ -263,7 +409,12 @@ export function isNicheAllowed(nicheId?: string): boolean {
     return true;
   }
   const canonical = resolveCanonicalNicheId(nicheId);
-  return allowedNiches.includes(nicheId) || allowedNiches.includes(canonical);
+  const match = NICHES.find((n) => n.id === nicheId || n.slug === nicheId);
+  return (
+    allowedNiches.includes(nicheId) ||
+    allowedNiches.includes(canonical) ||
+    Boolean(match && (allowedNiches.includes(match.id) || allowedNiches.includes(match.slug)))
+  );
 }
 
 export function getCsrfToken(): string | null {
@@ -332,8 +483,8 @@ export async function fetchSessionContext(): Promise<SessionContext | null> {
     notifyListeners();
   }
 
-  activeSessionContext = null;
-  return null;
+  // Fail-Safe: Erro 5xx ou de rede preserva activeSessionContext existente
+  return activeSessionContext;
 }
 
 /**

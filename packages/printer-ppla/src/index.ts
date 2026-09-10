@@ -58,21 +58,24 @@ export class PPLACompiler implements PrinterCompiler {
 
       switch (elem.type) {
         case 'text': {
-          const textValue = elem.field && data[elem.field] ? data[elem.field] : elem.text;
+          const isManual = elem.binding?.source === 'manual';
+          const textValue = (!isManual && elem.field && data[elem.field]) ? data[elem.field] : elem.text;
           // PPLA Sintaxe de Texto: Orientação(1) + Fonte(1..5) + Multiplicadores(2) + Y(4) + X(4) + Conteúdo
           lines.push(`1211000${yStr}${xStr}${textValue}`);
           break;
         }
 
         case 'price': {
-          const rawPrice = elem.field && data[elem.field] ? data[elem.field] : '9.99';
+          const isManual = elem.binding?.source === 'manual';
+          const rawPrice = (!isManual && elem.field && data[elem.field]) ? data[elem.field] : (elem.sampleValue || '9.99');
           const formatted = `${elem.prefix || 'R$'} ${rawPrice}`;
           lines.push(`1311000${yStr}${xStr}${formatted}`);
           break;
         }
 
         case 'barcode': {
-          const barcodeValue = elem.field && data[elem.field] ? data[elem.field] : elem.value;
+          const isManual = elem.binding?.source === 'manual';
+          const barcodeValue = (!isManual && elem.field && data[elem.field]) ? data[elem.field] : elem.value;
           // PPLA Sintaxe EAN-13: 1E000 + Altura + Y + X + Valor
           lines.push(`1F22000${yStr}${xStr}${barcodeValue}`);
           break;

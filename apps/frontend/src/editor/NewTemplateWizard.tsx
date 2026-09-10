@@ -7,7 +7,7 @@ import {
   calculateOrientation,
   formatDimensionLabel,
 } from '@witiquetas/label-schema';
-import { isNicheAllowed } from '../auth/session.js';
+import { isNicheAllowed, hasPermission } from '../auth/session.js';
 import { useEditorStore, formatDimensionBR } from './useEditorStore';
 import {
   Sparkles,
@@ -127,7 +127,7 @@ export default function NewTemplateWizard({ isOpen, onClose, onSuccess }: Wizard
     );
   }, [selectedNiche, searchSize]);
 
-  if (!isOpen) return null;
+  if (!isOpen || !hasPermission('templates.create')) return null;
 
   const handleSelectNiche = (niche: NicheDefinition) => {
     setSelectedNiche(niche);
@@ -202,21 +202,30 @@ export default function NewTemplateWizard({ isOpen, onClose, onSuccess }: Wizard
               </div>
 
               {/* Grid Responsivo de 4 Colunas */}
-              <div className="niche-grid">
-                {filteredNiches.map((niche) => (
-                  <div
-                    key={niche.id}
-                    className={`niche-card ${selectedNiche?.id === niche.id ? 'selected' : ''}`}
-                    onClick={() => handleSelectNiche(niche)}
-                  >
-                    <div className="niche-card-header">
-                      <div className="niche-card-icon">{getNicheIcon(niche.icon)}</div>
-                      <div className="niche-card-title">{niche.name}</div>
+              {filteredNiches.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '2.5rem 1rem', color: 'var(--text-muted)' }}>
+                  <p style={{ fontWeight: 600, fontSize: '0.9rem' }}>Nenhum nicho disponível para criação de modelo.</p>
+                  <p style={{ fontSize: '0.8rem', marginTop: '0.35rem' }}>
+                    Verifique os nichos habilitados para seu usuário ou organização.
+                  </p>
+                </div>
+              ) : (
+                <div className="niche-grid">
+                  {filteredNiches.map((niche) => (
+                    <div
+                      key={niche.id}
+                      className={`niche-card ${selectedNiche?.id === niche.id ? 'selected' : ''}`}
+                      onClick={() => handleSelectNiche(niche)}
+                    >
+                      <div className="niche-card-header">
+                        <div className="niche-card-icon">{getNicheIcon(niche.icon)}</div>
+                        <div className="niche-card-title">{niche.name}</div>
+                      </div>
+                      <p className="niche-card-desc">{niche.description}</p>
                     </div>
-                    <p className="niche-card-desc">{niche.description}</p>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 

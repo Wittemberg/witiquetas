@@ -1,14 +1,14 @@
 {
   "name": "witiquetas-frontend",
-  "version": "5.3.5-candidate",
-  "commit": "5.3.5-candidate",
-  "candidateSha": "5.3.5-candidate",
-  "runningSha": "5.3.5-candidate",
-  "shortCommit": "5.3.5",
-  "shortSha": "5.3.5",
-  "governanceSha": "5.3.5-candidate",
-  "status": "IMPLEMENTED_AWAITING_HOMOLOGATION",
-  "package": "PACOTE 5.3.5 — Hotfix de Login Unificado, Ciclo de Sessão DCC e Ajuste Final do Checkbox",
+  "version": "5.5.1-candidate",
+  "commit": "5.5.1-candidate",
+  "candidateSha": "5.5.1-candidate",
+  "runningSha": "5.5.1-candidate",
+  "shortCommit": "5.5.1",
+  "shortSha": "5.5.1",
+  "governanceSha": "5.5.1-candidate",
+  "status": "IMPLEMENTED_AWAITING_MANUAL_REVALIDATION",
+  "package": "HOTFIX 5.5.1 — Sincronização Multi-Aba Effective Configuration, templates.create e FieldPicker MANUAL",
   "phase": "Fase 5 — Administração e Governança da Aplicação",
-  "timestamp": "2026-09-08T19:45:00Z"
+  "timestamp": "2026-09-10T11:45:00Z"
 }

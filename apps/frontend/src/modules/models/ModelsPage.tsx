@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import type { TemplateSummaryDTO } from '@witiquetas/contracts';
 import { templatesApi } from '../../services/templatesApi.js';
 import { RenameModelModal, DeleteModelModal } from './ModelActionModals.js';
+import { hasPermission } from '../../auth/session.js';
 import {
   Plus,
   Search,
@@ -19,6 +20,10 @@ interface ModelsPageProps {
 }
 
 export const ModelsPage: React.FC<ModelsPageProps> = ({ onOpenModel, onCreateNew }) => {
+  const canCreate = hasPermission('templates.create');
+  const canEdit = hasPermission('templates.edit');
+  const canDelete = hasPermission('templates.delete');
+
   const [templates, setTemplates] = useState<TemplateSummaryDTO[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
@@ -48,6 +53,7 @@ export const ModelsPage: React.FC<ModelsPageProps> = ({ onOpenModel, onCreateNew
   }, [searchQuery]);
 
   const handleDuplicate = async (t: TemplateSummaryDTO) => {
+    if (!canCreate) return;
     setActionMenuOpenId(null);
     setLoading(true);
     try {
@@ -61,7 +67,7 @@ export const ModelsPage: React.FC<ModelsPageProps> = ({ onOpenModel, onCreateNew
   };
 
   const handleConfirmRename = async (newTitle: string) => {
-    if (!renameTarget) return;
+    if (!renameTarget || !canEdit) return;
     setActionLoading(true);
     try {
       await templatesApi.renameTemplate(renameTarget.id, newTitle);
@@ -77,7 +83,7 @@ export const ModelsPage: React.FC<ModelsPageProps> = ({ onOpenModel, onCreateNew
   const [blockedSessions, setBlockedSessions] = useState<any[] | null>(null);
 
   const handleConfirmDelete = async () => {
-    if (!deleteTarget) return;
+    if (!deleteTarget || !canDelete) return;
     setActionLoading(true);
     try {
       await templatesApi.deleteTemplate(deleteTarget.id);
@@ -120,7 +126,7 @@ export const ModelsPage: React.FC<ModelsPageProps> = ({ onOpenModel, onCreateNew
           </p>
         </div>
 
-        {!loading && !error && templates.length > 0 && (
+        {canCreate && !loading && !error && templates.length > 0 && (
           <button type="button" className="btn-primary-action" onClick={onCreateNew}>
             <Plus size={18} />
             <span>Nova Etiqueta</span>
@@ -177,15 +183,21 @@ export const ModelsPage: React.FC<ModelsPageProps> = ({ onOpenModel, onCreateNew
             <LayoutTemplate size={36} />
           </div>
           <h2>Nenhum modelo salvo ainda</h2>
-          <p>Crie seu primeiro modelo escolhendo um nicho e um formato de etiqueta.</p>
-          <button
-            type="button"
-            className="btn-primary-action"
-            onClick={onCreateNew}
-          >
-            <Plus size={18} />
-            <span>Criar primeira etiqueta</span>
-          </button>
+          <p>
+            {canCreate
+              ? 'Crie seu primeiro modelo escolhendo um nicho e um formato de etiqueta.'
+              : 'Nenhum modelo disponível para sua conta no momento.'}
+          </p>
+          {canCreate && (
+            <button
+              type="button"
+              className="btn-primary-action"
+              onClick={onCreateNew}
+            >
+              <Plus size={18} />
+              <span>Criar primeira etiqueta</span>
+            </button>
+          )}
         </div>
       )}
 
@@ -235,53 +247,61 @@ export const ModelsPage: React.FC<ModelsPageProps> = ({ onOpenModel, onCreateNew
                 </button>
 
                 {/* Dropdown Menu de Contexto ⋯ */}
-                <div className="model-card-menu-container">
-                  <button
-                    type="button"
-                    className="btn-icon-more"
-                    onClick={() =>
-                      setActionMenuOpenId(actionMenuOpenId === t.id ? null : t.id)
-                    }
-                    title="Mais opções"
-                  >
-                    <MoreVertical size={16} />
-                  </button>
+                {(canCreate || canEdit || canDelete) && (
+                  <div className="model-card-menu-container">
+                    <button
+                      type="button"
+                      className="btn-icon-more"
+                      onClick={() =>
+                        setActionMenuOpenId(actionMenuOpenId === t.id ? null : t.id)
+                      }
+                      title="Mais opções"
+                    >
+                      <MoreVertical size={16} />
+                    </button>
 
-                  {actionMenuOpenId === t.id && (
-                    <div className="model-card-dropdown">
-                      <button
-                        type="button"
-                        className="dropdown-item"
-                        onClick={() => handleDuplicate(t)}
-                      >
-                        <Copy size={14} />
-                        <span>Duplicar</span>
-                      </button>
-                      <button
-                        type="button"
-                        className="dropdown-item"
-                        onClick={() => {
-                          setActionMenuOpenId(null);
-                          setRenameTarget(t);
-                        }}
-                      >
-                        <Edit3 size={14} />
-                        <span>Renomear</span>
-                      </button>
-                      <button
-                        type="button"
-                        className="dropdown-item danger"
-                        onClick={() => {
-                          setActionMenuOpenId(null);
-                          setDeleteTarget(t);
-                        }}
-                      >
-                        <Trash2 size={14} />
-                        <span>Excluir</span>
-                      </button>
-                    </div>
-                  )}
-                </div>
+                    {actionMenuOpenId === t.id && (
+                      <div className="model-card-dropdown">
+                        {canCreate && (
+                          <button
+                            type="button"
+                            className="dropdown-item"
+                            onClick={() => handleDuplicate(t)}
+                          >
+                            <Copy size={14} />
+                            <span>Duplicar</span>
+                          </button>
+                        )}
+                        {canEdit && (
+                          <button
+                            type="button"
+                            className="dropdown-item"
+                            onClick={() => {
+                              setActionMenuOpenId(null);
+                              setRenameTarget(t);
+                            }}
+                          >
+                            <Edit3 size={14} />
+                            <span>Renomear</span>
+                          </button>
+                        )}
+                        {canDelete && (
+                          <button
+                            type="button"
+                            className="dropdown-item danger"
+                            onClick={() => {
+                              setActionMenuOpenId(null);
+                              setDeleteTarget(t);
+                            }}
+                          >
+                            <Trash2 size={14} />
+                            <span>Excluir</span>
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           ))}

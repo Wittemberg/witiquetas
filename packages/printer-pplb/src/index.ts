@@ -58,21 +58,24 @@ export class PPLBCompiler implements PrinterCompiler {
 
       switch (elem.type) {
         case 'text': {
-          const textValue = elem.field && data[elem.field] ? data[elem.field] : elem.text;
+          const isManual = elem.binding?.source === 'manual';
+          const textValue = (!isManual && elem.field && data[elem.field]) ? data[elem.field] : elem.text;
           // PPLB Sintaxe de Texto: A,x,y,rotação,fonte,multH,multV,N,"conteúdo"
           lines.push(`A${xDots},${yDots},0,3,1,1,N,"${textValue}"`);
           break;
         }
 
         case 'price': {
-          const rawPrice = elem.field && data[elem.field] ? data[elem.field] : '9.99';
+          const isManual = elem.binding?.source === 'manual';
+          const rawPrice = (!isManual && elem.field && data[elem.field]) ? data[elem.field] : (elem.sampleValue || '9.99');
           const formatted = `${elem.prefix || 'R$'} ${rawPrice}`;
           lines.push(`A${xDots},${yDots},0,4,1,1,N,"${formatted}"`);
           break;
         }
 
         case 'barcode': {
-          const barcodeValue = elem.field && data[elem.field] ? data[elem.field] : elem.value;
+          const isManual = elem.binding?.source === 'manual';
+          const barcodeValue = (!isManual && elem.field && data[elem.field]) ? data[elem.field] : elem.value;
           // PPLB Sintaxe EAN-13: B,x,y,rotação,tipo(E30),largura_barra(2),largura_espaco(4),altura,B,"valor"
           lines.push(`B${xDots},${yDots},0,E30,2,4,${elHDots},B,"${barcodeValue}"`);
           break;

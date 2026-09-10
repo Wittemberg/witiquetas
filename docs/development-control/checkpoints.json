@@ -1,6 +1,28 @@
 {
   "checkpoints": [
     {
+      "sha": "5.5.1-candidate",
+      "shortSha": "5.5.1",
+      "date": "2026-09-10T11:45:00Z",
+      "phase": "5",
+      "patch": "5.5.1-candidate",
+      "title": "fix(hotfix-5.5.1): sincronização de effective configuration, autorização frontend templates.create e correção do fieldpicker manual",
+      "type": "HOTFIX",
+      "capabilities": [
+        "cap-effective-configuration",
+        "cap-multi-tab-sync",
+        "cap-fieldpicker-manual",
+        "cap-templates-create-auth",
+        "cap-niche-governance"
+      ],
+      "testsPassed": true,
+      "deployed": false,
+      "manualValidation": false,
+      "homologated": false,
+      "status": "IMPLEMENTED_AWAITING_MANUAL_REVALIDATION",
+      "evidence": "Hotfix 5.5.1 implementado e validado com sucesso. 18/18 gates do hotfix aprovados, 28/28 testes de Effective Configuration/Editor aprovados e 5/5 testes de homologação aprovados. Sincronização multi-aba sem F5 via BroadcastChannel/storage/focus/visibilitychange com fail-safe; seletor de origem Manual/Integração/Sistema no PropertyInspector com liberação de digitação em MANUAL; restrição frontend completa por templates.create (botões, modal, deep-link, duplicar). Aguardando revalidação manual B1/C1/D1."
+    },
+    {
       "sha": "65d15c578c6f567f05e56cd48ba7311da03ba786",
       "shortSha": "65d15c5",
       "date": "2026-09-09T15:05:00Z",

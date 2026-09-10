@@ -6,7 +6,7 @@ import NewTemplateWizard from './NewTemplateWizard';
 import CompileModal from './CompileModal';
 import ImportModal from './ImportModal';
 import { getNicheToolboxConfig, NicheToolItem } from '@witiquetas/label-schema';
-import { isElementAllowed } from '../auth/session.js';
+import { isElementAllowed, useSessionContext, hasPermission, revalidateSessionContext } from '../auth/session.js';
 import {
   Sparkles,
   Printer,
@@ -99,6 +99,7 @@ export default function EditorLayout({
     setPreviewScenario,
     isDirty,
     saveStatus,
+    saveErrorMessage,
     saveDocumentToBackend,
     conflictInfo,
     currentTemplateId,
@@ -143,6 +144,16 @@ export default function EditorLayout({
   const [isShapePopoverOpen, setIsShapePopoverOpen] = useState(false);
   const [isMoreToolsOpen, setIsMoreToolsOpen] = useState(false);
 
+  // Hotfix 5.5.1: Sincronização reativa de Effective Configuration e autorização de criação / edição
+  const { version: sessionVersion } = useSessionContext();
+  const canCreateTemplate = hasPermission('templates.create');
+  const canEditTemplate = hasPermission('templates.edit');
+  const canSaveCurrentDocument = currentTemplateId ? canEditTemplate : canCreateTemplate;
+
+  useEffect(() => {
+    revalidateSessionContext();
+  }, []);
+
   const activeNicheId = document?.nicheId || document?.nicheName || 'gondola-supermercado';
   const toolboxConfig = React.useMemo(() => {
     const raw = getNicheToolboxConfig(activeNicheId);
@@ -157,7 +168,7 @@ export default function EditorLayout({
       recommendedTools: raw.recommendedTools.filter(filterTool),
       availableTools: raw.availableTools.filter(filterTool),
     };
-  }, [activeNicheId]);
+  }, [activeNicheId, sessionVersion]);
 
   const getToolIcon = (iconName: string) => {
     switch (iconName) {
@@ -342,6 +353,7 @@ export default function EditorLayout({
         // Apenas Ctrl+S é permitido durante edição de campo
         if (isCtrlOrCmd && (e.key === 's' || e.key === 'S')) {
           e.preventDefault();
+          if (!canSaveCurrentDocument) return;
           if (saveStatus === 'conflict') {
             openConflictModal();
           } else if (saveStatus === 'deleted') {
@@ -357,6 +369,7 @@ export default function EditorLayout({
       if (isCtrlOrCmd) {
         if (e.key === 's' || e.key === 'S') {
           e.preventDefault();
+          if (!canSaveCurrentDocument) return;
           if (saveStatus === 'conflict') {
             openConflictModal();
           } else if (saveStatus === 'deleted') {
@@ -570,7 +583,7 @@ export default function EditorLayout({
                   : saveStatus === 'deleted'
                     ? 'Modelo removido no servidor. Clique para opções de recuperação.'
                     : saveStatus === 'error'
-                      ? 'Erro ao salvar. Clique para tentar novamente.'
+                      ? (saveErrorMessage || 'Erro ao salvar. Clique para tentar novamente.')
                       : undefined
               }
             >
@@ -595,21 +608,23 @@ export default function EditorLayout({
                         : 'var(--status-success)',
                 }}
               >
-                {saveStatus === 'saving'
-                  ? 'Salvando...'
-                  : saveStatus === 'unsaved'
-                    ? 'Não salvo'
-                    : saveStatus === 'error'
-                      ? 'Erro'
-                      : saveStatus === 'conflict'
-                        ? 'Conflito'
-                        : saveStatus === 'deleted'
-                          ? 'Removido'
-                          : 'Salvo'}
+                {!canSaveCurrentDocument
+                  ? 'Somente leitura'
+                  : saveStatus === 'saving'
+                    ? 'Salvando...'
+                    : saveStatus === 'unsaved'
+                      ? 'Não salvo'
+                      : saveStatus === 'error'
+                        ? 'Erro'
+                        : saveStatus === 'conflict'
+                          ? 'Conflito'
+                          : saveStatus === 'deleted'
+                            ? 'Removido'
+                            : 'Salvo'}
               </span>
             </div>
 
-            {saveStatus === 'unsaved' && (
+            {saveStatus === 'unsaved' && canSaveCurrentDocument && (
               <button
                 className="btn"
                 style={{
@@ -818,26 +833,28 @@ export default function EditorLayout({
 
           <div style={{ padding: '0.85rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             {/* Botões de Ação do Topo da Barra Lateral */}
-            <div style={{ display: 'flex', gap: '0.4rem' }}>
-              <button
-                className="btn btn-primary"
-                style={{ flex: 1, justifyContent: 'center', fontSize: '0.78rem', padding: '0.45rem' }}
-                onClick={() => setIsWizardOpen(true)}
-              >
-                <Plus size={14} />
-                <span>Novo Formato</span>
-              </button>
+            {canCreateTemplate && (
+              <div style={{ display: 'flex', gap: '0.4rem' }}>
+                <button
+                  className="btn btn-primary"
+                  style={{ flex: 1, justifyContent: 'center', fontSize: '0.78rem', padding: '0.45rem' }}
+                  onClick={() => setIsWizardOpen(true)}
+                >
+                  <Plus size={14} />
+                  <span>Novo Formato</span>
+                </button>
 
-              <button
-                className="btn"
-                style={{ justifyContent: 'center', fontSize: '0.78rem', padding: '0.45rem 0.6rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
-                onClick={() => setIsImportModalOpen(true)}
-                title="Importar modelo existente (PPLB, ZPL, Legado)"
-              >
-                <FileUp size={14} color="var(--accent-blue)" />
-                <span>Importar</span>
-              </button>
-            </div>
+                <button
+                  className="btn"
+                  style={{ justifyContent: 'center', fontSize: '0.78rem', padding: '0.45rem 0.6rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
+                  onClick={() => setIsImportModalOpen(true)}
+                  title="Importar modelo existente (PPLB, ZPL, Legado)"
+                >
+                  <FileUp size={14} color="var(--accent-blue)" />
+                  <span>Importar</span>
+                </button>
+              </div>
+            )}
 
             {/* Paleta de Criação de Elementos (Lista Compacta por Nicho) */}
             <div>
@@ -1286,24 +1303,30 @@ export default function EditorLayout({
               >
                 Voltar para Meus Modelos
               </button>
-              <button
-                className="btn btn-primary"
-                onClick={async () => {
-                  const ok = await resolveDeletedSaveAsNew();
-                  if (ok) setIsDeletedModalOpen(false);
-                }}
-              >
-                Salvar como novo modelo
-              </button>
+              {canCreateTemplate && (
+                <button
+                  className="btn btn-primary"
+                  onClick={async () => {
+                    const ok = await resolveDeletedSaveAsNew();
+                    if (ok) setIsDeletedModalOpen(false);
+                  }}
+                >
+                  Salvar como novo modelo
+                </button>
+              )}
             </div>
           </div>
         </div>
       )}
 
       {/* Modais */}
-      <NewTemplateWizard isOpen={isWizardOpen} onClose={() => setIsWizardOpen(false)} />
+      {canCreateTemplate && (
+        <NewTemplateWizard isOpen={isWizardOpen} onClose={() => setIsWizardOpen(false)} />
+      )}
       <CompileModal isOpen={isCompileOpen} onClose={() => setIsCompileOpen(false)} />
-      <ImportModal isOpen={isImportModalOpen} onClose={() => setIsImportModalOpen(false)} />
+      {canCreateTemplate && (
+        <ImportModal isOpen={isImportModalOpen} onClose={() => setIsImportModalOpen(false)} />
+      )}
     </div>
   );
 }

@@ -84,6 +84,13 @@ function validateElementBinding(
     };
   }
 
+  if (element.binding?.source === 'integration' && fieldAvail && fieldAvail.integration === false) {
+    return {
+      error: `Integração para o campo '${field}' está desabilitada na política do nicho.`,
+      code: 'INTEGRATION_INPUT_DISABLED',
+    };
+  }
+
   return null;
 }
 

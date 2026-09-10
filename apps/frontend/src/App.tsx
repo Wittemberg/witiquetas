@@ -21,7 +21,16 @@ import EditorLayout from './editor/EditorLayout.js';
 import NewTemplateWizard from './editor/NewTemplateWizard.js';
 import DownloadAgentModal from './agent/DownloadAgentModal.js';
 import PairAgentModal from './agent/PairAgentModal.js';
-import { fetchSessionContext, logoutUser, canAccessDevControl, hasAnyPermission, type SessionContext } from './auth/session.js';
+import {
+  fetchSessionContext,
+  logoutUser,
+  canAccessDevControl,
+  hasPermission,
+  hasAnyPermission,
+  initSessionSync,
+  subscribeSessionContext,
+  type SessionContext
+} from './auth/session.js';
 import { LoginForm } from './auth/LoginForm.js';
 import { ApplicationShell } from './shell/ApplicationShell.js';
 import { AccessDeniedView } from './shell/AccessDeniedView.js';
@@ -126,6 +135,11 @@ export default function App() {
 
   // Inicialização e Verificação de Sessão Segura
   useEffect(() => {
+    const cleanupSync = initSessionSync();
+    const cleanupSub = subscribeSessionContext((ctx) => {
+      setSessionContext(ctx);
+    });
+
     const initSession = async () => {
       setSessionLoading(true);
       try {
@@ -144,6 +158,11 @@ export default function App() {
     };
 
     initSession();
+
+    return () => {
+      cleanupSync();
+      cleanupSub();
+    };
   }, []);
 
   const handleLogout = async () => {
@@ -169,6 +188,16 @@ export default function App() {
   useEffect(() => {
     const handleHashSync = async () => {
       const parsed = parseHash(window.location.hash);
+      if (parsed.module === 'new') {
+        if (!hasPermission('templates.create')) {
+          setCurrentModule('models');
+          window.location.hash = '#models';
+          return;
+        }
+        setCurrentModule('new');
+        return;
+      }
+
       if (parsed.module === 'editor' && parsed.templateId) {
         const store = useEditorStore.getState();
         if (store.currentTemplateId !== parsed.templateId) {
@@ -184,6 +213,10 @@ export default function App() {
         const store = useEditorStore.getState();
         if (store.currentTemplateId) {
           setCurrentModule(`editor/${store.currentTemplateId}`);
+        } else if (!hasPermission('templates.create')) {
+          setCurrentModule('models');
+          window.location.hash = '#models';
+          return;
         } else {
           setCurrentModule('editor');
         }
@@ -254,16 +287,24 @@ export default function App() {
         return (
           <ModelsPage
             onOpenModel={handleOpenModel}
-            onCreateNew={() => setIsWizardOpen(true)}
+            onCreateNew={() => {
+              if (hasPermission('templates.create')) {
+                setIsWizardOpen(true);
+              }
+            }}
           />
         );
 
       case 'new':
+        if (!hasPermission('templates.create')) {
+          setCurrentModule('models');
+          return null;
+        }
         return (
           <div className="new-template-redirect-view">
             <NewTemplateWizard
               isOpen={true}
-              onClose={() => setCurrentModule('home')}
+              onClose={() => setCurrentModule('models')}
               onSuccess={() => setCurrentModule('editor')}
             />
           </div>
@@ -686,15 +727,17 @@ export default function App() {
       {renderModuleContent()}
 
       {/* Wizard Modal */}
-      <NewTemplateWizard
-        isOpen={isWizardOpen}
-        onClose={() => setIsWizardOpen(false)}
-        onSuccess={() => {
-          const createdId = useEditorStore.getState().currentTemplateId;
-          setIsWizardOpen(false);
-          setCurrentModule(createdId ? `editor/${createdId}` : 'editor');
-        }}
-      />
+      {hasPermission('templates.create') && (
+        <NewTemplateWizard
+          isOpen={isWizardOpen}
+          onClose={() => setIsWizardOpen(false)}
+          onSuccess={() => {
+            const createdId = useEditorStore.getState().currentTemplateId;
+            setIsWizardOpen(false);
+            setCurrentModule(createdId ? `editor/${createdId}` : 'editor');
+          }}
+        />
+      )}
 
       {/* Modal de Download Multiplataforma do Agent */}
       <DownloadAgentModal

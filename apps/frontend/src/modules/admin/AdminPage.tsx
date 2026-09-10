@@ -9,7 +9,12 @@ import {
   ShieldAlert,
   Layers,
 } from 'lucide-react';
-import { SessionContext, fetchSessionContext, hasAnyPermission } from '../../auth/session.js';
+import {
+  SessionContext,
+  fetchSessionContext,
+  hasAnyPermission,
+  broadcastSessionContextInvalidation,
+} from '../../auth/session.js';
 import { CompanyAdminView } from './CompanyAdminView.js';
 import { UsersAdminView } from './UsersAdminView.js';
 import { RolesAdminView } from './RolesAdminView.js';
@@ -68,6 +73,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({
   // Invalida e recarrega imediatamente o contexto canônico
   const handleSelfAffected = async () => {
     console.log('[AdminShell] Alteração de configuração/perfil detectada. Recarregando contexto canônico...');
+    broadcastSessionContextInvalidation();
     const refreshed = await fetchSessionContext();
 
     if (!refreshed || refreshed.user.status !== 'ACTIVE') {

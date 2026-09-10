@@ -12,6 +12,7 @@ export interface FieldPickerProps {
   value: string;
   onChange: (value: string) => void;
   allowStatic?: boolean;
+  canSwitchToManual?: boolean;
   staticLabel?: string;
   label?: string;
   placeholder?: string;
@@ -27,6 +28,7 @@ export const FieldPicker: React.FC<FieldPickerProps> = ({
   value,
   onChange,
   allowStatic = true,
+  canSwitchToManual = true,
   staticLabel = '-- Texto Estático Manual --',
   label,
   className = 'inspector-select',
@@ -71,7 +73,11 @@ export const FieldPicker: React.FC<FieldPickerProps> = ({
         title={title || value || 'Selecione o campo da integração ou do sistema'}
         onChange={(e) => onChange(e.target.value)}
       >
-        {allowStatic && <option value="">{staticLabel}</option>}
+        {allowStatic && (
+          <option value="" disabled={!canSwitchToManual}>
+            {staticLabel} {!canSwitchToManual ? '(Manual bloqueado)' : ''}
+          </option>
+        )}
         {knownExtra && (
           <option value={value} style={{ color: 'var(--status-warning)' }}>
             {knownExtra.label} ({value}) — Desabilitado na política

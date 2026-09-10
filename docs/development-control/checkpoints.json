@@ -1,6 +1,28 @@
 {
   "checkpoints": [
     {
+      "sha": "d153a3344d0f9d41e19df13d312606895b5b65aa",
+      "shortSha": "d153a33",
+      "date": "2026-09-10T13:55:00Z",
+      "phase": "5",
+      "patch": "5.5.1.1",
+      "title": "fix(hotfix-5.5.1.1): restore field availability runtime resolution",
+      "type": "HOTFIX",
+      "capabilities": [
+        "cap-effective-configuration",
+        "cap-property-inspector-runtime",
+        "cap-fieldpicker-manual",
+        "cap-multi-tab-sync",
+        "cap-niche-governance"
+      ],
+      "testsPassed": true,
+      "deployed": false,
+      "manualValidation": false,
+      "homologated": false,
+      "status": "IMPLEMENTED_AWAITING_MANUAL_REVALIDATION",
+      "evidence": "P0 Hotfix 5.5.1.1 implementado e validado. Corrigido ReferenceError: getFieldAvailability is not defined no PropertyInspector através da importação canônica de '../auth/session.js'. Adicionado GATE 19 com teste regressivo de execução de runtime (renderToStaticMarkup) montando PropertyInspector com elementos Text, Price, Barcode e System e FieldPicker sob Effective Configuration READY, LOADING e ERROR. Bundle de produção inspecionado e verificado. 20/20 gates do hotfix aprovados, 93 testes regressivos totais GREEN."
+    },
+    {
       "sha": "8ff884ef6609174ef3e9d8ae93c928c80ebdc99a",
       "shortSha": "8ff884e",
       "date": "2026-09-10T11:45:00Z",

@@ -45,16 +45,32 @@ export async function resolve(specifier, context, nextResolve) {
       } else if (!fs.existsSync(targetPath)) {
         if (specifier.endsWith('.js') && fs.existsSync(targetPath.slice(0, -3) + '.ts')) {
           targetPath = targetPath.slice(0, -3) + '.ts';
+        } else if (specifier.endsWith('.js') && fs.existsSync(targetPath.slice(0, -3) + '.tsx')) {
+          targetPath = targetPath.slice(0, -3) + '.tsx';
         } else if (fs.existsSync(targetPath + '.ts')) {
           targetPath = targetPath + '.ts';
+        } else if (fs.existsSync(targetPath + '.tsx')) {
+          targetPath = targetPath + '.tsx';
         }
       }
       if (fs.existsSync(targetPath)) {
-        return {
-          format: 'module',
-          shortCircuit: true,
-          url: pathToFileURL(targetPath).href,
-        };
+        const stat = fs.statSync(targetPath);
+        if (stat.isDirectory()) {
+          if (fs.existsSync(path.join(targetPath, 'index.ts'))) {
+            targetPath = path.join(targetPath, 'index.ts');
+          } else if (fs.existsSync(path.join(targetPath, 'index.tsx'))) {
+            targetPath = path.join(targetPath, 'index.tsx');
+          } else if (fs.existsSync(path.join(targetPath, 'index.js'))) {
+            targetPath = path.join(targetPath, 'index.js');
+          }
+        }
+        if (!fs.statSync(targetPath).isDirectory()) {
+          return {
+            format: 'module',
+            shortCircuit: true,
+            url: pathToFileURL(targetPath).href,
+          };
+        }
       }
     } catch (e) {
       console.error('Loader resolve error:', e);
@@ -65,7 +81,7 @@ export async function resolve(specifier, context, nextResolve) {
 }
 
 export async function load(url, context, nextLoad) {
-  if (url.endsWith('.ts')) {
+  if (url.endsWith('.ts') || url.endsWith('.tsx')) {
     const filePath = fileURLToPath(url);
     const source = fs.readFileSync(filePath, 'utf8');
     const output = ts.transpileModule(source, {

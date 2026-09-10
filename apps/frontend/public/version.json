@@ -1,14 +1,14 @@
 {
   "name": "witiquetas-frontend",
-  "version": "5.5.1-candidate",
-  "commit": "8ff884ef6609174ef3e9d8ae93c928c80ebdc99a",
-  "candidateSha": "8ff884ef6609174ef3e9d8ae93c928c80ebdc99a",
-  "runningSha": "8ff884ef6609174ef3e9d8ae93c928c80ebdc99a",
-  "shortCommit": "8ff884e",
-  "shortSha": "8ff884e",
-  "governanceSha": "8ff884ef6609174ef3e9d8ae93c928c80ebdc99a",
+  "version": "5.5.1.1-candidate",
+  "commit": "d153a3344d0f9d41e19df13d312606895b5b65aa",
+  "candidateSha": "d153a3344d0f9d41e19df13d312606895b5b65aa",
+  "runningSha": "d153a3344d0f9d41e19df13d312606895b5b65aa",
+  "shortCommit": "d153a33",
+  "shortSha": "d153a33",
+  "governanceSha": "d153a3344d0f9d41e19df13d312606895b5b65aa",
   "status": "IMPLEMENTED_AWAITING_MANUAL_REVALIDATION",
-  "package": "HOTFIX 5.5.1 — Sincronização Multi-Aba Effective Configuration, templates.create e FieldPicker MANUAL",
+  "package": "P0 HOTFIX 5.5.1.1 — Resolução em tempo de execução de getFieldAvailability no PropertyInspector",
   "phase": "Fase 5 — Administração e Governança da Aplicação",
-  "timestamp": "2026-09-10T11:45:00Z"
+  "timestamp": "2026-09-10T13:55:00Z"
 }

@@ -40,8 +40,13 @@ import {
 
 import { useEditorStore } from '../apps/frontend/src/editor/useEditorStore.js';
 import { getNicheToolboxConfig, type NicheToolItem } from '@witiquetas/label-schema';
+import React from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import PropertyInspector from '../apps/frontend/src/editor/PropertyInspector.js';
+import FieldPicker from '../apps/frontend/src/editor/FieldPicker.js';
+import { getFieldAvailability } from '../apps/frontend/src/auth/session.js';
 
-test('HOTFIX 5.5.1 — SINCRONIZAÇÃO DE EFFECTIVE CONFIGURATION + AUTORIZAÇÃO DE CRIAÇÃO (18 GATES)', async (t) => {
+test('HOTFIX 5.5.1 / 5.5.1.1 — SINCRONIZAÇÃO DE EFFECTIVE CONFIGURATION + AUTORIZAÇÃO DE CRIAÇÃO + RUNTIME RESOLUTION (19 GATES)', async (t) => {
   clearAdminMemoryStores();
   clearSessionMemoryStores();
 
@@ -558,4 +563,173 @@ test('HOTFIX 5.5.1 — SINCRONIZAÇÃO DE EFFECTIVE CONFIGURATION + AUTORIZAÇÃ
       defaultToolbox.availableTools.length;
     assert.ok(totalTools >= 7, 'Toolbox mantém catálogo visual completo de ferramentas');
   });
+
+  // =========================================================================
+  // GATE 19: P0 HOTFIX 5.5.1.1 — Runtime Resolution do PropertyInspector & FieldPicker
+  // =========================================================================
+  await t.test('GATE 19: Runtime Execution — PropertyInspector & FieldPicker resolvem getFieldAvailability sem ReferenceError', async (tRuntime) => {
+    // 1. Editor / PropertyInspector abre sem ReferenceError com texto selecionado
+    // 2. PropertyInspector abre
+    // 3. FieldPicker abre
+    // 4. getFieldAvailability está resolvido no runtime
+
+    // Configurar contexto READY com governança canônica
+    setManualSessionContext({
+      principal: { company: { id: company.id, name: company.name }, user: { id: creatorUser.id, role: 'CREATOR' } },
+      effectiveConfiguration: {
+        companyId: company.id,
+        defaultNicheId: 'niche-gondola',
+        allowedNiches: ['niche-gondola'],
+        enabledElementsByNiche: {
+          'niche-gondola': ['text', 'price', 'barcode', 'qrcode'],
+        },
+        fieldsAvailabilityByNiche: {
+          'niche-gondola': {
+            'produto.descricao': { availableForManual: true, availableForIntegration: true },
+            'produto.preco': { availableForManual: false, availableForIntegration: true },
+            'produto.ean': { availableForManual: true, availableForIntegration: false },
+          },
+        },
+      },
+    }, 'READY');
+
+    // Montar documento no store com elementos representativos: text, price, barcode
+    useEditorStore.getState().setDocument({
+      schemaVersion: 1,
+      title: 'Teste Runtime 5.5.1.1',
+      nicheId: 'niche-gondola',
+      dimensions: { widthMm: 100, heightMm: 50, dpi: 203, orientation: 'landscape' },
+      elements: [
+        {
+          id: 'elem-text-manual',
+          type: 'text',
+          x: 5,
+          y: 5,
+          width: 40,
+          height: 8,
+          text: 'Texto Manual',
+          field: 'produto.descricao',
+        },
+        {
+          id: 'elem-price-integration',
+          type: 'price',
+          x: 5,
+          y: 15,
+          width: 40,
+          height: 12,
+          field: 'produto.preco',
+          binding: { source: 'integration', fieldId: 'produto.preco' },
+        },
+        {
+          id: 'elem-barcode-manual',
+          type: 'barcode',
+          x: 5,
+          y: 30,
+          width: 50,
+          height: 15,
+          format: 'EAN13',
+          value: '7894900011517',
+          field: 'produto.ean',
+        },
+        {
+          id: 'elem-text-system',
+          type: 'text',
+          x: 50,
+          y: 5,
+          width: 30,
+          height: 8,
+          text: 'Data Impressao',
+          field: 'system.printDate',
+          binding: { source: 'system', fieldId: 'system.printDate' },
+        },
+      ],
+    });
+
+    // Testar renderização do PropertyInspector para Text (selecionado)
+    useEditorStore.getState().setSelectedElementIds(['elem-text-manual']);
+    assert.doesNotThrow(() => {
+      const markupText = renderToStaticMarkup(React.createElement(PropertyInspector));
+      assert.ok(markupText.length > 0, 'PropertyInspector deve renderizar para elemento Text');
+      assert.ok(markupText.includes('Texto Manual') || markupText.includes('Inspetor'), 'Conteúdo do inspetor gerado');
+    }, 'PropertyInspector para elemento Text não deve lançar ReferenceError');
+
+    // Testar renderização do PropertyInspector para Price (selecionado)
+    useEditorStore.getState().setSelectedElementIds(['elem-price-integration']);
+    assert.doesNotThrow(() => {
+      const markupPrice = renderToStaticMarkup(React.createElement(PropertyInspector));
+      assert.ok(markupPrice.length > 0, 'PropertyInspector deve renderizar para elemento Price');
+    }, 'PropertyInspector para elemento Price não deve lançar ReferenceError');
+
+    // Testar renderização do PropertyInspector para Barcode (selecionado)
+    useEditorStore.getState().setSelectedElementIds(['elem-barcode-manual']);
+    assert.doesNotThrow(() => {
+      const markupBarcode = renderToStaticMarkup(React.createElement(PropertyInspector));
+      assert.ok(markupBarcode.length > 0, 'PropertyInspector deve renderizar para elemento Barcode');
+    }, 'PropertyInspector para elemento Barcode não deve lançar ReferenceError');
+
+    // Testar renderização do PropertyInspector com elemento System
+    useEditorStore.getState().setSelectedElementIds(['elem-text-system']);
+    assert.doesNotThrow(() => {
+      const markupSystem = renderToStaticMarkup(React.createElement(PropertyInspector));
+      assert.ok(markupSystem.length > 0, 'PropertyInspector deve renderizar para elemento com binding System');
+    }, 'PropertyInspector para elemento System não deve lançar ReferenceError');
+
+    // Testar renderização do FieldPicker isoladamente
+    assert.doesNotThrow(() => {
+      const markupPicker = renderToStaticMarkup(React.createElement(FieldPicker, {
+        value: 'produto.descricao',
+        onChange: () => {},
+        nicheId: 'niche-gondola',
+        allowStatic: true,
+        canSwitchToManual: true,
+      }));
+      assert.ok(markupPicker.length > 0, 'FieldPicker deve renderizar corretamente');
+      assert.ok(markupPicker.includes('Campos da Integração'), 'FieldPicker contém optgroups');
+    }, 'FieldPicker não deve lançar ReferenceError');
+
+    // 5. campo MANUAL permitido funciona
+    const descAvail = getFieldAvailability('niche-gondola', 'produto.descricao');
+    assert.equal(descAvail.manual, true, 'produto.descricao deve ter manual=true');
+    assert.equal(descAvail.availableForManual, true);
+
+    // 6. campo INTEGRATION permitido funciona
+    const priceAvail = getFieldAvailability('niche-gondola', 'produto.preco');
+    assert.equal(priceAvail.integration, true, 'produto.preco deve ter integration=true');
+    assert.equal(priceAvail.manual, false, 'produto.preco tem manual=false');
+
+    // 7. SYSTEM funciona
+    const sysGeneric = getFieldAvailability('niche-gondola', 'system.printDateTime');
+    assert.equal(sysGeneric.manual, true);
+    assert.equal(sysGeneric.integration, true);
+
+    // 8. system.printDate continua automático
+    const sysPrintDate = getFieldAvailability('niche-gondola', 'system.printDate');
+    assert.equal(sysPrintDate.manual, true);
+    assert.equal(sysPrintDate.integration, true);
+
+    // 9. Effective Configuration READY é aplicada
+    assert.equal(getFieldAvailability('niche-gondola', 'produto.ean').integration, false);
+    assert.equal(getFieldAvailability('niche-gondola', 'produto.ean').manual, true);
+
+    // 10. LOADING não destrói disponibilidade/modelo (Fail-safe)
+    setManualSessionContext(null, 'LOADING');
+    const loadingAvail = getFieldAvailability('niche-gondola', 'produto.preco');
+    assert.equal(loadingAvail.manual, true, 'LOADING fail-safe não desabilita manual');
+    assert.equal(loadingAvail.integration, true, 'LOADING fail-safe não desabilita integration');
+    // Deve renderizar sem erro em LOADING
+    assert.doesNotThrow(() => {
+      renderToStaticMarkup(React.createElement(PropertyInspector));
+    }, 'PropertyInspector renderiza em status LOADING sem erro');
+
+    // 11. ERROR não destrói disponibilidade/modelo (Fail-safe)
+    setManualSessionContext(null, 'ERROR');
+    const errorAvail = getFieldAvailability('niche-gondola', 'produto.preco');
+    assert.equal(errorAvail.manual, true, 'ERROR fail-safe não desabilita manual');
+    assert.equal(errorAvail.integration, true, 'ERROR fail-safe não desabilita integration');
+    // Deve renderizar sem erro em ERROR
+    assert.doesNotThrow(() => {
+      renderToStaticMarkup(React.createElement(PropertyInspector));
+    }, 'PropertyInspector renderiza em status ERROR sem erro');
+  });
 });
+

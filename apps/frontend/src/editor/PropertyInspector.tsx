@@ -3,7 +3,7 @@ import { useEditorStore, formatDimensionBR } from './useEditorStore';
 import FieldPicker from './FieldPicker';
 import { CANONICAL_FIELDS, TextElement, PriceElement, BarcodeElement, QrCodeElement, RectangleElement, LineElement, ImageElement, getFieldDefinition } from '@witiquetas/label-schema';
 import { CURATED_FONTS, getFontCompatibility } from './fontsCatalog';
-import { isElementAllowed } from '../auth/session.js';
+import { isElementAllowed, getFieldAvailability } from '../auth/session.js';
 import { QRCodeLibraryItemDTO } from '@witiquetas/contracts';
 import { validateCheckDigit, BarcodeFormat } from './barcodeEngine';
 import { normalizeRotation } from './bounds';

@@ -1,6 +1,27 @@
 {
   "checkpoints": [
     {
+      "sha": "9004bf18536d0fc2f5f8c9ef9a8ff60772464b72",
+      "shortSha": "9004bf1",
+      "date": "2026-09-14T12:00:00Z",
+      "phase": "5",
+      "patch": "5.5.1.2",
+      "title": "fix(hotfix-5.5.1.2): bloquear entrada no editor em modo de criacao",
+      "type": "HOTFIX",
+      "capabilities": [
+        "cap-effective-configuration",
+        "cap-templates-create-auth",
+        "cap-editor-entry-guard",
+        "cap-navigation-guard"
+      ],
+      "testsPassed": true,
+      "deployed": false,
+      "manualValidation": false,
+      "homologated": false,
+      "status": "IMPLEMENTED_AWAITING_MANUAL_REVALIDATION",
+      "evidence": "HOTFIX FINAL 5.5.1.2 implementado e validado. Guard de entrada cirúrgico no EditorLayout e no App.tsx: NOVO MODELO (currentTemplateId ausente ou rota de criação #new / #editor em branco) exige templates.create=true, redirecionando para Meus Modelos quando templates.create=false. MODELO EXISTENTE (currentTemplateId presente) continua abrindo normalmente com templates.view (somente leitura) ou templates.edit (edição e salvamento permitidos). Bloqueados Save As New, Importar como novo e duplicar para usuário sem templates.create. 9/9 gates automatizados aprovados, suíte completa de testes GREEN."
+    },
+    {
       "sha": "d153a3344d0f9d41e19df13d312606895b5b65aa",
       "shortSha": "d153a33",
       "date": "2026-09-10T13:55:00Z",

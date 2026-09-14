@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useEditorStore, formatDimensionBR } from './useEditorStore';
 import { parseImportContent, detectAdapter, ImportResult } from './importers';
+import { hasPermission } from '../auth/session.js';
 import {
   FileUp,
   FileText,
@@ -86,7 +87,7 @@ P1`;
     return () => clearTimeout(timer);
   }, [content, uploadedFileName, uploadedFileExt]);
 
-  if (!isOpen) return null;
+  if (!isOpen || !hasPermission('templates.create')) return null;
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -109,7 +110,7 @@ P1`;
   };
 
   const handleImportToCanvas = () => {
-    if (!parsedResult) return;
+    if (!hasPermission('templates.create') || !parsedResult) return;
     setDocument(parsedResult.document);
     onClose();
   };

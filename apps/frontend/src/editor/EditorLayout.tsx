@@ -148,7 +148,27 @@ export default function EditorLayout({
   const { version: sessionVersion } = useSessionContext();
   const canCreateTemplate = hasPermission('templates.create');
   const canEditTemplate = hasPermission('templates.edit');
+  const canViewTemplate = hasPermission('templates.view');
   const canSaveCurrentDocument = currentTemplateId ? canEditTemplate : canCreateTemplate;
+
+  // HOTFIX FINAL 5.5.1.2 — BLOQUEAR ENTRADA NO EDITOR EM MODO DE CRIAÇÃO
+  // NOVO MODELO (currentTemplateId ausente): exige templates.create.
+  // MODELO EXISTENTE (currentTemplateId presente): exige templates.view ou templates.edit.
+  const hasExistingTemplate = Boolean(currentTemplateId);
+  const isAllowedInEditor = hasExistingTemplate
+    ? (canViewTemplate || canEditTemplate)
+    : canCreateTemplate;
+
+
+  useEffect(() => {
+    if (!isAllowedInEditor) {
+      onBackToDashboard?.();
+    }
+  }, [isAllowedInEditor, onBackToDashboard]);
+
+  if (!isAllowedInEditor) {
+    return null;
+  }
 
   useEffect(() => {
     revalidateSessionContext();
@@ -1206,21 +1226,23 @@ export default function EditorLayout({
                 Carregar versão mais recente do servidor
               </button>
 
-              <button
-                className="btn"
-                style={{ background: 'var(--accent-blue)', color: '#ffffff' }}
-                onClick={async () => {
-                  setIsSavingCopy(true);
-                  try {
-                    const ok = await resolveConflictSaveAsCopy();
-                    if (ok) closeConflictModal();
-                  } finally {
-                    setIsSavingCopy(false);
-                  }
-                }}
-              >
-                Salvar minhas alterações como cópia
-              </button>
+              {canCreateTemplate && (
+                <button
+                  className="btn"
+                  style={{ background: 'var(--accent-blue)', color: '#ffffff' }}
+                  onClick={async () => {
+                    setIsSavingCopy(true);
+                    try {
+                      const ok = await resolveConflictSaveAsCopy();
+                      if (ok) closeConflictModal();
+                    } finally {
+                      setIsSavingCopy(false);
+                    }
+                  }}
+                >
+                  Salvar minhas alterações como cópia
+                </button>
+              )}
 
               <button
                 className="btn"

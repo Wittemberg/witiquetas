@@ -9,6 +9,8 @@ const ZOD_SHIM_URL = pathToFileURL(path.join(__dirname, 'zod-shim.js')).href;
 const EXPRESS_SHIM_URL = pathToFileURL(path.join(__dirname, 'express-shim.js')).href;
 const PG_SHIM_URL = pathToFileURL(path.join(__dirname, 'pg-shim.js')).href;
 const DOTENV_SHIM_URL = pathToFileURL(path.join(__dirname, 'dotenv-shim.js')).href;
+const KONVA_SHIM_URL = pathToFileURL(path.join(__dirname, 'konva-shim.js')).href;
+const USE_IMAGE_SHIM_URL = pathToFileURL(path.join(__dirname, 'use-image-shim.js')).href;
 
 export async function resolve(specifier, context, nextResolve) {
   if (specifier === 'zod') {
@@ -22,6 +24,12 @@ export async function resolve(specifier, context, nextResolve) {
   }
   if (specifier === 'dotenv') {
     return { format: 'module', shortCircuit: true, url: DOTENV_SHIM_URL };
+  }
+  if (specifier === 'konva' || specifier === 'react-konva') {
+    return { format: 'module', shortCircuit: true, url: KONVA_SHIM_URL };
+  }
+  if (specifier === 'use-image') {
+    return { format: 'module', shortCircuit: true, url: USE_IMAGE_SHIM_URL };
   }
 
   if (specifier.startsWith('@witiquetas/')) {

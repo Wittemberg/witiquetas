@@ -7,7 +7,7 @@ import {
 } from '@witiquetas/label-schema';
 import { type QRCodeLibraryItemDTO, type PrinterDTO } from '@witiquetas/contracts';
 import { normalizeElementGeometry, normalizeDocumentGeometry, constrainElementToLabel, constrainGroupMovement, validateDocumentBounds, SAFE_AREA_MARGIN_MM } from './bounds.ts';
-import { isElementAllowed } from '../auth/session.js';
+import { isElementAllowed, hasPermission } from '../auth/session.js';
 
 // Converter Milímetros ➔ Pixels com base no DPI (ex: 203 DPI = ~8 dots/mm)
 export function mmToPx(mm: number, dpi: number = 203): number {
@@ -467,7 +467,11 @@ interface EditorState {
   markSaved: () => void;
 }
 
-export const useEditorStore = create<EditorState>((set, get) => ({
+export const useEditorStore = create<EditorState>((set, get, api) => {
+  if (api) {
+    (api as any).getServerState = () => api.getState();
+  }
+  return {
   document: normalizeDocumentGeometry(initialDocument),
   selectedElementIds: ['prod-desc'],
   zoom: 1.0, // Zoom padrão inicial de 100%
@@ -611,6 +615,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
     set({
       document: newDoc,
+      currentTemplateId: null,
+      currentTemplateVersion: null,
+      saveStatus: 'unsaved',
       selectedElementIds: elements.length > 0 ? [elements[0].id] : [],
       history: [newDoc],
       historyIndex: 0,
@@ -1271,6 +1278,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           conflictInfo: null,
         });
       } else {
+        if (!hasPermission('templates.create')) {
+          console.warn('[EditorStore] Criação bloqueada: usuário sem permissão templates.create.');
+          set({
+            saveStatus: 'error',
+            saveErrorMessage: 'Você não possui permissão para criar novos modelos.',
+          });
+          return false;
+        }
         const created = await templatesApi.createTemplate({
           title: document.title || 'Etiqueta Térmica',
           name: document.title || 'Etiqueta Térmica',
@@ -1326,6 +1341,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
 
   resolveConflictSaveAsCopy: async () => {
+    if (!hasPermission('templates.create')) {
+      console.warn('[EditorStore] Salvar como cópia bloqueado: usuário sem permissão templates.create.');
+      return false;
+    }
     const { document } = get();
     const copyTitle = generateCopyTitle(document.title || 'Etiqueta');
     const localDocCopy: LabelDocument = JSON.parse(JSON.stringify(document));
@@ -1390,6 +1409,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
 
   resolveDeletedSaveAsNew: async () => {
+    if (!hasPermission('templates.create')) {
+      console.warn('[EditorStore] Salvar como novo modelo bloqueado: usuário sem permissão templates.create.');
+      return false;
+    }
     const { document } = get();
     const newTitle = `${document.title || 'Etiqueta'} (Novo)`;
     const localDocCopy: LabelDocument = JSON.parse(JSON.stringify(document));
@@ -1446,4 +1469,4 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       });
     }
   },
-}));
+}; });

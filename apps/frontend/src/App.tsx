@@ -104,6 +104,11 @@ export default function App() {
     if (parsed.module === 'editor' && parsed.templateId) {
       return `editor/${parsed.templateId}`;
     }
+    if ((parsed.module === 'editor' && !parsed.templateId) || parsed.module === 'new') {
+      if (!hasPermission('templates.create')) {
+        return 'models';
+      }
+    }
     return parsed.module || 'home';
   });
 
@@ -199,6 +204,11 @@ export default function App() {
       }
 
       if (parsed.module === 'editor' && parsed.templateId) {
+        if (!hasPermission('templates.view') && !hasPermission('templates.edit')) {
+          setCurrentModule('models');
+          window.location.hash = '#models';
+          return;
+        }
         const store = useEditorStore.getState();
         if (store.currentTemplateId !== parsed.templateId) {
           try {
@@ -207,11 +217,18 @@ export default function App() {
             setCurrentModule(`editor/${parsed.templateId}`);
           } catch (err: any) {
             console.error('[App] Erro ao carregar modelo da rota:', err);
+            setCurrentModule('models');
+            window.location.hash = '#models';
           }
         }
       } else if (parsed.module === 'editor' && !parsed.templateId) {
         const store = useEditorStore.getState();
         if (store.currentTemplateId) {
+          if (!hasPermission('templates.view') && !hasPermission('templates.edit')) {
+            setCurrentModule('models');
+            window.location.hash = '#models';
+            return;
+          }
           setCurrentModule(`editor/${store.currentTemplateId}`);
         } else if (!hasPermission('templates.create')) {
           setCurrentModule('models');
@@ -228,7 +245,7 @@ export default function App() {
     handleHashSync();
     window.addEventListener('hashchange', handleHashSync);
     return () => window.removeEventListener('hashchange', handleHashSync);
-  }, [currentModule]);
+  }, [currentModule, sessionContext]);
 
   const toggleTheme = () => {
     setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
@@ -298,26 +315,60 @@ export default function App() {
       case 'new':
         if (!hasPermission('templates.create')) {
           setCurrentModule('models');
+          window.location.hash = '#models';
           return null;
         }
         return (
           <div className="new-template-redirect-view">
             <NewTemplateWizard
               isOpen={true}
-              onClose={() => setCurrentModule('models')}
-              onSuccess={() => setCurrentModule('editor')}
+              onClose={() => {
+                setCurrentModule('models');
+                window.location.hash = '#models';
+              }}
+              onSuccess={() => {
+                const createdId = useEditorStore.getState().currentTemplateId;
+                setCurrentModule(createdId ? `editor/${createdId}` : 'editor');
+              }}
             />
           </div>
         );
 
-      case 'editor':
+      case 'editor': {
+        const store = useEditorStore.getState();
+        const hasTemplateId = Boolean(store.currentTemplateId);
+
+        // Se for novo modelo (sem currentTemplateId), exige templates.create
+        if (!hasTemplateId && !hasPermission('templates.create')) {
+          setCurrentModule('models');
+          window.location.hash = '#models';
+          return null;
+        }
+
+        // Se for modelo existente, exige templates.view ou templates.edit
+        if (hasTemplateId && !hasPermission('templates.view') && !hasPermission('templates.edit')) {
+          setCurrentModule('models');
+          window.location.hash = '#models';
+          return null;
+        }
+
         return (
           <EditorLayout
-            onBackToDashboard={() => setCurrentModule('models')}
+            onBackToDashboard={() => {
+              store.setDocument({
+                schemaVersion: 1,
+                title: '',
+                dimensions: { widthMm: 100, heightMm: 30, dpi: 203, orientation: 'landscape' },
+                elements: [],
+              }, null);
+              setCurrentModule('models');
+              window.location.hash = '#models';
+            }}
             theme={theme}
             onToggleTheme={toggleTheme}
           />
         );
+      }
 
       case 'print-center':
         return <PrintCenterPage />;

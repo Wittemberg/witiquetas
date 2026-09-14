@@ -1,6 +1,25 @@
 {
   "checkpoints": [
     {
+      "sha": "673064cd263ba19e60afdd94a8d1bde34dc819f8",
+      "shortSha": "673064c",
+      "date": "2026-09-14T15:30:00Z",
+      "phase": "5",
+      "patch": "governance",
+      "title": "docs(governance): add agent skills and progressive context architecture",
+      "type": "GOVERNANCE",
+      "capabilities": [
+        "gov-agent-skills-architecture",
+        "gov-progressive-context"
+      ],
+      "testsPassed": true,
+      "deployed": false,
+      "manualValidation": false,
+      "homologated": true,
+      "status": "HOMOLOGATED",
+      "evidence": "Governança interna de desenvolvimento: adicionados AGENTS.md, CONTEXT.md, DESIGN.md, docs/governance/ (AGENT-SKILLS-ARCHITECTURE.md, INTEGRATION-MANIFEST-SPEC.md) e skills/ (admin, editor, printing, release). Melhoria restrita a diretrizes operacionais de agentes de IA e engenharia, sem impacto em runtime, contratos comerciais ou deploy."
+    },
+    {
       "sha": "9c7c432bf4c7cd90f9869e1008117476932c0042",
       "shortSha": "9c7c432",
       "date": "2026-09-14T14:30:00Z",

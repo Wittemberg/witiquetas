@@ -23,6 +23,10 @@ https://github.com/Wittemberg/witiquetas
 
 ## Documentação Principal
 
+- `AGENTS.md` (Contrato Global e Governança de Agentes de IA / Contexto Progressivo)
+- `CONTEXT.md` (Contexto Compacto do Produto e Domínio)
+- `DESIGN.md` (Contrato Visual e Baseline de Design)
+- `docs/governance/AGENT-SKILLS-ARCHITECTURE.md` (Arquitetura de Contexto Progressivo e Skills)
 - `docs/product/PRODUCT-UX-CONSOLIDATION.md` (Consolidação de Produto, UX e Regras do Editor)
 - `docs/architecture/UNIVERSAL-DATA-ARCHITECTURE.md` (Arquitetura Universal de Dados e 4 Camadas)
 - `docs/architecture/INTEGRATION-FIELD-CATALOG.md` (Catálogo Dinâmico de Campos e SDK)

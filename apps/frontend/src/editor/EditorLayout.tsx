@@ -150,6 +150,7 @@ export default function EditorLayout({
   const canEditTemplate = hasPermission('templates.edit');
   const canViewTemplate = hasPermission('templates.view');
   const canSaveCurrentDocument = currentTemplateId ? canEditTemplate : canCreateTemplate;
+  const isReadOnly = !canSaveCurrentDocument;
 
   // HOTFIX FINAL 5.5.1.2 — BLOQUEAR ENTRADA NO EDITOR EM MODO DE CRIAÇÃO
   // NOVO MODELO (currentTemplateId ausente): exige templates.create.
@@ -420,9 +421,6 @@ export default function EditorLayout({
         } else if (e.key === 'a' || e.key === 'A') {
           e.preventDefault();
           selectAll();
-        } else if (e.key === 's' || e.key === 'S') {
-          e.preventDefault();
-          saveDocumentToBackend();
         }
       } else {
         if (e.key === 'Delete' || e.key === 'Backspace') {
@@ -590,9 +588,10 @@ export default function EditorLayout({
                 display: 'flex',
                 alignItems: 'center',
                 gap: '0.35rem',
-                cursor: saveStatus === 'conflict' || saveStatus === 'deleted' || saveStatus === 'error' ? 'pointer' : 'default',
+                cursor: canSaveCurrentDocument && (saveStatus === 'conflict' || saveStatus === 'deleted' || saveStatus === 'error') ? 'pointer' : 'default',
               }}
               onClick={() => {
+                if (!canSaveCurrentDocument) return;
                 if (saveStatus === 'conflict') openConflictModal();
                 else if (saveStatus === 'deleted') setIsDeletedModalOpen(true);
                 else if (saveStatus === 'error') saveDocumentToBackend();
@@ -1132,14 +1131,16 @@ export default function EditorLayout({
         <div className="wizard-modal-overlay">
           <div className="wizard-modal-content" style={{ maxWidth: '420px', padding: '1.5rem' }}>
             <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '0.5rem' }}>
-              Alterações não salvas
+              {isReadOnly ? 'Descartar alterações?' : 'Alterações não salvas'}
             </h3>
             <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '1.25rem', lineHeight: 1.5 }}>
-              Você possui alterações que ainda não foram salvas neste modelo. Deseja salvar antes de retornar aos modelos?
+              {isReadOnly
+                ? 'Este modelo está em modo somente leitura. Deseja descartar as alterações locais e sair?'
+                : 'Você possui alterações que ainda não foram salvas neste modelo. Deseja salvar antes de retornar aos modelos?'}
             </p>
             <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
               <button className="btn" onClick={() => setIsUnsavedExitModalOpen(false)}>
-                Continuar Editando
+                {isReadOnly ? 'Cancelar' : 'Continuar Editando'}
               </button>
               <button
                 className="btn"
@@ -1149,18 +1150,20 @@ export default function EditorLayout({
                   onBackToDashboard?.();
                 }}
               >
-                Descartar e Sair
+                {isReadOnly ? 'Descartar alterações e sair' : 'Descartar e Sair'}
               </button>
-              <button
-                className="btn btn-primary"
-                onClick={async () => {
-                  await saveDocumentToBackend();
-                  setIsUnsavedExitModalOpen(false);
-                  onBackToDashboard?.();
-                }}
-              >
-                Salvar e Sair
-              </button>
+              {!isReadOnly && (
+                <button
+                  className="btn btn-primary"
+                  onClick={async () => {
+                    await saveDocumentToBackend();
+                    setIsUnsavedExitModalOpen(false);
+                    onBackToDashboard?.();
+                  }}
+                >
+                  Salvar e Sair
+                </button>
+              )}
             </div>
           </div>
         </div>

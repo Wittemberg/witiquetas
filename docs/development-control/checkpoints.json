@@ -1,8 +1,28 @@
 {
   "checkpoints": [
     {
-      "sha": "9004bf18536d0fc2f5f8c9ef9a8ff60772464b72",
-      "shortSha": "9004bf1",
+      "sha": "9c7c432bf4c7cd90f9869e1008117476932c0042",
+      "shortSha": "9c7c432",
+      "date": "2026-09-14T14:30:00Z",
+      "phase": "5",
+      "patch": "5.5.1.3",
+      "title": "fix(editor): read-only model navigation and exit guard",
+      "type": "HOTFIX",
+      "capabilities": [
+        "cap-effective-configuration",
+        "cap-read-only-model-navigation",
+        "cap-editor-exit-guard"
+      ],
+      "testsPassed": true,
+      "deployed": false,
+      "manualValidation": false,
+      "homologated": false,
+      "status": "IMPLEMENTED_AWAITING_MANUAL_REVALIDATION",
+      "evidence": "HOTFIX FINAL READ-ONLY MODEL NAVIGATION: Em modo somente leitura (sem templates.edit), eliminada a pergunta e ação de 'Salvar e Sair'. Ao navegar/trocar de modelo sem alterações, navega diretamente sem prompt. Se houver alterações locais não persistíveis, oferece 'Descartar alterações e sair' ou 'Cancelar'. Bloqueados atalhos Ctrl+S e botão Salvar no header. Suíte de 6 gates automatizados GREEN."
+    },
+    {
+      "sha": "3515ed2d08a54d16fe026e6d1c9bfa780d6b9c9f",
+      "shortSha": "3515ed2",
       "date": "2026-09-14T12:00:00Z",
       "phase": "5",
       "patch": "5.5.1.2",

@@ -1264,6 +1264,14 @@ export const useEditorStore = create<EditorState>((set, get, api) => {
       const { templatesApi } = await import('../services/templatesApi.js');
 
       if (currentTemplateId) {
+        if (!hasPermission('templates.edit')) {
+          console.warn('[EditorStore] Edição bloqueada: usuário sem permissão templates.edit.');
+          set({
+            saveStatus: 'error',
+            saveErrorMessage: 'Você não possui permissão para editar este modelo.',
+          });
+          return false;
+        }
         const updated = await templatesApi.updateTemplate(currentTemplateId, {
           title: document.title,
           name: document.title,

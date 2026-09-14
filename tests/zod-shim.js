@@ -26,6 +26,9 @@ class ZodObject extends ZodType {
   extend(extraShape) {
     return new ZodObject({ ...this.shape, ...extraShape });
   }
+  strict() { return this; }
+  passthrough() { return this; }
+  strip() { return this; }
 }
 
 export const z = {
@@ -41,6 +44,7 @@ export const z = {
   record: (k, v) => new ZodType(),
   lazy: (fn) => new ZodType(),
   any: () => new ZodType(),
+  unknown: () => new ZodType(),
 };
 
 export default { z };

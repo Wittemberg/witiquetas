@@ -95,9 +95,21 @@ const printersStore = new Map<string, PrinterDTO>(
   defaultPrinters.map((p) => [p.id, p])
 );
 
+function getCompanyId(req: Request): string {
+  if (req.principal?.company?.id) {
+    return req.principal.company.id;
+  }
+  const headerCompany = req.headers['x-company-id'] as string;
+  if (headerCompany && headerCompany.trim()) {
+    return headerCompany.trim();
+  }
+  return 'comp-matriz-01';
+}
+
 // 1. Listar todas as impressoras
-router.get('/', requirePermission('printers.view'), (_req: Request, res: Response) => {
-  const printers = Array.from(printersStore.values());
+router.get('/', requirePermission('printers.view'), (req: Request, res: Response) => {
+  const companyId = getCompanyId(req);
+  const printers = Array.from(printersStore.values()).filter((p) => p.companyId === companyId);
   res.json({
     total: printers.length,
     printers,
@@ -106,8 +118,9 @@ router.get('/', requirePermission('printers.view'), (_req: Request, res: Respons
 
 // 2. Buscar impressora por ID
 router.get('/:id', requirePermission('printers.view'), (req: Request, res: Response) => {
+  const companyId = getCompanyId(req);
   const printer = printersStore.get(req.params.id);
-  if (!printer) {
+  if (!printer || printer.companyId !== companyId) {
     return res.status(404).json({ error: 'Impressora não encontrada.' });
   }
   res.json(printer);
@@ -115,7 +128,15 @@ router.get('/:id', requirePermission('printers.view'), (req: Request, res: Respo
 
 // 3. Cadastrar nova impressora
 router.post('/', requirePermission('printers.manage'), requireCsrf, (req: Request, res: Response) => {
-  const body = req.body as CreatePrinterDTO;
+  const companyId = getCompanyId(req);
+  const body = req.body as CreatePrinterDTO & { companyId?: string };
+
+  if (body.companyId && body.companyId !== companyId) {
+    return res.status(400).json({
+      code: 'INVALID_COMPANY_ID',
+      error: 'Não é permitido criar impressora para outro tenant.',
+    });
+  }
 
   if (!body.name || !body.protocol || !body.language) {
     return res.status(400).json({ error: 'Nome, protocolo e linguagem são obrigatórios.' });
@@ -124,16 +145,18 @@ router.post('/', requirePermission('printers.manage'), requireCsrf, (req: Reques
   const id = `prn-${Date.now()}`;
   const now = new Date().toISOString();
 
-  // Se marcar como padrão, desmarcar as outras
+  // Se marcar como padrão, desmarcar apenas as do mesmo tenant
   if (body.isDefault) {
     printersStore.forEach((p) => {
-      p.isDefault = false;
+      if (p.companyId === companyId) {
+        p.isDefault = false;
+      }
     });
   }
 
   const newPrinter: PrinterDTO = {
     id,
-    companyId: 'comp-matriz-01',
+    companyId,
     name: body.name,
     model: body.model || 'Térmica Padrão',
     protocol: body.protocol,
@@ -165,21 +188,33 @@ router.post('/', requirePermission('printers.manage'), requireCsrf, (req: Reques
 
 // 4. Atualizar impressora
 router.put('/:id', requirePermission('printers.manage'), requireCsrf, (req: Request, res: Response) => {
+  const companyId = getCompanyId(req);
   const printer = printersStore.get(req.params.id);
-  if (!printer) {
+  if (!printer || printer.companyId !== companyId) {
     return res.status(404).json({ error: 'Impressora não encontrada.' });
   }
 
   const body = req.body;
-
-  if (body.isDefault) {
-    printersStore.forEach((p) => {
-      p.isDefault = false;
+  if (body.companyId && body.companyId !== companyId) {
+    return res.status(400).json({
+      code: 'INVALID_COMPANY_ID',
+      error: 'Não é permitido alterar o tenant da impressora.',
     });
   }
 
+  if (body.isDefault) {
+    printersStore.forEach((p) => {
+      if (p.companyId === companyId) {
+        p.isDefault = false;
+      }
+    });
+  }
+
+  const { id: _ignoredId, companyId: _ignoredCompanyId, ...updates } = body;
+
   Object.assign(printer, {
-    ...body,
+    ...updates,
+    companyId,
     updatedAt: new Date().toISOString(),
   });
 
@@ -189,7 +224,9 @@ router.put('/:id', requirePermission('printers.manage'), requireCsrf, (req: Requ
 
 // 5. Excluir impressora
 router.delete('/:id', requirePermission('printers.manage'), requireCsrf, (req: Request, res: Response) => {
-  if (!printersStore.has(req.params.id)) {
+  const companyId = getCompanyId(req);
+  const printer = printersStore.get(req.params.id);
+  if (!printer || printer.companyId !== companyId) {
     return res.status(404).json({ error: 'Impressora não encontrada.' });
   }
   printersStore.delete(req.params.id);

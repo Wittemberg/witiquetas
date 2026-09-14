@@ -406,9 +406,9 @@ router.put('/:id', requirePermission('templates.edit'), requireCsrf, async (req:
 
 /**
  * POST /api/templates/:id/duplicate
- * Duplicar modelo no servidor
+ * Duplicar modelo no servidor (DUPLICATE = CREATE, requer templates.create)
  */
-router.post('/:id/duplicate', requirePermission('templates.edit'), requireCsrf, async (req: Request, res: Response) => {
+router.post('/:id/duplicate', requirePermission('templates.create'), requireCsrf, async (req: Request, res: Response) => {
   try {
     const companyId = getCompanyId(req);
     const existing = await templateRepository.getTemplateById(req.params.id, companyId);

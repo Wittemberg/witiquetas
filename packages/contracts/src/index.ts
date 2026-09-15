@@ -645,4 +645,125 @@ export interface EffectiveCompanyConfigurationDTO {
   enabledFieldsByNiche: Record<string, string[]>;
   fieldsAvailabilityByNiche?: Record<string, Record<string, { manual: boolean; integration: boolean }>>;
   permissions: string[];
+  activeIntegrations?: Array<{ id: string; name: string; providerId: string; status: IntegrationStatus }>;
 }
+
+// ==========================================
+// INTEGRAÇÕES E MANIFESTS (FASE 5 / PACOTE 5.6)
+// ==========================================
+
+export const CANONICAL_CAPABILITIES = [
+  'products.read',
+  'prices.read',
+  'inventory.read',
+  'logistics.read',
+  'healthcare.read',
+  'customers.read',
+] as const;
+
+export type CanonicalCapability = (typeof CANONICAL_CAPABILITIES)[number];
+
+export type IntegrationProviderType = 'SQL' | 'REST' | 'CSV' | 'WEBHOOK' | 'MCP';
+export type IntegrationStatus = 'ACTIVE' | 'INACTIVE' | 'ERROR' | 'TESTING';
+export type IntegrationEnvironment = 'PRODUCTION' | 'STAGING' | 'SANDBOX';
+export type IntegrationMappingDirection = 'READ' | 'WRITE';
+
+export interface IntegrationManifestFieldDTO {
+  externalField: string;
+  label: string;
+  type?: 'string' | 'integer' | 'decimal' | 'boolean' | 'date' | 'datetime' | 'url' | 'barcode' | 'image';
+  direction?: 'read' | 'write' | 'bidirectional';
+  suggestedCanonical?: string;
+  description?: string;
+}
+
+export interface IntegrationManifestDTO {
+  manifestVersion: string;
+  providerId: string;
+  displayName: string;
+  description?: string;
+  capabilities: CanonicalCapability[];
+  fields: IntegrationManifestFieldDTO[];
+  defaultSettings?: Record<string, unknown>;
+}
+
+export interface IntegrationFieldMappingDTO {
+  id: string;
+  companyId: string;
+  integrationId: string;
+  externalField: string;
+  canonicalFieldId: string;
+  direction: IntegrationMappingDirection;
+  enabled: boolean;
+  dataType?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface IntegrationDTO {
+  id: string;
+  companyId: string;
+  name: string;
+  providerType: IntegrationProviderType;
+  providerId: string;
+  status: IntegrationStatus;
+  environment: IntegrationEnvironment;
+  baseUrl?: string;
+  credentialRef?: string;
+  nicheId?: string;
+  settings: Record<string, unknown>;
+  manifest: IntegrationManifestDTO;
+  mappingsCount?: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateIntegrationDTO {
+  id?: string;
+  name: string;
+  providerType: IntegrationProviderType;
+  providerId: string;
+  status?: IntegrationStatus;
+  environment?: IntegrationEnvironment;
+  baseUrl?: string;
+  credentialRef?: string;
+  nicheId?: string;
+  settings?: Record<string, unknown>;
+  manifest?: IntegrationManifestDTO;
+}
+
+export interface UpdateIntegrationDTO {
+  name?: string;
+  status?: IntegrationStatus;
+  environment?: IntegrationEnvironment;
+  baseUrl?: string;
+  credentialRef?: string;
+  nicheId?: string;
+  settings?: Record<string, unknown>;
+}
+
+export interface SetIntegrationMappingsItemDTO {
+  externalField: string;
+  canonicalFieldId: string;
+  direction?: IntegrationMappingDirection;
+  enabled?: boolean;
+  dataType?: string;
+}
+
+export interface SetIntegrationMappingsDTO {
+  mappings: SetIntegrationMappingsItemDTO[];
+}
+
+export interface IntegrationPresetDTO {
+  presetId: string;
+  name: string;
+  description: string;
+  providerType: IntegrationProviderType;
+  defaultNicheId?: string;
+  manifest: IntegrationManifestDTO;
+  defaultMappings: Array<{
+    externalField: string;
+    canonicalFieldId: string;
+  }>;
+}
+

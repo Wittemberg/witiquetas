@@ -18,6 +18,11 @@ import type {
   CompanyNicheConfigDTO,
   CompanyElementConfigDTO,
   CompanyFieldConfigDTO,
+  IntegrationDTO,
+  CreateIntegrationDTO,
+  UpdateIntegrationDTO,
+  IntegrationFieldMappingDTO,
+  SetIntegrationMappingsItemDTO,
 } from '@witiquetas/contracts';
 
 // ==========================================
@@ -73,6 +78,8 @@ g.__WIT_ADMIN_MEM_COMPANY_NICHES__ = g.__WIT_ADMIN_MEM_COMPANY_NICHES__ || new M
 g.__WIT_ADMIN_MEM_COMPANY_ELEMENTS__ = g.__WIT_ADMIN_MEM_COMPANY_ELEMENTS__ || new Map<string, CompanyElementConfigDTO>();
 g.__WIT_ADMIN_MEM_COMPANY_FIELDS__ = g.__WIT_ADMIN_MEM_COMPANY_FIELDS__ || new Map<string, CompanyFieldConfigDTO>();
 g.__WIT_ADMIN_MEM_USER_PASSWORDS__ = g.__WIT_ADMIN_MEM_USER_PASSWORDS__ || new Map<string, string>();
+g.__WIT_ADMIN_MEM_INTEGRATIONS__ = g.__WIT_ADMIN_MEM_INTEGRATIONS__ || new Map<string, IntegrationDTO>();
+g.__WIT_ADMIN_MEM_INTEGRATION_MAPPINGS__ = g.__WIT_ADMIN_MEM_INTEGRATION_MAPPINGS__ || new Map<string, IntegrationFieldMappingDTO>();
 
 export const memCompanies: Map<string, CompanyDTO> = g.__WIT_ADMIN_MEM_COMPANIES__;
 export const memUsers: Map<string, UserDTO> = g.__WIT_ADMIN_MEM_USERS__;
@@ -84,6 +91,13 @@ export const memCompanyNiches: Map<string, CompanyNicheConfigDTO> = g.__WIT_ADMI
 export const memCompanyNicheElements: Map<string, CompanyElementConfigDTO> = g.__WIT_ADMIN_MEM_COMPANY_ELEMENTS__;
 export const memCompanyNicheFields: Map<string, CompanyFieldConfigDTO> = g.__WIT_ADMIN_MEM_COMPANY_FIELDS__;
 export const memUserPasswords: Map<string, string> = g.__WIT_ADMIN_MEM_USER_PASSWORDS__;
+export const memIntegrations: Map<string, IntegrationDTO> = g.__WIT_ADMIN_MEM_INTEGRATIONS__;
+export const memIntegrationMappings: Map<string, IntegrationFieldMappingDTO> = g.__WIT_ADMIN_MEM_INTEGRATION_MAPPINGS__;
+
+export function clearIntegrationMemoryStores(): void {
+  memIntegrations.clear();
+  memIntegrationMappings.clear();
+}
 
 export function clearAdminMemoryStores(): void {
   memCompanies.clear();
@@ -96,6 +110,7 @@ export function clearAdminMemoryStores(): void {
   memCompanyNicheElements.clear();
   memCompanyNicheFields.clear();
   memUserPasswords.clear();
+  clearIntegrationMemoryStores();
 }
 
 // ==========================================
@@ -1094,3 +1109,372 @@ export const CompanyConfigurationRepository = {
     return list;
   },
 };
+
+// ==========================================
+// 6. INTEGRATION REPOSITORY (FASE 5 / PACOTE 5.6)
+// ==========================================
+export const IntegrationRepository = {
+  async create(companyId: string, data: CreateIntegrationDTO): Promise<IntegrationDTO> {
+    const id = data.id || `int-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    const status = data.status || 'INACTIVE';
+    const environment = data.environment || 'PRODUCTION';
+    const baseUrl = data.baseUrl || null;
+    const credentialRef = data.credentialRef || null;
+    const nicheId = data.nicheId || null;
+    const settings = data.settings || {};
+    const manifest = data.manifest || {
+      manifestVersion: '1',
+      providerId: data.providerId,
+      displayName: data.name,
+      capabilities: [],
+      fields: [],
+    };
+    const now = new Date().toISOString();
+
+    if (pgPool) {
+      const query = `
+        INSERT INTO integrations (
+          id, company_id, name, provider_type, provider_id, status,
+          environment, base_url, credential_ref, niche_id, settings, manifest,
+          created_at, updated_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+        RETURNING
+          id, company_id AS "companyId", name, provider_type AS "providerType",
+          provider_id AS "providerId", status, environment, base_url AS "baseUrl",
+          credential_ref AS "credentialRef", niche_id AS "nicheId",
+          settings, manifest, created_at AS "createdAt", updated_at AS "updatedAt"
+      `;
+      const res = await pgPool.query(query, [
+        id, companyId, data.name, data.providerType, data.providerId, status,
+        environment, baseUrl, credentialRef, nicheId, JSON.stringify(settings),
+        JSON.stringify(manifest), now, now,
+      ]);
+      const dto = res.rows[0];
+      dto.mappingsCount = 0;
+      return dto;
+    }
+
+    const dto: IntegrationDTO = {
+      id,
+      companyId,
+      name: data.name,
+      providerType: data.providerType,
+      providerId: data.providerId,
+      status,
+      environment,
+      baseUrl: baseUrl || undefined,
+      credentialRef: credentialRef || undefined,
+      nicheId: nicheId || undefined,
+      settings,
+      manifest: manifest as any,
+      mappingsCount: 0,
+      createdAt: now,
+      updatedAt: now,
+    };
+    memIntegrations.set(`${companyId}:${id}`, dto);
+    return dto;
+  },
+
+  async findById(companyId: string, id: string): Promise<IntegrationDTO | null> {
+    if (pgPool) {
+      const query = `
+        SELECT
+          i.id, i.company_id AS "companyId", i.name, i.provider_type AS "providerType",
+          i.provider_id AS "providerId", i.status, i.environment, i.base_url AS "baseUrl",
+          i.credential_ref AS "credentialRef", i.niche_id AS "nicheId",
+          i.settings, i.manifest, i.created_at AS "createdAt", i.updated_at AS "updatedAt",
+          COUNT(m.id)::int AS "mappingsCount"
+        FROM integrations i
+        LEFT JOIN integration_field_mappings m ON m.company_id = i.company_id AND m.integration_id = i.id
+        WHERE i.company_id = $1 AND i.id = $2
+        GROUP BY i.id
+      `;
+      const res = await pgPool.query(query, [companyId, id]);
+      if (res.rows.length === 0) return null;
+      return res.rows[0];
+    }
+
+    const dto = memIntegrations.get(`${companyId}:${id}`);
+    if (!dto) return null;
+
+    let mappingsCount = 0;
+    for (const m of memIntegrationMappings.values()) {
+      if (m.companyId === companyId && m.integrationId === id) mappingsCount++;
+    }
+    return { ...dto, mappingsCount };
+  },
+
+  async findByCompanyId(companyId: string): Promise<IntegrationDTO[]> {
+    return this.listByCompany(companyId);
+  },
+
+  async listByCompany(companyId: string): Promise<IntegrationDTO[]> {
+
+    if (pgPool) {
+      const query = `
+        SELECT
+          i.id, i.company_id AS "companyId", i.name, i.provider_type AS "providerType",
+          i.provider_id AS "providerId", i.status, i.environment, i.base_url AS "baseUrl",
+          i.credential_ref AS "credentialRef", i.niche_id AS "nicheId",
+          i.settings, i.manifest, i.created_at AS "createdAt", i.updated_at AS "updatedAt",
+          COUNT(m.id)::int AS "mappingsCount"
+        FROM integrations i
+        LEFT JOIN integration_field_mappings m ON m.company_id = i.company_id AND m.integration_id = i.id
+        WHERE i.company_id = $1
+        GROUP BY i.id
+        ORDER BY i.created_at ASC
+      `;
+      const res = await pgPool.query(query, [companyId]);
+      return res.rows;
+    }
+
+    const list: IntegrationDTO[] = [];
+    for (const dto of memIntegrations.values()) {
+      if (dto.companyId === companyId) {
+        let mappingsCount = 0;
+        for (const m of memIntegrationMappings.values()) {
+          if (m.companyId === companyId && m.integrationId === dto.id) mappingsCount++;
+        }
+        list.push({ ...dto, mappingsCount });
+      }
+    }
+    return list.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  },
+
+  async update(companyId: string, id: string, data: UpdateIntegrationDTO): Promise<IntegrationDTO | null> {
+    const existing = await this.findById(companyId, id);
+    if (!existing) return null;
+
+    const now = new Date().toISOString();
+    const updatedName = data.name !== undefined ? data.name : existing.name;
+    const updatedStatus = data.status !== undefined ? data.status : existing.status;
+    const updatedEnvironment = data.environment !== undefined ? data.environment : existing.environment;
+    const updatedBaseUrl = data.baseUrl !== undefined ? (data.baseUrl || null) : (existing.baseUrl || null);
+    const updatedCredentialRef = data.credentialRef !== undefined ? (data.credentialRef || null) : (existing.credentialRef || null);
+    const updatedNicheId = data.nicheId !== undefined ? (data.nicheId || null) : (existing.nicheId || null);
+    const updatedSettings = data.settings !== undefined ? data.settings : existing.settings;
+
+    if (pgPool) {
+      const query = `
+        UPDATE integrations SET
+          name = $3,
+          status = $4,
+          environment = $5,
+          base_url = $6,
+          credential_ref = $7,
+          niche_id = $8,
+          settings = $9,
+          updated_at = $10
+        WHERE company_id = $1 AND id = $2
+        RETURNING
+          id, company_id AS "companyId", name, provider_type AS "providerType",
+          provider_id AS "providerId", status, environment, base_url AS "baseUrl",
+          credential_ref AS "credentialRef", niche_id AS "nicheId",
+          settings, manifest, created_at AS "createdAt", updated_at AS "updatedAt"
+      `;
+      const res = await pgPool.query(query, [
+        companyId, id, updatedName, updatedStatus, updatedEnvironment,
+        updatedBaseUrl, updatedCredentialRef, updatedNicheId, JSON.stringify(updatedSettings), now,
+      ]);
+      if (res.rows.length === 0) return null;
+      const dto = res.rows[0];
+      dto.mappingsCount = existing.mappingsCount;
+      return dto;
+    }
+
+    const updatedDto: IntegrationDTO = {
+      ...existing,
+      name: updatedName,
+      status: updatedStatus,
+      environment: updatedEnvironment,
+      baseUrl: updatedBaseUrl || undefined,
+      credentialRef: updatedCredentialRef || undefined,
+      nicheId: updatedNicheId || undefined,
+      settings: updatedSettings,
+      updatedAt: now,
+    };
+    memIntegrations.set(`${companyId}:${id}`, updatedDto);
+    return updatedDto;
+  },
+
+  async delete(companyId: string, id: string): Promise<boolean> {
+    if (pgPool) {
+      const res = await pgPool.query('DELETE FROM integrations WHERE company_id = $1 AND id = $2', [companyId, id]);
+      return (res.rowCount || 0) > 0;
+    }
+
+    const key = `${companyId}:${id}`;
+    if (!memIntegrations.has(key)) return false;
+    memIntegrations.delete(key);
+
+    // Cascata in-memory de mappings
+    for (const [mKey, m] of memIntegrationMappings.entries()) {
+      if (m.companyId === companyId && m.integrationId === id) {
+        memIntegrationMappings.delete(mKey);
+      }
+    }
+    return true;
+  },
+};
+
+// ==========================================
+// 7. INTEGRATION MAPPING REPOSITORY (FASE 5 / PACOTE 5.6)
+// ==========================================
+export const IntegrationMappingRepository = {
+  async setMappings(
+    companyId: string,
+    integrationId: string,
+    mappings: SetIntegrationMappingsItemDTO[]
+  ): Promise<IntegrationFieldMappingDTO[]> {
+    const integration = await IntegrationRepository.findById(companyId, integrationId);
+    if (!integration) {
+      throw new Error(`integration_not_found: integration '${integrationId}' not found for company '${companyId}'`);
+    }
+
+    const now = new Date().toISOString();
+
+    if (pgPool) {
+      const client = await pgPool.connect();
+      try {
+        await client.query('BEGIN');
+        await client.query(
+          'DELETE FROM integration_field_mappings WHERE company_id = $1 AND integration_id = $2',
+          [companyId, integrationId]
+        );
+
+        const result: IntegrationFieldMappingDTO[] = [];
+        for (const item of mappings) {
+          const mapId = `map-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+          const direction = item.direction || 'READ';
+          const enabled = item.enabled !== undefined ? item.enabled : true;
+          const dataType = item.dataType || null;
+
+          const insQuery = `
+            INSERT INTO integration_field_mappings (
+              id, company_id, integration_id, external_field, canonical_field_id,
+              direction, enabled, data_type, created_at, updated_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+            RETURNING
+              id, company_id AS "companyId", integration_id AS "integrationId",
+              external_field AS "externalField", canonical_field_id AS "canonicalFieldId",
+              direction, enabled, data_type AS "dataType",
+              created_at AS "createdAt", updated_at AS "updatedAt"
+          `;
+          const insRes = await client.query(insQuery, [
+            mapId, companyId, integrationId, item.externalField, item.canonicalFieldId,
+            direction, enabled, dataType, now, now,
+          ]);
+          result.push(insRes.rows[0]);
+        }
+        await client.query('COMMIT');
+        return result;
+      } catch (err) {
+        await client.query('ROLLBACK');
+        throw err;
+      } finally {
+        client.release();
+      }
+    }
+
+    // In-memory: remove existentes desta integração
+    for (const [key, m] of memIntegrationMappings.entries()) {
+      if (m.companyId === companyId && m.integrationId === integrationId) {
+        memIntegrationMappings.delete(key);
+      }
+    }
+
+    const result: IntegrationFieldMappingDTO[] = [];
+    for (const item of mappings) {
+      const mapId = `map-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+      const dto: IntegrationFieldMappingDTO = {
+        id: mapId,
+        companyId,
+        integrationId,
+        externalField: item.externalField,
+        canonicalFieldId: item.canonicalFieldId,
+        direction: item.direction || 'READ',
+        enabled: item.enabled !== undefined ? item.enabled : true,
+        dataType: item.dataType,
+        createdAt: now,
+        updatedAt: now,
+      };
+      memIntegrationMappings.set(`${companyId}:${integrationId}:${item.externalField}`, dto);
+      result.push(dto);
+    }
+    return result;
+  },
+
+  async getMappings(companyId: string, integrationId: string): Promise<IntegrationFieldMappingDTO[]> {
+    if (pgPool) {
+      const query = `
+        SELECT
+          id, company_id AS "companyId", integration_id AS "integrationId",
+          external_field AS "externalField", canonical_field_id AS "canonicalFieldId",
+          direction, enabled, data_type AS "dataType",
+          created_at AS "createdAt", updated_at AS "updatedAt"
+        FROM integration_field_mappings
+        WHERE company_id = $1 AND integration_id = $2
+        ORDER BY external_field ASC
+      `;
+      const res = await pgPool.query(query, [companyId, integrationId]);
+      return res.rows;
+    }
+
+    const list: IntegrationFieldMappingDTO[] = [];
+    for (const m of memIntegrationMappings.values()) {
+      if (m.companyId === companyId && m.integrationId === integrationId) {
+        list.push(m);
+      }
+    }
+    return list.sort((a, b) => a.externalField.localeCompare(b.externalField));
+  },
+
+  async getActiveMappingsByCompany(companyId: string): Promise<IntegrationFieldMappingDTO[]> {
+    if (pgPool) {
+      const query = `
+        SELECT
+          m.id, m.company_id AS "companyId", m.integration_id AS "integrationId",
+          m.external_field AS "externalField", m.canonical_field_id AS "canonicalFieldId",
+          m.direction, m.enabled, m.data_type AS "dataType",
+          m.created_at AS "createdAt", m.updated_at AS "updatedAt"
+        FROM integration_field_mappings m
+        JOIN integrations i ON i.id = m.integration_id AND i.company_id = m.company_id
+        WHERE m.company_id = $1 AND i.status = 'ACTIVE' AND m.enabled = true
+      `;
+      const res = await pgPool.query(query, [companyId]);
+      return res.rows;
+    }
+
+    const activeIntegrationIds = new Set<string>();
+    for (const integ of memIntegrations.values()) {
+      if (integ.companyId === companyId && integ.status === 'ACTIVE') {
+        activeIntegrationIds.add(integ.id);
+      }
+    }
+
+    const list: IntegrationFieldMappingDTO[] = [];
+    for (const m of memIntegrationMappings.values()) {
+      if (m.companyId === companyId && activeIntegrationIds.has(m.integrationId) && m.enabled) {
+        list.push(m);
+      }
+    }
+    return list;
+  },
+
+  async deleteByIntegration(companyId: string, integrationId: string): Promise<void> {
+    if (pgPool) {
+      await pgPool.query(
+        'DELETE FROM integration_field_mappings WHERE company_id = $1 AND integration_id = $2',
+        [companyId, integrationId]
+      );
+      return;
+    }
+
+    for (const [key, m] of memIntegrationMappings.entries()) {
+      if (m.companyId === companyId && m.integrationId === integrationId) {
+        memIntegrationMappings.delete(key);
+      }
+    }
+  },
+};
+

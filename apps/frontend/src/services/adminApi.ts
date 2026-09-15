@@ -1,4 +1,12 @@
 import { getCsrfToken } from '../auth/session';
+import type {
+  IntegrationDTO,
+  CreateIntegrationDTO,
+  UpdateIntegrationDTO,
+  IntegrationFieldMappingDTO,
+  IntegrationPresetDTO,
+} from '@witiquetas/contracts';
+
 
 export interface CompanyDTO {
   id: string;
@@ -257,7 +265,61 @@ export const AdminApi = {
       body: JSON.stringify({ nicheAccess }),
     });
   },
+
+  // Integrações (Fase 5 / Pacote 5.6)
+  async fetchIntegrationPresets(): Promise<IntegrationPresetDTO[]> {
+    return request<IntegrationPresetDTO[]>('/integrations/manifests/presets');
+  },
+
+  async fetchIntegrations(): Promise<IntegrationDTO[]> {
+    return request<IntegrationDTO[]>('/integrations');
+  },
+
+  async fetchIntegration(id: string): Promise<IntegrationDTO> {
+    return request<IntegrationDTO>(`/integrations/${encodeURIComponent(id)}`);
+  },
+
+  async createIntegration(data: CreateIntegrationDTO & { defaultMappings?: Array<{ externalField: string; canonicalFieldId: string }> }): Promise<IntegrationDTO> {
+    return request<IntegrationDTO>('/integrations', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async updateIntegration(id: string, data: UpdateIntegrationDTO): Promise<IntegrationDTO> {
+    return request<IntegrationDTO>(`/integrations/${encodeURIComponent(id)}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async deleteIntegration(id: string): Promise<{ message: string; id: string }> {
+    return request<{ message: string; id: string }>(`/integrations/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+    });
+  },
+
+  async fetchIntegrationMappings(id: string): Promise<IntegrationFieldMappingDTO[]> {
+    return request<IntegrationFieldMappingDTO[]>(`/integrations/${encodeURIComponent(id)}/mappings`);
+  },
+
+  async updateIntegrationMappings(
+    id: string,
+    mappings: Array<{
+      externalField: string;
+      canonicalFieldId: string;
+      direction?: string;
+      enabled?: boolean;
+      dataType?: string;
+    }>
+  ): Promise<IntegrationFieldMappingDTO[]> {
+    return request<IntegrationFieldMappingDTO[]>(`/integrations/${encodeURIComponent(id)}/mappings`, {
+      method: 'PUT',
+      body: JSON.stringify({ mappings }),
+    });
+  },
 };
+
 
 export interface NicheAdminItemDTO {
   id: string;

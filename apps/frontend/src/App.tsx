@@ -394,12 +394,27 @@ export default function App() {
         );
 
       case 'integrations':
+        if (
+          !hasAnyPermission([
+            'integrations.view',
+            'integrations.manage',
+          ])
+        ) {
+          return (
+            <AccessDeniedView
+              onGoHome={() => {
+                setCurrentModule('home');
+                window.location.hash = '#home';
+              }}
+            />
+          );
+        }
         return (
-          <PlaceholderModulePage
-            title="Integrações"
-            icon={Plug}
-            description="Conecte o Witiquetas às fontes de dados da sua empresa."
+          <AdminPage
+            sessionContext={sessionContext}
+            onUpdateSessionContext={setSessionContext}
             onGoHome={() => setCurrentModule('home')}
+            initialTab="integrations"
           />
         );
 
@@ -412,6 +427,12 @@ export default function App() {
             'users.manage',
             'roles.view',
             'roles.manage',
+            'niches.view',
+            'niches.manage',
+            'elements.view',
+            'elements.manage',
+            'integrations.view',
+            'integrations.manage',
           ])
         ) {
           return (
@@ -430,6 +451,7 @@ export default function App() {
             onGoHome={() => setCurrentModule('home')}
           />
         );
+
 
       case 'development':
       case 'developer':

@@ -173,3 +173,32 @@ export const LabelDocumentSchema = z.object({
   createdAt: z.string().optional(),
   updatedAt: z.string().optional(),
 });
+
+export const CANONICAL_CAPABILITIES = [
+  'products.read',
+  'prices.read',
+  'inventory.read',
+  'logistics.read',
+  'healthcare.read',
+  'customers.read',
+] as const;
+
+export const IntegrationManifestFieldSchema = z.object({
+  externalField: z.string().min(1).max(64).regex(/^[a-zA-Z0-9_.-]+$/),
+  label: z.string().min(1).max(128),
+  type: z.enum(['string', 'integer', 'decimal', 'boolean', 'date', 'datetime', 'url', 'barcode', 'image']).optional(),
+  direction: z.enum(['read', 'write', 'bidirectional']).optional(),
+  suggestedCanonical: z.string().optional(),
+  description: z.string().max(256).optional(),
+}).strict();
+
+export const IntegrationManifestSchema = z.object({
+  manifestVersion: z.string().min(1).max(32),
+  providerId: z.string().min(1).max(64),
+  displayName: z.string().min(1).max(128),
+  description: z.string().max(512).optional(),
+  capabilities: z.array(z.enum(CANONICAL_CAPABILITIES)).min(1),
+  fields: z.array(IntegrationManifestFieldSchema),
+  defaultSettings: z.record(z.unknown()).optional(),
+}).strict();
+

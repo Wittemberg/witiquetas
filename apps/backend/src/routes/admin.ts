@@ -8,15 +8,21 @@ import {
   NICHES,
   getIntegrationFieldsByNiche,
   SYSTEM_FIELDS,
+  ALL_KNOWN_INTEGRATION_FIELDS,
+  INTEGRATION_PRESETS,
+  IntegrationManifestSchema,
 } from '@witiquetas/label-schema';
 import {
   CompanyRepository,
   UserRepository,
   RoleRepository,
   CompanyConfigurationRepository,
+  IntegrationRepository,
+  IntegrationMappingRepository,
   CANONICAL_PERMISSIONS,
   TENANT_MANAGEABLE_PERMISSIONS,
 } from '../repositories/adminRepositories.js';
+
 import { SessionRepository } from '../repositories/sessionRepository.js';
 import { PasswordService } from '../services/passwordService.js';
 import { EffectiveConfigurationService } from '../services/effectiveConfigurationService.js';
@@ -963,4 +969,300 @@ router.put('/roles/:id/niches', requirePermission('roles.manage'), requireCsrf, 
   });
 });
 
+// ==========================================
+// 6. INTEGRAÇÕES (Integrations Foundation — Pacote 5.6)
+// ==========================================
+
+/**
+ * GET /api/admin/integrations/manifests/presets
+ * Retorna os templates/presets canônicos de integração
+ */
+router.get('/integrations/manifests/presets', requirePermission('integrations.view'), async (req: Request, res: Response) => {
+  return res.status(200).json(INTEGRATION_PRESETS);
+});
+
+/**
+ * GET /api/admin/integrations
+ * Lista todas as integrações da empresa autenticada
+ */
+router.get('/integrations', requirePermission('integrations.view'), async (req: Request, res: Response) => {
+  const companyId = req.principal!.company.id;
+  const integrations = await IntegrationRepository.findByCompanyId(companyId);
+  return res.status(200).json(integrations);
+});
+
+/**
+ * POST /api/admin/integrations
+ * Cria uma nova integração para a empresa autenticada
+ */
+router.post('/integrations', requirePermission('integrations.manage'), requireCsrf, async (req: Request, res: Response) => {
+  const companyId = req.principal!.company.id;
+  const {
+    id,
+    name,
+    providerType,
+    providerId,
+    status,
+    environment,
+    baseUrl,
+    credentialRef,
+    nicheId,
+    settings,
+    manifest,
+    defaultMappings,
+  } = req.body;
+
+  if (!name || typeof name !== 'string' || name.trim().length === 0) {
+    return res.status(400).json({ error: 'O nome da integração é obrigatório.', code: 'INVALID_NAME' });
+  }
+
+  const validProviderTypes = ['SQL', 'REST', 'CSV', 'WEBHOOK', 'MCP'];
+  if (!providerType || !validProviderTypes.includes(providerType)) {
+    return res.status(400).json({
+      error: `Tipo de provedor inválido. Permitidos: ${validProviderTypes.join(', ')}`,
+      code: 'INVALID_PROVIDER_TYPE',
+    });
+  }
+
+  if (!providerId || typeof providerId !== 'string' || providerId.trim().length === 0) {
+    return res.status(400).json({ error: 'O identificador do provedor (providerId) é obrigatório.', code: 'INVALID_PROVIDER_ID' });
+  }
+
+  if (nicheId && !NICHES.some((n) => n.id === nicheId)) {
+    return res.status(400).json({ error: `Nicho inválido: '${nicheId}'.`, code: 'INVALID_NICHE' });
+  }
+
+  if (!manifest || typeof manifest !== 'object') {
+    return res.status(400).json({ error: 'O manifesto da integração é obrigatório.', code: 'MISSING_MANIFEST' });
+  }
+
+  const manifestValidation = IntegrationManifestSchema.safeParse(manifest);
+  if (!manifestValidation.success) {
+    return res.status(400).json({
+      error: 'Manifesto de integração inválido.',
+      code: 'INVALID_MANIFEST',
+      details: manifestValidation.error.issues,
+    });
+  }
+
+  let cleanCredentialRef: string | undefined = undefined;
+  if (credentialRef !== undefined && credentialRef !== null) {
+    if (typeof credentialRef !== 'string' || credentialRef.length > 128) {
+      return res.status(400).json({ error: 'credentialRef deve ser uma referência opaca de no máximo 128 caracteres.', code: 'INVALID_CREDENTIAL_REF' });
+    }
+    cleanCredentialRef = credentialRef.trim() || undefined;
+  }
+
+  const created = await IntegrationRepository.create(companyId, {
+    id,
+    name: name.trim(),
+
+    providerType,
+    providerId: providerId.trim(),
+    status: status || 'ACTIVE',
+    environment: environment || 'PRODUCTION',
+    baseUrl: baseUrl ? String(baseUrl).trim() : undefined,
+    credentialRef: cleanCredentialRef,
+    nicheId: nicheId || undefined,
+    settings: (settings && typeof settings === 'object') ? settings : {},
+    manifest: manifestValidation.data as any,
+  });
+
+  // Se defaultMappings foram fornecidos, inicializa os mapeamentos
+  if (Array.isArray(defaultMappings) && defaultMappings.length > 0) {
+    const validMappings = defaultMappings
+      .filter((m: any) => m && m.externalField && m.canonicalFieldId && !m.canonicalFieldId.startsWith('system.'))
+      .map((m: any) => ({
+        externalField: String(m.externalField).trim(),
+        canonicalFieldId: String(m.canonicalFieldId).trim(),
+        direction: m.direction || 'READ',
+        enabled: m.enabled !== false,
+      }));
+    if (validMappings.length > 0) {
+      await IntegrationMappingRepository.setMappings(companyId, created.id, validMappings);
+    }
+  }
+
+  return res.status(201).json(created);
+});
+
+/**
+ * GET /api/admin/integrations/:id
+ * Retorna uma integração específica da empresa (Anti-IDOR)
+ */
+router.get('/integrations/:id', requirePermission('integrations.view'), async (req: Request, res: Response) => {
+  const companyId = req.principal!.company.id;
+  const integrationId = req.params.id;
+
+  const integration = await IntegrationRepository.findById(companyId, integrationId);
+  if (!integration) {
+    return res.status(404).json({ error: 'Integração não encontrada.', code: 'INTEGRATION_NOT_FOUND' });
+  }
+
+  return res.status(200).json(integration);
+});
+
+/**
+ * PUT /api/admin/integrations/:id
+ * Atualiza campos de configuração da integração (Anti-IDOR)
+ */
+router.put('/integrations/:id', requirePermission('integrations.manage'), requireCsrf, async (req: Request, res: Response) => {
+  const companyId = req.principal!.company.id;
+  const integrationId = req.params.id;
+
+  const existing = await IntegrationRepository.findById(companyId, integrationId);
+  if (!existing) {
+    return res.status(404).json({ error: 'Integração não encontrada.', code: 'INTEGRATION_NOT_FOUND' });
+  }
+
+  const {
+    name,
+    status,
+    environment,
+    baseUrl,
+    credentialRef,
+    nicheId,
+    settings,
+  } = req.body;
+
+  if (name !== undefined) {
+    if (typeof name !== 'string' || name.trim().length === 0) {
+      return res.status(400).json({ error: 'O nome da integração não pode estar em branco.', code: 'INVALID_NAME' });
+    }
+  }
+
+  const validStatuses = ['ACTIVE', 'INACTIVE', 'ERROR', 'TESTING'];
+  if (status !== undefined && !validStatuses.includes(status)) {
+    return res.status(400).json({ error: `Status inválido. Permitidos: ${validStatuses.join(', ')}`, code: 'INVALID_STATUS' });
+  }
+
+  const validEnvironments = ['PRODUCTION', 'STAGING', 'SANDBOX'];
+  if (environment !== undefined && !validEnvironments.includes(environment)) {
+    return res.status(400).json({ error: `Ambiente inválido. Permitidos: ${validEnvironments.join(', ')}`, code: 'INVALID_ENVIRONMENT' });
+  }
+
+  if (nicheId !== undefined && nicheId !== null && !NICHES.some((n) => n.id === nicheId)) {
+    return res.status(400).json({ error: `Nicho inválido: '${nicheId}'.`, code: 'INVALID_NICHE' });
+  }
+
+  let cleanCredentialRef: string | undefined = undefined;
+  if (credentialRef !== undefined && credentialRef !== null) {
+    if (typeof credentialRef !== 'string' || credentialRef.length > 128) {
+      return res.status(400).json({ error: 'credentialRef deve ser uma referência opaca de no máximo 128 caracteres.', code: 'INVALID_CREDENTIAL_REF' });
+    }
+    cleanCredentialRef = credentialRef.trim() || undefined;
+  }
+
+  const updated = await IntegrationRepository.update(companyId, integrationId, {
+    name: name !== undefined ? name.trim() : undefined,
+    status,
+    environment,
+    baseUrl: baseUrl !== undefined ? (baseUrl ? String(baseUrl).trim() : undefined) : undefined,
+    credentialRef: credentialRef !== undefined ? cleanCredentialRef : undefined,
+    nicheId: nicheId !== undefined ? (nicheId || undefined) : undefined,
+    settings: (settings && typeof settings === 'object') ? settings : undefined,
+  });
+
+  if (!updated) {
+    return res.status(404).json({ error: 'Integração não encontrada.', code: 'INTEGRATION_NOT_FOUND' });
+  }
+
+  return res.status(200).json(updated);
+});
+
+/**
+ * DELETE /api/admin/integrations/:id
+ * Remove uma integração e seus mapeamentos (Anti-IDOR)
+ */
+router.delete('/integrations/:id', requirePermission('integrations.manage'), requireCsrf, async (req: Request, res: Response) => {
+  const companyId = req.principal!.company.id;
+  const integrationId = req.params.id;
+
+  const deleted = await IntegrationRepository.delete(companyId, integrationId);
+  if (!deleted) {
+    return res.status(404).json({ error: 'Integração não encontrada.', code: 'INTEGRATION_NOT_FOUND' });
+  }
+
+  return res.status(200).json({ message: 'Integração excluída com sucesso.', id: integrationId });
+});
+
+/**
+ * GET /api/admin/integrations/:id/mappings
+ * Lista todos os mapeamentos de campo de uma integração (Anti-IDOR)
+ */
+router.get('/integrations/:id/mappings', requirePermission('integrations.view'), async (req: Request, res: Response) => {
+  const companyId = req.principal!.company.id;
+  const integrationId = req.params.id;
+
+  const integration = await IntegrationRepository.findById(companyId, integrationId);
+  if (!integration) {
+    return res.status(404).json({ error: 'Integração não encontrada.', code: 'INTEGRATION_NOT_FOUND' });
+  }
+
+  const mappings = await IntegrationMappingRepository.getMappings(companyId, integrationId);
+  return res.status(200).json(mappings);
+});
+
+/**
+ * PUT /api/admin/integrations/:id/mappings
+ * Substitui em lote os mapeamentos de campo da integração (Anti-IDOR)
+ */
+router.put('/integrations/:id/mappings', requirePermission('integrations.manage'), requireCsrf, async (req: Request, res: Response) => {
+  const companyId = req.principal!.company.id;
+  const integrationId = req.params.id;
+
+  const integration = await IntegrationRepository.findById(companyId, integrationId);
+  if (!integration) {
+    return res.status(404).json({ error: 'Integração não encontrada.', code: 'INTEGRATION_NOT_FOUND' });
+  }
+
+  const { mappings } = req.body;
+  if (!Array.isArray(mappings)) {
+    return res.status(400).json({ error: 'O corpo da requisição deve conter a lista "mappings".', code: 'INVALID_MAPPINGS_PAYLOAD' });
+  }
+
+  for (const m of mappings) {
+    if (!m || typeof m !== 'object') {
+      return res.status(400).json({ error: 'Mapeamento inválido.', code: 'INVALID_MAPPING_ITEM' });
+    }
+    if (!m.externalField || typeof m.externalField !== 'string' || m.externalField.trim().length === 0) {
+      return res.status(400).json({ error: 'externalField é obrigatório em cada item.', code: 'MISSING_EXTERNAL_FIELD' });
+    }
+    if (!m.canonicalFieldId || typeof m.canonicalFieldId !== 'string' || m.canonicalFieldId.trim().length === 0) {
+      return res.status(400).json({ error: 'canonicalFieldId é obrigatório em cada item.', code: 'MISSING_CANONICAL_FIELD' });
+    }
+
+    const canon = m.canonicalFieldId.trim();
+    if (canon.startsWith('system.') || canon === 'system') {
+      return res.status(400).json({
+        error: `Não é permitido mapear campos para o namespace reservado 'system'. Campo: '${canon}'.`,
+        code: 'SYSTEM_NAMESPACE_RESERVED',
+      });
+    }
+
+    const exists = ALL_KNOWN_INTEGRATION_FIELDS.some((cf) => cf.id === canon);
+    if (!exists) {
+      return res.status(400).json({
+        error: `Campo canônico desconhecido: '${canon}'.`,
+        code: 'UNKNOWN_CANONICAL_FIELD',
+      });
+    }
+  }
+
+  const updatedMappings = await IntegrationMappingRepository.setMappings(
+    companyId,
+    integrationId,
+    mappings.map((m: any) => ({
+      externalField: m.externalField.trim(),
+      canonicalFieldId: m.canonicalFieldId.trim(),
+      direction: m.direction || 'READ',
+      enabled: m.enabled !== false,
+      dataType: m.dataType ? String(m.dataType) : undefined,
+    }))
+  );
+
+  return res.status(200).json(updatedMappings);
+});
+
 export default router;
+

@@ -1107,16 +1107,21 @@
           "module": "integrations",
           "weight": 2,
           "mvp": false,
-          "status": "PLANNED",
+          "status": "IMPLEMENTED",
           "manualValidation": false,
           "physicalValidation": false,
           "frozen": false,
-          "evidence": [],
+          "evidence": [
+            "packages/contracts/src/index.ts",
+            "apps/backend/src/repositories/adminRepositories.ts",
+            "apps/backend/src/routes/admin.ts",
+            "tests/package56IntegrationFoundation.test.ts"
+          ],
           "dependencies": [
             "cap-company-settings"
           ],
           "notes": [
-            "Conexão com fontes de dados corporativas."
+            "PACOTE 5.6: Registro e ciclo de vida de integrações ERP e conectores externos com isolamento multi-tenant por company_id, suporte in-memory e PostgreSQL."
           ]
         },
         {
@@ -1126,14 +1131,18 @@
           "module": "integrations",
           "weight": 2,
           "mvp": false,
-          "status": "PLANNED",
+          "status": "IMPLEMENTED",
           "manualValidation": false,
           "physicalValidation": false,
           "frozen": false,
-          "evidence": [],
+          "evidence": [
+            "packages/contracts/src/index.ts",
+            "packages/label-schema/src/canonicalFields.ts",
+            "tests/package56IntegrationFoundation.test.ts"
+          ],
           "dependencies": [],
           "notes": [
-            "Dicionário universal independente de ERP."
+            "PACOTE 5.6: Dicionário e catálogo de 6 capabilities canônicas (products.read, prices.read, inventory.read, logistics.read, healthcare.read, customers.read) e campos canônicos."
           ]
         },
         {
@@ -1143,17 +1152,22 @@
           "module": "integrations",
           "weight": 2,
           "mvp": false,
-          "status": "PLANNED",
+          "status": "IMPLEMENTED",
           "manualValidation": false,
           "physicalValidation": false,
           "frozen": false,
-          "evidence": [],
+          "evidence": [
+            "apps/backend/src/repositories/adminRepositories.ts",
+            "apps/backend/src/routes/admin.ts",
+            "apps/frontend/src/modules/admin/IntegrationsAdminView.tsx",
+            "tests/package56IntegrationFoundation.test.ts"
+          ],
           "dependencies": [
             "cap-canonical-field-registry",
             "cap-integration-registry"
           ],
           "notes": [
-            "Transformação de schemas em runtime sem alterar templates."
+            "PACOTE 5.6: Mapeamento declarativo de campos externos para canônicos com preservação de namespaces reservados."
           ]
         },
         {
@@ -1163,16 +1177,19 @@
           "module": "integrations",
           "weight": 2,
           "mvp": false,
-          "status": "PLANNED",
+          "status": "IMPLEMENTED",
           "manualValidation": false,
           "physicalValidation": false,
           "frozen": false,
-          "evidence": [],
+          "evidence": [
+            "packages/label-schema/src/schema.ts",
+            "tests/package56IntegrationFoundation.test.ts"
+          ],
           "dependencies": [
             "cap-integration-registry"
           ],
           "notes": [
-            "Evita tentativas de uso de dados não providos pelo ERP."
+            "PACOTE 5.6: Validação estrita de matriz de capacidades baseada no manifesto de integração."
           ]
         },
         {
@@ -1319,17 +1336,22 @@
           "module": "admin",
           "weight": 2,
           "mvp": false,
-          "status": "PLANNED",
+          "status": "IMPLEMENTED",
           "manualValidation": false,
           "physicalValidation": false,
           "frozen": false,
-          "evidence": [],
+          "evidence": [
+            "apps/frontend/src/modules/admin/IntegrationsAdminView.tsx",
+            "apps/frontend/src/modules/admin/AdminPage.tsx",
+            "apps/frontend/src/App.tsx",
+            "tests/package56IntegrationFoundation.test.ts"
+          ],
           "dependencies": [
             "cap-admin-shell",
             "cap-integration-field-mapping"
           ],
           "notes": [
-            "Configuração sem necessidade de código."
+            "PACOTE 5.6: Interface administrativa canônica para governança de integrações ERP e mapeamento de campos de-para."
           ]
         },
         {

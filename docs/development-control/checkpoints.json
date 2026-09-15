@@ -1,6 +1,28 @@
 {
   "checkpoints": [
     {
+      "sha": "2d9c56b1f9fb2640f61e5256d5e3c975afa213ac",
+      "shortSha": "2d9c56b",
+      "date": "2026-09-14T21:42:00Z",
+      "phase": "5",
+      "patch": "5.6.0-candidate",
+      "title": "feat(package-5.6): implement integration foundation and field mapping",
+      "type": "FEATURE",
+      "capabilities": [
+        "cap-integration-registry",
+        "cap-canonical-field-registry",
+        "cap-integration-field-mapping",
+        "cap-integration-capability-matrix",
+        "cap-admin-integrations"
+      ],
+      "testsPassed": true,
+      "deployed": false,
+      "manualValidation": false,
+      "homologated": false,
+      "status": "IMPLEMENTED_AWAITING_MANUAL_REVALIDATION",
+      "evidence": "PACOTE 5.6 IMPLEMENTADO: Fundação canônica de integrações ERP e conectores externos. Catálogo restrito a 6 capabilities canônicas (products.read, prices.read, inventory.read, logistics.read, healthcare.read, customers.read). Zero credenciais ou secrets no manifesto (apenas credential_ref opaco). Regra Opção A: zero integrações ativas ou mapeamentos fictícios por padrão (availableForIntegration=false até integração real e mapeamento ativo). Interface visual canônica em Administração -> Integrações (IntegrationsAdminView) com suporte a presets, badges e mapeamento de-para. 10 Gates / 11 cenários de testes automatizados GREEN, suíte total de 102 testes passando 100%."
+    },
+    {
       "sha": "673064cd263ba19e60afdd94a8d1bde34dc819f8",
       "shortSha": "673064c",
       "date": "2026-09-14T15:30:00Z",

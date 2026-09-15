@@ -8,6 +8,7 @@ import {
   Home,
   ShieldAlert,
   Layers,
+  Plug,
 } from 'lucide-react';
 import {
   SessionContext,
@@ -19,34 +20,58 @@ import { CompanyAdminView } from './CompanyAdminView.js';
 import { UsersAdminView } from './UsersAdminView.js';
 import { RolesAdminView } from './RolesAdminView.js';
 import { NichesAdminView } from './NichesAdminView.js';
+import { IntegrationsAdminView } from './IntegrationsAdminView.js';
 
 interface AdminPageProps {
   sessionContext: SessionContext;
   onUpdateSessionContext: (ctx: SessionContext | null) => void;
   onGoHome: () => void;
+  initialTab?: AdminTab;
 }
 
-type AdminTab = 'company' | 'users' | 'roles' | 'niches';
+type AdminTab = 'company' | 'users' | 'roles' | 'niches' | 'integrations';
 
 export const AdminPage: React.FC<AdminPageProps> = ({
   sessionContext,
   onUpdateSessionContext,
   onGoHome,
+  initialTab,
 }) => {
   const canViewCompany = hasAnyPermission(['company.view', 'company.manage']);
   const canViewUsers = hasAnyPermission(['users.view', 'users.manage']);
   const canViewRoles = hasAnyPermission(['roles.view', 'roles.manage']);
   const canViewNiches = hasAnyPermission(['niches.view', 'niches.manage', 'elements.view', 'elements.manage']);
+  const canViewIntegrations = hasAnyPermission(['integrations.view', 'integrations.manage']);
+  const canManageIntegrations = hasAnyPermission(['integrations.manage']);
 
   const getDefaultTab = (): AdminTab => {
+    if (initialTab === 'integrations' && canViewIntegrations) return 'integrations';
+    if (initialTab === 'niches' && canViewNiches) return 'niches';
+    if (initialTab === 'roles' && canViewRoles) return 'roles';
+    if (initialTab === 'users' && canViewUsers) return 'users';
+    if (initialTab === 'company' && canViewCompany) return 'company';
+
     if (canViewCompany) return 'company';
     if (canViewUsers) return 'users';
     if (canViewRoles) return 'roles';
     if (canViewNiches) return 'niches';
+    if (canViewIntegrations) return 'integrations';
     return 'company';
   };
 
   const [activeTab, setActiveTab] = useState<AdminTab>(getDefaultTab);
+
+  // Sincroniza initialTab se alterado externamente
+  useEffect(() => {
+    if (initialTab) {
+      if (initialTab === 'integrations' && canViewIntegrations) setActiveTab('integrations');
+      else if (initialTab === 'niches' && canViewNiches) setActiveTab('niches');
+      else if (initialTab === 'roles' && canViewRoles) setActiveTab('roles');
+      else if (initialTab === 'users' && canViewUsers) setActiveTab('users');
+      else if (initialTab === 'company' && canViewCompany) setActiveTab('company');
+    }
+  }, [initialTab, canViewIntegrations, canViewNiches, canViewRoles, canViewUsers, canViewCompany]);
+
 
   // Ajusta a aba se as permissões mudarem
   useEffect(() => {
@@ -103,34 +128,48 @@ export const AdminPage: React.FC<AdminPageProps> = ({
       refreshed.permissions.includes('niches.manage') ||
       refreshed.permissions.includes('elements.view') ||
       refreshed.permissions.includes('elements.manage');
+    const stillCanViewIntegrations =
+      refreshed.permissions.includes('*') ||
+      refreshed.permissions.includes('integrations.view') ||
+      refreshed.permissions.includes('integrations.manage');
 
-    if (!stillCanViewCompany && !stillCanViewUsers && !stillCanViewRoles && !stillCanViewNiches) {
+    if (!stillCanViewCompany && !stillCanViewUsers && !stillCanViewRoles && !stillCanViewNiches && !stillCanViewIntegrations) {
       console.warn('[AdminShell] Permissões administrativas revogadas por completo. Redirecionando para rota autorizada...');
       onGoHome();
     } else if (activeTab === 'company' && !stillCanViewCompany) {
       if (stillCanViewUsers) setActiveTab('users');
       else if (stillCanViewRoles) setActiveTab('roles');
       else if (stillCanViewNiches) setActiveTab('niches');
+      else if (stillCanViewIntegrations) setActiveTab('integrations');
       else onGoHome();
     } else if (activeTab === 'users' && !stillCanViewUsers) {
       if (stillCanViewRoles) setActiveTab('roles');
       else if (stillCanViewCompany) setActiveTab('company');
       else if (stillCanViewNiches) setActiveTab('niches');
+      else if (stillCanViewIntegrations) setActiveTab('integrations');
       else onGoHome();
     } else if (activeTab === 'roles' && !stillCanViewRoles) {
       if (stillCanViewCompany) setActiveTab('company');
       else if (stillCanViewUsers) setActiveTab('users');
       else if (stillCanViewNiches) setActiveTab('niches');
+      else if (stillCanViewIntegrations) setActiveTab('integrations');
       else onGoHome();
     } else if (activeTab === 'niches' && !stillCanViewNiches) {
       if (stillCanViewCompany) setActiveTab('company');
       else if (stillCanViewUsers) setActiveTab('users');
       else if (stillCanViewRoles) setActiveTab('roles');
+      else if (stillCanViewIntegrations) setActiveTab('integrations');
+      else onGoHome();
+    } else if (activeTab === 'integrations' && !stillCanViewIntegrations) {
+      if (stillCanViewCompany) setActiveTab('company');
+      else if (stillCanViewUsers) setActiveTab('users');
+      else if (stillCanViewRoles) setActiveTab('roles');
+      else if (stillCanViewNiches) setActiveTab('niches');
       else onGoHome();
     }
   };
 
-  const hasAnyAdminAccess = canViewCompany || canViewUsers || canViewRoles || canViewNiches;
+  const hasAnyAdminAccess = canViewCompany || canViewUsers || canViewRoles || canViewNiches || canViewIntegrations;
 
   if (!hasAnyAdminAccess) {
     return (
@@ -168,6 +207,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({
             {activeTab === 'users' && 'Usuários'}
             {activeTab === 'roles' && 'Perfis e Permissões'}
             {activeTab === 'niches' && 'Nichos & Elementos'}
+            {activeTab === 'integrations' && 'Integrações'}
           </span>
         </div>
       </div>
@@ -176,7 +216,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({
         <div className="admin-page-title-group">
           <h2 className="admin-page-title">Administração</h2>
           <p className="admin-page-subtitle">
-            Gerenciamento de dados cadastrais da organização, catálogo de usuários, matriz RBAC de perfis e parametrização de nichos, elementos visuais e campos canônicos.
+            Gerenciamento de dados cadastrais da organização, catálogo de usuários, matriz RBAC de perfis e parametrização de nichos, elementos visuais, campos canônicos e conectores de dados (ERP).
           </p>
         </div>
       </div>
@@ -226,6 +266,17 @@ export const AdminPage: React.FC<AdminPageProps> = ({
             <span>Nichos & Elementos</span>
           </button>
         )}
+
+        {canViewIntegrations && (
+          <button
+            type="button"
+            className={`admin-tab-btn ${activeTab === 'integrations' ? 'active' : ''}`}
+            onClick={() => setActiveTab('integrations')}
+          >
+            <Plug size={16} />
+            <span>Integrações</span>
+          </button>
+        )}
       </div>
 
       {/* Conteúdo da Aba Ativa */}
@@ -251,7 +302,15 @@ export const AdminPage: React.FC<AdminPageProps> = ({
         {activeTab === 'niches' && canViewNiches && (
           <NichesAdminView onConfigChanged={handleSelfAffected} />
         )}
+
+        {activeTab === 'integrations' && canViewIntegrations && (
+          <IntegrationsAdminView
+            canManage={canManageIntegrations}
+            onConfigChanged={handleSelfAffected}
+          />
+        )}
       </div>
     </div>
   );
 };
+

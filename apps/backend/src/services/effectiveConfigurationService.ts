@@ -13,6 +13,8 @@ import {
   UserRepository,
   RoleRepository,
   CompanyConfigurationRepository,
+  IntegrationRepository,
+  IntegrationMappingRepository,
 } from '../repositories/adminRepositories.js';
 
 export interface EffectiveConfigurationOptions {
@@ -191,6 +193,12 @@ export const EffectiveConfigurationService = {
     const fieldsAvailabilityByNiche: Record<string, Record<string, { manual: boolean; integration: boolean }>> = {};
     const companyFieldConfigs = await CompanyConfigurationRepository.getFields(companyId);
 
+    // Consulta integrações ativas e mapeamentos habilitados da empresa (Fase 5 / Pacote 5.6)
+    const allCompanyIntegrations = await IntegrationRepository.listByCompany(companyId);
+    const activeIntegrations = allCompanyIntegrations.filter((i) => i.status === 'ACTIVE');
+    const activeMappings = await IntegrationMappingRepository.getActiveMappingsByCompany(companyId);
+    const providedCanonicalFields = new Set<string>(activeMappings.map((m) => m.canonicalFieldId));
+
     // Mapear campos explicitamente configurados: key = "nicheId:fieldId"
     const fieldConfigMap = new Map<string, { enabled: boolean; manual: boolean; integration: boolean }>();
     for (const fc of companyFieldConfigs) {
@@ -215,18 +223,28 @@ export const EffectiveConfigurationService = {
         const isSystem = SYSTEM_FIELDS.some((sf) => sf.id === f.id);
         const fieldPreset = profilePreset?.defaultFields.find((df) => df.fieldId === f.id);
 
+        const companyManualAllowed = isSystem ? false : (cfg ? cfg.manual : (fieldPreset ? fieldPreset.availableForManual : true));
+        const companyIntegrationAllowed = isSystem ? false : (cfg ? cfg.integration : (fieldPreset ? fieldPreset.availableForIntegration : true));
+
+        // Regra canônica (Opção A):
+        // SEM INTEGRAÇÃO REAL ATIVA + SEM MAPPING HABILITADO = availableForIntegration = false
+        const hasIntegrationSource = activeIntegrations.length > 0 && providedCanonicalFields.has(f.id);
+        const effectiveIntegrationAvailable = companyIntegrationAllowed && hasIntegrationSource;
+        const effectiveManualAvailable = companyManualAllowed;
+
         const isEnabled = cfg
-          ? (cfg.enabled && (isSystem || cfg.manual || cfg.integration))
+          ? (cfg.enabled && (isSystem || effectiveManualAvailable || effectiveIntegrationAvailable))
           : isSystem
             ? true
             : (fieldPreset ? true : true);
+
         if (isEnabled) {
           effectiveFields.push(f.id);
         }
 
         availabilityMap[f.id] = {
-          manual: isSystem ? false : (cfg ? cfg.manual : (fieldPreset ? fieldPreset.availableForManual : true)),
-          integration: isSystem ? false : (cfg ? cfg.integration : (fieldPreset ? fieldPreset.availableForIntegration : true)),
+          manual: effectiveManualAvailable,
+          integration: effectiveIntegrationAvailable,
         };
       }
       enabledFieldsByNiche[nicheId] = effectiveFields;
@@ -242,6 +260,13 @@ export const EffectiveConfigurationService = {
       enabledFieldsByNiche,
       fieldsAvailabilityByNiche,
       permissions: Array.from(userPermissions),
+      activeIntegrations: activeIntegrations.map((i) => ({
+        id: i.id,
+        name: i.name,
+        providerId: i.providerId,
+        status: i.status,
+      })),
     };
   },
 };
+

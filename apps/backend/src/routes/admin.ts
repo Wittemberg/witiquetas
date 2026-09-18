@@ -9,9 +9,9 @@ import {
   getIntegrationFieldsByNiche,
   SYSTEM_FIELDS,
   ALL_KNOWN_INTEGRATION_FIELDS,
-  INTEGRATION_PRESETS,
   IntegrationManifestSchema,
 } from '@witiquetas/label-schema';
+import { INTEGRATION_PRESETS } from '@witiquetas/contracts';
 import {
   CompanyRepository,
   UserRepository,

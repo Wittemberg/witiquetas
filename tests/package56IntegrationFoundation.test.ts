@@ -23,10 +23,10 @@ import { EffectiveConfigurationService } from '../apps/backend/src/services/effe
 import {
   CANONICAL_CAPABILITIES,
   IntegrationManifestSchema,
-  INTEGRATION_PRESETS,
   ALL_KNOWN_INTEGRATION_FIELDS,
   SYSTEM_FIELDS,
 } from '@witiquetas/label-schema';
+import { INTEGRATION_PRESETS } from '@witiquetas/contracts';
 import { getMigrationsList } from '../apps/backend/src/db.js';
 import { ZPLCompiler } from '../packages/printer-core/src/zplCompiler.js';
 

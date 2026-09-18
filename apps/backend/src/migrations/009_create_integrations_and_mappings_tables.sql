@@ -1,4 +1,4 @@
-﻿-- 009_create_integrations_and_mappings_tables.sql
+-- 009_create_integrations_and_mappings_tables.sql
 -- FASE 5 — PACOTE 5.6: Fundação de Integrações, Manifests e Mapeamento de Campos
 -- Isolamento multi-tenant estrito com chaves compostas e integridade referencial
 

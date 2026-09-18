@@ -39,7 +39,7 @@ export function getMigrationsList(): Array<{ filename: string; sql: string }> {
         if (files.length > 0) {
           return files.map((filename) => ({
             filename,
-            sql: fs.readFileSync(path.join(dirPath, filename), 'utf-8'),
+            sql: fs.readFileSync(path.join(dirPath, filename), 'utf-8').replace(/^\uFEFF/, ''),
           }));
         }
       } catch {}

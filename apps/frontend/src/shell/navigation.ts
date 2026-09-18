@@ -5,7 +5,6 @@ import {
   ListOrdered,
   Printer,
   Cpu,
-  Plug,
   Settings,
   Terminal,
   type LucideIcon,
@@ -64,13 +63,6 @@ export const BASE_NAV_ITEMS: NavItem[] = [
     path: '/agents',
   },
   {
-    id: 'integrations',
-    label: 'Integrações',
-    icon: Plug,
-    description: 'Conectores ERP e integrações',
-    path: '/integrations',
-  },
-  {
     id: 'admin',
     label: 'Administração',
     icon: Settings,
@@ -80,9 +72,10 @@ export const BASE_NAV_ITEMS: NavItem[] = [
 ];
 
 /**
- * Resolver único e canônico da navegação do frontend comercial do tenant (Hotfix 5.3.2).
+ * Resolver único e canônico da navegação do frontend comercial do tenant (Hotfix 5.3.2 / Pacote 5.6.1).
  * Exibe EXCLUSIVAMENTE os módulos disponíveis para o tenant conforme suas permissões.
  *
+ * Integrações é uma aba interna de Administração (Pacote 5.6.1) e não polui a sidebar principal.
  * DCC é ferramenta interna da PLATAFORMA e NUNCA aparece na navegação de tenant (nem mesmo para ADMIN).
  */
 export function getEffectiveNavigation(sessionContext: SessionContext | null): NavItem[] {
@@ -111,8 +104,6 @@ export function getEffectiveNavigation(sessionContext: SessionContext | null): N
       if (checkAny(['printers.view', 'printers.manage'])) items.push(item);
     } else if (item.id === 'agents') {
       if (checkAny(['agents.view', 'agents.manage'])) items.push(item);
-    } else if (item.id === 'integrations') {
-      if (checkAny(['integrations.view', 'integrations.manage'])) items.push(item);
     } else if (item.id === 'admin') {
       if (
         checkAny([
@@ -122,6 +113,12 @@ export function getEffectiveNavigation(sessionContext: SessionContext | null): N
           'users.manage',
           'roles.view',
           'roles.manage',
+          'niches.view',
+          'niches.manage',
+          'elements.view',
+          'elements.manage',
+          'integrations.view',
+          'integrations.manage',
         ])
       ) {
         items.push(item);

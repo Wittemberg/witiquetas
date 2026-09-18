@@ -19,6 +19,7 @@ import {
   Check,
   X,
   ExternalLink,
+  Pencil,
 } from 'lucide-react';
 import {
   AdminApi,
@@ -76,6 +77,13 @@ export const IntegrationsAdminView: React.FC<IntegrationsAdminViewProps> = ({
   const [createName, setCreateName] = useState<string>('');
   const [createBaseUrl, setCreateBaseUrl] = useState<string>('');
   const [createCredentialRef, setCreateCredentialRef] = useState<string>('');
+
+  // Modal de edição (Pacote 5.6.1)
+  const [isEditModalOpen, setIsEditModalOpen] = useState<boolean>(false);
+  const [editName, setEditName] = useState<string>('');
+  const [editBaseUrl, setEditBaseUrl] = useState<string>('');
+  const [editCredentialRef, setEditCredentialRef] = useState<string>('');
+  const [editEnvironment, setEditEnvironment] = useState<'PRODUCTION' | 'STAGING' | 'SANDBOX'>('PRODUCTION');
 
   const loadData = async () => {
     setLoading(true);
@@ -323,6 +331,53 @@ export const IntegrationsAdminView: React.FC<IntegrationsAdminViewProps> = ({
     }
   };
 
+  // Abrir modal de edição preenchido com a integração selecionada (Pacote 5.6.1)
+  const handleOpenEditModal = () => {
+    if (!selectedIntegration || !canManage) return;
+    setEditName(selectedIntegration.name);
+    setEditBaseUrl(selectedIntegration.baseUrl || '');
+    setEditCredentialRef(selectedIntegration.credentialRef || '');
+    setEditEnvironment((selectedIntegration.environment as any) || 'PRODUCTION');
+    setIsEditModalOpen(true);
+  };
+
+  // Salvar alterações da integração existente (Pacote 5.6.1)
+  const handleSaveEditIntegration = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedIntegration || !canManage) return;
+
+    if (!editName.trim()) {
+      setFeedback({ type: 'error', message: 'O nome da conexão não pode estar em branco.' });
+      return;
+    }
+
+    setSaving(true);
+    setFeedback(null);
+    try {
+      const updated = await AdminApi.updateIntegration(selectedIntegration.id, {
+        name: editName.trim(),
+        baseUrl: editBaseUrl.trim() || undefined,
+        credentialRef: editCredentialRef.trim() || undefined,
+        environment: editEnvironment,
+      });
+
+      setIntegrations((prev) => prev.map((i) => (i.id === updated.id ? { ...i, ...updated } : i)));
+      setIsEditModalOpen(false);
+      setFeedback({
+        type: 'success',
+        message: `Integração "${updated.name}" atualizada com sucesso!`,
+      });
+      if (onConfigChanged) await onConfigChanged();
+    } catch (err: any) {
+      setFeedback({
+        type: 'error',
+        message: err.message || 'Erro ao atualizar integração.',
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="admin-loading-state">
@@ -387,10 +442,10 @@ export const IntegrationsAdminView: React.FC<IntegrationsAdminViewProps> = ({
         <div className="admin-empty-state-card" style={{ textAlign: 'center', padding: '3.5rem 1.5rem', background: 'rgba(0,0,0,0.15)', borderRadius: '12px', border: '1px dashed var(--border-color)', margin: '1.5rem 0' }}>
           <Plug size={48} color="var(--accent-blue)" style={{ margin: '0 auto 1rem', opacity: 0.8 }} />
           <h4 style={{ fontSize: '1.2rem', margin: '0 0 0.5rem', color: 'var(--text-primary)' }}>
-            Nenhuma integração conectada
+            Nenhuma integração cadastrada
           </h4>
           <p style={{ maxWidth: '520px', margin: '0 auto 1.5rem', color: 'var(--text-muted)', fontSize: '0.9rem', lineHeight: '1.5' }}>
-            Empresas recém-criadas iniciam sem integrações ativas por padrão. Conecte sua primeira fonte de dados para que os campos dinâmicos de etiquetas fiquem disponíveis na impressão.
+            Empresas recém-criadas iniciam sem integrações ativas por padrão. Adicione sua primeira fonte de dados para que os campos dinâmicos de etiquetas fiquem disponíveis na impressão.
           </p>
           {canManage && (
             <button
@@ -405,13 +460,22 @@ export const IntegrationsAdminView: React.FC<IntegrationsAdminViewProps> = ({
               }}
             >
               <Plus size={16} />
-              <span>Conectar Primeira Fonte de Dados</span>
+              <span>Adicionar Primeira Fonte de Dados</span>
             </button>
           )}
         </div>
       ) : (
         /* Layout Master-Detail */
-        <div className="admin-master-detail-container" style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: '1.5rem', marginTop: '1.5rem' }}>
+        <div
+          className="admin-master-detail-container"
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'minmax(260px, 300px) minmax(0, 1fr)',
+            gap: '1.5rem',
+            marginTop: '1.5rem',
+            alignItems: 'start',
+          }}
+        >
           {/* Coluna Esquerda: Lista de Integrações */}
           <div className="admin-integrations-list-column">
             <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', marginBottom: '0.65rem', fontWeight: 700 }}>
@@ -437,15 +501,15 @@ export const IntegrationsAdminView: React.FC<IntegrationsAdminViewProps> = ({
                     }}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', minWidth: 0 }}>
                         <IconComponent size={16} color={isSelected ? 'var(--accent-blue)' : 'var(--text-muted)'} />
-                        <span style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--text-primary)' }}>
+                        <span style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                           {item.name}
                         </span>
                       </div>
                       <span
                         className={`badge ${item.status === 'ACTIVE' ? 'badge-success' : 'badge-secondary'}`}
-                        style={{ fontSize: '0.65rem', padding: '0.15rem 0.4rem' }}
+                        style={{ fontSize: '0.65rem', padding: '0.15rem 0.4rem', flexShrink: 0 }}
                       >
                         {item.status}
                       </span>
@@ -466,12 +530,23 @@ export const IntegrationsAdminView: React.FC<IntegrationsAdminViewProps> = ({
 
           {/* Coluna Direita: Detalhe e Mapeamentos da Integração Selecionada */}
           {selectedIntegration && (
-            <div className="admin-integration-detail-column" style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '12px', border: '1px solid var(--border-color)', padding: '1.5rem' }}>
+            <div className="admin-integration-detail-column" style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '12px', border: '1px solid var(--border-color)', padding: '1.5rem', minWidth: 0 }}>
               {/* Header do Detalhe */}
-              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', borderBottom: '1px solid var(--border-color)', paddingBottom: '1.25rem', marginBottom: '1.5rem' }}>
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', marginBottom: '0.35rem' }}>
-                    <h3 style={{ margin: 0, fontSize: '1.3rem', color: 'var(--text-primary)' }}>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  justifyContent: 'space-between',
+                  borderBottom: '1px solid var(--border-color)',
+                  paddingBottom: '1.25rem',
+                  marginBottom: '1.5rem',
+                  flexWrap: 'wrap',
+                  gap: '1rem',
+                }}
+              >
+                <div style={{ minWidth: '240px', flex: 1 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', marginBottom: '0.35rem', flexWrap: 'wrap' }}>
+                    <h3 style={{ margin: 0, fontSize: '1.3rem', color: 'var(--text-primary)', wordBreak: 'break-word' }}>
                       {selectedIntegration.name}
                     </h3>
                     <span className="badge badge-info" style={{ fontSize: '0.75rem' }}>
@@ -481,7 +556,7 @@ export const IntegrationsAdminView: React.FC<IntegrationsAdminViewProps> = ({
                       {selectedIntegration.environment}
                     </span>
                   </div>
-                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', lineHeight: '1.5', wordBreak: 'break-all' }}>
                     Provider ID: <code style={{ color: 'var(--accent-cyan)' }}>{selectedIntegration.providerId}</code>
                     {selectedIntegration.baseUrl && (
                       <> • Endpoint: <code>{selectedIntegration.baseUrl}</code></>
@@ -493,7 +568,18 @@ export const IntegrationsAdminView: React.FC<IntegrationsAdminViewProps> = ({
                 </div>
 
                 {canManage && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      onClick={handleOpenEditModal}
+                      disabled={saving}
+                      style={{ fontSize: '0.825rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+                      title="Editar Propriedades da Integração"
+                    >
+                      <Pencil size={14} />
+                      <span>Editar Integração</span>
+                    </button>
                     <button
                       type="button"
                       className={`btn ${selectedIntegration.status === 'ACTIVE' ? 'btn-secondary' : 'btn-primary'}`}
@@ -708,124 +794,215 @@ export const IntegrationsAdminView: React.FC<IntegrationsAdminViewProps> = ({
         </div>
       )}
 
-      {/* Modal: Adicionar Nova Integração */}
+      {/* Modal: Adicionar Nova Integração (Landscape / Wide — Pacote 5.6.1) */}
       {isCreateModalOpen && (
-        <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '1.5rem' }}>
-          <div className="modal-container" style={{ background: 'var(--bg-card)', borderRadius: '14px', border: '1px solid var(--border-color)', maxWidth: '580px', width: '100%', padding: '1.75rem', boxShadow: '0 20px 40px rgba(0,0,0,0.4)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-                <Plug size={20} color="var(--accent-blue)" />
-                <h3 style={{ margin: 0, fontSize: '1.2rem', color: 'var(--text-primary)' }}>
-                  Conectar Nova Fonte de Dados
-                </h3>
+        <div
+          className="modal-overlay"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0, 0, 0, 0.75)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: '1.5rem',
+          }}
+        >
+          <div
+            className="modal-container modal-landscape"
+            style={{
+              background: 'var(--bg-card)',
+              borderRadius: '14px',
+              border: '1px solid var(--border-color)',
+              maxWidth: '920px',
+              width: '100%',
+              maxHeight: '90vh',
+              display: 'flex',
+              flexDirection: 'column',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+              overflow: 'hidden',
+            }}
+          >
+            {/* Header Pinned */}
+            <div
+              style={{
+                padding: '1.25rem 1.75rem',
+                borderBottom: '1px solid var(--border-color)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                background: 'rgba(255, 255, 255, 0.02)',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <Plug size={22} color="var(--accent-blue)" />
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.2rem', color: 'var(--text-primary)', fontWeight: 700 }}>
+                    Adicionar Fonte de Dados
+                  </h3>
+                  <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                    Cadastre uma nova integração declarativa e configure suas propriedades de acesso.
+                  </div>
+                </div>
               </div>
               <button
                 type="button"
                 className="btn-icon"
                 onClick={() => setIsCreateModalOpen(false)}
-                style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
+                style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '0.4rem' }}
+                title="Fechar modal"
               >
                 <X size={20} />
               </button>
             </div>
 
-            <form onSubmit={handleCreateIntegration}>
-              {/* Seletor de Modelo / Preset */}
-              <div style={{ marginBottom: '1.25rem' }}>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '0.5rem' }}>
-                  Selecione o Modelo de Integração
-                </label>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                  {presets.map((p) => {
-                    const IconComp = PROVIDER_ICONS[p.providerType] || Plug;
-                    const isPicked = selectedPresetId === p.presetId;
+            {/* Form Scrollable */}
+            <form onSubmit={handleCreateIntegration} style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+              <div style={{ padding: '1.5rem 1.75rem', overflowY: 'auto', flex: 1 }}>
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))',
+                    gap: '1.75rem',
+                    alignItems: 'start',
+                  }}
+                >
+                  {/* COLUNA ESQUERDA: Seleção de Modelo / Provider */}
+                  <div>
+                    <div style={{ fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', marginBottom: '0.65rem', fontWeight: 700 }}>
+                      1. Modelo de Integração
+                    </div>
 
-                    return (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                      {presets.map((p) => {
+                        const IconComp = PROVIDER_ICONS[p.providerType] || Plug;
+                        const isPicked = selectedPresetId === p.presetId;
+
+                        return (
+                          <div
+                            key={p.presetId}
+                            onClick={() => {
+                              setSelectedPresetId(p.presetId);
+                              setCreateName(p.name);
+                            }}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.75rem',
+                              padding: '0.85rem 1rem',
+                              borderRadius: '8px',
+                              border: `1px solid ${isPicked ? 'var(--accent-blue)' : 'var(--border-color)'}`,
+                              background: isPicked ? 'rgba(59, 130, 246, 0.12)' : 'rgba(0, 0, 0, 0.15)',
+                              cursor: 'pointer',
+                              transition: 'all 0.15s ease',
+                            }}
+                          >
+                            <IconComp size={20} color={isPicked ? 'var(--accent-blue)' : 'var(--text-muted)'} />
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                                {p.name}
+                              </div>
+                              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                {p.description} • Tipo: <strong>{p.providerType}</strong>
+                              </div>
+                            </div>
+                            {isPicked && <Check size={18} color="var(--accent-blue)" />}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* COLUNA DIREITA: Propriedades da Conexão */}
+                  <div>
+                    <div style={{ fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', marginBottom: '0.65rem', fontWeight: 700 }}>
+                      2. Parâmetros da Conexão
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                      {/* Nome da Conexão */}
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '0.35rem' }}>
+                          Nome da Conexão *
+                        </label>
+                        <input
+                          type="text"
+                          className="form-input"
+                          value={createName}
+                          onChange={(e) => setCreateName(e.target.value)}
+                          placeholder="ex: Startwo Varejo Central"
+                          required
+                          style={{ width: '100%', padding: '0.55rem 0.75rem', fontSize: '0.875rem' }}
+                        />
+                      </div>
+
+                      {/* Endpoint Base URL (Opcional) */}
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '0.35rem' }}>
+                          URL Base / Host (Opcional)
+                        </label>
+                        <input
+                          type="text"
+                          className="form-input"
+                          value={createBaseUrl}
+                          onChange={(e) => setCreateBaseUrl(e.target.value)}
+                          placeholder="ex: https://api.empresa.com.br ou 192.168.1.100"
+                          style={{ width: '100%', padding: '0.55rem 0.75rem', fontSize: '0.875rem' }}
+                        />
+                      </div>
+
+                      {/* Referência de Credencial (Opcional) */}
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '0.35rem' }}>
+                          Referência de Credencial / Vault (Opcional)
+                        </label>
+                        <input
+                          type="text"
+                          className="form-input"
+                          value={createCredentialRef}
+                          onChange={(e) => setCreateCredentialRef(e.target.value)}
+                          placeholder="ex: vault://erp-production/token"
+                          maxLength={128}
+                          style={{ width: '100%', padding: '0.55rem 0.75rem', fontSize: '0.875rem' }}
+                        />
+                      </div>
+
+                      {/* Box de Segurança */}
                       <div
-                        key={p.presetId}
-                        onClick={() => {
-                          setSelectedPresetId(p.presetId);
-                          setCreateName(p.name);
-                        }}
                         style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.75rem',
-                          padding: '0.75rem 1rem',
+                          background: 'rgba(59, 130, 246, 0.08)',
+                          border: '1px solid rgba(59, 130, 246, 0.25)',
                           borderRadius: '8px',
-                          border: `1px solid ${isPicked ? 'var(--accent-blue)' : 'var(--border-color)'}`,
-                          background: isPicked ? 'rgba(59, 130, 246, 0.1)' : 'rgba(0,0,0,0.1)',
-                          cursor: 'pointer',
+                          padding: '0.75rem 0.85rem',
+                          display: 'flex',
+                          gap: '0.65rem',
+                          alignItems: 'flex-start',
                         }}
                       >
-                        <IconComp size={18} color={isPicked ? 'var(--accent-blue)' : 'var(--text-muted)'} />
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)' }}>
-                            {p.name}
-                          </div>
-                          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                            {p.description} • Tipo: <strong>{p.providerType}</strong>
-                          </div>
-                        </div>
-                        {isPicked && <Check size={18} color="var(--accent-blue)" />}
+                        <Lock size={16} color="var(--accent-blue)" style={{ marginTop: '2px', flexShrink: 0 }} />
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: '1.4' }}>
+                          Armazenamento Seguro: Apenas referências opacas de credenciais são registradas. Nenhuma senha, token ou chave secreta em texto puro é manipulada ou persistida.
+                        </span>
                       </div>
-                    );
-                  })}
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              {/* Nome da Integração */}
-              <div style={{ marginBottom: '1rem' }}>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '0.35rem' }}>
-                  Nome da Conexão
-                </label>
-                <input
-                  type="text"
-                  className="form-input"
-                  value={createName}
-                  onChange={(e) => setCreateName(e.target.value)}
-                  placeholder="ex: Startwo Varejo Central"
-                  required
-                  style={{ width: '100%', padding: '0.5rem', fontSize: '0.9rem' }}
-                />
-              </div>
-
-              {/* Endpoint Base URL (Opcional) */}
-              <div style={{ marginBottom: '1rem' }}>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '0.35rem' }}>
-                  URL Base / Host (Opcional)
-                </label>
-                <input
-                  type="text"
-                  className="form-input"
-                  value={createBaseUrl}
-                  onChange={(e) => setCreateBaseUrl(e.target.value)}
-                  placeholder="ex: https://api.empresa.com.br ou 192.168.1.100"
-                  style={{ width: '100%', padding: '0.5rem', fontSize: '0.9rem' }}
-                />
-              </div>
-
-              {/* Referência de Credencial (Opcional) */}
-              <div style={{ marginBottom: '1.5rem' }}>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '0.35rem' }}>
-                  Referência de Credencial / Vault (Opcional)
-                </label>
-                <input
-                  type="text"
-                  className="form-input"
-                  value={createCredentialRef}
-                  onChange={(e) => setCreateCredentialRef(e.target.value)}
-                  placeholder="ex: vault://erp-production/token"
-                  maxLength={128}
-                  style={{ width: '100%', padding: '0.5rem', fontSize: '0.9rem' }}
-                />
-                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'block', marginTop: '0.25rem' }}>
-                  Apenas identificador opaco. Nenhuma chave secreta ou senha é persistida no manifesto ou trafegada em texto bruto.
-                </span>
-              </div>
-
-              {/* Botões do Modal */}
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+              {/* Footer Pinned */}
+              <div
+                style={{
+                  padding: '1rem 1.75rem',
+                  borderTop: '1px solid var(--border-color)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'flex-end',
+                  gap: '0.75rem',
+                  background: 'rgba(255, 255, 255, 0.02)',
+                }}
+              >
                 <button
                   type="button"
                   className="btn btn-secondary"
@@ -838,7 +1015,275 @@ export const IntegrationsAdminView: React.FC<IntegrationsAdminViewProps> = ({
                   className="btn btn-primary"
                   disabled={saving}
                 >
-                  {saving ? 'Criando...' : 'Salvar e Conectar'}
+                  {saving ? 'Salvando...' : 'Salvar Integração'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Editar Integração Existente (Landscape / Wide — Pacote 5.6.1) */}
+      {isEditModalOpen && selectedIntegration && (
+        <div
+          className="modal-overlay"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0, 0, 0, 0.75)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: '1.5rem',
+          }}
+        >
+          <div
+            className="modal-container modal-landscape"
+            style={{
+              background: 'var(--bg-card)',
+              borderRadius: '14px',
+              border: '1px solid var(--border-color)',
+              maxWidth: '920px',
+              width: '100%',
+              maxHeight: '90vh',
+              display: 'flex',
+              flexDirection: 'column',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+              overflow: 'hidden',
+            }}
+          >
+            {/* Header Pinned */}
+            <div
+              style={{
+                padding: '1.25rem 1.75rem',
+                borderBottom: '1px solid var(--border-color)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                background: 'rgba(255, 255, 255, 0.02)',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <Pencil size={20} color="var(--accent-blue)" />
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.2rem', color: 'var(--text-primary)', fontWeight: 700 }}>
+                    Editar Fonte de Dados
+                  </h3>
+                  <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                    Atualize os parâmetros declarativos da integração selecionada.
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="btn-icon"
+                onClick={() => setIsEditModalOpen(false)}
+                style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '0.4rem' }}
+                title="Fechar modal"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Form Scrollable */}
+            <form onSubmit={handleSaveEditIntegration} style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+              <div style={{ padding: '1.5rem 1.75rem', overflowY: 'auto', flex: 1 }}>
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))',
+                    gap: '1.75rem',
+                    alignItems: 'start',
+                  }}
+                >
+                  {/* COLUNA ESQUERDA: Provedor e Manifesto (Imutáveis) */}
+                  <div>
+                    <div style={{ fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', marginBottom: '0.65rem', fontWeight: 700 }}>
+                      Estrutura do Provedor (Imutável)
+                    </div>
+
+                    <div
+                      style={{
+                        padding: '1rem',
+                        borderRadius: '10px',
+                        background: 'rgba(0, 0, 0, 0.2)',
+                        border: '1px solid var(--border-color)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '0.85rem',
+                      }}
+                    >
+                      <div>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.2rem' }}>
+                          Tipo de Provedor & ID
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <span className="badge badge-info" style={{ fontSize: '0.75rem' }}>
+                            {selectedIntegration.providerType}
+                          </span>
+                          <code style={{ fontSize: '0.85rem', color: 'var(--accent-cyan)' }}>
+                            {selectedIntegration.providerId}
+                          </code>
+                        </div>
+                      </div>
+
+                      <div>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.35rem' }}>
+                          Capabilities do Manifesto
+                        </div>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem' }}>
+                          {selectedIntegration.manifest.capabilities?.map((cap) => (
+                            <span
+                              key={cap}
+                              style={{
+                                fontSize: '0.7rem',
+                                padding: '0.2rem 0.5rem',
+                                borderRadius: '4px',
+                                background: 'rgba(16, 185, 129, 0.1)',
+                                border: '1px solid rgba(16, 185, 129, 0.3)',
+                                color: 'var(--status-success)',
+                              }}
+                            >
+                              {cap}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div
+                        style={{
+                          fontSize: '0.72rem',
+                          color: 'var(--text-muted)',
+                          lineHeight: '1.4',
+                          borderTop: '1px solid rgba(255, 255, 255, 0.05)',
+                          paddingTop: '0.5rem',
+                        }}
+                      >
+                        O modelo do provedor e as capacidades declaradas definem a estrutura canônica da integração e não podem ser alterados após o provisionamento.
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* COLUNA DIREITA: Parâmetros Editáveis */}
+                  <div>
+                    <div style={{ fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', marginBottom: '0.65rem', fontWeight: 700 }}>
+                      Parâmetros da Conexão
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                      {/* Nome da Conexão */}
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '0.35rem' }}>
+                          Nome da Conexão *
+                        </label>
+                        <input
+                          type="text"
+                          className="form-input"
+                          value={editName}
+                          onChange={(e) => setEditName(e.target.value)}
+                          placeholder="ex: Startwo Varejo Central"
+                          required
+                          style={{ width: '100%', padding: '0.55rem 0.75rem', fontSize: '0.875rem' }}
+                        />
+                      </div>
+
+                      {/* URL Base / Host */}
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '0.35rem' }}>
+                          URL Base / Host (Opcional)
+                        </label>
+                        <input
+                          type="text"
+                          className="form-input"
+                          value={editBaseUrl}
+                          onChange={(e) => setEditBaseUrl(e.target.value)}
+                          placeholder="ex: https://api.empresa.com.br ou 192.168.1.100"
+                          style={{ width: '100%', padding: '0.55rem 0.75rem', fontSize: '0.875rem' }}
+                        />
+                      </div>
+
+                      {/* Referência de Credencial */}
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '0.35rem' }}>
+                          Referência de Credencial / Vault (Opcional)
+                        </label>
+                        <input
+                          type="text"
+                          className="form-input"
+                          value={editCredentialRef}
+                          onChange={(e) => setEditCredentialRef(e.target.value)}
+                          placeholder="ex: vault://erp-production/token"
+                          maxLength={128}
+                          style={{ width: '100%', padding: '0.55rem 0.75rem', fontSize: '0.875rem' }}
+                        />
+                      </div>
+
+                      {/* Ambiente */}
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '0.35rem' }}>
+                          Ambiente de Execução
+                        </label>
+                        <select
+                          className="form-input"
+                          value={editEnvironment}
+                          onChange={(e) => setEditEnvironment(e.target.value as any)}
+                          style={{ width: '100%', padding: '0.55rem 0.75rem', fontSize: '0.875rem' }}
+                        >
+                          <option value="PRODUCTION">Produção (PRODUCTION)</option>
+                          <option value="STAGING">Homologação (STAGING)</option>
+                          <option value="SANDBOX">Sandbox / Testes (SANDBOX)</option>
+                        </select>
+                      </div>
+
+                      {/* Box de Segurança */}
+                      <div
+                        style={{
+                          background: 'rgba(59, 130, 246, 0.08)',
+                          border: '1px solid rgba(59, 130, 246, 0.25)',
+                          borderRadius: '8px',
+                          padding: '0.75rem 0.85rem',
+                          display: 'flex',
+                          gap: '0.65rem',
+                          alignItems: 'flex-start',
+                        }}
+                      >
+                        <Lock size={16} color="var(--accent-blue)" style={{ marginTop: '2px', flexShrink: 0 }} />
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: '1.4' }}>
+                          Armazenamento Seguro: Nenhuma credencial em texto puro é manipulada ou persistida nesta tela.
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Footer Pinned */}
+              <div
+                style={{
+                  padding: '1rem 1.75rem',
+                  borderTop: '1px solid var(--border-color)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'flex-end',
+                  gap: '0.75rem',
+                  background: 'rgba(255, 255, 255, 0.02)',
+                }}
+              >
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => setIsEditModalOpen(false)}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={saving}
+                >
+                  {saving ? 'Salvando...' : 'Salvar Integração'}
                 </button>
               </div>
             </form>

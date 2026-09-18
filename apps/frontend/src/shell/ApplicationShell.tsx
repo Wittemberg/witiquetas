@@ -49,8 +49,12 @@ export const ApplicationShell: React.FC<ApplicationShellProps> = ({
   }, [currentModule]);
 
   const navItems = getEffectiveNavigation(sessionContext ?? null);
-  const activeItem = navItems.find((item) => item.id === currentModule);
-  const moduleTitle = activeItem ? activeItem.label : currentModule === 'editor' ? 'Editor de Etiquetas' : 'Início';
+  const activeItem = navItems.find((item) => item.id === currentModule) || (currentModule === 'integrations' ? navItems.find((item) => item.id === 'admin') : undefined);
+  const moduleTitle = activeItem
+    ? (currentModule === 'integrations' ? 'Administração — Integrações' : activeItem.label)
+    : currentModule === 'editor'
+    ? 'Editor de Etiquetas'
+    : 'Início';
 
   const isEditor = currentModule === 'editor';
 

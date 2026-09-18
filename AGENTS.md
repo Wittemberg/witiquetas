@@ -1,65 +1,85 @@
-# AGENTS.md — Contrato Global de Desenvolvimento do Witiquetas
+# Witiquetas — Agent Instructions
 
-Este arquivo é o contrato operacional para agentes de IA, IDEs agentes e automações que trabalhem neste repositório.
+Este arquivo é o roteador de contexto e contrato operacional para agentes de IA que trabalhem no repositório Witiquetas.
 
-## Princípios
-- Preserve comportamento homologado. Mudanças devem ser cirúrgicas.
-- Não redesenhe módulos estáveis para resolver um bug local.
-- Segurança, integridade de dados, isolamento multiempresa, impressão física e governança têm prioridade.
-- Nunca invente permissões, campos canônicos, nichos, status de impressão ou capacidades de hardware.
-- Backend é a autoridade final para autorização e persistência; UI deve refletir permissões sem substituir enforcement server-side.
-- Corrija causa raiz, não sintoma.
+## Inicialização de uma tarefa
 
-## Antes de alterar código
-1. Identifique o módulo afetado.
-2. Leia `CONTEXT.md`, `DESIGN.md` e somente a skill necessária em `skills/`.
-3. Consulte a fase atual e o escopo canônico em `docs/development-control/project.json` e `docs/development-control/roadmap.json`.
-4. Localize testes e invariantes relacionados.
-5. Confirme se o componente está HOMOLOGATED/FROZEN.
-6. Consulte a documentação canônica correspondente em `docs/` e na raiz (`ARQUITETURA.md`, `docs/architecture/UNIVERSAL-DATA-ARCHITECTURE.md`).
-7. Defina o menor diff possível.
+Sempre:
+1. `git status`
+2. Ler `docs/development-control/project.json`
+3. Identificar fase atual
+4. Identificar mudança OpenSpec ativa em `openspec/changes/`, se houver
+5. Ler `docs/estado-atual.md`
+6. Localizar código e testes relacionados
+7. Carregar somente a documentação e skills necessárias
 
-## Regressão e escopo
-- Não alterar Editor, Central de Impressão, Agent, Administração, DCC ou autenticação fora do escopo.
-- Não mascarar layout com `overflow:hidden`.
-- Não usar `any`, `@ts-ignore` ou fallback permissivo para contornar domínio.
-- LOADING/ERROR/UNKNOWN de configuração não podem significar `EVERYTHING_DISABLED` nem mutar modelo.
-- Elemento legado já existente e depois desabilitado deve continuar preservável/selecionável/exportável/deletável; criação e duplicação obedecem configuração efetiva.
+## Princípio operacional
 
-## Impressão
-- `DELIVERED_TO_TRANSPORT` significa entrega ao transporte, nunca `PRINTED` sem feedback real do hardware.
-- Agent é transporte local; não deve reinterpretar linguagem da impressora.
-- Nunca expor RAW TCP/9100 publicamente.
-- Documento canônico: `DOCUMENTACAO-AGENTE-LOCAL.md` e `packages/printer-core`.
+ENTENDER → DELIMITAR → IMPLEMENTAR → TESTAR → VALIDAR → DOCUMENTAR → ENTREGAR
 
-## Administração e autorização
-- Hierarquia efetiva: Platform → Company → Niche → Integration → Role → User → Model.
-- Preservar o catálogo canônico vigente; não inventar permissões.
-- `templates.view`, `templates.create` e `templates.edit` são independentes.
-- PLATFORM_DEVELOPER não é ADMIN de tenant e permanece restrito à empresa configurada.
-- Documento canônico: `docs/architecture/GOVERNANCE-ADMIN-ARCHITECTURE.md` e `docs/decisions/ADR-002-customer-company.md`.
+## Regra de escopo
 
-## Dados e integrações
-- Separar elemento visual, campo canônico e fonte de valor.
-- Fontes: MANUAL / INTEGRATION / SYSTEM.
-- Dados externos devem ser mapeados para campos canônicos por contrato versionado.
-- ERP é autoridade empresarial; APIs públicas são apenas enriquecimento.
-- Documento canônico: `docs/architecture/UNIVERSAL-DATA-ARCHITECTURE.md` e `docs/governance/INTEGRATION-MANIFEST-SPEC.md`.
+- Prefira o MENOR DIFF CORRETO.
+- Não alterar módulos não relacionados.
+- Não refatorar áreas estáveis sem necessidade.
+- Corrija a causa raiz, não o sintoma. Não use `any`, `@ts-ignore` ou fallback permissivo para mascarar erros.
 
-## Release
-Antes de declarar pacote pronto:
-- testes relevantes verdes;
-- build frontend/backend/workspaces sem erro;
-- regressão crítica coberta por teste executável;
-- commit/push/CI/deploy convergentes;
-- `/version.json`, `/api/version` e `/api/health` coerentes;
-- validação manual quando exigida;
-- STOP RULE respeitada.
-- Documento canônico: `docs/operations/RELEASE-SAFETY.md` e `docs/development-control/checkpoints.json`.
+## Fontes de verdade
 
-## Skills
-Carregue apenas as skills relevantes:
-- `skills/editor/SKILL.md`
-- `skills/admin/SKILL.md`
-- `skills/printing/SKILL.md`
-- `skills/release/SKILL.md`
+Hierarquia de precedência:
+1. Requisito explícito atual
+2. ADR aplicável (`docs/decisions/`)
+3. Documento canônico específico da área
+4. Roadmap / Governança (`docs/development-control/`)
+5. Contratos / Schemas (`packages/contracts/`, `packages/label-schema/`)
+6. Testes executáveis / Golden tests (`tests/`)
+7. Código existente
+8. Documentação histórica
+
+Se houver conflito real entre fontes canônicas, registre e não decida silenciosamente.
+
+## Freeze e Módulos Homologados
+
+Consultar `project.json` e `roadmap.json` antes de qualquer alteração:
+- Módulos `FROZEN` ou `HOMOLOGATED` (Editor, Compiladores, Agente Local, Central de Impressão) estão congelados contra mudanças funcionais durante fases administrativas, salvo P0, segurança, perda de dados, crash ou regressão explícita.
+
+## Arquitetura
+
+Preservar o fluxo linear:
+Dados → LabelDocument → Motor Witiquetas → Compiler → PrintJob → Agent → Impressora
+
+Invariantes de domínio:
+- `Printer Language` != `Template Language` != `Integration Field Catalog`.
+- Elemento visual, campo canônico e fonte de valor (MANUAL / INTEGRATION / SYSTEM) são separados.
+- `DELIVERED_TO_TRANSPORT` significa apenas entrega ao transporte, nunca `PRINTED` sem telemetria física real.
+- Agent é transporte local e não deve reinterpretar linguagens de impressão nem expor TCP/9100 publicamente.
+
+## Segurança e Autorização
+
+- Frontend controla UX; Backend é a autoridade final para autorização e persistência.
+- Multi-tenancy e RBAC são fail-closed: hierarquia `Platform → Company → Niche → Integration → Role → User → Model`.
+- Nunca expor secrets, tokens ou variáveis sensíveis.
+
+## OpenSpec
+
+- **Correção pequena e clara:** implementação direta + testes correspondentes.
+- **Feature, mudança de contrato, schema ou realinhamento relevante:** ciclo formal OpenSpec (`proposal` → `specs` → `design` → `tasks`).
+- Apenas uma mudança OpenSpec ativa por vez.
+
+## Documentação e Retomada
+
+- Não crie arquivos `.md` avulsos para cada correção pontual; atualize o documento canônico existente.
+- Mantenha `docs/estado-atual.md` curto e atualizado para handoff e retomada rápida entre sessões.
+
+## Consulta Rápida de Contexto
+
+- **Produto e UX:** `docs/product/`
+- **Arquitetura Geral:** `ARQUITETURA.md`, `docs/architecture/`
+- **Roadmap e Estado:** `docs/development-control/project.json`, `docs/development-control/roadmap.json`
+- **Operações e Release:** `docs/operations/RELEASE-SAFETY.md`, `docs/development-control/checkpoints.json`
+- **Agente Local:** `DOCUMENTACAO-AGENTE-LOCAL.md`, `packages/contracts/`
+- **Impressão e Compiladores:** `packages/printer-core/`, `packages/printer-*/`
+- **Segurança:** `SECURITY.md`, `docs/SECURITY-DEVELOPER-AUTH.md`
+- **Skills Locais:** `skills/editor/`, `skills/admin/`, `skills/printing/`, `skills/release/`
+- **Harness e Padrões Wittemberg:** `.harness/AGENTS.md`, `.harness/standards/wittemberg/`
+- **Estado de Retomada:** `docs/estado-atual.md`

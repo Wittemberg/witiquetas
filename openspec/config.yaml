@@ -1,0 +1,21 @@
+schema: spec-driven
+
+context: |
+  Witiquetas — Plataforma de criação, compilação, impressão e governança de etiquetas térmicas.
+  Contrato principal: consulte AGENTS.md e docs/development-control/project.json.
+  Módulos congelados (FROZEN/HOMOLOGATED): Editor, Compiladores PPLA/PPLB, Agente Local Daemon Rust, Central de Impressão.
+  Princípio norteador: Menor diff correto. Backend é autoridade final para RBAC e isolamento multi-tenant.
+  Retomada rápida: consulte docs/estado-atual.md.
+
+rules:
+  proposal:
+    - Vincular explicitamente ao escopo da fase ativa em docs/development-control/project.json
+    - Definir explicitamente o que fica FORA do escopo (non-goals)
+  specs:
+    - Descrever comportamento observável sem alterar módulos congelados
+    - Separar comportamento observado existente de nova intenção funcional
+  design:
+    - Respeitar os ADRs em docs/decisions/ e arquitetura em docs/architecture/
+    - Preservar o fluxo: Dados -> LabelDocument -> Motor -> Compiler -> PrintJob -> Agent -> Impressora
+  tasks:
+    - Definir tarefas granulares com critério verificável por teste ou evidência executável

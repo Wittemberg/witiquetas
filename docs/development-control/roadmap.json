@@ -1107,15 +1107,16 @@
           "module": "integrations",
           "weight": 2,
           "mvp": false,
-          "status": "IMPLEMENTED",
-          "manualValidation": false,
+          "status": "HOMOLOGATED",
+          "manualValidation": true,
           "physicalValidation": false,
           "frozen": false,
           "evidence": [
             "packages/contracts/src/index.ts",
             "apps/backend/src/repositories/adminRepositories.ts",
             "apps/backend/src/routes/admin.ts",
-            "tests/package56IntegrationFoundation.test.ts"
+            "tests/package56IntegrationFoundation.test.ts",
+            "Homologação manual concluída com sucesso pelo usuário (Baseline 6436984)"
           ],
           "dependencies": [
             "cap-company-settings"
@@ -1131,14 +1132,15 @@
           "module": "integrations",
           "weight": 2,
           "mvp": false,
-          "status": "IMPLEMENTED",
-          "manualValidation": false,
+          "status": "HOMOLOGATED",
+          "manualValidation": true,
           "physicalValidation": false,
           "frozen": false,
           "evidence": [
             "packages/contracts/src/index.ts",
             "packages/label-schema/src/canonicalFields.ts",
-            "tests/package56IntegrationFoundation.test.ts"
+            "tests/package56IntegrationFoundation.test.ts",
+            "Homologação manual concluída com sucesso pelo usuário (Baseline 6436984)"
           ],
           "dependencies": [],
           "notes": [
@@ -1152,15 +1154,16 @@
           "module": "integrations",
           "weight": 2,
           "mvp": false,
-          "status": "IMPLEMENTED",
-          "manualValidation": false,
+          "status": "HOMOLOGATED",
+          "manualValidation": true,
           "physicalValidation": false,
           "frozen": false,
           "evidence": [
             "apps/backend/src/repositories/adminRepositories.ts",
             "apps/backend/src/routes/admin.ts",
             "apps/frontend/src/modules/admin/IntegrationsAdminView.tsx",
-            "tests/package56IntegrationFoundation.test.ts"
+            "tests/package56IntegrationFoundation.test.ts",
+            "Homologação manual concluída com sucesso pelo usuário (Baseline 6436984)"
           ],
           "dependencies": [
             "cap-canonical-field-registry",
@@ -1177,13 +1180,14 @@
           "module": "integrations",
           "weight": 2,
           "mvp": false,
-          "status": "IMPLEMENTED",
-          "manualValidation": false,
+          "status": "HOMOLOGATED",
+          "manualValidation": true,
           "physicalValidation": false,
           "frozen": false,
           "evidence": [
             "packages/label-schema/src/schema.ts",
-            "tests/package56IntegrationFoundation.test.ts"
+            "tests/package56IntegrationFoundation.test.ts",
+            "Homologação manual concluída com sucesso pelo usuário (Baseline 6436984)"
           ],
           "dependencies": [
             "cap-integration-registry"
@@ -1336,22 +1340,24 @@
           "module": "admin",
           "weight": 2,
           "mvp": false,
-          "status": "IMPLEMENTED",
-          "manualValidation": false,
+          "status": "HOMOLOGATED",
+          "manualValidation": true,
           "physicalValidation": false,
           "frozen": false,
           "evidence": [
             "apps/frontend/src/modules/admin/IntegrationsAdminView.tsx",
             "apps/frontend/src/modules/admin/AdminPage.tsx",
             "apps/frontend/src/App.tsx",
-            "tests/package56IntegrationFoundation.test.ts"
+            "tests/package56IntegrationFoundation.test.ts",
+            "tests/package561IntegrationUxAndEdit.test.ts",
+            "Homologação manual concluída com sucesso pelo usuário (Baseline 6436984)"
           ],
           "dependencies": [
             "cap-admin-shell",
             "cap-integration-field-mapping"
           ],
           "notes": [
-            "PACOTE 5.6: Interface administrativa canônica para governança de integrações ERP e mapeamento de campos de-para."
+            "PACOTE 5.6 / 5.6.1: Interface administrativa canônica para governança de integrações ERP e mapeamento de campos de-para. Homologado pelo usuário."
           ]
         },
         {

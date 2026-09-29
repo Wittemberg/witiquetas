@@ -1,6 +1,24 @@
 {
   "checkpoints": [
     {
+      "sha": "22773f82a7363815efecc9debdf61705bac6ed09",
+      "shortSha": "22773f8",
+      "date": "2026-09-29T15:45:00Z",
+      "phase": "5",
+      "patch": "5.7.0-candidate",
+      "title": "5.7 — Printers & Local Agents Governance & P0 Independent Resolution",
+      "type": "FEATURE",
+      "capabilities": [
+        "cap-admin-printers-agents"
+      ],
+      "testsPassed": true,
+      "deployed": false,
+      "manualValidation": false,
+      "homologated": false,
+      "status": "IMPLEMENTED_AWAITING_MANUAL_HOMOLOGATION",
+      "evidence": "PACOTE 5.7 IMPLEMENTADO (AWAITING MANUAL HOMOLOGATION): Governança completa de Impressoras Físicas e Agentes Locais no padrão multi-tenant corporativo. Migration 010 com DDL da tabela printers (serial_flow_control, location, constraint fk_printer_agent e partial unique index uq_printers_company_default). Zero physical printer seeding (empresa nova com zero impressoras físicas). Repositório PrintersRepository e endpoints /printers com RBAC (printers.view, printers.manage), CSRF e Anti-IDOR. Resolução definitiva dos P0 independentes: P0-3 (TypeScript tests no CI), P0-4 (Auth/RBAC/CSRF em qrcodes.ts) e P0-5 (removido bypass pré-RBAC em agents.ts com fail-closed estrito). Frontend administrativo com PrintersAdminView e AgentsAdminView com layout Landscape Master-Detail, status, filtros e modal WIT-XXXX-XXXX. 17 gates focais GREEN (14/14 testes) e suíte canônica de 180 testes 100% GREEN."
+    },
+    {
       "sha": "643698450f5c9fa0f5020ddcc0c85e9c217c99c6",
       "shortSha": "6436984",
       "date": "2026-09-18T13:35:00Z",

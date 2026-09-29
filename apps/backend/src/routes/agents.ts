@@ -187,17 +187,7 @@ export async function authenticateWebUser(req: Request, res: Response, next: Fun
     return res.status(401).json({ error: 'Sessão web expirada ou inválida.' });
   }
 
-  // 3. Fallback de compatibilidade retroativa para ambiente de teste pré-RBAC
-  if (process.env.AUTH_MODE !== 'RBAC' && process.env.RBAC_ENABLED !== 'true') {
-    (req as any).user = {
-      id: 'usr-admin',
-      companyId: process.env.ADMIN_COMPANY_ID || 'comp-matriz-01',
-      role: 'ADMIN',
-    } as AuthWebUser;
-    return next();
-  }
-
-  // 4. Fail-closed se não possuir sessão válida nem token administrativo
+  // 3. Fail-closed se não possuir sessão válida nem token administrativo (P0-5 RESOLVED)
   return res.status(401).json({ error: 'Não autenticado. Forneça uma sessão web válida ou token administrativo.' });
 }
 

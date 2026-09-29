@@ -108,7 +108,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         <nav className="sidebar-nav">
           {effectiveItems.map((item) => {
-            const isActive = currentModule === item.id || (item.id === 'admin' && currentModule === 'integrations');
+            const isActive =
+              currentModule === item.id ||
+              (item.id === 'admin' &&
+                (currentModule === 'integrations' || currentModule === 'printers' || currentModule === 'agents'));
             const IconComponent = item.icon;
             return (
               <button

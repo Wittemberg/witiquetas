@@ -32,17 +32,34 @@ process.env.ADMIN_API_KEY = testAdminKeyMatriz;
 process.env.ADMIN_COMPANY_ID = 'comp-matriz-01';
 process.env.SUPER_ADMIN_API_KEY = testSuperAdminKey;
 
-// Helper: Executa a cadeia de handlers de rota (incluindo middlewares de autenticação)
-function executeRouteChain(handlers: Function[], req: any, res: any) {
+// Setup da impressora de teste local no store em memória para webPrintFlow
+printersStore.set('prn-gondola-elgin-tcp', {
+  id: 'prn-gondola-elgin-tcp',
+  companyId: 'comp-matriz-01',
+  name: 'Elgin L42 Pro - Gôndola Matriz',
+  model: 'L42PRO',
+  protocol: 'RAW_TCP',
+  host: '192.168.1.200',
+  port: 9100,
+  language: 'PPLB',
+  dpi: 203,
+  active: true,
+  isDefault: true,
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString(),
+});
+
+// Helper: Executa a cadeia de handlers de rota (incluindo middlewares assíncronos de autenticação)
+async function executeRouteChain(handlers: Function[], req: any, res: any): Promise<void> {
   let idx = 0;
-  function next() {
+  async function next(): Promise<void> {
     idx++;
     if (idx < handlers.length) {
-      handlers[idx](req, res, next);
+      await handlers[idx](req, res, next);
     }
   }
   if (handlers && handlers.length > 0) {
-    handlers[0](req, res, next);
+    await handlers[0](req, res, next);
   }
 }
 
@@ -118,40 +135,40 @@ const getSessionHandlers = (authRouter as any).routes.find(
 // SUÍTE P0: AUTENTICAÇÃO WEB REAL PRÉ-RBAC
 // ============================================================================
 
-test('P0.1: Header declaratório x-web-client sozinho NÃO autentica -> retorna 401', () => {
+test('P0.1: Header declaratório x-web-client sozinho NÃO autentica -> retorna 401', async () => {
   const { req, res } = createMockReqRes({
     method: 'POST',
     url: '/',
     headers: { 'x-web-client': 'witiquetas-web' },
     body: { printerId: 'prn-gondola-elgin-tcp', compiledCommand: 'P1\n', language: 'PPLB' },
   });
-  executeRouteChain(postJobHandlers, req, res);
+  await executeRouteChain(postJobHandlers, req, res);
   assert.equal(res.statusCode, 401, 'x-web-client sozinho deve retornar 401');
 });
 
-test('P0.2: Header declaratório x-web-session sozinho NÃO autentica -> retorna 401', () => {
+test('P0.2: Header declaratório x-web-session sozinho NÃO autentica -> retorna 401', async () => {
   const { req, res } = createMockReqRes({
     method: 'POST',
     url: '/',
     headers: { 'x-web-session': 'witiquetas-editor' },
     body: { printerId: 'prn-gondola-elgin-tcp', compiledCommand: 'P1\n', language: 'PPLB' },
   });
-  executeRouteChain(postJobHandlers, req, res);
+  await executeRouteChain(postJobHandlers, req, res);
   assert.equal(res.statusCode, 401, 'x-web-session sozinho deve retornar 401');
 });
 
-test('P0.3: Header declaratório sec-fetch-dest sozinho NÃO autentica -> retorna 401', () => {
+test('P0.3: Header declaratório sec-fetch-dest sozinho NÃO autentica -> retorna 401', async () => {
   const { req, res } = createMockReqRes({
     method: 'POST',
     url: '/',
     headers: { 'sec-fetch-dest': 'empty' },
     body: { printerId: 'prn-gondola-elgin-tcp', compiledCommand: 'P1\n', language: 'PPLB' },
   });
-  executeRouteChain(postJobHandlers, req, res);
+  await executeRouteChain(postJobHandlers, req, res);
   assert.equal(res.statusCode, 401, 'sec-fetch-dest sozinho deve retornar 401');
 });
 
-test('P0.4: Todos os headers declaratórios combinados sem cookie -> retorna 401', () => {
+test('P0.4: Todos os headers declaratórios combinados sem cookie -> retorna 401', async () => {
   const { req, res } = createMockReqRes({
     method: 'POST',
     url: '/',
@@ -164,28 +181,28 @@ test('P0.4: Todos os headers declaratórios combinados sem cookie -> retorna 401
     },
     body: { printerId: 'prn-gondola-elgin-tcp', compiledCommand: 'P1\n', language: 'PPLB' },
   });
-  executeRouteChain(postJobHandlers, req, res);
+  await executeRouteChain(postJobHandlers, req, res);
   assert.equal(res.statusCode, 401, 'Headers combinados sem cookie/token devem retornar 401');
 });
 
-test('P0.5: API key inválida no bootstrap de sessão -> retorna 403', () => {
+test('P0.5: API key inválida no bootstrap de sessão -> retorna 403', async () => {
   const { req, res } = createMockReqRes({
     method: 'POST',
     url: '/pre-rbac-session',
     body: { apiKey: 'chave_totalmente_invalida' },
   });
-  executeRouteChain(postAuthSessionHandlers, req, res);
+  await executeRouteChain(postAuthSessionHandlers, req, res);
   assert.equal(res.statusCode, 403, 'Chave inválida no bootstrap deve retornar 403');
   assert.equal(res.getHeader('set-cookie'), undefined, 'Nenhum cookie de sessão pode ser emitido');
 });
 
-test('P0.6: API key válida no bootstrap -> cria sessão server-side e emite cookie HttpOnly', () => {
+test('P0.6: API key válida no bootstrap -> cria sessão server-side e emite cookie HttpOnly', async () => {
   const { req, res } = createMockReqRes({
     method: 'POST',
     url: '/pre-rbac-session',
     body: { apiKey: testAdminKeyMatriz },
   });
-  executeRouteChain(postAuthSessionHandlers, req, res);
+  await executeRouteChain(postAuthSessionHandlers, req, res);
   assert.equal(res.statusCode, 200, 'Bootstrap com chave válida deve retornar 200');
   assert.ok(res.data.success);
   assert.equal(res.data.user.companyId, 'comp-matriz-01');
@@ -197,7 +214,7 @@ test('P0.6: API key válida no bootstrap -> cria sessão server-side e emite coo
   assert.ok(setCookie.includes('Path=/'), 'Cookie DEVE ter Path=/');
 });
 
-test('P0.7: Cookie de sessão válido em POST /print-jobs -> cria PrintJob autorizado com tenant server-side', () => {
+test('P0.7: Cookie de sessão válido em POST /print-jobs -> cria PrintJob autorizado com tenant server-side', async () => {
   // Cria sessão legítima no store
   const session = createWebSession({
     id: 'usr-matriz-op',
@@ -219,7 +236,7 @@ test('P0.7: Cookie de sessão válido em POST /print-jobs -> cria PrintJob autor
     },
   });
 
-  executeRouteChain(postJobHandlers, req, res);
+  await executeRouteChain(postJobHandlers, req, res);
 
   assert.equal(res.statusCode, 201, `Job deve ser criado com 201. Erro: ${JSON.stringify(res.data)}`);
   assert.ok(res.data.success);
@@ -229,7 +246,7 @@ test('P0.7: Cookie de sessão válido em POST /print-jobs -> cria PrintJob autor
   assert.equal(res.data.job.printerId, 'prn-gondola-elgin-tcp');
 });
 
-test('P0.8: Sessão expirada -> retorna 401', () => {
+test('P0.8: Sessão expirada -> retorna 401', async () => {
   const expiredSessionId = 'sess_expirada_' + crypto.randomBytes(16).toString('hex');
   webSessionsStore.set(expiredSessionId, {
     sessionId: expiredSessionId,
@@ -253,11 +270,11 @@ test('P0.8: Sessão expirada -> retorna 401', () => {
     },
   });
 
-  executeRouteChain(postJobHandlers, req, res);
+  await executeRouteChain(postJobHandlers, req, res);
   assert.equal(res.statusCode, 401, 'Sessão expirada deve retornar 401');
 });
 
-test('P0.9: Sessão de tenant A NÃO cria job em impressora do tenant B -> retorna 403 Forbidden', () => {
+test('P0.9: Sessão de tenant A NÃO cria job em impressora do tenant B -> retorna 403 Forbidden', async () => {
   // Impressora da Filial
   printersStore.set('prn-filial-01', {
     id: 'prn-filial-01',
@@ -295,12 +312,12 @@ test('P0.9: Sessão de tenant A NÃO cria job em impressora do tenant B -> retor
     },
   });
 
-  executeRouteChain(postJobHandlers, req, res);
+  await executeRouteChain(postJobHandlers, req, res);
   assert.equal(res.statusCode, 403, 'Operador da Matriz não pode enviar job para impressora da Filial');
   assert.ok(res.data.error.includes('Não autorizado a enviar jobs para impressora da empresa'));
 });
 
-test('P0.10: Logout invalida sessão e limpa cookie -> chamadas subsequentes retornam 401', () => {
+test('P0.10: Logout invalida sessão e limpa cookie -> chamadas subsequentes retornam 401', async () => {
   const session = createWebSession({
     id: 'usr-logout-op',
     companyId: 'comp-matriz-01',
@@ -315,7 +332,7 @@ test('P0.10: Logout invalida sessão e limpa cookie -> chamadas subsequentes ret
       cookie: `witiquetas_session=${session.sessionId}`,
     },
   });
-  executeRouteChain(postLogoutHandlers, reqLogout, resLogout);
+  await executeRouteChain(postLogoutHandlers, reqLogout, resLogout);
   assert.equal(resLogout.statusCode, 200);
   assert.equal(getWebSession(session.sessionId), null, 'Sessão deve ser removida do store');
   assert.ok(resLogout.getHeader('set-cookie').includes('Max-Age=0'), 'Cookie deve ser zerado no logout');
@@ -333,7 +350,7 @@ test('P0.10: Logout invalida sessão e limpa cookie -> chamadas subsequentes ret
       language: 'PPLB',
     },
   });
-  executeRouteChain(postJobHandlers, reqJob, resJob);
+  await executeRouteChain(postJobHandlers, reqJob, resJob);
   assert.equal(resJob.statusCode, 401, 'Sessão invalidada deve retornar 401');
 });
 
@@ -371,7 +388,7 @@ test('P0.11: Frontend source NÃO contém ADMIN_API_KEY nem SUPER_ADMIN_API_KEY'
   }
 });
 
-test('P0.12: Token de Agente NÃO funciona como credencial/sessão Web em POST /print-jobs', () => {
+test('P0.12: Token de Agente NÃO funciona como credencial/sessão Web em POST /print-jobs', async () => {
   const { req, res } = createMockReqRes({
     method: 'POST',
     url: '/',
@@ -385,7 +402,7 @@ test('P0.12: Token de Agente NÃO funciona como credencial/sessão Web em POST /
     },
   });
 
-  executeRouteChain(postJobHandlers, req, res);
+  await executeRouteChain(postJobHandlers, req, res);
   assert.equal(res.statusCode, 403, 'Token de agente não é chave administrativa e deve retornar 403');
 });
 
@@ -418,7 +435,7 @@ test('P0.13: Job criado para impressora RAW_TCP é consumido pelo Agent com host
   assert.equal(job.copies, 1);
 });
 
-test('P0.14: WINDOWS_SPOOLER não entra na validação de host TCP e cria job sem exigir host', () => {
+test('P0.14: WINDOWS_SPOOLER não entra na validação de host TCP e cria job sem exigir host', async () => {
   printersStore.set('prn-spooler-01', {
     id: 'prn-spooler-01',
     companyId: 'comp-matriz-01',
@@ -453,12 +470,12 @@ test('P0.14: WINDOWS_SPOOLER não entra na validação de host TCP e cria job se
     },
   });
 
-  executeRouteChain(postJobHandlers, req, res);
+  await executeRouteChain(postJobHandlers, req, res);
   assert.equal(res.statusCode, 201, 'WINDOWS_SPOOLER deve criar job sem exigir host TCP');
   assert.equal(res.data.job.printerId, 'prn-spooler-01');
 });
 
-test('P0.15: CUPS não entra na validação de host TCP e cria job sem exigir host', () => {
+test('P0.15: CUPS não entra na validação de host TCP e cria job sem exigir host', async () => {
   printersStore.set('prn-cups-01', {
     id: 'prn-cups-01',
     companyId: 'comp-matriz-01',
@@ -493,12 +510,12 @@ test('P0.15: CUPS não entra na validação de host TCP e cria job sem exigir ho
     },
   });
 
-  executeRouteChain(postJobHandlers, req, res);
+  await executeRouteChain(postJobHandlers, req, res);
   assert.equal(res.statusCode, 201, 'CUPS deve criar job sem exigir host TCP');
   assert.equal(res.data.job.printerId, 'prn-cups-01');
 });
 
-test('P0.16: RAW_TCP com host ausente/vazio é rejeitado com 400 Bad Request', () => {
+test('P0.16: RAW_TCP com host ausente/vazio é rejeitado com 400 Bad Request', async () => {
   printersStore.set('prn-tcp-nohost', {
     id: 'prn-tcp-nohost',
     companyId: 'comp-matriz-01',
@@ -533,7 +550,7 @@ test('P0.16: RAW_TCP com host ausente/vazio é rejeitado com 400 Bad Request', (
     },
   });
 
-  executeRouteChain(postJobHandlers, req, res);
+  await executeRouteChain(postJobHandlers, req, res);
   assert.equal(res.statusCode, 400, 'RAW_TCP com host vazio deve retornar 400');
   assert.ok(res.data.error.includes('não possui Host/IP configurado'));
 });

@@ -1,99 +1,18 @@
 import { Router, Request, Response } from 'express';
-import type { PrinterDTO, CreatePrinterDTO, PrinterProfileDTO } from '@witiquetas/contracts';
+import type { PrinterDTO, CreatePrinterDTO, UpdatePrinterDTO } from '@witiquetas/contracts';
 import {
   requireAuthenticatedUser,
   requirePermission,
   requireCsrf,
 } from '../middleware/authMiddleware.js';
+import {
+  PrintersRepository,
+  memPrinters as printersStore,
+} from '../repositories/printersRepository.js';
+import { AgentsRepository } from '../repositories/agentsRepository.js';
 
 const router = Router();
 router.use(requireAuthenticatedUser);
-
-// Storage em memória inicial com modelos pré-configurados e perfis de capacidades homologadas
-const defaultPrinters: PrinterDTO[] = [
-  {
-    id: 'prn-gondola-elgin-tcp',
-    companyId: 'comp-matriz-01',
-    name: 'Elgin L42 Pro (Gôndola / Estoque)',
-    model: 'Elgin L42 Pro',
-    protocol: 'RAW_TCP',
-    host: '192.168.1.200',
-    port: 9100,
-    language: 'PPLB',
-    dpi: 203,
-    active: true,
-    isDefault: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    capabilities: {
-      nativeFonts: ['Roboto', 'Arial', 'Courier New', 'Noto Sans'],
-      supportedFonts: ['Roboto', 'Arial', 'Inter', 'Noto Sans', 'Montserrat', 'Noto Serif', 'Courier New', 'Roboto Mono'],
-      maxWidthMm: 104,
-      maxDpi: 203,
-      supportsQrCode: true,
-      supportsEan13: true,
-      supportsCode128: true,
-      supportsImages: true,
-      notes: 'Equipamento homologado com cabeçote térmico de 4 polegadas (104 mm).',
-    },
-  },
-  {
-    id: 'prn-expedicao-argox-tcp',
-    companyId: 'comp-matriz-01',
-    name: 'Argox OS-214plus (Expedição / Logística)',
-    model: 'Argox OS-214plus',
-    protocol: 'RAW_TCP',
-    host: '192.168.1.201',
-    port: 9100,
-    language: 'PPLA',
-    dpi: 203,
-    active: true,
-    isDefault: false,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    capabilities: {
-      nativeFonts: ['Courier New', 'Arial', 'Roboto'],
-      supportedFonts: ['Roboto', 'Arial', 'Inter', 'Noto Sans', 'Noto Serif', 'Courier New', 'Roboto Mono'],
-      maxWidthMm: 104,
-      maxDpi: 203,
-      supportsQrCode: true,
-      supportsEan13: true,
-      supportsCode128: true,
-      supportsImages: true,
-      notes: 'Equipamento homologado padrão Argox PPLA.',
-    },
-  },
-  {
-    id: 'prn-zebra-zd220-tcp',
-    companyId: 'comp-matriz-01',
-    name: 'Zebra ZD220 (E-commerce / Farmácia)',
-    model: 'Zebra ZD220',
-    protocol: 'RAW_TCP',
-    host: '192.168.1.202',
-    port: 9100,
-    language: 'ZPL',
-    dpi: 203,
-    active: true,
-    isDefault: false,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    capabilities: {
-      nativeFonts: ['Roboto', 'Arial', 'Courier New', 'Noto Sans'],
-      supportedFonts: ['Roboto', 'Arial', 'Inter', 'Noto Sans', 'Montserrat', 'Noto Serif', 'Courier New', 'Roboto Mono'],
-      maxWidthMm: 104,
-      maxDpi: 203,
-      supportsQrCode: true,
-      supportsEan13: true,
-      supportsCode128: true,
-      supportsImages: true,
-      notes: 'Equipamento homologado Zebra ZPL.',
-    },
-  },
-];
-
-const printersStore = new Map<string, PrinterDTO>(
-  defaultPrinters.map((p) => [p.id, p])
-);
 
 function getCompanyId(req: Request): string {
   if (req.principal?.company?.id) {
@@ -106,131 +25,140 @@ function getCompanyId(req: Request): string {
   return 'comp-matriz-01';
 }
 
-// 1. Listar todas as impressoras
-router.get('/', requirePermission('printers.view'), (req: Request, res: Response) => {
-  const companyId = getCompanyId(req);
-  const printers = Array.from(printersStore.values()).filter((p) => p.companyId === companyId);
-  res.json({
-    total: printers.length,
-    printers,
-  });
+// 1. Listar todas as impressoras do tenant
+router.get('/', requirePermission('printers.view'), async (req: Request, res: Response) => {
+  try {
+    const companyId = getCompanyId(req);
+    const printers = await PrintersRepository.listByCompany(companyId);
+    return res.json({
+      total: printers.length,
+      printers,
+    });
+  } catch (err: any) {
+    console.error(`[PrintersRoute] Erro ao listar impressoras: ${err.message}`);
+    return res.status(500).json({ error: 'Erro ao listar impressoras.' });
+  }
 });
 
-// 2. Buscar impressora por ID
-router.get('/:id', requirePermission('printers.view'), (req: Request, res: Response) => {
-  const companyId = getCompanyId(req);
-  const printer = printersStore.get(req.params.id);
-  if (!printer || printer.companyId !== companyId) {
-    return res.status(404).json({ error: 'Impressora não encontrada.' });
+// 2. Buscar impressora por ID com isolamento multi-tenant estrito (Anti-IDOR)
+router.get('/:id', requirePermission('printers.view'), async (req: Request, res: Response) => {
+  try {
+    const companyId = getCompanyId(req);
+    const printer = await PrintersRepository.findById(companyId, req.params.id);
+    if (!printer) {
+      return res.status(404).json({ error: 'Impressora não encontrada.' });
+    }
+    return res.json(printer);
+  } catch (err: any) {
+    console.error(`[PrintersRoute] Erro ao buscar impressora: ${err.message}`);
+    return res.status(500).json({ error: 'Erro ao buscar impressora.' });
   }
-  res.json(printer);
 });
 
 // 3. Cadastrar nova impressora
-router.post('/', requirePermission('printers.manage'), requireCsrf, (req: Request, res: Response) => {
-  const companyId = getCompanyId(req);
-  const body = req.body as CreatePrinterDTO & { companyId?: string };
+router.post('/', requirePermission('printers.manage'), requireCsrf, async (req: Request, res: Response) => {
+  try {
+    const companyId = getCompanyId(req);
+    const body = req.body as CreatePrinterDTO & { companyId?: string };
 
-  if (body.companyId && body.companyId !== companyId) {
-    return res.status(400).json({
-      code: 'INVALID_COMPANY_ID',
-      error: 'Não é permitido criar impressora para outro tenant.',
-    });
-  }
+    if (body.companyId && body.companyId !== companyId) {
+      return res.status(400).json({
+        code: 'INVALID_COMPANY_ID',
+        error: 'Não é permitido criar impressora para outro tenant.',
+      });
+    }
 
-  if (!body.name || !body.protocol || !body.language) {
-    return res.status(400).json({ error: 'Nome, protocolo e linguagem são obrigatórios.' });
-  }
+    if (!body.name || (!body.protocol && !body.language && !body.connectionType)) {
+      return res.status(400).json({ error: 'Nome e protocolo/tipo de conexão são obrigatórios.' });
+    }
 
-  const id = `prn-${Date.now()}`;
-  const now = new Date().toISOString();
-
-  // Se marcar como padrão, desmarcar apenas as do mesmo tenant
-  if (body.isDefault) {
-    printersStore.forEach((p) => {
-      if (p.companyId === companyId) {
-        p.isDefault = false;
+    // Se agentId fornecido, valida vínculo same-tenant
+    if (body.agentId) {
+      const agent = await AgentsRepository.findByIdAndCompany(companyId, body.agentId);
+      if (!agent) {
+        return res.status(400).json({
+          code: 'INVALID_AGENT',
+          error: 'O agente de impressão especificado não existe ou pertence a outra empresa.',
+        });
       }
-    });
+    }
+
+    const newPrinter = await PrintersRepository.create(companyId, body);
+    return res.status(201).json(newPrinter);
+  } catch (err: any) {
+    console.error(`[PrintersRoute] Erro ao cadastrar impressora: ${err.message}`);
+    return res.status(500).json({ error: 'Erro ao cadastrar impressora.' });
   }
-
-  const newPrinter: PrinterDTO = {
-    id,
-    companyId,
-    name: body.name,
-    model: body.model || 'Térmica Padrão',
-    protocol: body.protocol,
-    host: body.host,
-    port: body.port || 9100,
-    baudRate: body.baudRate,
-    serialPort: body.serialPort,
-    language: body.language,
-    dpi: body.dpi || 203,
-    active: true,
-    isDefault: !!body.isDefault,
-    createdAt: now,
-    updatedAt: now,
-    capabilities: {
-      nativeFonts: ['Roboto', 'Arial', 'Courier New'],
-      supportedFonts: ['Roboto', 'Arial', 'Inter', 'Noto Sans', 'Montserrat', 'Noto Serif', 'Courier New', 'Roboto Mono'],
-      maxWidthMm: 104,
-      maxDpi: body.dpi || 203,
-      supportsQrCode: true,
-      supportsEan13: true,
-      supportsCode128: true,
-      supportsImages: true,
-    },
-  };
-
-  printersStore.set(id, newPrinter);
-  res.status(201).json(newPrinter);
 });
 
-// 4. Atualizar impressora
-router.put('/:id', requirePermission('printers.manage'), requireCsrf, (req: Request, res: Response) => {
-  const companyId = getCompanyId(req);
-  const printer = printersStore.get(req.params.id);
-  if (!printer || printer.companyId !== companyId) {
-    return res.status(404).json({ error: 'Impressora não encontrada.' });
-  }
+// 4. Atualizar impressora existente
+router.put('/:id', requirePermission('printers.manage'), requireCsrf, async (req: Request, res: Response) => {
+  try {
+    const companyId = getCompanyId(req);
+    const existing = await PrintersRepository.findById(companyId, req.params.id);
+    if (!existing) {
+      return res.status(404).json({ error: 'Impressora não encontrada.' });
+    }
 
-  const body = req.body;
-  if (body.companyId && body.companyId !== companyId) {
-    return res.status(400).json({
-      code: 'INVALID_COMPANY_ID',
-      error: 'Não é permitido alterar o tenant da impressora.',
-    });
-  }
+    const body = req.body as UpdatePrinterDTO & { companyId?: string };
+    if (body.companyId && body.companyId !== companyId) {
+      return res.status(400).json({
+        code: 'INVALID_COMPANY_ID',
+        error: 'Não é permitido alterar o tenant da impressora.',
+      });
+    }
 
-  if (body.isDefault) {
-    printersStore.forEach((p) => {
-      if (p.companyId === companyId) {
-        p.isDefault = false;
+    // Se agentId fornecido, valida vínculo same-tenant
+    if (body.agentId) {
+      const agent = await AgentsRepository.findByIdAndCompany(companyId, body.agentId);
+      if (!agent) {
+        return res.status(400).json({
+          code: 'INVALID_AGENT',
+          error: 'O agente de impressão especificado não existe ou pertence a outra empresa.',
+        });
       }
-    });
+    }
+
+    const updated = await PrintersRepository.update(companyId, req.params.id, body);
+    if (!updated) {
+      return res.status(404).json({ error: 'Impressora não encontrada.' });
+    }
+
+    return res.json(updated);
+  } catch (err: any) {
+    console.error(`[PrintersRoute] Erro ao atualizar impressora: ${err.message}`);
+    return res.status(500).json({ error: 'Erro ao atualizar impressora.' });
   }
-
-  const { id: _ignoredId, companyId: _ignoredCompanyId, ...updates } = body;
-
-  Object.assign(printer, {
-    ...updates,
-    companyId,
-    updatedAt: new Date().toISOString(),
-  });
-
-  printersStore.set(printer.id, printer);
-  res.json(printer);
 });
 
 // 5. Excluir impressora
-router.delete('/:id', requirePermission('printers.manage'), requireCsrf, (req: Request, res: Response) => {
-  const companyId = getCompanyId(req);
-  const printer = printersStore.get(req.params.id);
-  if (!printer || printer.companyId !== companyId) {
-    return res.status(404).json({ error: 'Impressora não encontrada.' });
+router.delete('/:id', requirePermission('printers.manage'), requireCsrf, async (req: Request, res: Response) => {
+  try {
+    const companyId = getCompanyId(req);
+    const deleted = await PrintersRepository.delete(companyId, req.params.id);
+    if (!deleted) {
+      return res.status(404).json({ error: 'Impressora não encontrada.' });
+    }
+    return res.json({ success: true, message: 'Impressora removida com sucesso.' });
+  } catch (err: any) {
+    console.error(`[PrintersRoute] Erro ao excluir impressora: ${err.message}`);
+    return res.status(500).json({ error: 'Erro ao excluir impressora.' });
   }
-  printersStore.delete(req.params.id);
-  res.json({ success: true, message: 'Impressora removida com sucesso.' });
+});
+
+// 6. Definir impressora como padrão do tenant
+router.post('/:id/default', requirePermission('printers.manage'), requireCsrf, async (req: Request, res: Response) => {
+  try {
+    const companyId = getCompanyId(req);
+    const success = await PrintersRepository.setDefault(companyId, req.params.id);
+    if (!success) {
+      return res.status(404).json({ error: 'Impressora não encontrada.' });
+    }
+    return res.json({ success: true, message: 'Impressora definida como padrão com sucesso.' });
+  } catch (err: any) {
+    console.error(`[PrintersRoute] Erro ao definir impressora padrão: ${err.message}`);
+    return res.status(500).json({ error: 'Erro ao definir impressora padrão.' });
+  }
 });
 
 export { printersStore };

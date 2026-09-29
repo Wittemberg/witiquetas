@@ -9,6 +9,8 @@ import {
   ShieldAlert,
   Layers,
   Plug,
+  Printer,
+  Cpu,
 } from 'lucide-react';
 import {
   SessionContext,
@@ -21,6 +23,8 @@ import { UsersAdminView } from './UsersAdminView.js';
 import { RolesAdminView } from './RolesAdminView.js';
 import { NichesAdminView } from './NichesAdminView.js';
 import { IntegrationsAdminView } from './IntegrationsAdminView.js';
+import { PrintersAdminView } from './PrintersAdminView.js';
+import { AgentsAdminView } from './AgentsAdminView.js';
 
 interface AdminPageProps {
   sessionContext: SessionContext;
@@ -29,7 +33,7 @@ interface AdminPageProps {
   initialTab?: AdminTab;
 }
 
-type AdminTab = 'company' | 'users' | 'roles' | 'niches' | 'integrations';
+type AdminTab = 'company' | 'users' | 'roles' | 'niches' | 'integrations' | 'printers' | 'agents';
 
 export const AdminPage: React.FC<AdminPageProps> = ({
   sessionContext,
@@ -43,8 +47,14 @@ export const AdminPage: React.FC<AdminPageProps> = ({
   const canViewNiches = hasAnyPermission(['niches.view', 'niches.manage', 'elements.view', 'elements.manage']);
   const canViewIntegrations = hasAnyPermission(['integrations.view', 'integrations.manage']);
   const canManageIntegrations = hasAnyPermission(['integrations.manage']);
+  const canViewPrinters = hasAnyPermission(['printers.view', 'printers.manage']);
+  const canManagePrinters = hasAnyPermission(['printers.manage']);
+  const canViewAgents = hasAnyPermission(['agents.view', 'agents.manage']);
+  const canManageAgents = hasAnyPermission(['agents.manage']);
 
   const getDefaultTab = (): AdminTab => {
+    if (initialTab === 'printers' && canViewPrinters) return 'printers';
+    if (initialTab === 'agents' && canViewAgents) return 'agents';
     if (initialTab === 'integrations' && canViewIntegrations) return 'integrations';
     if (initialTab === 'niches' && canViewNiches) return 'niches';
     if (initialTab === 'roles' && canViewRoles) return 'roles';
@@ -56,6 +66,8 @@ export const AdminPage: React.FC<AdminPageProps> = ({
     if (canViewRoles) return 'roles';
     if (canViewNiches) return 'niches';
     if (canViewIntegrations) return 'integrations';
+    if (canViewPrinters) return 'printers';
+    if (canViewAgents) return 'agents';
     return 'company';
   };
 
@@ -64,13 +76,15 @@ export const AdminPage: React.FC<AdminPageProps> = ({
   // Sincroniza initialTab se alterado externamente
   useEffect(() => {
     if (initialTab) {
-      if (initialTab === 'integrations' && canViewIntegrations) setActiveTab('integrations');
+      if (initialTab === 'printers' && canViewPrinters) setActiveTab('printers');
+      else if (initialTab === 'agents' && canViewAgents) setActiveTab('agents');
+      else if (initialTab === 'integrations' && canViewIntegrations) setActiveTab('integrations');
       else if (initialTab === 'niches' && canViewNiches) setActiveTab('niches');
       else if (initialTab === 'roles' && canViewRoles) setActiveTab('roles');
       else if (initialTab === 'users' && canViewUsers) setActiveTab('users');
       else if (initialTab === 'company' && canViewCompany) setActiveTab('company');
     }
-  }, [initialTab, canViewIntegrations, canViewNiches, canViewRoles, canViewUsers, canViewCompany]);
+  }, [initialTab, canViewPrinters, canViewAgents, canViewIntegrations, canViewNiches, canViewRoles, canViewUsers, canViewCompany]);
 
 
   // Ajusta a aba se as permissões mudarem
@@ -208,6 +222,8 @@ export const AdminPage: React.FC<AdminPageProps> = ({
             {activeTab === 'roles' && 'Perfis e Permissões'}
             {activeTab === 'niches' && 'Nichos & Elementos'}
             {activeTab === 'integrations' && 'Integrações'}
+            {activeTab === 'printers' && 'Impressoras'}
+            {activeTab === 'agents' && 'Agentes de Impressão'}
           </span>
         </div>
       </div>
@@ -216,7 +232,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({
         <div className="admin-page-title-group">
           <h2 className="admin-page-title">Administração</h2>
           <p className="admin-page-subtitle">
-            Gerenciamento de dados cadastrais da organização, catálogo de usuários, matriz RBAC de perfis e parametrização de nichos, elementos visuais, campos canônicos e conectores de dados (ERP).
+            Gerenciamento de dados cadastrais da organização, catálogo de usuários, matriz RBAC de perfis, impressoras térmicas, agentes de impressão e conectores de dados (ERP).
           </p>
         </div>
       </div>
@@ -277,6 +293,28 @@ export const AdminPage: React.FC<AdminPageProps> = ({
             <span>Integrações</span>
           </button>
         )}
+
+        {canViewPrinters && (
+          <button
+            type="button"
+            className={`admin-tab-btn ${activeTab === 'printers' ? 'active' : ''}`}
+            onClick={() => setActiveTab('printers')}
+          >
+            <Printer size={16} />
+            <span>Impressoras</span>
+          </button>
+        )}
+
+        {canViewAgents && (
+          <button
+            type="button"
+            className={`admin-tab-btn ${activeTab === 'agents' ? 'active' : ''}`}
+            onClick={() => setActiveTab('agents')}
+          >
+            <Cpu size={16} />
+            <span>Agentes de Impressão</span>
+          </button>
+        )}
       </div>
 
       {/* Conteúdo da Aba Ativa */}
@@ -308,6 +346,14 @@ export const AdminPage: React.FC<AdminPageProps> = ({
             canManage={canManageIntegrations}
             onConfigChanged={handleSelfAffected}
           />
+        )}
+
+        {activeTab === 'printers' && canViewPrinters && (
+          <PrintersAdminView canManage={canManagePrinters} />
+        )}
+
+        {activeTab === 'agents' && canViewAgents && (
+          <AgentsAdminView canManage={canManageAgents} />
         )}
       </div>
     </div>

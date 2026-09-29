@@ -49,33 +49,19 @@ export const BASE_NAV_ITEMS: NavItem[] = [
     path: '/print-center',
   },
   {
-    id: 'printers',
-    label: 'Impressoras',
-    icon: Printer,
-    description: 'Gestão de impressoras térmicas',
-    path: '/printers',
-  },
-  {
-    id: 'agents',
-    label: 'Agents de Impressão',
-    icon: Cpu,
-    description: 'Status e gerenciamento de agentes locais',
-    path: '/agents',
-  },
-  {
     id: 'admin',
     label: 'Administração',
     icon: Settings,
-    description: 'Gestão de Empresa, Usuários e Perfis de Acesso',
+    description: 'Gestão de Empresa, Usuários, Perfis, Impressoras e Integrações',
     path: '/admin',
   },
 ];
 
 /**
- * Resolver único e canônico da navegação do frontend comercial do tenant (Hotfix 5.3.2 / Pacote 5.6.1).
+ * Resolver único e canônico da navegação do frontend comercial do tenant (Hotfix 5.3.2 / Pacote 5.6.1 / Pacote 5.7).
  * Exibe EXCLUSIVAMENTE os módulos disponíveis para o tenant conforme suas permissões.
  *
- * Integrações é uma aba interna de Administração (Pacote 5.6.1) e não polui a sidebar principal.
+ * Integrações, Impressoras e Agentes são abas internas de Administração e não poluem a sidebar principal.
  * DCC é ferramenta interna da PLATAFORMA e NUNCA aparece na navegação de tenant (nem mesmo para ADMIN).
  */
 export function getEffectiveNavigation(sessionContext: SessionContext | null): NavItem[] {
@@ -100,10 +86,6 @@ export function getEffectiveNavigation(sessionContext: SessionContext | null): N
       if (checkPerm('templates.create')) items.push(item);
     } else if (item.id === 'print-center') {
       if (checkAny(['print.execute', 'print.history'])) items.push(item);
-    } else if (item.id === 'printers') {
-      if (checkAny(['printers.view', 'printers.manage'])) items.push(item);
-    } else if (item.id === 'agents') {
-      if (checkAny(['agents.view', 'agents.manage'])) items.push(item);
     } else if (item.id === 'admin') {
       if (
         checkAny([
@@ -119,6 +101,10 @@ export function getEffectiveNavigation(sessionContext: SessionContext | null): N
           'elements.manage',
           'integrations.view',
           'integrations.manage',
+          'printers.view',
+          'printers.manage',
+          'agents.view',
+          'agents.manage',
         ])
       ) {
         items.push(item);

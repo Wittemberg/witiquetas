@@ -104,6 +104,34 @@ export class AgentsRepository {
   }
 
   /**
+   * Busca um agente por ID garantindo que pertença à empresa especificada (same-tenant)
+   */
+  static async findByIdAndCompany(companyId: string, id: string): Promise<AgentRecord | null> {
+    if (pgPool) {
+      try {
+        const res = await pgPool.query(
+          'SELECT * FROM agents WHERE id = $1 AND company_id = $2 AND revoked_at IS NULL',
+          [id, companyId]
+        );
+        if (res.rows.length === 0) return null;
+        const record = this.mapRowToRecord(res.rows[0]);
+        memoryAgentsStore.set(record.id, record);
+        return record;
+      } catch (err: any) {
+        console.error(`[AgentsRepository] Erro ao buscar agente por ID e Empresa no PostgreSQL: ${err.message}`);
+        throw err;
+      }
+    }
+
+    if (memoryAgentsStore.has(id)) {
+      const cached = memoryAgentsStore.get(id)!;
+      if (!cached.revokedAt && cached.companyId === companyId) return cached;
+    }
+
+    return null;
+  }
+
+  /**
    * Busca um agente por tokenHash
    */
   static async findByTokenHash(tokenHash: string): Promise<AgentRecord | null> {

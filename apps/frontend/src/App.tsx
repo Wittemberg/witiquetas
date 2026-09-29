@@ -374,22 +374,42 @@ export default function App() {
         return <PrintCenterPage />;
 
       case 'printers':
+        if (!hasAnyPermission(['printers.view', 'printers.manage'])) {
+          return (
+            <AccessDeniedView
+              onGoHome={() => {
+                setCurrentModule('home');
+                window.location.hash = '#home';
+              }}
+            />
+          );
+        }
         return (
-          <PlaceholderModulePage
-            title="Impressoras"
-            icon={Printer}
-            description="Cadastre e acompanhe impressoras locais e de rede."
+          <AdminPage
+            sessionContext={sessionContext}
+            onUpdateSessionContext={setSessionContext}
             onGoHome={() => setCurrentModule('home')}
+            initialTab="printers"
           />
         );
 
       case 'agents':
+        if (!hasAnyPermission(['agents.view', 'agents.manage'])) {
+          return (
+            <AccessDeniedView
+              onGoHome={() => {
+                setCurrentModule('home');
+                window.location.hash = '#home';
+              }}
+            />
+          );
+        }
         return (
-          <PlaceholderModulePage
-            title="Agents de Impressão"
-            icon={Cpu}
-            description="Gerencie os computadores responsáveis pela impressão local."
+          <AdminPage
+            sessionContext={sessionContext}
+            onUpdateSessionContext={setSessionContext}
             onGoHome={() => setCurrentModule('home')}
+            initialTab="agents"
           />
         );
 
@@ -433,6 +453,10 @@ export default function App() {
             'elements.manage',
             'integrations.view',
             'integrations.manage',
+            'printers.view',
+            'printers.manage',
+            'agents.view',
+            'agents.manage',
           ])
         ) {
           return (

@@ -1,7 +1,24 @@
 import { Router, Request, Response } from 'express';
 import type { QRCodeLibraryItemDTO, CreateQRCodeDTO, UpdateQRCodeDTO } from '@witiquetas/contracts';
+import {
+  requireAuthenticatedUser,
+  requirePermission,
+  requireCsrf,
+} from '../middleware/authMiddleware.js';
 
 const router = Router();
+router.use(requireAuthenticatedUser);
+
+function getCompanyId(req: Request): string {
+  if (req.principal?.company?.id) {
+    return req.principal.company.id;
+  }
+  const headerCompany = req.headers['x-company-id'] as string;
+  if (headerCompany && headerCompany.trim()) {
+    return headerCompany.trim();
+  }
+  return 'comp-matriz-01';
+}
 
 // Storage em memória da biblioteca de QR Codes com itens padrão da empresa
 const defaultQRCodes: QRCodeLibraryItemDTO[] = [
@@ -47,13 +64,16 @@ const qrCodesStore = new Map<string, QRCodeLibraryItemDTO>(
   defaultQRCodes.map((qr) => [qr.id, qr])
 );
 
-// 1. Listar QR Codes da Biblioteca (Ordenados: Favoritos primeiro, depois Nome)
-router.get('/', (_req: Request, res: Response) => {
-  const items = Array.from(qrCodesStore.values()).sort((a, b) => {
-    if (a.favorite && !b.favorite) return -1;
-    if (!a.favorite && b.favorite) return 1;
-    return a.name.localeCompare(b.name, 'pt-BR');
-  });
+// 1. Listar QR Codes da Biblioteca (Ordenados: Favoritos primeiro, depois Nome, isolados por empresa)
+router.get('/', requirePermission('templates.view'), (req: Request, res: Response) => {
+  const companyId = getCompanyId(req);
+  const items = Array.from(qrCodesStore.values())
+    .filter((item) => item.companyId === companyId)
+    .sort((a, b) => {
+      if (a.favorite && !b.favorite) return -1;
+      if (!a.favorite && b.favorite) return 1;
+      return a.name.localeCompare(b.name, 'pt-BR');
+    });
 
   res.json({
     total: items.length,
@@ -62,7 +82,8 @@ router.get('/', (_req: Request, res: Response) => {
 });
 
 // 2. Cadastrar novo QR Code na Biblioteca
-router.post('/', (req: Request, res: Response) => {
+router.post('/', requirePermission('templates.create'), requireCsrf, (req: Request, res: Response) => {
+  const companyId = getCompanyId(req);
   const body = req.body as CreateQRCodeDTO;
 
   if (!body.name || !body.name.trim()) {
@@ -78,7 +99,7 @@ router.post('/', (req: Request, res: Response) => {
 
   const newItem: QRCodeLibraryItemDTO = {
     id,
-    companyId: 'comp-matriz-01',
+    companyId,
     name: body.name.trim(),
     url: body.url.trim(),
     favorite: !!body.favorite,
@@ -90,10 +111,11 @@ router.post('/', (req: Request, res: Response) => {
   res.status(201).json(newItem);
 });
 
-// 3. Atualizar QR Code existente
-router.put('/:id', (req: Request, res: Response) => {
+// 3. Atualizar QR Code existente (com proteção Anti-IDOR por empresa)
+router.put('/:id', requirePermission('templates.edit'), requireCsrf, (req: Request, res: Response) => {
+  const companyId = getCompanyId(req);
   const item = qrCodesStore.get(req.params.id);
-  if (!item) {
+  if (!item || item.companyId !== companyId) {
     return res.status(404).json({ error: 'QR Code não encontrado na biblioteca.' });
   }
 
@@ -107,9 +129,11 @@ router.put('/:id', (req: Request, res: Response) => {
   res.json(item);
 });
 
-// 4. Excluir QR Code da biblioteca (Sem afetar modelos salvos)
-router.delete('/:id', (req: Request, res: Response) => {
-  if (!qrCodesStore.has(req.params.id)) {
+// 4. Excluir QR Code da biblioteca (com proteção Anti-IDOR por empresa)
+router.delete('/:id', requirePermission('templates.delete'), requireCsrf, (req: Request, res: Response) => {
+  const companyId = getCompanyId(req);
+  const item = qrCodesStore.get(req.params.id);
+  if (!item || item.companyId !== companyId) {
     return res.status(404).json({ error: 'QR Code não encontrado na biblioteca.' });
   }
 

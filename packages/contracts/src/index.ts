@@ -237,29 +237,43 @@ export interface AgentDTO {
 }
 
 // ==========================================
-// PRINTERS & TRANSPORT TYPES
+// PRINTERS & TRANSPORT TYPES (PACKAGE 5.7)
 // ==========================================
-export type TransportType = 'RAW_TCP' | 'WINDOWS_SPOOLER' | 'CUPS' | 'SERIAL' | 'USB_DIRECT';
-export type PrinterProtocol = TransportType; // Alias retrocompatível
-export type PrinterLanguageCode = 'PPLA' | 'PPLB' | 'ZPL' | 'EPL';
+export type SerialFlowControl = 'NONE' | 'RTS_CTS' | 'XON_XOFF';
+export type PrinterConnectionType = 'RAW_TCP' | 'WINDOWS_SPOOLER' | 'CUPS' | 'SERIAL' | 'USB_DIRECT';
+export type TransportType = PrinterConnectionType;
+
+export type CanonicalPrinterProtocol = 'ZPL' | 'PPLB' | 'PPLA' | 'TSPL' | 'DPL' | 'CPCL' | 'RAW_TEXT';
+export type PrinterLanguageCode = CanonicalPrinterProtocol | 'EPL';
+export type PrinterProtocol = TransportType | CanonicalPrinterProtocol;
 export type CopyStrategy = 'EMBEDDED_IN_PAYLOAD' | 'TRANSPORT_REPEAT';
+export type PrinterStatus = 'ACTIVE' | 'INACTIVE' | 'OFFLINE';
 
 export interface PrinterDTO {
   id: string;
   companyId: string;
-  agentId?: string;
   name: string;
-  model?: string;
-  protocol: TransportType;
-  host?: string;
-  port?: number;
-  baudRate?: number;
-  serialPort?: string;
-  spoolerName?: string;
-  language: PrinterLanguageCode;
+  modelId: string;
+  model?: string; // alias retrocompatível com modelId
+  manufacturer?: string;
+  protocol: TransportType; // Transporte / Protocolo de conexão físico (RAW_TCP, etc.)
+  connectionType: PrinterConnectionType; // alias para protocol
+  printerProtocol?: CanonicalPrinterProtocol | string; // Linguagem térmica (ZPL, PPLB, etc.)
+  language: PrinterLanguageCode; // Linguagem de impressão térmica
   dpi: number;
-  active: boolean;
+  host?: string; // alias para ip
+  ip?: string; // host/ip de rede
+  port?: number;
+  spoolerName?: string;
+  serialPort?: string;
+  baudRate?: number;
+  serialFlowControl?: SerialFlowControl;
+  agentId?: string | null;
+  location?: string | null;
   isDefault: boolean;
+  status: PrinterStatus;
+  active: boolean; // status === 'ACTIVE'
+  settings?: Record<string, unknown>;
   createdAt: string;
   updatedAt: string;
   capabilities?: PrinterCapabilitiesDTO;
@@ -267,16 +281,38 @@ export interface PrinterDTO {
 
 export interface CreatePrinterDTO {
   name: string;
+  modelId?: string;
   model?: string;
-  protocol: TransportType;
-  host?: string;
-  port?: number;
-  baudRate?: number;
-  serialPort?: string;
-  spoolerName?: string;
-  language: PrinterLanguageCode;
+  manufacturer?: string;
+  protocol?: CanonicalPrinterProtocol | string;
+  language?: PrinterLanguageCode;
   dpi?: number;
+  connectionType?: PrinterConnectionType;
+  host?: string;
+  ip?: string;
+  port?: number;
+  spoolerName?: string;
+  serialPort?: string;
+  baudRate?: number;
+  serialFlowControl?: SerialFlowControl;
+  agentId?: string | null;
+  location?: string | null;
   isDefault?: boolean;
+  status?: PrinterStatus;
+  active?: boolean;
+  settings?: Record<string, unknown>;
+}
+
+export interface UpdatePrinterDTO extends Partial<CreatePrinterDTO> {}
+
+export interface PrinterModelProfileDTO {
+  id: string;
+  name: string;
+  manufacturer: string;
+  protocol: CanonicalPrinterProtocol;
+  defaultDpi: number;
+  supportedConnectionTypes: PrinterConnectionType[];
+  capabilities: PrinterCapabilitiesDTO;
 }
 
 // ==========================================

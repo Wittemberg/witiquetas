@@ -1367,16 +1367,18 @@
           "module": "admin",
           "weight": 2,
           "mvp": false,
-          "status": "PLANNED",
+          "status": "IMPLEMENTED_AWAITING_MANUAL_REVALIDATION",
           "manualValidation": false,
           "physicalValidation": false,
           "frozen": false,
-          "evidence": [],
+          "evidence": [
+            "tests/package57PrintersAndAgentsGovernance.test.ts"
+          ],
           "dependencies": [
             "cap-admin-shell"
           ],
           "notes": [
-            "Visibilidade operacional do parque de dispositivos."
+            "PACOTE 5.7: Governança completa de impressoras físicas e agentes locais. Suporte a RAW_TCP, Windows Spooler, Serial (RS232) e CUPS. Gerenciamento de pareamento WIT-XXXX-XXXX, status de heartbeat e isolamento multi-tenant."
           ]
         },
         {

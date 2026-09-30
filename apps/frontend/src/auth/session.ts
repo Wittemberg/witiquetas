@@ -188,11 +188,17 @@ export async function revalidateSessionContext(force = false): Promise<SessionCo
       return data;
     }
 
-    if (res.status === 401 || res.status === 403) {
+    if (res.status === 401) {
       activeSessionContext = null;
       currentConfigStatus = 'READY';
       notifyListeners();
       return null;
+    }
+
+    if (res.status === 403) {
+      // 403: Authenticated but forbidden — does not destroy valid active session
+      currentConfigStatus = 'READY';
+      return activeSessionContext;
     }
 
     // Fail-Safe: Erro 5xx ou inesperado preserva activeSessionContext existente
@@ -469,11 +475,17 @@ export async function fetchSessionContext(): Promise<SessionContext | null> {
       return data;
     }
 
-    if (res.status === 401 || res.status === 403) {
+    if (res.status === 401) {
       activeSessionContext = null;
       currentConfigStatus = 'READY';
       notifyListeners();
       return null;
+    }
+
+    if (res.status === 403) {
+      // 403: Authenticated but forbidden — does not destroy valid active session
+      currentConfigStatus = 'READY';
+      return activeSessionContext;
     }
     currentConfigStatus = 'ERROR';
     notifyListeners();

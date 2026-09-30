@@ -147,17 +147,31 @@ const handleVersion = (_req: Request, res: Response) => {
   let commit = (envCommit && envCommit !== 'unknown') ? envCommit : '';
   let shortCommit = (process.env.SHORT_SHA && process.env.SHORT_SHA !== 'unknown') ? process.env.SHORT_SHA : '';
   let governanceSha = '';
+  let version = '5.7.0-candidate';
+  let packageName = 'PACOTE 5.7 — Governança de Impressoras Físicas e Agentes Locais';
+  let phase = 'Fase 5 — Administração e Governança da Aplicação';
+  let status = 'IMPLEMENTED_AWAITING_HOMOLOGATION';
 
   try {
     const devService = new DevelopmentControlService();
     const checkpoints = devService.getCheckpoints();
     if (checkpoints && checkpoints.length > 0) {
-      governanceSha = checkpoints[0].sha;
+      const latest = checkpoints[0];
+      governanceSha = latest.sha;
       if (!commit) {
-        commit = checkpoints[0].sha;
+        commit = latest.sha;
       }
       if (!shortCommit) {
-        shortCommit = checkpoints[0].shortSha || checkpoints[0].sha.slice(0, 7);
+        shortCommit = latest.shortSha || latest.sha.slice(0, 7);
+      }
+      if (latest.patch) {
+        version = latest.patch;
+      }
+      if (latest.title) {
+        packageName = latest.title;
+      }
+      if ((latest as any).status) {
+        status = (latest as any).status;
       }
     }
   } catch (_e) {
@@ -176,16 +190,16 @@ const handleVersion = (_req: Request, res: Response) => {
 
   res.json({
     name: 'witiquetas-backend',
-    version: '5.3.5-candidate',
+    version,
     commit,
     candidateSha: commit,
     runningSha: commit,
     shortCommit,
     shortSha: shortCommit,
     governanceSha,
-    status: 'IMPLEMENTED_AWAITING_HOMOLOGATION',
-    package: 'PACOTE 5.3.5 — Hotfix de Login Unificado, Ciclo de Sessão DCC e Ajuste Final do Checkbox',
-    phase: 'Fase 5 — Administração e Governança da Aplicação',
+    status,
+    package: packageName,
+    phase,
     environment: process.env.NODE_ENV || 'development',
     timezone: process.env.TZ || 'America/Sao_Paulo',
     timestamp: (process.env.BUILT_AT && process.env.BUILT_AT !== 'unknown') ? process.env.BUILT_AT : new Date().toISOString(),

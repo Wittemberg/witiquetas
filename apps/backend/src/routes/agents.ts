@@ -120,8 +120,14 @@ export async function authenticateAgent(req: Request, res: Response, next: Funct
 
 import { parseCookies, getWebSession, SESSION_COOKIE_NAME } from './auth.js';
 import { SessionService } from '../services/sessionService.js';
+import {
+  developerAuthService,
+  DCC_SESSION_COOKIE_NAME,
+  getDeveloperCompanyId,
+} from '../services/developerAuthService.js';
+import { CompanyRepository } from '../repositories/adminRepositories.js';
 
-// Helper: Middleware de autenticação administrativa / web (Sessão RBAC / Pré-RBAC + Bearer Admin)
+// Helper: Middleware de autenticação administrativa / web (Sessão RBAC / Pré-RBAC + Bearer Admin + PLATFORM_DEVELOPER)
 export async function authenticateWebUser(req: Request, res: Response, next: Function) {
   const authHeader = req.headers.authorization;
 
@@ -156,7 +162,7 @@ export async function authenticateWebUser(req: Request, res: Response, next: Fun
     return res.status(403).json({ error: 'Credencial administrativa inválida ou sem permissão.' });
   }
 
-  // 2. Cookie de Sessão Web Server-Side:
+  // 2. Cookie de Sessão Web Server-Side (Tenant):
   const cookies = parseCookies(req.headers.cookie);
   const sessionId = cookies[SESSION_COOKIE_NAME];
 
@@ -187,7 +193,62 @@ export async function authenticateWebUser(req: Request, res: Response, next: Fun
     return res.status(401).json({ error: 'Sessão web expirada ou inválida.' });
   }
 
-  // 3. Fail-closed se não possuir sessão válida nem token administrativo (P0-5 RESOLVED)
+  // 3. Cookie / Header de Sessão de Desenvolvedor da Plataforma (PLATFORM_DEVELOPER)
+  const dccCookieToken = cookies[DCC_SESSION_COOKIE_NAME];
+  const dccHeaderToken = typeof req.headers['x-dcc-session'] === 'string' ? (req.headers['x-dcc-session'] as string).trim() : undefined;
+  const rawDccToken = dccCookieToken || dccHeaderToken;
+
+  if (rawDccToken) {
+    const dccSession = developerAuthService.validateSession(rawDccToken);
+    if (dccSession) {
+      const devCompanyId = getDeveloperCompanyId();
+      const foundCompany = await CompanyRepository.findById(devCompanyId);
+      const now = new Date().toISOString();
+      const company = foundCompany || {
+        id: devCompanyId,
+        name: 'Empresa Principal',
+        legalName: null,
+        document: null,
+        slug: 'default',
+        status: 'ACTIVE' as const,
+        createdAt: now,
+        updatedAt: now,
+      };
+
+      req.principal = {
+        sessionId: `dcc-${dccSession.username.toLowerCase()}`,
+        csrfToken: dccSession.csrfToken || 'dcc-csrf-exempt',
+        user: {
+          id: 'developer-marcel',
+          companyId: company.id,
+          name: dccSession.username,
+          email: 'developer@witiquetas.local',
+          status: 'ACTIVE',
+          isDccMaster: true,
+        },
+        company: {
+          id: company.id,
+          name: company.name,
+          slug: company.slug,
+          status: company.status,
+        },
+        roles: [],
+        permissions: ['*'],
+      };
+
+      (req as any).user = {
+        id: 'developer-marcel',
+        companyId: company.id,
+        role: 'SUPER_ADMIN' as const,
+      } as AuthWebUser;
+      (req as any).company = req.principal.company;
+      (req as any).isPlatformDeveloper = true;
+      req.authMethod = dccCookieToken ? 'cookie' : 'bearer';
+      return next();
+    }
+  }
+
+  // 4. Fail-closed se não possuir sessão válida nem token administrativo (P0-5 RESOLVED)
   return res.status(401).json({ error: 'Não autenticado. Forneça uma sessão web válida ou token administrativo.' });
 }
 

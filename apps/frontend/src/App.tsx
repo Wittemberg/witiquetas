@@ -259,8 +259,7 @@ export default function App() {
         fetch('/api/health').then((r) => r.json()),
         fetch('/api/version').then((r) => r.json()),
         fetch('/api/agents', { credentials: 'include' }).then(async (r) => {
-          if (r.status === 401) {
-            setSessionContext(null);
+          if (!r.ok) {
             return { agents: [] };
           }
           return r.json();

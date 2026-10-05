@@ -1,4 +1,8 @@
-import type { AgentDTO } from '@witiquetas/contracts';
+import type {
+  AgentDTO,
+  GeneratePairingCodeResponseDTO,
+  PairingStatusResponseDTO,
+} from '@witiquetas/contracts';
 import { getCsrfToken } from '../auth/session.js';
 
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
@@ -33,12 +37,7 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
   return res.json() as Promise<T>;
 }
 
-export interface PairingCodeResponse {
-  pairingCode: string;
-  formattedCode: string;
-  expiresInSeconds: number;
-  expiresAt: string;
-}
+export type PairingCodeResponse = GeneratePairingCodeResponseDTO;
 
 export const agentsApi = {
   async listAgents(): Promise<AgentDTO[]> {
@@ -50,6 +49,10 @@ export const agentsApi = {
     return request<PairingCodeResponse>('/api/agents/generate-pairing-code', {
       method: 'POST',
     });
+  },
+
+  async getPairingStatus(code: string): Promise<PairingStatusResponseDTO> {
+    return request<PairingStatusResponseDTO>(`/api/agents/pairing-status/${encodeURIComponent(code)}`);
   },
 
   async revokeAgent(agentId: string): Promise<{ success: boolean; message: string }> {

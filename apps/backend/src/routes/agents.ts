@@ -8,6 +8,8 @@ import type {
   PairAgentResponseDTO,
   AgentHeartbeatRequestDTO,
   AgentHeartbeatResponseDTO,
+  GeneratePairingCodeResponseDTO,
+  PairingStatusResponseDTO,
 } from '@witiquetas/contracts';
 import { printJobsStore } from './printJobs.js';
 
@@ -262,13 +264,7 @@ export interface PairingCodeRecord {
   status: 'PENDING' | 'USED' | 'EXPIRED';
   usedAt?: string;
   agentId?: string;
-  agentDetails?: {
-    id: string;
-    machineName: string;
-    os: string;
-    architecture: string;
-    agentVersion: string;
-  };
+  agentDetails?: AgentDTO;
 }
 
 const pairingCodes = new Map<string, PairingCodeRecord>();
@@ -305,6 +301,8 @@ router.post('/generate-pairing-code', authenticateWebUser, (req: Request, res: R
   const code = generateUnambiguousPairingCode();
   const now = Date.now();
   const expiresAt = now + 15 * 60 * 1000; // 15 minutos de validade
+  const expiresAtIso = new Date(expiresAt).toISOString();
+  const command = `witiquetas-agent-windows-x64.exe pair --code ${code}`;
 
   pairingCodes.set(code, {
     pairingCode: code,
@@ -316,12 +314,18 @@ router.post('/generate-pairing-code', authenticateWebUser, (req: Request, res: R
     status: 'PENDING',
   });
 
-  res.json({
+  const response: GeneratePairingCodeResponseDTO = {
     pairingCode: code,
+    formattedCode: code,
     expiresInSeconds: 900,
+    expiresAt: expiresAtIso,
+    command,
+    status: 'PENDING',
     companyName,
     companyId: targetCompanyId,
-  });
+  };
+
+  res.json(response);
 });
 
 // 1.1 Consultar Status de Pareamento (Exclusivo Web/Admin para polling amigável no modal)
@@ -361,13 +365,16 @@ router.get('/pairing-status/:code', authenticateWebUser, async (req: Request, re
     }
   }
 
-  res.json({
+  const response: PairingStatusResponseDTO = {
     pairingCode: pairing.pairingCode,
+    formattedCode: pairing.pairingCode,
     companyId: pairing.companyId,
     status: pairing.status,
-    expiresAt: pairing.expiresAt,
+    expiresAt: new Date(pairing.expiresAt).toISOString(),
     agent: agentRecord || pairing.agentDetails || null,
-  });
+  };
+
+  res.json(response);
 });
 
 // 2. Parear Agente Local (Única rota não autenticada do ciclo de vida do agente)
@@ -454,10 +461,15 @@ router.post('/pair', async (req: Request, res: Response) => {
   pairing.agentId = agentId;
   pairing.agentDetails = {
     id: agentId,
+    companyId: newAgent.companyId,
+    installationId: newAgent.installationId,
     machineName: newAgent.machineName,
     os: newAgent.os,
     architecture: newAgent.architecture,
     agentVersion: newAgent.agentVersion,
+    status: newAgent.status,
+    lastSeenAt: newAgent.lastSeenAt,
+    createdAt: newAgent.createdAt,
   };
 
   const response: PairAgentResponseDTO = {

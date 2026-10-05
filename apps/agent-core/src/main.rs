@@ -17,26 +17,26 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // 2. Comandos Administrativos de Gerenciamento do Windows Service
-    if args.iter().any(|arg| arg == "--install-service") {
+    if args.iter().any(|arg| arg == "--install-service" || arg == "install-service") {
         return service::install_service();
     }
 
-    if args.iter().any(|arg| arg == "--uninstall-service") {
+    if args.iter().any(|arg| arg == "--uninstall-service" || arg == "uninstall-service") {
         return service::uninstall_service();
     }
 
-    if args.iter().any(|arg| arg == "--service-status") {
+    if args.iter().any(|arg| arg == "--service-status" || arg == "service-status") {
         return service::service_status();
     }
 
     // 3. Informações de Versão
-    if args.iter().any(|arg| arg == "--version" || arg == "-v") {
+    if args.iter().any(|arg| arg == "--version" || arg == "version" || arg == "-v") {
         println!("Witiquetas Agent Core v{}", config::CURRENT_AGENT_VERSION);
         return Ok(());
     }
 
     // 4. Manual de Ajuda
-    if args.iter().any(|arg| arg == "--help" || arg == "-h") {
+    if args.iter().any(|arg| arg == "--help" || arg == "help" || arg == "-h") {
         print_help();
         return Ok(());
     }
@@ -44,7 +44,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Inicializar subsistema de logging no modo interativo
     let _log_guard = init_logging(false);
 
-    let is_force_pair = args.iter().any(|arg| arg == "--pair" || arg == "--repair" || arg == "-p");
+    let is_force_pair = args.iter().any(|arg| arg == "--pair" || arg == "pair" || arg == "--repair" || arg == "repair" || arg == "-p");
     let is_single_run = args.iter().any(|arg| arg == "--single-run") || env::var("WITIQUETAS_SINGLE_RUN").unwrap_or_default() == "1";
 
     let mut custom_backend_url = None;

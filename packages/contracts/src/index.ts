@@ -161,6 +161,26 @@ export interface PairAgentRequestDTO {
   installationId?: string;
 }
 
+export interface GeneratePairingCodeResponseDTO {
+  pairingCode: string;
+  formattedCode: string;
+  expiresInSeconds: number;
+  expiresAt: string; // ISO 8601 string, ex: "2026-10-05T16:30:00.000Z"
+  command: string;
+  status: 'PENDING' | 'USED' | 'EXPIRED';
+  companyName: string;
+  companyId: string;
+}
+
+export interface PairingStatusResponseDTO {
+  pairingCode: string;
+  formattedCode: string;
+  companyId: string;
+  status: 'PENDING' | 'USED' | 'EXPIRED';
+  expiresAt: string; // ISO 8601 string
+  agent: AgentDTO | null;
+}
+
 export interface PairAgentResponseDTO {
   success: boolean;
   agentId: string;

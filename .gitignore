@@ -46,6 +46,7 @@ target/
 apps/backend/bin/agents/*.exe
 apps/backend/bin/agents/*.tar.gz
 apps/backend/bin/agents/*.zip
+bin/
 
 # Agent cache
 .agents/

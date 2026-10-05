@@ -17,6 +17,43 @@ import {
 import { agentsApi, type PairingCodeResponse } from '../../services/agentsApi.js';
 import type { AgentDTO } from '@witiquetas/contracts';
 
+export function formatPairingExpiration(expiresAt?: string, expiresInSeconds?: number): {
+  primary: string;
+  secondary: string | null;
+  fullText: string;
+} {
+  const minutes = expiresInSeconds && expiresInSeconds > 0
+    ? Math.round(expiresInSeconds / 60)
+    : 15;
+  const primary = `Este código expira em ${minutes} minutos.`;
+
+  if (!expiresAt) {
+    return { primary, secondary: null, fullText: primary };
+  }
+
+  try {
+    const date = new Date(expiresAt);
+    if (isNaN(date.getTime())) {
+      return { primary, secondary: null, fullText: primary };
+    }
+    const timeStr = date.toLocaleTimeString('pt-BR', {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+    if (!timeStr || timeStr.toLowerCase().includes('invalid')) {
+      return { primary, secondary: null, fullText: primary };
+    }
+    const secondary = `Expira às ${timeStr}`;
+    return {
+      primary,
+      secondary,
+      fullText: `${primary} (${secondary})`,
+    };
+  } catch {
+    return { primary, secondary: null, fullText: primary };
+  }
+}
+
 interface AgentsAdminViewProps {
   canManage?: boolean;
 }
@@ -32,6 +69,7 @@ export const AgentsAdminView: React.FC<AgentsAdminViewProps> = ({ canManage = tr
   const [pairingData, setPairingData] = useState<PairingCodeResponse | null>(null);
   const [generatingCode, setGeneratingCode] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
+  const [copiedCommand, setCopiedCommand] = useState(false);
   const [revokingId, setRevokingId] = useState<string | null>(null);
 
   const loadAgents = async () => {
@@ -59,6 +97,7 @@ export const AgentsAdminView: React.FC<AgentsAdminViewProps> = ({ canManage = tr
       setPairingData(data);
       setIsPairingModalOpen(true);
       setCopiedCode(false);
+      setCopiedCommand(false);
     } catch (err: any) {
       setError(err.message || 'Falha ao gerar código de pareamento.');
     } finally {
@@ -67,10 +106,21 @@ export const AgentsAdminView: React.FC<AgentsAdminViewProps> = ({ canManage = tr
   };
 
   const handleCopyCode = () => {
-    if (pairingData?.formattedCode) {
-      navigator.clipboard.writeText(pairingData.formattedCode);
+    const code = pairingData?.pairingCode || pairingData?.formattedCode;
+    if (code) {
+      navigator.clipboard.writeText(code);
       setCopiedCode(true);
       setTimeout(() => setCopiedCode(false), 2500);
+    }
+  };
+
+  const handleCopyCommand = () => {
+    const code = pairingData?.pairingCode || pairingData?.formattedCode || '';
+    const cmd = pairingData?.command || `witiquetas-agent-windows-x64.exe pair --code ${code}`;
+    if (cmd) {
+      navigator.clipboard.writeText(cmd);
+      setCopiedCommand(true);
+      setTimeout(() => setCopiedCommand(false), 2500);
     }
   };
 
@@ -282,111 +332,226 @@ export const AgentsAdminView: React.FC<AgentsAdminViewProps> = ({ canManage = tr
       </div>
 
       {/* Modal de Pareamento por Código Canônico (WIT-XXXX-XXXX) */}
-      {isPairingModalOpen && pairingData && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0, 0, 0, 0.75)',
-            backdropFilter: 'blur(4px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 9999,
-            padding: '1rem',
-          }}
-        >
+      {isPairingModalOpen && pairingData && (() => {
+        const pairingCode = pairingData.pairingCode || pairingData.formattedCode || '';
+        const command = pairingData.command || `witiquetas-agent-windows-x64.exe pair --code ${pairingCode}`;
+        const expirationInfo = formatPairingExpiration(pairingData.expiresAt, pairingData.expiresInSeconds);
+
+        return (
           <div
-            className="card"
             style={{
-              width: '100%',
-              maxWidth: '520px',
-              padding: '1.75rem',
+              position: 'fixed',
+              inset: 0,
+              background: 'rgba(0, 0, 0, 0.75)',
+              backdropFilter: 'blur(4px)',
               display: 'flex',
-              flexDirection: 'column',
-              gap: '1.25rem',
-              borderRadius: '12px',
-              border: '1px solid var(--border-color)',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 9999,
+              padding: '1rem',
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
-              <div style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <Key size={20} color="var(--accent-blue)" />
-                Parear Novo Agente de Impressão
-              </div>
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={() => setIsPairingModalOpen(false)}
-                style={{ padding: '0.2rem 0.5rem', fontSize: '0.8rem' }}
-              >
-                ✕
-              </button>
-            </div>
-
-            <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-              Execute o agente no computador local onde as impressoras estão conectadas e informe o código abaixo:
-            </div>
-
-            {/* Caixa de Código em Destaque */}
             <div
+              className="card"
               style={{
+                width: '100%',
+                maxWidth: '560px',
+                padding: '1.75rem',
                 display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '1rem 1.25rem',
-                background: 'rgba(59, 130, 246, 0.08)',
-                border: '1px solid var(--accent-blue)',
-                borderRadius: '8px',
+                flexDirection: 'column',
+                gap: '1.25rem',
+                borderRadius: '12px',
+                border: '1px solid var(--border-color)',
+                boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.5)',
               }}
             >
-              <div>
-                <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--accent-blue)', fontWeight: 700 }}>
-                  Código de Pareamento Único
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
+                <div style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <Key size={20} color="var(--accent-blue)" />
+                  Parear Novo Agente de Impressão
                 </div>
-                <div style={{ fontSize: '1.75rem', fontWeight: 800, letterSpacing: '0.12em', fontFamily: 'monospace', color: 'var(--text-primary)' }}>
-                  {pairingData.formattedCode}
-                </div>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => setIsPairingModalOpen(false)}
+                  style={{ padding: '0.2rem 0.5rem', fontSize: '0.8rem' }}
+                >
+                  ✕
+                </button>
               </div>
 
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={handleCopyCode}
-                style={{ fontSize: '0.8rem', padding: '0.5rem 0.75rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
-              >
-                {copiedCode ? <Check size={16} /> : <Copy size={16} />}
-                {copiedCode ? 'Copiado!' : 'Copiar'}
-              </button>
-            </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.75rem', color: 'var(--status-warning, #f59e0b)' }}>
-              <Clock size={14} />
-              <span>Este código expira em {Math.round(pairingData.expiresInSeconds / 60)} minutos ({new Date(pairingData.expiresAt).toLocaleTimeString('pt-BR')}).</span>
-            </div>
-
-            <div style={{ padding: '0.85rem', background: 'rgba(255, 255, 255, 0.02)', borderRadius: '6px', border: '1px solid var(--border-color)', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-              <strong>Comando no Terminal / Prompt:</strong>
-              <div style={{ fontFamily: 'monospace', background: 'rgba(0, 0, 0, 0.4)', padding: '0.5rem', borderRadius: '4px', marginTop: '0.35rem', color: '#38bdf8' }}>
-                witiquetas-agent-windows-x64.exe pair --code {pairingData.formattedCode}
+              <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: 1.4 }}>
+                Execute o instalador/agente no computador local onde as impressoras estão conectadas e informe o código gerado:
               </div>
-            </div>
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={() => {
-                  setIsPairingModalOpen(false);
-                  loadAgents();
+              {/* Caixa de Código em Destaque */}
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '1.1rem 1.25rem',
+                  background: 'var(--card-bg, rgba(255, 255, 255, 0.03))',
+                  border: '2px solid var(--accent-blue, #3b82f6)',
+                  borderRadius: '10px',
+                  gap: '1rem',
+                  boxShadow: '0 4px 12px rgba(59, 130, 246, 0.12)',
                 }}
               >
-                Fechar
-              </button>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+                  <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--accent-blue, #60a5fa)', fontWeight: 700 }}>
+                    CÓDIGO DE PAREAMENTO
+                  </div>
+                  <div
+                    data-testid="pairing-code-display"
+                    style={{
+                      fontSize: '1.85rem',
+                      fontWeight: 800,
+                      letterSpacing: '0.12em',
+                      fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+                      color: 'var(--text-primary, #ffffff)',
+                      userSelect: 'all',
+                    }}
+                  >
+                    {pairingCode}
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={handleCopyCode}
+                  style={{
+                    fontSize: '0.85rem',
+                    fontWeight: 600,
+                    padding: '0.55rem 1rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.4rem',
+                    whiteSpace: 'nowrap',
+                    minWidth: '110px',
+                    justifyContent: 'center',
+                  }}
+                  title="Copiar código de pareamento"
+                >
+                  {copiedCode ? <Check size={16} /> : <Copy size={16} />}
+                  {copiedCode ? 'Copiado ✓' : 'Copiar'}
+                </button>
+              </div>
+
+              {/* Expiração sem Invalid Date */}
+              <div
+                data-testid="pairing-expiration-display"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.45rem',
+                  fontSize: '0.8rem',
+                  color: 'var(--status-warning, #f59e0b)',
+                  fontWeight: 500,
+                }}
+              >
+                <Clock size={15} style={{ flexShrink: 0 }} />
+                <span>
+                  {expirationInfo.primary}
+                  {expirationInfo.secondary && (
+                    <span style={{ opacity: 0.9, marginLeft: '0.35rem' }}>
+                      ({expirationInfo.secondary})
+                    </span>
+                  )}
+                </span>
+              </div>
+
+              {/* Componente de Comando no Terminal de Alto Contraste (WCAG AAA) */}
+              <div
+                style={{
+                  borderRadius: '8px',
+                  border: '1px solid #334155',
+                  background: '#0f172a',
+                  overflow: 'hidden',
+                }}
+              >
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '0.55rem 0.85rem',
+                    background: '#1e293b',
+                    borderBottom: '1px solid #334155',
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: '0.75rem',
+                      fontWeight: 600,
+                      color: '#cbd5e1',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.45rem',
+                    }}
+                  >
+                    <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', background: '#22c55e' }}></span>
+                    Comando no Terminal / Prompt
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleCopyCommand}
+                    style={{
+                      background: copiedCommand ? '#166534' : 'rgba(255, 255, 255, 0.08)',
+                      border: '1px solid rgba(255, 255, 255, 0.15)',
+                      color: '#ffffff',
+                      borderRadius: '4px',
+                      padding: '0.25rem 0.6rem',
+                      fontSize: '0.75rem',
+                      fontWeight: 600,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.35rem',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease',
+                    }}
+                    title="Copiar comando completo"
+                  >
+                    {copiedCommand ? <Check size={13} /> : <Copy size={13} />}
+                    {copiedCommand ? 'Copiado ✓' : 'Copiar'}
+                  </button>
+                </div>
+
+                <div
+                  data-testid="pairing-command-display"
+                  style={{
+                    padding: '0.85rem 1rem',
+                    fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+                    fontSize: '0.82rem',
+                    color: '#f8fafc',
+                    overflowX: 'auto',
+                    whiteSpace: 'pre',
+                    userSelect: 'all',
+                    lineHeight: 1.45,
+                  }}
+                >
+                  {command}
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '0.25rem' }}>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => {
+                    setIsPairingModalOpen(false);
+                    loadAgents();
+                  }}
+                >
+                  Fechar
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 };

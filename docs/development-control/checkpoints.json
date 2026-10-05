@@ -1,6 +1,24 @@
 {
   "checkpoints": [
     {
+      "sha": "b226d0f8d167825b597b4ec8f121bbffbb961ef0",
+      "shortSha": "b226d0f",
+      "date": "2026-10-05T13:40:00Z",
+      "phase": "5",
+      "patch": "5.7.0.1",
+      "title": "5.7.0.1 — Agent Pairing & Windows UX Hotfix",
+      "type": "HOTFIX",
+      "capabilities": [
+        "cap-admin-printers-agents"
+      ],
+      "testsPassed": true,
+      "deployed": false,
+      "manualValidation": false,
+      "homologated": false,
+      "status": "IMPLEMENTED_AWAITING_MANUAL_HOMOLOGATION",
+      "evidence": "PACOTE 5.7.0.1 IMPLEMENTADO (AWAITING MANUAL HOMOLOGATION): Hotfix de experiência de pareamento e auditoria da arquitetura Windows Agent. 1) Pairing backend retorna contrato canônico padronizado com pairingCode, formattedCode, expiresInSeconds, expiresAt (ISO 8601 UTC), command (witiquetas-agent-windows-x64.exe pair --code ...) e status PENDING. 2) Eliminação de '(Invalid Date)' no modal de pareamento com helper formatPairingExpiration e fallback gracioso. 3) Componente de comando com contraste WCAG AAA (fundo #0f172a, texto #f8fafc), fonte monospace, com botão de cópia dedicado e feedback 'Copiado ✓' sem alert(). 4) Componente de código em destaque com fonte monospace e botão de cópia próprio. 5) Auditoria do Windows Agent Core (Rust/windows-service) e habilitação dos verbos 'pair' e 'install-service' na CLI. 6) Suíte de testes automatizados (Gate 1 a 6) 100% GREEN."
+    },
+    {
       "sha": "22773f82a7363815efecc9debdf61705bac6ed09",
       "shortSha": "22773f8",
       "date": "2026-09-29T15:45:00Z",

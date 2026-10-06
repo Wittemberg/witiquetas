@@ -1,11 +1,67 @@
+//! Módulo de Pareamento e Identidade do Witiquetas Agent
+//!
+//! Este módulo separa rigorosamente a lógica pura de negócio do pareamento
+//! de qualquer interação de console/terminal:
+//! - `execute_pairing(request)`: Executa handshake de rede e salva credenciais (sem stdin/stdout)
+//! - `unpair()`: Remove a identidade local de forma segura e não-destrutiva
+//! - `normalize_pairing_code(raw)`: Valida e formata códigos (tolerante a minúsculas, hífens e espaços)
+//! - `run_interactive_pairing(...)`: Adapter de console legado para uso exclusivo em terminal humano
+
 use serde::{Deserialize, Serialize};
 use std::env;
 use std::fs;
 use std::io::{self, Write};
 use std::path::PathBuf;
+use thiserror::Error;
 
 pub const DEFAULT_BACKEND_URL: &str = "https://witiquetas.wrtec.com.br";
 pub const CURRENT_CONFIG_VERSION: u32 = 1;
+
+#[derive(Debug, Error)]
+pub enum PairingError {
+    #[error("Código de pareamento inválido: {0}")]
+    InvalidCode(String),
+
+    #[error("O código de pareamento expirou. Gere um novo código no painel.")]
+    ExpiredCode,
+
+    #[error("Este código de pareamento já foi utilizado por outro Agent.")]
+    AlreadyUsed,
+
+    #[error("Muitas tentativas de pareamento. Aguarde alguns instantes.")]
+    RateLimited,
+
+    #[error("Falha de autenticação/pareamento: {0}")]
+    ServerRejected(String),
+
+    #[error("Erro de rede ao conectar no servidor: {0}")]
+    Network(String),
+
+    #[error("Erro de I/O no sistema de arquivos: {0}")]
+    Io(#[from] io::Error),
+
+    #[error("Erro de serialização JSON: {0}")]
+    Serialization(#[from] serde_json::Error),
+
+    #[error("Nenhuma identidade local encontrada")]
+    IdentityNotFound,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PairingRequest {
+    pub pairing_code: String,
+    pub backend_url: Option<String>,
+    pub machine_name: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UnpairResult {
+    pub removed: bool,
+    pub path: String,
+    pub agent_id: Option<String>,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -50,7 +106,33 @@ struct PairAgentResponse {
     error: Option<String>,
 }
 
-/// Retorna o caminho padrão de persistência de identidade segura do Agent
+/// Normaliza e valida código de pareamento no padrão WIT-XXXX-XXXX
+/// Aceita: minúsculas, maiúsculas, com ou sem 'WIT-', com ou sem hífens/espaços
+pub fn normalize_pairing_code(raw: &str) -> Result<String, PairingError> {
+    let clean: String = raw
+        .trim()
+        .chars()
+        .filter(|c| c.is_alphanumeric())
+        .map(|c| c.to_ascii_uppercase())
+        .collect();
+
+    let core = if clean.starts_with("WIT") && clean.len() >= 11 {
+        &clean[3..]
+    } else {
+        &clean[..]
+    };
+
+    if core.len() != 8 {
+        return Err(PairingError::InvalidCode(format!(
+            "O código deve conter 8 caracteres alfanuméricos (recebido: '{}')",
+            raw.trim()
+        )));
+    }
+
+    Ok(format!("WIT-{}-{}", &core[0..4], &core[4..8]))
+}
+
+/// Retorna o caminho canônico de persistência da identidade do Agent
 pub fn get_identity_path() -> PathBuf {
     if let Ok(custom_path) = env::var("WITIQUETAS_CONFIG_PATH") {
         return PathBuf::from(custom_path);
@@ -76,7 +158,7 @@ pub fn get_identity_path() -> PathBuf {
 }
 
 /// Carrega a identidade do Agent se o arquivo existir
-pub fn load_identity() -> Result<Option<AgentIdentityData>, Box<dyn std::error::Error>> {
+pub fn load_identity() -> Result<Option<AgentIdentityData>, PairingError> {
     let path = get_identity_path();
     if !path.exists() {
         return Ok(None);
@@ -85,24 +167,22 @@ pub fn load_identity() -> Result<Option<AgentIdentityData>, Box<dyn std::error::
     let content = match fs::read_to_string(&path) {
         Ok(c) => c,
         Err(err) => {
-            eprintln!("[Aviso] Não foi possível ler o arquivo de identidade local ({}): {}", path.display(), err);
-            return Ok(None);
+            return Err(PairingError::Io(err));
         }
     };
 
     let identity: AgentIdentityData = match serde_json::from_str(&content) {
         Ok(id) => id,
         Err(err) => {
-            eprintln!("[Aviso] Configuração local corrompida ({}): {}. Use --pair para reconectar.", path.display(), err);
-            return Ok(None);
+            return Err(PairingError::Serialization(err));
         }
     };
 
     Ok(Some(identity))
 }
 
-/// Salva a identidade pareada no disco com permissões seguras
-pub fn save_identity(data: &AgentIdentityData) -> Result<PathBuf, Box<dyn std::error::Error>> {
+/// Salva a identidade pareada no disco
+pub fn save_identity(data: &AgentIdentityData) -> Result<PathBuf, PairingError> {
     let path = get_identity_path();
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)?;
@@ -120,23 +200,118 @@ pub fn get_machine_name() -> String {
         .unwrap_or_else(|_| "DESKTOP-AGENT".to_string())
 }
 
-/// Executa o fluxo interativo de pareamento via CLI
+/// Lógica Pura: Zero println!, zero stdin.
+/// Executa o handshake de pareamento com o servidor Witiquetas e persiste a identidade.
+pub async fn execute_pairing(request: PairingRequest) -> Result<AgentIdentityData, PairingError> {
+    let normalized_code = normalize_pairing_code(&request.pairing_code)?;
+    let backend_url = request
+        .backend_url
+        .or_else(|| env::var("WITIQUETAS_BACKEND_URL").ok())
+        .unwrap_or_else(|| DEFAULT_BACKEND_URL.to_string());
+
+    let machine_name = request.machine_name.unwrap_or_else(get_machine_name);
+    let os = env::consts::OS.to_string();
+    let architecture = env::consts::ARCH.to_string();
+    let agent_version = crate::config::CURRENT_AGENT_VERSION.to_string();
+
+    let now_millis = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis())
+        .unwrap_or(0);
+    let installation_id = format!("inst-{}-{:x}", now_millis, rand_u64());
+
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(20))
+        .build()
+        .map_err(|e| PairingError::Network(e.to_string()))?;
+
+    let pair_endpoint = crate::protocol::client::build_api_url(&backend_url, "/agents/pair");
+
+    let request_body = PairAgentRequest {
+        pairing_code: normalized_code,
+        machine_name: machine_name.clone(),
+        os: os.clone(),
+        os_version: format!("{}-{}", os, architecture),
+        architecture,
+        agent_version,
+        protocol_version: 1,
+        installation_id: installation_id.clone(),
+    };
+
+    let response = client
+        .post(&pair_endpoint)
+        .json(&request_body)
+        .send()
+        .await
+        .map_err(|e| PairingError::Network(e.to_string()))?;
+
+    let status = response.status();
+    let body_text = response
+        .text()
+        .await
+        .map_err(|e| PairingError::Network(e.to_string()))?;
+
+    if !status.is_success() {
+        if status.as_u16() == 400 || status.as_u16() == 404 {
+            if body_text.contains("expirado") {
+                return Err(PairingError::ExpiredCode);
+            }
+            return Err(PairingError::InvalidCode("Código não encontrado ou inválido no servidor.".into()));
+        } else if status.as_u16() == 409 {
+            return Err(PairingError::AlreadyUsed);
+        } else if status.as_u16() == 429 {
+            return Err(PairingError::RateLimited);
+        }
+        return Err(PairingError::ServerRejected(format!("HTTP {}: {}", status.as_u16(), body_text)));
+    }
+
+    let parsed: PairAgentResponse = serde_json::from_str(&body_text)?;
+
+    let identity = AgentIdentityData {
+        config_version: CURRENT_CONFIG_VERSION,
+        agent_id: parsed.agent_id,
+        installation_id: parsed.installation_id,
+        token: parsed.token,
+        backend_url,
+        company_id: parsed.company_id,
+        machine_name,
+        paired_at: parsed.server_time.unwrap_or_else(|| "agora".to_string()),
+    };
+
+    save_identity(&identity)?;
+    Ok(identity)
+}
+
+/// Remove com segurança o arquivo de identidade local (unpair)
+pub fn unpair() -> Result<UnpairResult, PairingError> {
+    let path = get_identity_path();
+    if !path.exists() {
+        return Ok(UnpairResult {
+            removed: false,
+            path: path.display().to_string(),
+            agent_id: None,
+        });
+    }
+
+    let agent_id = load_identity().ok().flatten().map(|id| id.agent_id);
+    fs::remove_file(&path)?;
+
+    Ok(UnpairResult {
+        removed: true,
+        path: path.display().to_string(),
+        agent_id,
+    })
+}
+
+/// Adaptador Interativo para Terminal Humano (CLI legado)
 pub async fn run_interactive_pairing(
     backend_url_override: Option<String>,
     code_override: Option<String>,
 ) -> Result<AgentIdentityData, Box<dyn std::error::Error>> {
-    let backend_url = backend_url_override
-        .or_else(|| env::var("WITIQUETAS_BACKEND_URL").ok())
-        .unwrap_or_else(|| DEFAULT_BACKEND_URL.to_string());
-
-    let machine_name = get_machine_name();
-    let os = env::consts::OS.to_string();
-    let architecture = env::consts::ARCH.to_string();
     let agent_version = crate::config::CURRENT_AGENT_VERSION.to_string();
-    let installation_id = format!("inst-{}-{:x}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)?.as_millis(), rand_u64());
 
     let pairing_code = if let Some(code) = code_override {
-        code.trim().to_uppercase()
+        code
     } else {
         println!("--------------------------------------------------");
         println!(" Witiquetas Agent de Impressão (v{})", agent_version);
@@ -151,7 +326,7 @@ pub async fn run_interactive_pairing(
 
         let mut input = String::new();
         io::stdin().read_line(&mut input)?;
-        let trimmed = input.trim().to_uppercase();
+        let trimmed = input.trim().to_string();
         if trimmed.is_empty() {
             return Err("Código de pareamento não fornecido.".into());
         }
@@ -159,80 +334,32 @@ pub async fn run_interactive_pairing(
     };
 
     println!();
-    println!(" Conectando ao servidor {}...", backend_url);
+    println!(" Conectando ao servidor...");
 
-    let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(20))
-        .build()?;
-
-    let pair_endpoint = crate::protocol::client::build_api_url(&backend_url, "/agents/pair");
-
-    let request_body = PairAgentRequest {
-        pairing_code: pairing_code.clone(),
-        machine_name: machine_name.clone(),
-        os: os.clone(),
-        os_version: format!("{}-{}", os, architecture),
-        architecture: architecture.clone(),
-        agent_version: agent_version.clone(),
-        protocol_version: 1,
-        installation_id: installation_id.clone(),
+    let request = PairingRequest {
+        pairing_code,
+        backend_url: backend_url_override,
+        machine_name: None,
     };
 
-    let response = client
-        .post(&pair_endpoint)
-        .json(&request_body)
-        .send()
-        .await?;
-
-    let status = response.status();
-    let body_text = response.text().await?;
-
-    if !status.is_success() {
-        if status.as_u16() == 400 || status.as_u16() == 404 {
-            if body_text.contains("expirado") {
-                eprintln!();
-                eprintln!(" [Erro] O código expirou. Gere um novo código no Witiquetas.");
-            } else {
-                eprintln!();
-                eprintln!(" [Erro] Código inválido ou não encontrado. Verifique e tente novamente.");
-            }
-        } else if status.as_u16() == 409 {
-            eprintln!();
-            eprintln!(" [Erro] Este código de pareamento já foi utilizado por outro Agent.");
-        } else if status.as_u16() == 429 {
-            eprintln!();
-            eprintln!(" [Erro] Muitas tentativas. Aguarde alguns instantes antes de tentar novamente.");
-        } else {
-            eprintln!();
-            eprintln!(" [Erro] Falha ao conectar ao servidor (HTTP {}).", status.as_u16());
+    match execute_pairing(request).await {
+        Ok(identity) => {
+            let path = get_identity_path();
+            println!();
+            println!(" ==================================================");
+            println!(" [OK] Agent conectado com sucesso!");
+            println!(" Computador: {}", identity.machine_name);
+            println!(" Configuração salva em: {}", path.display());
+            println!(" ==================================================");
+            println!();
+            Ok(identity)
         }
-        return Err("Falha de pareamento.".into());
+        Err(err) => {
+            eprintln!();
+            eprintln!(" [Erro de Pareamento] {}", err);
+            Err(Box::new(err))
+        }
     }
-
-    let parsed: PairAgentResponse = serde_json::from_str(&body_text)?;
-
-    let identity = AgentIdentityData {
-        config_version: CURRENT_CONFIG_VERSION,
-        agent_id: parsed.agent_id,
-        installation_id: parsed.installation_id,
-        token: parsed.token,
-        backend_url,
-        company_id: parsed.company_id,
-        machine_name: machine_name.clone(),
-        paired_at: parsed.server_time.unwrap_or_else(|| "agora".to_string()),
-    };
-
-    let saved_path = save_identity(&identity)?;
-
-    println!();
-    println!(" ==================================================");
-    println!(" [OK] Agent conectado com sucesso!");
-    println!(" Computador: {}", machine_name);
-    println!(" Configuração salva em: {}", saved_path.display());
-    println!(" ==================================================");
-    println!();
-
-    Ok(identity)
 }
 
 fn rand_u64() -> u64 {
@@ -278,5 +405,21 @@ pub mod tests {
         let path = get_identity_path();
         assert!(path.to_string_lossy().contains("identity.json") || path.to_string_lossy().contains("witiquetas"));
     }
-}
 
+    #[test]
+    fn test_normalize_valid_codes() {
+        assert_eq!(normalize_pairing_code("WIT-7K4P-92MX").unwrap(), "WIT-7K4P-92MX");
+        assert_eq!(normalize_pairing_code("wit-7k4p-92mx").unwrap(), "WIT-7K4P-92MX");
+        assert_eq!(normalize_pairing_code("7k4p92mx").unwrap(), "WIT-7K4P-92MX");
+        assert_eq!(normalize_pairing_code("WIT7K4P92MX").unwrap(), "WIT-7K4P-92MX");
+        assert_eq!(normalize_pairing_code(" 7k4p-92mx ").unwrap(), "WIT-7K4P-92MX");
+    }
+
+    #[test]
+    fn test_normalize_invalid_codes() {
+        assert!(normalize_pairing_code("").is_err());
+        assert!(normalize_pairing_code("WIT-123").is_err());
+        assert!(normalize_pairing_code("WIT-TOOLONGCODE123").is_err());
+        assert!(normalize_pairing_code("WIT-7K4P-92M!").is_err());
+    }
+}

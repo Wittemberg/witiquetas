@@ -1,8 +1,55 @@
+//! Gerenciamento do Serviço de Sistema (Windows Service) do Witiquetas Agent
+//!
+//! Este módulo implementa o ciclo de vida resiliente do Agent como serviço de segundo plano:
+//! - Registro e ciclo no Service Control Manager (SCM) do Windows
+//! - Idempotência estrita em todas as operações (install, uninstall, start, stop, status)
+//! - Suporte a caminhos com espaços (ex: `C:\Program Files\Witiquetas\Agent\witiquetas-agent.exe`)
+//! - Configurações de recuperação automática (Delayed Auto-Start, restart em 5s)
+//! - Retornos tipados e serializáveis (`ServiceOperationResult`, `ServiceStatusInfo`)
+
+use serde::{Deserialize, Serialize};
 use std::error::Error;
 
 pub const SERVICE_NAME: &str = "WitiquetasAgent";
 pub const SERVICE_DISPLAY_NAME: &str = "Witiquetas Agent de Impressão";
 pub const SERVICE_DESCRIPTION: &str = "Witiquetas Print Runtime & Agent Core Headless";
+
+/// Formata a linha de comando do binário para registro no SCM
+pub fn format_service_bin_path(exe_path: &str) -> String {
+    format!("\"{}\" --run-service", exe_path)
+}
+
+/// Formata o argumento `binPath=` para o utilitário `sc.exe`
+pub fn format_sc_binpath_arg(exe_path: &str) -> String {
+    format!("binPath= \"{}\" --run-service", exe_path)
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ServiceOperationResult {
+    pub success: bool,
+    pub service_name: String,
+    pub action: String, // "install" | "uninstall" | "start" | "stop"
+    pub status: String, // "created" | "updated" | "removed" | "already_running" | "already_stopped" | "not_installed" | "unsupported_platform"
+    pub message: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub details: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ServiceStatusInfo {
+    pub service_name: String,
+    pub display_name: String,
+    pub installed: bool,
+    pub state: String, // "RUNNING" | "STOPPED" | "START_PENDING" | "STOP_PENDING" | "PAUSED" | "NOT_INSTALLED" | "UNKNOWN"
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub start_type: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub binary_path: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub is_delayed_auto_start: Option<bool>,
+}
 
 #[cfg(windows)]
 pub mod win {
@@ -21,12 +68,11 @@ pub mod win {
     use windows_service::{
         define_windows_service,
         service::{
-            ServiceAccess, ServiceControl, ServiceControlAccept, ServiceExitCode, ServiceState,
+            ServiceControl, ServiceControlAccept, ServiceExitCode, ServiceState,
             ServiceStatus, ServiceType,
         },
         service_control_handler::{self, ServiceControlHandlerResult},
         service_dispatcher,
-        service_manager::{ServiceManager, ServiceManagerAccess},
     };
 
     define_windows_service!(ffi_service_main, service_main);
@@ -97,7 +143,6 @@ pub mod win {
                 Ok(cfg) => cfg,
                 Err(err) => {
                     eprintln!("[Windows Service] Configuração não encontrada: {}. O serviço aguardará pareamento.", err);
-                    // Manter vivo em loop de espera por configuração para não derrubar o serviço
                     while !shutdown_requested.load(Ordering::SeqCst) {
                         tokio::time::sleep(Duration::from_secs(10)).await;
                         if let Ok(cfg) = AgentConfig::load_auto() {
@@ -142,70 +187,106 @@ pub mod win {
         Ok(())
     }
 
-    /// Instala o executável atual como Windows Service com início automático atrasado e políticas de reinicialização
-    pub fn install_service() -> Result<(), Box<dyn Error>> {
+    /// Helper interno para obter status do SCM
+    fn query_raw_service() -> Result<(bool, String), Box<dyn Error>> {
+        let output = Command::new("sc.exe")
+            .args(["query", SERVICE_NAME])
+            .output()?;
+
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        if stdout.contains("1060") || stdout.contains("FAILED") || stdout.contains("não existe") || stdout.contains("does not exist") {
+            return Ok((false, "NOT_INSTALLED".to_string()));
+        }
+
+        let state = if stdout.contains("RUNNING") {
+            "RUNNING"
+        } else if stdout.contains("STOPPED") {
+            "STOPPED"
+        } else if stdout.contains("START_PENDING") {
+            "START_PENDING"
+        } else if stdout.contains("STOP_PENDING") {
+            "STOP_PENDING"
+        } else if stdout.contains("PAUSED") {
+            "PAUSED"
+        } else {
+            "UNKNOWN"
+        };
+
+        Ok((true, state.to_string()))
+    }
+
+    /// Instala ou reconfigura de forma idempotente o serviço com Delayed Auto-Start e auto-recovery
+    pub fn install_service() -> Result<ServiceOperationResult, Box<dyn Error>> {
         let current_exe = env::current_exe()?;
         let exe_path_str = current_exe.to_str().ok_or("Caminho do executável inválido")?;
 
-        let manager = match ServiceManager::local_computer(None::<&str>, ServiceManagerAccess::CONNECT | ServiceManagerAccess::CREATE_SERVICE) {
-            Ok(m) => m,
-            Err(err) => {
-                eprintln!();
-                eprintln!(" ========================================================================");
-                eprintln!(" [ERRO DE ELEVAÇÃO] Permissão negada para acessar o Gerenciador de Serviços.");
-                eprintln!(" Para instalar o Witiquetas Agent como serviço do Windows, execute:");
-                eprintln!("   1. Abra o Terminal / PowerShell como Administrador ('Executar como Administrador')");
-                eprintln!("   2. Execute novamente: {} --install-service", current_exe.file_name().unwrap_or_default().to_string_lossy());
-                eprintln!(" ========================================================================");
-                eprintln!();
-                return Err(format!("Permissão de Administrador necessária: {}", err).into());
+        let bin_path_arg = format_sc_binpath_arg(exe_path_str);
+        let (is_installed, current_state) = query_raw_service().unwrap_or((false, "NOT_INSTALLED".to_string()));
+
+        let action_status = if is_installed {
+            // Reconfiguração idempotente de serviço já existente
+            let sc_config = Command::new("sc.exe")
+                .args([
+                    "config",
+                    SERVICE_NAME,
+                    &bin_path_arg,
+                    &format!("DisplayName= {}", SERVICE_DISPLAY_NAME),
+                    "start= delayed-auto",
+                ])
+                .output()?;
+
+            if !sc_config.status.success() {
+                let err = String::from_utf8_lossy(&sc_config.stderr);
+                return Ok(ServiceOperationResult {
+                    success: false,
+                    service_name: SERVICE_NAME.to_string(),
+                    action: "install".to_string(),
+                    status: "config_failed".to_string(),
+                    message: format!("Falha ao reconfigurar serviço: {}", err.trim()),
+                    details: Some(err.to_string()),
+                });
             }
+            "updated"
+        } else {
+            // Criação inicial
+            let sc_create = Command::new("sc.exe")
+                .args([
+                    "create",
+                    SERVICE_NAME,
+                    &bin_path_arg,
+                    &format!("DisplayName= {}", SERVICE_DISPLAY_NAME),
+                    "start= auto",
+                ])
+                .output()?;
+
+            if !sc_create.status.success() {
+                let err = String::from_utf8_lossy(&sc_create.stderr);
+                let stdout = String::from_utf8_lossy(&sc_create.stdout);
+                let msg = if !err.is_empty() { err } else { stdout };
+                return Ok(ServiceOperationResult {
+                    success: false,
+                    service_name: SERVICE_NAME.to_string(),
+                    action: "install".to_string(),
+                    status: "create_failed".to_string(),
+                    message: format!("Falha ao registrar serviço no SCM: {}", msg.trim()),
+                    details: Some(msg.to_string()),
+                });
+            }
+
+            // Aplicar Delayed Auto-Start
+            let _ = Command::new("sc.exe")
+                .args(["config", SERVICE_NAME, "start= delayed-auto"])
+                .output();
+
+            "created"
         };
 
-        // Montar comando com flag interna --run-service
-        let bin_path = format!("\"{}\" --run-service", exe_path_str);
-
-        // Se o serviço já existe, desinstalar primeiro para atualizar o path
-        if let Ok(existing) = manager.open_service(SERVICE_NAME, ServiceAccess::ALL_ACCESS) {
-            println!("[Serviço] Serviço anterior detectado. Atualizando registro...");
-            let _ = existing.delete();
-            std::thread::sleep(Duration::from_millis(500));
-        }
-
-        // Criar o serviço via sc.exe para aplicar automaticamente DelayedAutoStart e FailureActions
-        println!("==================================================");
-        println!(" Instalando Windows Service: {}", SERVICE_DISPLAY_NAME);
-        println!(" Caminho do Executável: {}", bin_path);
-        println!("==================================================");
-
-        let sc_create = Command::new("sc.exe")
-            .args([
-                "create",
-                SERVICE_NAME,
-                &format!("binPath= {}", bin_path),
-                &format!("DisplayName= {}", SERVICE_DISPLAY_NAME),
-                "start= auto",
-            ])
-            .output()?;
-
-        if !sc_create.status.success() {
-            let stderr = String::from_utf8_lossy(&sc_create.stderr);
-            let stdout = String::from_utf8_lossy(&sc_create.stdout);
-            eprintln!("[Erro SC Create] {}", if !stderr.is_empty() { stderr } else { stdout });
-            return Err("Falha ao registrar serviço via sc.exe".into());
-        }
-
-        // Configurar Descrição
+        // Descrição do serviço
         let _ = Command::new("sc.exe")
             .args(["description", SERVICE_NAME, SERVICE_DESCRIPTION])
             .output();
 
-        // Configurar Delayed-Auto (Automatic Delayed Start)
-        let _ = Command::new("sc.exe")
-            .args(["config", SERVICE_NAME, "start= delayed-auto"])
-            .output();
-
-        // Configurar Ações de Recuperação (Restart em 1ª, 2ª e falhas subsequentes após 5 segundos)
+        // Política de recuperação resiliente: 24h reset, 3 tentativas imediatas a cada 5s
         let _ = Command::new("sc.exe")
             .args([
                 "failure",
@@ -215,86 +296,202 @@ pub mod win {
             ])
             .output();
 
-        println!(" [OK] Serviço '{}' registrado com sucesso.", SERVICE_NAME);
-        println!(" [OK] Tipo de inicialização: Automático (Atraso na Inicialização / Delayed Start)");
-        println!(" [OK] Política de recuperação: Reiniciar automaticamente a cada falha.");
-
-        // Iniciar o serviço imediatamente
-        println!(" Iniciando serviço...");
-        let sc_start = Command::new("sc.exe")
-            .args(["start", SERVICE_NAME])
-            .output()?;
-
-        if sc_start.status.success() {
-            println!(" [OK] Serviço '{}' iniciado com sucesso!", SERVICE_NAME);
-        } else {
-            let out = String::from_utf8_lossy(&sc_start.stdout);
-            println!(" [Aviso] Solicitação de início enviada: {}", out.trim());
+        // Se parado ou recém-criado, iniciar
+        if current_state != "RUNNING" {
+            let _ = Command::new("sc.exe").args(["start", SERVICE_NAME]).output();
         }
 
-        println!("==================================================");
-        println!(" O Witiquetas Agent agora opera em segundo plano.");
-        println!(" O serviço iniciará automaticamente ao ligar o computador.");
-        println!("==================================================");
-
-        Ok(())
+        Ok(ServiceOperationResult {
+            success: true,
+            service_name: SERVICE_NAME.to_string(),
+            action: "install".to_string(),
+            status: action_status.to_string(),
+            message: if action_status == "created" {
+                format!("Serviço '{}' instalado e iniciado com sucesso.", SERVICE_NAME)
+            } else {
+                format!("Serviço '{}' já existente atualizado e reconfigurado com sucesso.", SERVICE_NAME)
+            },
+            details: Some(format!("binPath: \"{}\" --run-service | Startup: delayed-auto | Recovery: restart/5s", exe_path_str)),
+        })
     }
 
-    /// Desinstala e remove o serviço do Windows
-    pub fn uninstall_service() -> Result<(), Box<dyn Error>> {
-        let manager = match ServiceManager::local_computer(None::<&str>, ServiceManagerAccess::CONNECT) {
-            Ok(m) => m,
-            Err(err) => {
-                eprintln!();
-                eprintln!(" [ERRO] Execute o terminal como Administrador para desinstalar o serviço.");
-                return Err(format!("Permissão de Administrador necessária: {}", err).into());
-            }
-        };
+    /// Desinstalação idempotente
+    pub fn uninstall_service() -> Result<ServiceOperationResult, Box<dyn Error>> {
+        let (is_installed, _) = query_raw_service().unwrap_or((false, "NOT_INSTALLED".to_string()));
 
-        println!("Parando e removendo serviço '{}'...", SERVICE_NAME);
+        if !is_installed {
+            return Ok(ServiceOperationResult {
+                success: true,
+                service_name: SERVICE_NAME.to_string(),
+                action: "uninstall".to_string(),
+                status: "not_installed".to_string(),
+                message: format!("Serviço '{}' não está instalado no sistema.", SERVICE_NAME),
+                details: None,
+            });
+        }
 
-        // Parar via sc.exe
+        // Parar serviço antes de deletar
         let _ = Command::new("sc.exe").args(["stop", SERVICE_NAME]).output();
         std::thread::sleep(Duration::from_millis(500));
 
-        let service = match manager.open_service(SERVICE_NAME, ServiceAccess::ALL_ACCESS) {
-            Ok(s) => s,
-            Err(_) => {
-                // Fallback para sc delete
-                let _ = Command::new("sc.exe").args(["delete", SERVICE_NAME]).output();
-                println!(" [OK] Serviço '{}' removido.", SERVICE_NAME);
-                return Ok(());
-            }
-        };
-
-        service.delete()?;
-        println!(" [OK] Serviço '{}' desinstalado com sucesso.", SERVICE_NAME);
-        Ok(())
+        let sc_delete = Command::new("sc.exe").args(["delete", SERVICE_NAME]).output()?;
+        if sc_delete.status.success() {
+            Ok(ServiceOperationResult {
+                success: true,
+                service_name: SERVICE_NAME.to_string(),
+                action: "uninstall".to_string(),
+                status: "removed".to_string(),
+                message: format!("Serviço '{}' desinstalado com sucesso.", SERVICE_NAME),
+                details: None,
+            })
+        } else {
+            let err = String::from_utf8_lossy(&sc_delete.stderr);
+            Ok(ServiceOperationResult {
+                success: false,
+                service_name: SERVICE_NAME.to_string(),
+                action: "uninstall".to_string(),
+                status: "delete_failed".to_string(),
+                message: format!("Falha ao remover serviço: {}", err.trim()),
+                details: Some(err.to_string()),
+            })
+        }
     }
 
-    /// Consulta e exibe o status atual do serviço
-    pub fn service_status() -> Result<(), Box<dyn Error>> {
-        let output = Command::new("sc.exe")
-            .args(["query", SERVICE_NAME])
-            .output()?;
-
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        println!("==================================================");
-        println!(" Status do Serviço Windows: {}", SERVICE_NAME);
-        println!("==================================================");
-        if stdout.contains("RUNNING") {
-            println!(" Estado: EM EXECUÇÃO (RUNNING)");
-        } else if stdout.contains("STOPPED") {
-            println!(" Estado: PARADO (STOPPED)");
-        } else if stdout.contains("PAUSED") {
-            println!(" Estado: PAUSADO (PAUSED)");
-        } else if stdout.contains("1060") || stdout.contains("FAILED") || stdout.contains("não existe") {
-            println!(" Estado: NÃO INSTALADO");
-        } else {
-            println!("{}", stdout);
+    /// Início de serviço idempotente
+    pub fn start_service() -> Result<ServiceOperationResult, Box<dyn Error>> {
+        let (is_installed, state) = query_raw_service()?;
+        if !is_installed {
+            return Ok(ServiceOperationResult {
+                success: false,
+                service_name: SERVICE_NAME.to_string(),
+                action: "start".to_string(),
+                status: "not_installed".to_string(),
+                message: format!("Serviço '{}' não está instalado.", SERVICE_NAME),
+                details: None,
+            });
         }
-        println!("==================================================");
-        Ok(())
+
+        if state == "RUNNING" {
+            return Ok(ServiceOperationResult {
+                success: true,
+                service_name: SERVICE_NAME.to_string(),
+                action: "start".to_string(),
+                status: "already_running".to_string(),
+                message: format!("Serviço '{}' já está em execução.", SERVICE_NAME),
+                details: None,
+            });
+        }
+
+        let sc_start = Command::new("sc.exe").args(["start", SERVICE_NAME]).output()?;
+        let success = sc_start.status.success();
+        let stdout = String::from_utf8_lossy(&sc_start.stdout);
+
+        Ok(ServiceOperationResult {
+            success,
+            service_name: SERVICE_NAME.to_string(),
+            action: "start".to_string(),
+            status: if success { "started".to_string() } else { "failed".to_string() },
+            message: if success {
+                format!("Serviço '{}' iniciado com sucesso.", SERVICE_NAME)
+            } else {
+                format!("Falha ao iniciar serviço: {}", stdout.trim())
+            },
+            details: Some(stdout.to_string()),
+        })
+    }
+
+    /// Parada de serviço idempotente
+    pub fn stop_service() -> Result<ServiceOperationResult, Box<dyn Error>> {
+        let (is_installed, state) = query_raw_service()?;
+        if !is_installed {
+            return Ok(ServiceOperationResult {
+                success: true,
+                service_name: SERVICE_NAME.to_string(),
+                action: "stop".to_string(),
+                status: "not_installed".to_string(),
+                message: format!("Serviço '{}' não está instalado.", SERVICE_NAME),
+                details: None,
+            });
+        }
+
+        if state == "STOPPED" {
+            return Ok(ServiceOperationResult {
+                success: true,
+                service_name: SERVICE_NAME.to_string(),
+                action: "stop".to_string(),
+                status: "already_stopped".to_string(),
+                message: format!("Serviço '{}' já se encontra parado.", SERVICE_NAME),
+                details: None,
+            });
+        }
+
+        let sc_stop = Command::new("sc.exe").args(["stop", SERVICE_NAME]).output()?;
+        let success = sc_stop.status.success();
+        let stdout = String::from_utf8_lossy(&sc_stop.stdout);
+
+        Ok(ServiceOperationResult {
+            success,
+            service_name: SERVICE_NAME.to_string(),
+            action: "stop".to_string(),
+            status: if success { "stopped".to_string() } else { "failed".to_string() },
+            message: if success {
+                format!("Comando de parada enviado ao serviço '{}'.", SERVICE_NAME)
+            } else {
+                format!("Falha ao parar serviço: {}", stdout.trim())
+            },
+            details: Some(stdout.to_string()),
+        })
+    }
+
+    /// Consulta de status tipada e completa
+    pub fn service_status() -> Result<ServiceStatusInfo, Box<dyn Error>> {
+        let (is_installed, state) = query_raw_service()?;
+        if !is_installed {
+            return Ok(ServiceStatusInfo {
+                service_name: SERVICE_NAME.to_string(),
+                display_name: SERVICE_DISPLAY_NAME.to_string(),
+                installed: false,
+                state: "NOT_INSTALLED".to_string(),
+                start_type: None,
+                binary_path: None,
+                is_delayed_auto_start: None,
+            });
+        }
+
+        // Consultar configuração detalhada via sc qc
+        let qc_output = Command::new("sc.exe").args(["qc", SERVICE_NAME]).output();
+        let mut binary_path = None;
+        let mut start_type = None;
+        let mut is_delayed = None;
+
+        if let Ok(qc) = qc_output {
+            let qc_text = String::from_utf8_lossy(&qc.stdout);
+            for line in qc_text.lines() {
+                let trimmed = line.trim();
+                if trimmed.starts_with("BINARY_PATH_NAME") {
+                    if let Some((_, val)) = trimmed.split_once(':') {
+                        binary_path = Some(val.trim().to_string());
+                    }
+                } else if trimmed.starts_with("START_TYPE") {
+                    if let Some((_, val)) = trimmed.split_once(':') {
+                        start_type = Some(val.trim().to_string());
+                        if val.contains("DELAYED") || val.contains("ATRASO") {
+                            is_delayed = Some(true);
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(ServiceStatusInfo {
+            service_name: SERVICE_NAME.to_string(),
+            display_name: SERVICE_DISPLAY_NAME.to_string(),
+            installed: true,
+            state,
+            start_type,
+            binary_path,
+            is_delayed_auto_start: is_delayed,
+        })
     }
 }
 
@@ -303,22 +500,63 @@ pub mod non_win {
     use super::*;
 
     pub fn run_service() -> Result<(), Box<dyn Error>> {
-        Err("Execução como serviço nativo está disponível apenas no Windows.".into())
+        Err("Execução como serviço nativo de sistema está disponível apenas no Windows.".into())
     }
 
-    pub fn install_service() -> Result<(), Box<dyn Error>> {
-        println!("Aviso: O comando --install-service destina-se a sistemas Windows.");
-        Ok(())
+    pub fn install_service() -> Result<ServiceOperationResult, Box<dyn Error>> {
+        Ok(ServiceOperationResult {
+            success: false,
+            service_name: SERVICE_NAME.to_string(),
+            action: "install".to_string(),
+            status: "unsupported_platform".to_string(),
+            message: "Gerenciamento de serviço nativo Windows não suportado nesta plataforma.".to_string(),
+            details: None,
+        })
     }
 
-    pub fn uninstall_service() -> Result<(), Box<dyn Error>> {
-        println!("Aviso: O comando --uninstall-service destina-se a sistemas Windows.");
-        Ok(())
+    pub fn uninstall_service() -> Result<ServiceOperationResult, Box<dyn Error>> {
+        Ok(ServiceOperationResult {
+            success: true,
+            service_name: SERVICE_NAME.to_string(),
+            action: "uninstall".to_string(),
+            status: "unsupported_platform".to_string(),
+            message: "Serviço não aplicável nesta plataforma.".to_string(),
+            details: None,
+        })
     }
 
-    pub fn service_status() -> Result<(), Box<dyn Error>> {
-        println!("Aviso: O comando --service-status destina-se a sistemas Windows.");
-        Ok(())
+    pub fn start_service() -> Result<ServiceOperationResult, Box<dyn Error>> {
+        Ok(ServiceOperationResult {
+            success: false,
+            service_name: SERVICE_NAME.to_string(),
+            action: "start".to_string(),
+            status: "unsupported_platform".to_string(),
+            message: "Comando start não aplicável nesta plataforma.".to_string(),
+            details: None,
+        })
+    }
+
+    pub fn stop_service() -> Result<ServiceOperationResult, Box<dyn Error>> {
+        Ok(ServiceOperationResult {
+            success: false,
+            service_name: SERVICE_NAME.to_string(),
+            action: "stop".to_string(),
+            status: "unsupported_platform".to_string(),
+            message: "Comando stop não aplicável nesta plataforma.".to_string(),
+            details: None,
+        })
+    }
+
+    pub fn service_status() -> Result<ServiceStatusInfo, Box<dyn Error>> {
+        Ok(ServiceStatusInfo {
+            service_name: SERVICE_NAME.to_string(),
+            display_name: SERVICE_DISPLAY_NAME.to_string(),
+            installed: false,
+            state: "UNSUPPORTED_PLATFORM".to_string(),
+            start_type: None,
+            binary_path: None,
+            is_delayed_auto_start: None,
+        })
     }
 }
 
@@ -327,3 +565,58 @@ pub use win::*;
 
 #[cfg(not(windows))]
 pub use non_win::*;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_bin_path_quoting_with_spaces() {
+        let path = r#"C:\Program Files\Witiquetas\Agent\witiquetas-agent.exe"#;
+        let formatted = format_service_bin_path(path);
+        assert_eq!(
+            formatted,
+            r#""C:\Program Files\Witiquetas\Agent\witiquetas-agent.exe" --run-service"#
+        );
+
+        let sc_arg = format_sc_binpath_arg(path);
+        assert_eq!(
+            sc_arg,
+            r#"binPath= "C:\Program Files\Witiquetas\Agent\witiquetas-agent.exe" --run-service"#
+        );
+    }
+
+    #[test]
+    fn test_service_operation_result_serialization() {
+        let result = ServiceOperationResult {
+            success: true,
+            service_name: SERVICE_NAME.to_string(),
+            action: "install".to_string(),
+            status: "created".to_string(),
+            message: "Serviço instalado com sucesso.".to_string(),
+            details: Some("Delayed auto-start configurado".to_string()),
+        };
+
+        let json = serde_json::to_string(&result).unwrap();
+        assert!(json.contains("\"success\":true"));
+        assert!(json.contains("\"serviceName\":\"WitiquetasAgent\""));
+        assert!(json.contains("\"action\":\"install\""));
+    }
+
+    #[test]
+    fn test_service_status_info_serialization() {
+        let status = ServiceStatusInfo {
+            service_name: SERVICE_NAME.to_string(),
+            display_name: SERVICE_DISPLAY_NAME.to_string(),
+            installed: true,
+            state: "RUNNING".to_string(),
+            start_type: Some("DELAYED_AUTO_START".to_string()),
+            binary_path: Some(r#""C:\Program Files\Witiquetas\Agent\witiquetas-agent.exe" --run-service"#.to_string()),
+            is_delayed_auto_start: Some(true),
+        };
+
+        let json = serde_json::to_string(&status).unwrap();
+        assert!(json.contains("\"installed\":true"));
+        assert!(json.contains("\"state\":\"RUNNING\""));
+    }
+}

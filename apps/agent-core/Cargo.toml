@@ -1,9 +1,10 @@
 [package]
 name = "witiquetas-agent-core"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 authors = ["Wittemberg / Witiquetas"]
 description = "Witiquetas Print Runtime & Agent Core Headless"
+build = "build.rs"
 
 [dependencies]
 tokio = { version = "1.38", features = ["full"] }

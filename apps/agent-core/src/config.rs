@@ -20,7 +20,7 @@ pub const MIN_POLL_INTERVAL_SECS: u64 = 5;
 pub const MAX_POLL_INTERVAL_SECS: u64 = 300;
 pub const DEFAULT_POLL_INTERVAL_SECS: u64 = 15;
 pub const DEFAULT_TIMEOUT_SECS: u64 = 30;
-pub const CURRENT_AGENT_VERSION: &str = "0.1.0";
+pub const CURRENT_AGENT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AgentConfig {

@@ -126,7 +126,7 @@ export interface PrinterProfileDTO {
 // ==========================================
 // LOCAL AGENTS & PAIRING (AGENT PROTOCOL V1)
 // ==========================================
-export type AgentStatus = 'ONLINE' | 'OFFLINE' | 'UNPAIRED' | 'DEGRADED' | 'REVOKED';
+export type AgentStatus = 'ONLINE' | 'OFFLINE' | 'UNPAIRED' | 'DEGRADED' | 'REVOKED' | 'PAIRING' | 'ERROR';
 export type AgentServiceMode = 'SERVICE' | 'STANDALONE_CLI' | 'DESKTOP_SYSTRAY';
 export type AgentOperatingSystem = 'windows' | 'linux' | 'macos' | 'freebsd' | 'unknown';
 export type AgentArchitecture = 'x86_64' | 'aarch64' | 'armv7' | 'x86' | 'unknown';

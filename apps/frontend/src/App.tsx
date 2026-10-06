@@ -21,6 +21,11 @@ import EditorLayout from './editor/EditorLayout.js';
 import NewTemplateWizard from './editor/NewTemplateWizard.js';
 import DownloadAgentModal from './agent/DownloadAgentModal.js';
 import PairAgentModal from './agent/PairAgentModal.js';
+import { AgentStatusBadge } from './agent/AgentStatusBadge.js';
+import { ReconnectAgentModal } from './agent/ReconnectAgentModal.js';
+import { AgentDetailsModal } from './agent/AgentDetailsModal.js';
+import { formatLastSeen } from './agent/agentStatusUtils.js';
+import type { AgentDTO } from '@witiquetas/contracts';
 import {
   fetchSessionContext,
   logoutUser,
@@ -121,7 +126,9 @@ export default function App() {
   const [isWizardOpen, setIsWizardOpen] = useState<boolean>(false);
   const [isDownloadModalOpen, setIsDownloadModalOpen] = useState<boolean>(false);
   const [isPairModalOpen, setIsPairModalOpen] = useState<boolean>(false);
-  const [agents, setAgents] = useState<any[]>([]);
+  const [agents, setAgents] = useState<AgentDTO[]>([]);
+  const [reconnectAgent, setReconnectAgent] = useState<AgentDTO | null>(null);
+  const [detailsAgent, setDetailsAgent] = useState<AgentDTO | null>(null);
 
   // Sessão Humana e Contexto Efetivo (Pacote 5.2)
   const [sessionContext, setSessionContext] = useState<SessionContext | null>(null);
@@ -268,7 +275,16 @@ export default function App() {
 
       setHealth(healthRes);
       setVersion(versionRes);
-      setAgents(agentsRes.agents || []);
+      const fetchedAgents: AgentDTO[] = agentsRes.agents || [];
+      setAgents(fetchedAgents);
+      if (reconnectAgent) {
+        const updated = fetchedAgents.find((a) => a.id === reconnectAgent.id);
+        if (updated) setReconnectAgent(updated);
+      }
+      if (detailsAgent) {
+        const updated = fetchedAgents.find((a) => a.id === detailsAgent.id);
+        if (updated) setDetailsAgent(updated);
+      }
       setLastUpdated(new Date().toLocaleTimeString('pt-BR'));
     } catch (err: any) {
       setError(err.message || 'Erro ao comunicar com a API Backend.');
@@ -656,24 +672,27 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Card Agent de Impressão */}
-              <div className="card">
+              {/* Card Agent de Impressão (Package 5.7.2) */}
+              <div className="card" data-testid="dashboard-agent-card">
                 <div className="card-header">
                   <div>
                     <div className="card-title">
                       <Cpu size={20} color="var(--accent-blue)" />
                       Agent de Impressão
                     </div>
-                    <div className="card-subtitle">Daemon Headless de Hardware (Rust)</div>
+                    <div className="card-subtitle">
+                      {agents.length === 0
+                        ? 'Nenhum Agent configurado'
+                        : agents.length === 1
+                        ? '1 computador cadastrado'
+                        : `${agents.length} computadores cadastrados`}
+                    </div>
                   </div>
                   {agents.length > 0 ? (
-                    <span className={`badge ${agents[0].status === 'ONLINE' ? 'badge-success' : 'badge-danger'}`}>
-                      {agents[0].status === 'ONLINE' ? <CheckCircle2 size={12} /> : <XCircle size={12} />}
-                      {agents[0].status === 'ONLINE' ? 'Online' : 'Offline'}
-                    </span>
+                    <AgentStatusBadge status={agents[0].status} />
                   ) : (
                     <span className="badge badge-warning">
-                      Sem Agent
+                      Nenhum Agent
                     </span>
                   )}
                 </div>
@@ -681,38 +700,80 @@ export default function App() {
                 <div className="metrics">
                   <div className="metric-item">
                     <span className="metric-label">Computador</span>
-                    <span className="metric-value">{agents[0]?.machineName || 'Nenhum'}</span>
-                  </div>
-                  <div className="metric-item metric-item-full">
-                    <span className="metric-label">Sistema / SO</span>
-                    <span className="metric-value">{agents[0] ? `${agents[0].os} (${agents[0].architecture})` : 'Multiplataforma'}</span>
+                    <span className="metric-value">
+                      {agents.length > 0 ? agents[0].machineName : 'Nenhum configurado'}
+                    </span>
                   </div>
                   <div className="metric-item">
-                    <span className="metric-label">Protocolo</span>
-                    <span className="metric-value">Agent Protocol v1</span>
+                    <span className="metric-label">Última conexão</span>
+                    <span className="metric-value">
+                      {agents.length > 0 ? formatLastSeen(agents[0].lastSeenAt) : 'N/A'}
+                    </span>
+                  </div>
+                  <div className="metric-item">
+                    <span className="metric-label">Sistema / SO</span>
+                    <span className="metric-value">
+                      {agents[0] ? `${agents[0].os} (${agents[0].architecture})` : 'Multiplataforma'}
+                    </span>
                   </div>
                   <div className="metric-item">
                     <span className="metric-label">Versão</span>
-                    <span className="metric-value">{agents[0]?.agentVersion ? `v${agents[0].agentVersion}` : 'v0.1.0'}</span>
+                    <span className="metric-value">
+                      {agents[0]?.agentVersion ? `v${agents[0].agentVersion}` : 'v0.1.0'}
+                    </span>
                   </div>
                 </div>
 
                 <div className="card-actions">
-                  <button
-                    className="btn btn-primary"
-                    onClick={() => setIsPairModalOpen(true)}
-                    style={{ background: 'linear-gradient(135deg, #10b981, #3b82f6)' }}
-                  >
-                    <KeyRound size={15} />
-                    <span>Conectar Agent</span>
-                  </button>
-                  <button
-                    className="btn"
-                    onClick={() => setIsDownloadModalOpen(true)}
-                  >
-                    <Download size={15} />
-                    <span>Baixar Agent</span>
-                  </button>
+                  {agents.length === 0 ? (
+                    <button
+                      className="btn btn-primary"
+                      onClick={() => setIsPairModalOpen(true)}
+                    >
+                      <KeyRound size={15} />
+                      <span>Adicionar Agent</span>
+                    </button>
+                  ) : agents[0].status === 'ONLINE' ? (
+                    <>
+                      <button
+                        className="btn btn-primary"
+                        onClick={() => setDetailsAgent(agents[0])}
+                      >
+                        <CheckCircle2 size={15} />
+                        <span>Detalhes</span>
+                      </button>
+                      <button
+                        className="btn btn-secondary"
+                        onClick={() => {
+                          setCurrentModule('agents');
+                          window.location.hash = '#agents';
+                        }}
+                      >
+                        <Settings size={15} />
+                        <span>Administração</span>
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        className="btn btn-primary"
+                        onClick={() => setReconnectAgent(agents[0])}
+                      >
+                        <RefreshCw size={15} />
+                        <span>Reconectar</span>
+                      </button>
+                      <button
+                        className="btn btn-secondary"
+                        onClick={() => {
+                          setCurrentModule('agents');
+                          window.location.hash = '#agents';
+                        }}
+                      >
+                        <Settings size={15} />
+                        <span>Administração</span>
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
@@ -846,6 +907,30 @@ export default function App() {
         isOpen={isPairModalOpen}
         onClose={() => setIsPairModalOpen(false)}
         onSuccess={fetchData}
+      />
+
+      {/* Modal de Reconexão para Agent Offline (Package 5.7.2) */}
+      <ReconnectAgentModal
+        isOpen={Boolean(reconnectAgent)}
+        agent={reconnectAgent}
+        onClose={() => setReconnectAgent(null)}
+        onRefresh={fetchData}
+        onReinstall={() => {
+          setReconnectAgent(null);
+          setIsPairModalOpen(true);
+        }}
+      />
+
+      {/* Modal de Detalhes e Diagnóstico do Agent (Package 5.7.2) */}
+      <AgentDetailsModal
+        isOpen={Boolean(detailsAgent)}
+        agent={detailsAgent}
+        onClose={() => setDetailsAgent(null)}
+        onReconnect={() => {
+          const a = detailsAgent;
+          setDetailsAgent(null);
+          setReconnectAgent(a);
+        }}
       />
     </ApplicationShell>
   );

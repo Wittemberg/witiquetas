@@ -554,6 +554,15 @@ router.delete('/:id', authenticateWebUser, async (req: Request, res: Response) =
   res.json({ success: true, message: 'Agente revogado com sucesso.' });
 });
 
+router.post('/:id/revoke', authenticateWebUser, async (req: Request, res: Response) => {
+  const user = (req as any).user as AuthWebUser;
+  const success = await AgentsRepository.revoke(req.params.id, user.companyId);
+  if (!success) {
+    return res.status(404).json({ error: 'Agente não encontrado ou sem permissão para revogação.' });
+  }
+  res.json({ success: true, message: 'Agente revogado com sucesso.' });
+});
+
 // Resolução determinística do caminho do binário do Agent Windows x64:
 // Compatível com CommonJS, ESM, container Docker (WORKDIR /app/apps/backend) e ambiente de desenvolvimento.
 export function getAgentWindowsX64Path(): string {

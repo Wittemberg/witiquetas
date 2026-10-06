@@ -1,9 +1,12 @@
 pub mod config;
+pub mod diagnostics;
 pub mod identity;
 pub mod logging;
+pub mod output;
 pub mod pairing;
 pub mod payload;
 pub mod protocol;
 pub mod runtime;
 pub mod service;
 pub mod transport;
+pub mod version;

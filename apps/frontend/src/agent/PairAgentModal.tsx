@@ -11,7 +11,7 @@ import {
   Cpu,
   Monitor,
   ShieldCheck,
-  Terminal,
+  Laptop,
 } from 'lucide-react';
 import { ensurePreRbacSession } from '../auth/session';
 
@@ -215,7 +215,7 @@ export default function PairAgentModal({ isOpen, onClose, onSuccess }: PairAgent
                 Conectar Agent de Impressão
               </h2>
               <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '0.15rem 0 0 0' }}>
-                {pairingData?.companyName || 'Pareamento Seguro de Terminal'}
+                {pairingData?.companyName || 'Pareamento Seguro do Agent'}
               </p>
             </div>
           </div>
@@ -355,7 +355,7 @@ export default function PairAgentModal({ isOpen, onClose, onSuccess }: PairAgent
                 </div>
               </div>
 
-              {/* Instruções Rápidas */}
+              {/* Instruções de Conexão */}
               <div
                 style={{
                   background: 'var(--bg-card-hover)',
@@ -367,13 +367,13 @@ export default function PairAgentModal({ isOpen, onClose, onSuccess }: PairAgent
                 }}
               >
                 <div style={{ fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.4rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                  <Terminal size={14} color="var(--accent-cyan)" />
-                  <span>Passo a passo no terminal:</span>
+                  <Laptop size={15} color="var(--accent-blue)" />
+                  <span>Como conectar o novo computador:</span>
                 </div>
                 <ol style={{ margin: 0, paddingLeft: '1.2rem', lineHeight: 1.6 }}>
-                  <li>Execute <code>witiquetas-agent-windows-x64.exe</code> no computador da loja/estoque.</li>
-                  <li>Cole ou digite o código <strong>{pairingData.pairingCode}</strong> e pressione Enter.</li>
-                  <li>Esta tela reconhecerá a conexão instantaneamente.</li>
+                  <li>Abra o <strong>Witiquetas Agent</strong> no computador conectado às impressoras térmicas.</li>
+                  <li>Informe o código de pareamento <strong>{pairingData.pairingCode}</strong> para autorizar a máquina.</li>
+                  <li>A conexão será confirmada automaticamente nesta tela em poucos instantes.</li>
                 </ol>
               </div>
             </>
@@ -413,7 +413,7 @@ export default function PairAgentModal({ isOpen, onClose, onSuccess }: PairAgent
                   Agent Conectado com Sucesso!
                 </h3>
                 <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: 0 }}>
-                  O terminal agora está autorizado e pronto para receber ordens de impressão direta.
+                  O computador agora está autorizado e pronto para receber ordens de impressão direta.
                 </p>
               </div>
 

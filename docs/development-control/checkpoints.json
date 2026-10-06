@@ -1,6 +1,43 @@
 {
   "checkpoints": [
     {
+      "sha": "pending-5.7.2.1",
+      "shortSha": "p-5.7.2.1",
+      "date": "2026-10-06T18:45:00Z",
+      "phase": "5",
+      "patch": "5.7.2.1",
+      "title": "5.7.2.1 — Agent Operational UX Consistency: Dashboard + Admin + Reconnect Flow",
+      "type": "IMPROVEMENT",
+      "capabilities": [
+        "cap-admin-printers-agents"
+      ],
+      "testsPassed": true,
+      "deployed": false,
+      "manualValidation": false,
+      "homologated": false,
+      "status": "IMPLEMENTED_AWAITING_MANUAL_HOMOLOGATION",
+      "evidence": "PACOTE 5.7.2.1 IMPLEMENTADO: Consistência operacional de Agentes entre Dashboard e Administração. 1) Separação clara entre Agent Cadastrado (identidade persistente salva) e Agent Conectado (heartbeat recente em runtime). 2) Estados canônicos ONLINE, OFFLINE, PAIRING, REVOKED, ERROR com AgentStatusBadge unificado. 3) Fluxo de Reconectar com ReconnectAgentModal não destrutivo, sem geração de identidade espúria, sem marcação artificial de online e com verificação em tempo real. 4) Zero-Terminal UX estrito: remoção de passos de terminal para usuário final e transparência sobre evolução do instalador/tray. 5) Ação genérica renomeada para 'Adicionar Novo Agent' e download reorganizado como instalador. 6) Suíte de testes automatizados e invariantes do DCC 100% GREEN."
+    },
+    {
+      "sha": "ec7de253eb633c07f79d9f7c46ac621c58beb640",
+      "shortSha": "ec7de25",
+      "date": "2026-10-06T15:30:00Z",
+      "phase": "5",
+      "patch": "5.7.2",
+      "title": "5.7.2 — Agent Distribution Foundation: Core Service & Zero-Terminal Readiness",
+      "type": "FEATURE",
+      "capabilities": [
+        "cap-admin-printers-agents",
+        "cap-agent-distribution-foundation"
+      ],
+      "testsPassed": true,
+      "deployed": false,
+      "manualValidation": false,
+      "homologated": false,
+      "status": "IMPLEMENTED_AWAITING_MANUAL_HOMOLOGATION",
+      "evidence": "PACOTE 5.7.2 IMPLEMENTADO: Fundação de distribuição profissional do Agent Core e prontidão para experiência Zero-Terminal. Endurecimento do Windows Service (WitiquetasAgent, Delayed Auto-Start, restart em falha, quoting rigoroso de caminhos com espaços como Program Files), idempotência estrita de operações de serviço, interface de máquina padronizada --json com StructuredResponse<T> e exit codes determinísticos (0, 1, 2, 10, 20, 30, 31), módulo de diagnóstico não-destrutivo com garantia absoluta de redaction de credenciais/tokens e auditoria de ACL em ProgramData, separação total do pairing core da CLI com normalização de código WIT-XXXX-XXXX e comando unpair seguro, injeção de metadados em compile-time (commit, timestamp ISO 8601, target architecture via build.rs) e suíte Rust de 74 testes passando 100% (53 unitários + 9 distribuição + 12 serviços residentes) com zero regressões no ecossistema TypeScript."
+    },
+    {
       "sha": "b226d0f8d167825b597b4ec8f121bbffbb961ef0",
       "shortSha": "b226d0f",
       "date": "2026-10-05T13:40:00Z",

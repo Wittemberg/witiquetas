@@ -11,7 +11,6 @@ import {
   AlertCircle,
   HelpCircle,
   Monitor,
-  Terminal,
   Layers,
   Sparkles,
 } from 'lucide-react';
@@ -454,13 +453,13 @@ export default function DownloadAgentModal({ isOpen, onClose }: DownloadAgentMod
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-              <Terminal size={15} color="var(--accent-cyan)" />
-              <span>Como executar o Agent após o download:</span>
+              <Laptop size={15} color="var(--accent-blue)" />
+              <span>Como iniciar o Agent após o download:</span>
             </div>
             <ol style={{ margin: '0.2rem 0 0 1.2rem', padding: 0, fontSize: '0.8rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
-              <li>Execute o arquivo <code>witiquetas-agent-windows-x64.exe</code> no computador conectado à impressora.</li>
-              <li>O Agent iniciará automaticamente e solicitará o pareamento de segurança.</li>
-              <li>Pronto! Todas as impressões disparadas pelo navegador serão enviadas diretamente em RAW TCP.</li>
+              <li>Abra o arquivo <strong>witiquetas-agent-windows-x64.exe</strong> no computador conectado à impressora.</li>
+              <li>O Agent iniciará e solicitará o código de pareamento gerado no painel Web.</li>
+              <li>Pronto! Todas as impressões disparadas pelo navegador serão enviadas diretamente para as impressoras locais.</li>
             </ol>
           </div>
         </div>

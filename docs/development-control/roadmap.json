@@ -1372,13 +1372,15 @@
           "physicalValidation": false,
           "frozen": false,
           "evidence": [
-            "tests/package57PrintersAndAgentsGovernance.test.ts"
+            "tests/package57PrintersAndAgentsGovernance.test.ts",
+            "tests/package5720AgentOperationalUxConsistency.test.ts"
           ],
           "dependencies": [
             "cap-admin-shell"
           ],
           "notes": [
-            "PACOTE 5.7: Governança completa de impressoras físicas e agentes locais. Suporte a RAW_TCP, Windows Spooler, Serial (RS232) e CUPS. Gerenciamento de pareamento WIT-XXXX-XXXX, status de heartbeat e isolamento multi-tenant."
+            "PACOTE 5.7: Governança completa de impressoras físicas e agentes locais. Suporte a RAW_TCP, Windows Spooler, Serial (RS232) e CUPS. Gerenciamento de pareamento WIT-XXXX-XXXX, status de heartbeat e isolamento multi-tenant.",
+            "PACOTE 5.7.2.1: Consistência operacional completa de Agentes entre Dashboard e Administração (Reconnect Flow, AgentStatusBadge, Zero-Terminal UX)."
           ]
         },
         {

@@ -16,6 +16,10 @@ import {
 } from 'lucide-react';
 import { agentsApi, type PairingCodeResponse } from '../../services/agentsApi.js';
 import type { AgentDTO } from '@witiquetas/contracts';
+import { AgentStatusBadge } from '../../agent/AgentStatusBadge.js';
+import { ReconnectAgentModal } from '../../agent/ReconnectAgentModal.js';
+import { AgentDetailsModal } from '../../agent/AgentDetailsModal.js';
+import { formatLastSeen } from '../../agent/agentStatusUtils.js';
 
 export function formatPairingExpiration(expiresAt?: string, expiresInSeconds?: number): {
   primary: string;
@@ -72,12 +76,25 @@ export const AgentsAdminView: React.FC<AgentsAdminViewProps> = ({ canManage = tr
   const [copiedCommand, setCopiedCommand] = useState(false);
   const [revokingId, setRevokingId] = useState<string | null>(null);
 
+  // Reconnect & Details Modal State (Package 5.7.2)
+  const [reconnectAgent, setReconnectAgent] = useState<AgentDTO | null>(null);
+  const [detailsAgent, setDetailsAgent] = useState<AgentDTO | null>(null);
+
   const loadAgents = async () => {
     try {
       setLoading(true);
       setError(null);
       const list = await agentsApi.listAgents();
       setAgents(list);
+      // Sincroniza instâncias de modal abertas
+      if (reconnectAgent) {
+        const updated = list.find((a) => a.id === reconnectAgent.id);
+        if (updated) setReconnectAgent(updated);
+      }
+      if (detailsAgent) {
+        const updated = list.find((a) => a.id === detailsAgent.id);
+        if (updated) setDetailsAgent(updated);
+      }
     } catch (err: any) {
       setError(err.message || 'Falha ao carregar agentes locais.');
     } finally {
@@ -190,7 +207,7 @@ export const AgentsAdminView: React.FC<AgentsAdminViewProps> = ({ canManage = tr
             Agentes Locais de Impressão (Witiquetas Agent Core)
           </div>
           <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
-            {agents.length} agente(s) pareado(s) • {onlineCount} online recebendo impressões locais
+            {agents.length} agente(s) cadastrado(s) • {onlineCount} online recebendo impressões locais
           </div>
         </div>
 
@@ -202,7 +219,7 @@ export const AgentsAdminView: React.FC<AgentsAdminViewProps> = ({ canManage = tr
             title="Baixar executável do agente para Windows"
           >
             <Download size={16} />
-            Baixar Agent (x64)
+            Baixar Instalador
           </a>
 
           {canManage && (
@@ -214,7 +231,7 @@ export const AgentsAdminView: React.FC<AgentsAdminViewProps> = ({ canManage = tr
               style={{ fontSize: '0.8rem', padding: '0.45rem 0.85rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
             >
               <Key size={16} />
-              {generatingCode ? 'Gerando...' : 'Gerar Código de Pareamento'}
+              {generatingCode ? 'Gerando...' : 'Adicionar Novo Agent'}
             </button>
           )}
 
@@ -242,7 +259,7 @@ export const AgentsAdminView: React.FC<AgentsAdminViewProps> = ({ canManage = tr
           <div style={{ padding: '3.5rem 1rem', textAlign: 'center', color: 'var(--text-muted)' }}>
             <Laptop size={44} style={{ margin: '0 auto 0.75rem auto', opacity: 0.35 }} />
             <div style={{ fontSize: '1.05rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '0.35rem' }}>
-              Nenhum agente de impressão pareado
+              Nenhum agente de impressão cadastrado
             </div>
             <div style={{ fontSize: '0.82rem', maxWidth: '480px', margin: '0 auto 1.25rem auto' }}>
               O Witiquetas Agent Core conecta seus computadores locais para enviar comandos diretamente a impressoras USB, Spooler ou Seriais que não estão expostas na nuvem.
@@ -255,7 +272,7 @@ export const AgentsAdminView: React.FC<AgentsAdminViewProps> = ({ canManage = tr
                 style={{ fontSize: '0.85rem' }}
               >
                 <Key size={16} />
-                Conectar Primeiro Agente
+                Adicionar Novo Agent
               </button>
             )}
           </div>
@@ -266,6 +283,7 @@ export const AgentsAdminView: React.FC<AgentsAdminViewProps> = ({ canManage = tr
               return (
                 <div
                   key={agent.id}
+                  data-testid={`agent-card-${agent.id}`}
                   style={{
                     padding: '1.15rem',
                     borderRadius: '8px',
@@ -284,9 +302,7 @@ export const AgentsAdminView: React.FC<AgentsAdminViewProps> = ({ canManage = tr
                       </span>
                     </div>
 
-                    <span className={`badge ${isOnline ? 'badge-success' : 'badge-secondary'}`}>
-                      {isOnline ? 'Online' : 'Offline'}
-                    </span>
+                    <AgentStatusBadge status={agent.status} />
                   </div>
 
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
@@ -299,7 +315,7 @@ export const AgentsAdminView: React.FC<AgentsAdminViewProps> = ({ canManage = tr
                       <span>v{agent.agentVersion}</span>
                     </div>
                     <div>
-                      <span style={{ display: 'block', fontWeight: 600 }}>Último Heartbeat:</span>
+                      <span style={{ display: 'block', fontWeight: 600 }}>Última Conexão:</span>
                       <span>{formatLastSeen(agent.lastSeenAt)}</span>
                     </div>
                     <div>
@@ -310,20 +326,56 @@ export const AgentsAdminView: React.FC<AgentsAdminViewProps> = ({ canManage = tr
                     </div>
                   </div>
 
-                  {canManage && (
-                    <div style={{ display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid var(--border-color)', paddingTop: '0.65rem', marginTop: '0.25rem' }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      flexWrap: 'wrap',
+                      gap: '0.5rem',
+                      borderTop: '1px solid var(--border-color)',
+                      paddingTop: '0.65rem',
+                      marginTop: '0.25rem',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      {!isOnline ? (
+                        <button
+                          type="button"
+                          className="btn btn-primary"
+                          onClick={() => setReconnectAgent(agent)}
+                          style={{ fontSize: '0.75rem', padding: '0.35rem 0.75rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+                        >
+                          <RefreshCw size={13} />
+                          <span>Reconectar</span>
+                        </button>
+                      ) : null}
+
+                      <button
+                        type="button"
+                        className="btn btn-secondary"
+                        onClick={() => setDetailsAgent(agent)}
+                        style={{ fontSize: '0.75rem', padding: '0.35rem 0.65rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+                      >
+                        <CheckCircle2 size={13} />
+                        <span>Detalhes</span>
+                      </button>
+                    </div>
+
+                    {canManage && (
                       <button
                         type="button"
                         className="btn btn-danger"
                         onClick={() => handleRevoke(agent)}
                         disabled={revokingId === agent.id}
-                        style={{ fontSize: '0.75rem', padding: '0.3rem 0.65rem' }}
+                        style={{ fontSize: '0.75rem', padding: '0.35rem 0.65rem', marginLeft: 'auto' }}
+                        title="Revogar credencial do agente"
                       >
                         <Trash2 size={13} />
                         {revokingId === agent.id ? 'Revogando...' : 'Revogar Agente'}
                       </button>
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </div>
               );
             })}
@@ -492,7 +544,7 @@ export const AgentsAdminView: React.FC<AgentsAdminViewProps> = ({ canManage = tr
                     }}
                   >
                     <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', background: '#22c55e' }}></span>
-                    Comando no Terminal / Prompt
+                    Comando de Pareamento Rápido (Suporte Técnico)
                   </div>
 
                   <button
@@ -552,6 +604,30 @@ export const AgentsAdminView: React.FC<AgentsAdminViewProps> = ({ canManage = tr
           </div>
         );
       })()}
+
+      {/* Modal de Reconexão para Agent Offline (Package 5.7.2) */}
+      <ReconnectAgentModal
+        isOpen={Boolean(reconnectAgent)}
+        agent={reconnectAgent}
+        onClose={() => setReconnectAgent(null)}
+        onRefresh={loadAgents}
+        onReinstall={() => {
+          setReconnectAgent(null);
+          handleOpenPairingModal();
+        }}
+      />
+
+      {/* Modal de Detalhes e Diagnóstico do Agent (Package 5.7.2) */}
+      <AgentDetailsModal
+        isOpen={Boolean(detailsAgent)}
+        agent={detailsAgent}
+        onClose={() => setDetailsAgent(null)}
+        onReconnect={() => {
+          const a = detailsAgent;
+          setDetailsAgent(null);
+          setReconnectAgent(a);
+        }}
+      />
     </div>
   );
 };

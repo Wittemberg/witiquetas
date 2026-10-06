@@ -56,8 +56,8 @@ export const agentsApi = {
   },
 
   async revokeAgent(agentId: string): Promise<{ success: boolean; message: string }> {
-    return request<{ success: boolean; message: string }>(`/api/agents/${encodeURIComponent(agentId)}/revoke`, {
-      method: 'POST',
+    return request<{ success: boolean; message: string }>(`/api/agents/${encodeURIComponent(agentId)}`, {
+      method: 'DELETE',
     });
   },
 };

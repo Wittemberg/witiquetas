@@ -1,8 +1,8 @@
 {
   "checkpoints": [
     {
-      "sha": "pending-5.7.2.1",
-      "shortSha": "p-5.7.2.1",
+      "sha": "754b17c80eeacbb26a76059c22e43ffaeeb638e9",
+      "shortSha": "754b17c",
       "date": "2026-10-06T18:45:00Z",
       "phase": "5",
       "patch": "5.7.2.1",
@@ -19,8 +19,8 @@
       "evidence": "PACOTE 5.7.2.1 IMPLEMENTADO: Consistência operacional de Agentes entre Dashboard e Administração. 1) Separação clara entre Agent Cadastrado (identidade persistente salva) e Agent Conectado (heartbeat recente em runtime). 2) Estados canônicos ONLINE, OFFLINE, PAIRING, REVOKED, ERROR com AgentStatusBadge unificado. 3) Fluxo de Reconectar com ReconnectAgentModal não destrutivo, sem geração de identidade espúria, sem marcação artificial de online e com verificação em tempo real. 4) Zero-Terminal UX estrito: remoção de passos de terminal para usuário final e transparência sobre evolução do instalador/tray. 5) Ação genérica renomeada para 'Adicionar Novo Agent' e download reorganizado como instalador. 6) Suíte de testes automatizados e invariantes do DCC 100% GREEN."
     },
     {
-      "sha": "ec7de253eb633c07f79d9f7c46ac621c58beb640",
-      "shortSha": "ec7de25",
+      "sha": "de848d8527cb8fa9a08088fcd1fb9cd80140846a",
+      "shortSha": "de848d8",
       "date": "2026-10-06T15:30:00Z",
       "phase": "5",
       "patch": "5.7.2",

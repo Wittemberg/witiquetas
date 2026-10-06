@@ -260,6 +260,9 @@ export class AgentsRepository {
 
     if (memoryAgentsStore.has(agentId)) {
       const cached = memoryAgentsStore.get(agentId)!;
+      if (companyId && companyId !== '*' && cached.companyId !== companyId) {
+        return false;
+      }
       cached.revokedAt = new Date().toISOString();
       cached.status = 'UNAUTHORIZED' as any;
       return true;

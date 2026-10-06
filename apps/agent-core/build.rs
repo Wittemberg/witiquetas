@@ -77,6 +77,18 @@ fn register_git_rerun_triggers() {
                 let head_file = git_dir.join("HEAD");
                 if head_file.exists() {
                     println!("cargo:rerun-if-changed={}", head_file.display());
+                    if let Ok(head_content) = std::fs::read_to_string(&head_file) {
+                        if let Some(ref_path) = head_content.strip_prefix("ref: ") {
+                            let ref_file = git_dir.join(ref_path.trim());
+                            if ref_file.exists() {
+                                println!("cargo:rerun-if-changed={}", ref_file.display());
+                            }
+                        }
+                    }
+                }
+                let logs_head = git_dir.join("logs").join("HEAD");
+                if logs_head.exists() {
+                    println!("cargo:rerun-if-changed={}", logs_head.display());
                 }
             }
         }

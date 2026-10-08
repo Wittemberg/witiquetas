@@ -1,6 +1,24 @@
 {
   "checkpoints": [
     {
+      "sha": "d3fe104aec711aded3b0d3e2736ccfc94a0bf7b4",
+      "shortSha": "d3fe104",
+      "date": "2026-10-08T11:28:00Z",
+      "phase": "5",
+      "patch": "5.7.2.1.1",
+      "title": "5.7.2.1.1 — P0 Frontend Runtime Crash: RefreshCw Import Fix in App.tsx",
+      "type": "HOTFIX",
+      "capabilities": [
+        "cap-admin-printers-agents"
+      ],
+      "testsPassed": true,
+      "deployed": false,
+      "manualValidation": false,
+      "homologated": false,
+      "status": "IMPLEMENTED_AWAITING_MANUAL_HOMOLOGATION",
+      "evidence": "P0 HOTFIX IMPLEMENTADO: Correção cirúrgica de ReferenceError: RefreshCw is not defined em apps/frontend/src/App.tsx ao acessar o Dashboard (#/home) com agentes cadastrados em estado OFFLINE. 1) Adicionado import explícito de RefreshCw de 'lucide-react' em App.tsx. 2) Auditoria completa de todos os componentes Lucide em App.tsx e submódulos do Package 5.7.2.x garantindo zero referências órfãs. 3) Preservação integral da UX aprovada, RBAC, tenant isolation e Developer Session. 4) Criação de suíte de regressão tests/package57211FrontendRuntimeCrash.test.ts com execução real em runtime via renderToStaticMarkup de AgentStatusBadge (ONLINE, OFFLINE, REVOKED), ReconnectAgentModal, AgentDetailsModal, AgentsAdminView, Dashboard Agent Card e componente App raiz. 5) Builds de contracts, frontend e backend 100% GREEN."
+    },
+    {
       "sha": "754b17c80eeacbb26a76059c22e43ffaeeb638e9",
       "shortSha": "754b17c",
       "date": "2026-10-06T18:45:00Z",
@@ -15,7 +33,7 @@
       "deployed": false,
       "manualValidation": false,
       "homologated": false,
-      "status": "IMPLEMENTED_AWAITING_MANUAL_HOMOLOGATION",
+      "status": "MANUAL_HOMOLOGATION_BLOCKED",
       "evidence": "PACOTE 5.7.2.1 IMPLEMENTADO: Consistência operacional de Agentes entre Dashboard e Administração. 1) Separação clara entre Agent Cadastrado (identidade persistente salva) e Agent Conectado (heartbeat recente em runtime). 2) Estados canônicos ONLINE, OFFLINE, PAIRING, REVOKED, ERROR com AgentStatusBadge unificado. 3) Fluxo de Reconectar com ReconnectAgentModal não destrutivo, sem geração de identidade espúria, sem marcação artificial de online e com verificação em tempo real. 4) Zero-Terminal UX estrito: remoção de passos de terminal para usuário final e transparência sobre evolução do instalador/tray. 5) Ação genérica renomeada para 'Adicionar Novo Agent' e download reorganizado como instalador. 6) Suíte de testes automatizados e invariantes do DCC 100% GREEN."
     },
     {

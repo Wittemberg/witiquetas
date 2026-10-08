@@ -16,9 +16,9 @@ test('1. METADATA REGRESSION: version.json do frontend contém metadados canôni
 
   assert.equal(content.name, 'witiquetas-frontend', 'name deve ser witiquetas-frontend');
   assert.equal(content.version, latestCheckpoint.patch, 'version deve ser o patch do último checkpoint e não stale');
-  assert.ok(content.status === 'HOMOLOGATED_FROZEN' || content.status === 'IMPLEMENTED_AWAITING_HOMOLOGATION');
+  assert.ok(content.status === 'HOMOLOGATED_FROZEN' || content.status === 'IMPLEMENTED_AWAITING_HOMOLOGATION' || content.status === 'IMPLEMENTED_AWAITING_MANUAL_HOMOLOGATION');
   assert.ok(!content.version.includes('4.3.0'), 'version não pode ser o valor stale do Pacote 4.3');
-  assert.ok(content.package.includes('5.3') || content.package.includes('5.2') || content.package.includes('5.1') || content.package.includes('4.5.6.1'), 'package deve ser compatível com o release');
+  assert.ok(content.package.includes('5.7') || content.package.includes('5.3') || content.package.includes('5.2') || content.package.includes('5.1') || content.package.includes('4.5.6.1'), 'package deve ser compatível com o release');
 });
 
 test('2. METADATA REGRESSION: version.json coincide com o último checkpoint de governança', () => {

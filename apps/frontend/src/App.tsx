@@ -15,7 +15,8 @@ import {
   ListOrdered,
   Printer,
   Plug,
-  Settings
+  Settings,
+  RefreshCw
 } from 'lucide-react';
 import EditorLayout from './editor/EditorLayout.js';
 import NewTemplateWizard from './editor/NewTemplateWizard.js';

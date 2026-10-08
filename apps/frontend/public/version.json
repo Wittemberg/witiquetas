@@ -1,14 +1,14 @@
 {
   "name": "witiquetas-frontend",
-  "version": "5.7.0-candidate",
-  "commit": "a46b10235f1e784c048c5cbef813d6646bf21c1a",
-  "candidateSha": "a46b10235f1e784c048c5cbef813d6646bf21c1a",
-  "runningSha": "a46b10235f1e784c048c5cbef813d6646bf21c1a",
-  "shortCommit": "a46b102",
-  "shortSha": "a46b102",
-  "governanceSha": "22773f82a7363815efecc9debdf61705bac6ed09",
+  "version": "5.7.2.1.1",
+  "commit": "d3fe104aec711aded3b0d3e2736ccfc94a0bf7b4",
+  "candidateSha": "d3fe104aec711aded3b0d3e2736ccfc94a0bf7b4",
+  "runningSha": "d3fe104aec711aded3b0d3e2736ccfc94a0bf7b4",
+  "shortCommit": "d3fe104",
+  "shortSha": "d3fe104",
+  "governanceSha": "d3fe104aec711aded3b0d3e2736ccfc94a0bf7b4",
   "status": "IMPLEMENTED_AWAITING_MANUAL_HOMOLOGATION",
-  "package": "5.7 — Governança de Impressoras Físicas e Agentes Locais",
+  "package": "5.7.2.1.1 — P0 Frontend Runtime Crash",
   "phase": "Fase 5 — Administração e Governança da Aplicação",
-  "timestamp": "2026-09-29T15:45:00Z"
+  "timestamp": "2026-10-08T11:28:00Z"
 }

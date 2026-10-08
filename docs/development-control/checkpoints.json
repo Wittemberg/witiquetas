@@ -1,6 +1,24 @@
 {
   "checkpoints": [
     {
+      "sha": "3b72c6b6265ee14f2f9a9b88c2bc8dcc2dde384d",
+      "shortSha": "3b72c6b",
+      "date": "2026-10-08T14:35:00Z",
+      "phase": "5",
+      "patch": "5.7.2.1.2",
+      "title": "5.7.2.1.2 — Reconnect UX Landscape + Light Theme + Offline Diagnostics",
+      "type": "IMPROVEMENT",
+      "capabilities": [
+        "cap-admin-printers-agents"
+      ],
+      "testsPassed": true,
+      "deployed": false,
+      "manualValidation": false,
+      "homologated": false,
+      "status": "IMPLEMENTED_AWAITING_MANUAL_HOMOLOGATION",
+      "evidence": "PACOTE 5.7.2.1.2 IMPLEMENTADO: Refinamento operacional e visual do fluxo de reconexão. 1) Modal ReconnectAgentModal redesenhado em formato landscape (largura 980px) em 2 colunas no desktop (esquerda: dados e credencial persistente; direita: diagnóstico honesto, orientações e verificação). 2) Correção de tokens de tema eliminando fallback escuro hardcoded (#182234), garantindo contraste WCAG acessível em ambos os temas Light e Dark. 3) Diagnóstico técnico honesto que distingue ausência de heartbeat recente (OFFLINE >2min) de credencial desautorizada (AUTH_ERROR/REVOKED) e operação normal (ONLINE), sem inferências técnicas falsas e sem alterar status artificialmente. 4) UX honesta esclarecendo que 'Verificar Conexão Agora' consulta a nuvem e não liga o computador remotamente, informando evolução para Tray Companion e instalador gráfico na Fase 5. 5) Suíte de testes package57212ReconnectUxLandscape com renderização real em múltiplas resoluções 100% GREEN."
+    },
+    {
       "sha": "d3fe104aec711aded3b0d3e2736ccfc94a0bf7b4",
       "shortSha": "d3fe104",
       "date": "2026-10-08T11:28:00Z",
@@ -12,10 +30,10 @@
         "cap-admin-printers-agents"
       ],
       "testsPassed": true,
-      "deployed": false,
-      "manualValidation": false,
+      "deployed": true,
+      "manualValidation": true,
       "homologated": false,
-      "status": "IMPLEMENTED_AWAITING_MANUAL_HOMOLOGATION",
+      "status": "P0_RESOLVED_AWAITING_FORMAL_CLOSURE",
       "evidence": "P0 HOTFIX IMPLEMENTADO: Correção cirúrgica de ReferenceError: RefreshCw is not defined em apps/frontend/src/App.tsx ao acessar o Dashboard (#/home) com agentes cadastrados em estado OFFLINE. 1) Adicionado import explícito de RefreshCw de 'lucide-react' em App.tsx. 2) Auditoria completa de todos os componentes Lucide em App.tsx e submódulos do Package 5.7.2.x garantindo zero referências órfãs. 3) Preservação integral da UX aprovada, RBAC, tenant isolation e Developer Session. 4) Criação de suíte de regressão tests/package57211FrontendRuntimeCrash.test.ts com execução real em runtime via renderToStaticMarkup de AgentStatusBadge (ONLINE, OFFLINE, REVOKED), ReconnectAgentModal, AgentDetailsModal, AgentsAdminView, Dashboard Agent Card e componente App raiz. 5) Builds de contracts, frontend e backend 100% GREEN."
     },
     {
@@ -52,7 +70,7 @@
       "deployed": false,
       "manualValidation": false,
       "homologated": false,
-      "status": "IMPLEMENTED_AWAITING_MANUAL_HOMOLOGATION",
+      "status": "AWAITING_MANUAL_HOMOLOGATION",
       "evidence": "PACOTE 5.7.2 IMPLEMENTADO: Fundação de distribuição profissional do Agent Core e prontidão para experiência Zero-Terminal. Endurecimento do Windows Service (WitiquetasAgent, Delayed Auto-Start, restart em falha, quoting rigoroso de caminhos com espaços como Program Files), idempotência estrita de operações de serviço, interface de máquina padronizada --json com StructuredResponse<T> e exit codes determinísticos (0, 1, 2, 10, 20, 30, 31), módulo de diagnóstico não-destrutivo com garantia absoluta de redaction de credenciais/tokens e auditoria de ACL em ProgramData, separação total do pairing core da CLI com normalização de código WIT-XXXX-XXXX e comando unpair seguro, injeção de metadados em compile-time (commit, timestamp ISO 8601, target architecture via build.rs) e suíte Rust de 74 testes passando 100% (53 unitários + 9 distribuição + 12 serviços residentes) com zero regressões no ecossistema TypeScript."
     },
     {

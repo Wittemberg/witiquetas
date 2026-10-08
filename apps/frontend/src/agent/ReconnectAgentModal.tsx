@@ -6,10 +6,11 @@ import {
   AlertCircle,
   X,
   KeyRound,
-  Info,
   Clock,
   Radio,
   Layers,
+  ShieldAlert,
+  Info,
 } from 'lucide-react';
 import type { AgentDTO } from '@witiquetas/contracts';
 import { AgentStatusBadge } from './AgentStatusBadge.js';
@@ -39,6 +40,38 @@ export const ReconnectAgentModal: React.FC<ReconnectAgentModalProps> = ({
   if (!isOpen || !agent) return null;
 
   const isOnline = agent.status === 'ONLINE';
+  const isRevoked = agent.status === 'REVOKED' || agent.status === 'UNAUTHORIZED';
+
+  // Diagnóstico determinístico e honesto (Track C)
+  const getDiagnosticInfo = () => {
+    if (isOnline) {
+      return {
+        category: 'ONLINE',
+        badge: 'Operacional',
+        badgeClass: 'badge-success',
+        title: 'Serviço ativo e comunicando',
+        detail: 'O Agent está conectado à nuvem e transmitindo heartbeats normalmente.',
+      };
+    }
+    if (isRevoked) {
+      return {
+        category: 'AUTH_ERROR',
+        badge: 'Credencial Revogada',
+        badgeClass: 'badge-secondary',
+        title: 'Acesso desautorizado',
+        detail: 'A credencial deste agente foi revogada na administração. É necessário realizar um novo pareamento para autorizá-lo novamente.',
+      };
+    }
+    return {
+      category: 'OFFLINE',
+      badge: 'Sem Heartbeat Recente',
+      badgeClass: 'badge-danger',
+      title: 'Serviço local sem resposta na nuvem',
+      detail: `Nenhum sinal recebido nos últimos 2 minutos (última comunicação registrada: ${formatLastSeen(agent.lastSeenAt)}).`,
+    };
+  };
+
+  const diagnostic = getDiagnosticInfo();
 
   const handleCheckConnection = async () => {
     setIsChecking(true);
@@ -47,22 +80,21 @@ export const ReconnectAgentModal: React.FC<ReconnectAgentModalProps> = ({
       if (onRefresh) {
         await onRefresh();
       }
-      // O estado do agent pode ter sido atualizado pelo pai via onRefresh
       if (agent.status === 'ONLINE') {
         setFeedback({
           type: 'success',
-          message: 'Conexão restabelecida com sucesso! O Agent está Online e pronto para processar impressões.',
+          message: 'Conexão restabelecida! O Agent está Online e pronto para processar impressões.',
         });
       } else {
         setFeedback({
           type: 'warning',
-          message: 'O Agent ainda não respondeu ao sinal de verificação. Certifique-se de que o computador está ligado e conectado à rede.',
+          message: `Nenhum sinal recente recebido do computador ${agent.machineName}. O agente permanece offline nos servidores da nuvem. Verifique se o equipamento está ligado e conectado à rede.`,
         });
       }
     } catch (err: any) {
       setFeedback({
         type: 'warning',
-        message: err.message || 'Não foi possível verificar o status no momento.',
+        message: err.message || 'Falha ao consultar status com o servidor.',
       });
     } finally {
       setIsChecking(false);
@@ -77,78 +109,95 @@ export const ReconnectAgentModal: React.FC<ReconnectAgentModalProps> = ({
       style={{
         position: 'fixed',
         inset: 0,
-        background: 'rgba(0, 0, 0, 0.75)',
-        backdropFilter: 'blur(4px)',
+        backgroundColor: 'rgba(0, 0, 0, 0.75)',
+        backdropFilter: 'blur(6px)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        zIndex: 9999,
+        zIndex: 10000,
         padding: '1rem',
       }}
     >
+      <style>{`
+        .reconnect-modal-grid {
+          display: grid;
+          grid-template-columns: minmax(280px, 340px) 1fr;
+          gap: 1.25rem;
+          align-items: start;
+        }
+        @media (max-width: 800px) {
+          .reconnect-modal-grid {
+            grid-template-columns: 1fr;
+            gap: 1rem;
+          }
+        }
+      `}</style>
       <div
-        className="card"
+        className="wizard-modal-content"
         onClick={(e) => e.stopPropagation()}
         data-testid="reconnect-agent-modal"
         style={{
-          width: '100%',
-          maxWidth: '560px',
-          maxHeight: '90vh',
+          width: 'min(95vw, 980px)',
+          maxWidth: '980px',
+          maxHeight: '92vh',
+          backgroundColor: 'var(--modal-bg, var(--bg-card))',
+          color: 'var(--text-primary)',
+          borderRadius: '16px',
+          border: '1px solid var(--border-color)',
+          boxShadow: 'var(--shadow-elevated)',
           display: 'flex',
           flexDirection: 'column',
-          gap: '1.25rem',
-          padding: '1.5rem',
-          borderRadius: '14px',
-          border: '1px solid var(--border-color)',
-          background: 'var(--card-bg, #182234)',
-          boxShadow: '0 20px 40px rgba(0, 0, 0, 0.5)',
-          overflowY: 'auto',
+          overflow: 'hidden',
         }}
       >
         {/* Header */}
         <div
           style={{
+            padding: '1.15rem 1.5rem',
+            borderBottom: '1px solid var(--border-color)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            borderBottom: '1px solid var(--border-color)',
-            paddingBottom: '0.85rem',
+            backgroundColor: 'var(--header-bg, var(--modal-bg))',
+            flexShrink: 0,
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
             <div
               style={{
-                width: '36px',
-                height: '36px',
+                width: '38px',
+                height: '38px',
                 borderRadius: '10px',
-                background: 'rgba(59, 130, 246, 0.15)',
+                backgroundColor: 'rgba(59, 130, 246, 0.15)',
                 color: 'var(--accent-blue)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
+                flexShrink: 0,
               }}
             >
-              <RefreshCw size={18} />
+              <RefreshCw size={20} />
             </div>
             <div>
               <h3
                 style={{
-                  fontSize: '1.1rem',
+                  fontSize: '1.15rem',
                   fontWeight: 700,
                   margin: 0,
                   color: 'var(--text-primary)',
+                  lineHeight: 1.2,
                 }}
               >
                 Reconectar Agent de Impressão
               </h3>
               <p
                 style={{
-                  fontSize: '0.78rem',
+                  fontSize: '0.8rem',
                   color: 'var(--text-muted)',
-                  margin: '0.15rem 0 0 0',
+                  margin: '0.2rem 0 0 0',
                 }}
               >
-                Recuperação de comunicação com terminal existente
+                Diagnóstico e recuperação de comunicação com terminal cadastrado
               </p>
             </div>
           </div>
@@ -157,183 +206,305 @@ export const ReconnectAgentModal: React.FC<ReconnectAgentModalProps> = ({
             type="button"
             className="btn btn-secondary"
             onClick={onClose}
-            style={{ padding: '0.3rem 0.55rem', fontSize: '0.8rem' }}
+            style={{ padding: '0.35rem 0.6rem', fontSize: '0.8rem' }}
             title="Fechar modal"
+            aria-label="Fechar"
           >
-            <X size={16} />
+            <X size={18} />
           </button>
         </div>
 
-        {/* Card Resumo do Agent */}
+        {/* Body Landscape (2 Colunas no Desktop) */}
         <div
+          className="reconnect-modal-grid"
           style={{
-            padding: '1rem 1.15rem',
-            background: 'var(--bg-card-hover, rgba(255, 255, 255, 0.03))',
-            borderRadius: '10px',
-            border: '1px solid var(--border-color)',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '0.75rem',
+            padding: '1.25rem 1.5rem',
+            overflowY: 'auto',
+            flex: 1,
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <Laptop size={18} color="var(--accent-blue)" />
-              <span
-                data-testid="reconnect-agent-machine-name"
-                style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--text-primary)' }}
-              >
-                {agent.machineName}
-              </span>
-            </div>
-            <AgentStatusBadge status={agent.status} size="sm" />
-          </div>
-
+          {/* COLUNA ESQUERDA: Identidade & Metadados do Agente */}
           <div
             style={{
-              display: 'grid',
-              gridTemplateColumns: '1fr 1fr',
-              gap: '0.6rem',
-              fontSize: '0.78rem',
-              color: 'var(--text-muted)',
-            }}
-          >
-            <div>
-              <span style={{ display: 'block', fontWeight: 600 }}>Última conexão:</span>
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
-                <Clock size={12} />
-                {formatLastSeen(agent.lastSeenAt)}
-              </span>
-            </div>
-            <div>
-              <span style={{ display: 'block', fontWeight: 600 }}>Sistema Operacional:</span>
-              <span>{agent.os} ({agent.architecture})</span>
-            </div>
-            <div>
-              <span style={{ display: 'block', fontWeight: 600 }}>Versão Instalada:</span>
-              <span>v{agent.agentVersion}</span>
-            </div>
-            <div>
-              <span style={{ display: 'block', fontWeight: 600 }}>Identidade / Instalação:</span>
-              <span style={{ fontFamily: 'monospace', fontSize: '0.72rem' }}>
-                {agent.installationId ? `${agent.installationId.substring(0, 14)}...` : 'N/A'}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* Feedback de Verificação */}
-        {feedback && (
-          <div
-            style={{
-              padding: '0.85rem 1rem',
-              borderRadius: '8px',
               display: 'flex',
-              alignItems: 'center',
-              gap: '0.65rem',
-              fontSize: '0.82rem',
-              background:
-                feedback.type === 'success'
-                  ? 'rgba(16, 185, 129, 0.15)'
-                  : 'rgba(245, 158, 11, 0.15)',
-              border: `1px solid ${
-                feedback.type === 'success' ? 'var(--status-success)' : 'var(--status-warning)'
-              }`,
-              color:
-                feedback.type === 'success' ? 'var(--status-success)' : 'var(--status-warning)',
+              flexDirection: 'column',
+              gap: '0.85rem',
             }}
           >
-            {feedback.type === 'success' ? <CheckCircle2 size={18} /> : <AlertCircle size={18} />}
-            <span>{feedback.message}</span>
-          </div>
-        )}
+            {/* Card de Identificação */}
+            <div
+              style={{
+                padding: '1rem',
+                backgroundColor: 'var(--bg-card-hover, rgba(0, 0, 0, 0.03))',
+                borderRadius: '10px',
+                border: '1px solid var(--border-color)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.75rem',
+              }}
+            >
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '0.5rem',
+                  flexWrap: 'wrap',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', minWidth: 0 }}>
+                  <Laptop size={18} color="var(--accent-blue)" style={{ flexShrink: 0 }} />
+                  <span
+                    data-testid="reconnect-agent-machine-name"
+                    style={{
+                      fontWeight: 700,
+                      fontSize: '0.95rem',
+                      color: 'var(--text-primary)',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}
+                    title={agent.machineName}
+                  >
+                    {agent.machineName}
+                  </span>
+                </div>
+                <AgentStatusBadge status={agent.status} size="sm" />
+              </div>
 
-        {/* Orientações sem terminal */}
-        <div
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '0.75rem',
-            fontSize: '0.82rem',
-            lineHeight: 1.5,
-            color: 'var(--text-muted)',
-          }}
-        >
+              {/* Lista de Metadados */}
+              <div
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.5rem',
+                  fontSize: '0.78rem',
+                  borderTop: '1px solid var(--border-color)',
+                  paddingTop: '0.65rem',
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem' }}>
+                  <span style={{ color: 'var(--text-muted)', fontWeight: 500 }}>Última conexão:</span>
+                  <span style={{ color: 'var(--text-primary)', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                    <Clock size={12} color="var(--text-muted)" />
+                    {formatLastSeen(agent.lastSeenAt)}
+                  </span>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem' }}>
+                  <span style={{ color: 'var(--text-muted)', fontWeight: 500 }}>Sistema:</span>
+                  <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>
+                    {agent.os} ({agent.architecture})
+                  </span>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem' }}>
+                  <span style={{ color: 'var(--text-muted)', fontWeight: 500 }}>Versão:</span>
+                  <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>
+                    v{agent.agentVersion}
+                  </span>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem' }}>
+                  <span style={{ color: 'var(--text-muted)', fontWeight: 500 }}>Identidade:</span>
+                  <span
+                    style={{
+                      color: 'var(--text-primary)',
+                      fontFamily: 'var(--font-mono, monospace)',
+                      fontSize: '0.72rem',
+                    }}
+                  >
+                    {agent.installationId ? `${agent.installationId.substring(0, 14)}...` : 'Salva'}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Caixa Informativa sobre Identidade Persistente */}
+            <div
+              style={{
+                padding: '0.85rem',
+                backgroundColor: 'rgba(59, 130, 246, 0.08)',
+                border: '1px solid rgba(59, 130, 246, 0.25)',
+                borderRadius: '8px',
+                fontSize: '0.76rem',
+                lineHeight: 1.45,
+                color: 'var(--text-primary)',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.25rem', color: 'var(--accent-blue)', fontWeight: 600 }}>
+                <Info size={14} />
+                <span>Identidade Persistente</span>
+              </div>
+              Este terminal já possui credencial salva. Estar Offline significa apenas que a nuvem não recebeu dados recentes — não é necessário reinstalar para restabelecer a comunicação regular.
+            </div>
+          </div>
+
+          {/* COLUNA DIREITA: Diagnóstico, Orientações & Verificação */}
           <div
             style={{
-              padding: '0.85rem 1rem',
-              borderRadius: '8px',
-              background: 'rgba(59, 130, 246, 0.08)',
-              border: '1px solid rgba(59, 130, 246, 0.2)',
-              color: 'var(--text-primary)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '0.85rem',
             }}
           >
-            <strong>Identidade persistente:</strong> Este Agent já está pareado com credencial única. Estar Offline significa apenas que o serviço local não está respondendo no momento — não é necessário baixar o programa novamente nem criar outro código para restabelecer a conexão normal.
-          </div>
+            {/* Painel de Diagnóstico */}
+            <div
+              style={{
+                padding: '0.9rem 1rem',
+                borderRadius: '10px',
+                border: `1px solid ${isOnline ? 'var(--status-success)' : isRevoked ? 'var(--status-danger)' : 'var(--status-warning)'}`,
+                backgroundColor: isOnline
+                  ? 'rgba(16, 185, 129, 0.08)'
+                  : isRevoked
+                  ? 'rgba(239, 68, 68, 0.08)'
+                  : 'rgba(245, 158, 11, 0.08)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.35rem',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                  Diagnóstico Técnico:
+                </span>
+                <span
+                  className={`badge ${diagnostic.badgeClass}`}
+                  style={{ fontSize: '0.72rem', padding: '0.15rem 0.5rem' }}
+                >
+                  {diagnostic.badge}
+                </span>
+              </div>
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
+                <strong>{diagnostic.title}:</strong> {diagnostic.detail}
+              </div>
+            </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
-            <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
-              Como restabelecer a conexão:
-            </span>
-            <ul style={{ margin: 0, paddingLeft: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-              <li>Verifique se o computador <strong>{agent.machineName}</strong> está ligado e conectado à rede.</li>
-              <li>O serviço de segundo plano do Witiquetas Agent carrega a identidade salva automaticamente ao iniciar o Windows.</li>
-              <li>Assim que a comunicação for restabelecida, o status passará para <strong>Online</strong> automaticamente no próximo ciclo de sincronização.</li>
-            </ul>
-          </div>
+            {/* Orientações Práticas para o Usuário (Sem Terminal) */}
+            <div
+              style={{
+                padding: '0.85rem 1rem',
+                backgroundColor: 'var(--bg-card-hover, rgba(0, 0, 0, 0.02))',
+                borderRadius: '10px',
+                border: '1px solid var(--border-color)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.45rem',
+                fontSize: '0.78rem',
+                color: 'var(--text-secondary)',
+                lineHeight: 1.45,
+              }}
+            >
+              <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>
+                Como reativar a comunicação:
+              </span>
+              <ul style={{ margin: 0, paddingLeft: '1.15rem', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+                <li>Certifique-se de que o computador <strong>{agent.machineName}</strong> está ligado e com acesso à rede.</li>
+                <li>O serviço de segundo plano (<em>WitiquetasAgent</em>) carrega a identidade e inicia junto com o Windows.</li>
+                <li>Se o serviço foi interrompido, reiniciar o computador normalmente restaura a execução do agente.</li>
+              </ul>
+            </div>
 
-          <div
-            style={{
-              fontSize: '0.75rem',
-              padding: '0.65rem 0.85rem',
-              background: 'var(--bg-card, rgba(0, 0, 0, 0.2))',
-              borderRadius: '6px',
-              border: '1px dashed var(--border-color)',
-              color: 'var(--text-muted)',
-            }}
-          >
-            <span style={{ fontWeight: 600 }}>Evolução do produto:</span> Reconexão automática com controle facilitado pelo Menu Iniciar e bandeja do sistema estará disponível na próxima atualização do Witiquetas Agent.
-          </div>
+            {/* Banner de Transparência (Track D - UX Honesta) */}
+            <div
+              style={{
+                padding: '0.75rem 0.9rem',
+                backgroundColor: 'var(--bg-input, var(--bg-card-hover))',
+                borderRadius: '8px',
+                border: '1px dashed var(--border-color)',
+                fontSize: '0.74rem',
+                color: 'var(--text-muted)',
+                lineHeight: 1.4,
+              }}
+            >
+              <div style={{ fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.15rem' }}>
+                Transparência da Verificação:
+              </div>
+              A ação <em>Verificar Conexão Agora</em> consulta os servidores da nuvem para checar se novos heartbeats foram recebidos; ela não emite comandos remotos para ligar o computador ou iniciar serviços locais.
+              Controle facilitado de 1 clique pela bandeja do sistema (Tray Companion) será introduzido nos próximos pacotes da Fase 5.
+            </div>
 
-          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-            Se este computador foi formatado ou o Agent foi desinstalado, use <em>Reinstalar / Novo Pareamento</em> para emitir uma nova autorização.
+            {/* Feedback Dinâmico pós-verificação */}
+            {feedback && (
+              <div
+                style={{
+                  padding: '0.75rem 0.9rem',
+                  borderRadius: '8px',
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: '0.55rem',
+                  fontSize: '0.78rem',
+                  lineHeight: 1.4,
+                  backgroundColor:
+                    feedback.type === 'success'
+                      ? 'rgba(16, 185, 129, 0.12)'
+                      : 'rgba(245, 158, 11, 0.12)',
+                  border: `1px solid ${
+                    feedback.type === 'success' ? 'var(--status-success)' : 'var(--status-warning)'
+                  }`,
+                  color: 'var(--text-primary)',
+                }}
+              >
+                {feedback.type === 'success' ? (
+                  <CheckCircle2 size={16} color="var(--status-success)" style={{ flexShrink: 0, marginTop: '2px' }} />
+                ) : (
+                  <AlertCircle size={16} color="var(--status-warning)" style={{ flexShrink: 0, marginTop: '2px' }} />
+                )}
+                <span>{feedback.message}</span>
+              </div>
+            )}
           </div>
         </div>
 
         {/* Rodapé / Ações */}
         <div
           style={{
+            padding: '1rem 1.5rem',
+            borderTop: '1px solid var(--border-color)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
             flexWrap: 'wrap',
             gap: '0.75rem',
-            borderTop: '1px solid var(--border-color)',
-            paddingTop: '1rem',
+            backgroundColor: 'var(--header-bg, var(--modal-bg))',
+            flexShrink: 0,
           }}
         >
-          {onReinstall && (
+          {onReinstall ? (
             <button
               type="button"
               className="btn btn-secondary"
               onClick={onReinstall}
-              style={{ fontSize: '0.8rem', padding: '0.45rem 0.85rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+              style={{
+                fontSize: '0.8rem',
+                padding: '0.45rem 0.85rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.4rem',
+              }}
+              title="Gerar novo código de pareamento caso o computador tenha sido formatado"
             >
               <KeyRound size={15} />
               <span>Reinstalar / Novo Pareamento</span>
             </button>
-          )}
+          ) : <div />}
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginLeft: 'auto' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
             <button
               type="button"
               className="btn btn-primary"
               onClick={handleCheckConnection}
               disabled={isChecking}
-              style={{ fontSize: '0.8rem', padding: '0.45rem 1rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+              style={{
+                fontSize: '0.8rem',
+                padding: '0.45rem 1rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.45rem',
+              }}
             >
               <RefreshCw size={15} className={isChecking ? 'spin' : ''} />
-              <span>{isChecking ? 'Verificando...' : 'Verificar Conexão Agora'}</span>
+              <span>{isChecking ? 'Consultando Servidor...' : 'Verificar Conexão Agora'}</span>
             </button>
 
             <button

@@ -1374,7 +1374,8 @@
           "evidence": [
             "tests/package57PrintersAndAgentsGovernance.test.ts",
             "tests/package5720AgentOperationalUxConsistency.test.ts",
-            "tests/package57211FrontendRuntimeCrash.test.ts"
+            "tests/package57211FrontendRuntimeCrash.test.ts",
+            "tests/package57212ReconnectUxLandscape.test.ts"
           ],
           "dependencies": [
             "cap-admin-shell"
@@ -1382,7 +1383,8 @@
           "notes": [
             "PACOTE 5.7: Governança completa de impressoras físicas e agentes locais. Suporte a RAW_TCP, Windows Spooler, Serial (RS232) e CUPS. Gerenciamento de pareamento WIT-XXXX-XXXX, status de heartbeat e isolamento multi-tenant.",
             "PACOTE 5.7.2.1: Consistência operacional completa de Agentes entre Dashboard e Administração (Reconnect Flow, AgentStatusBadge, Zero-Terminal UX).",
-            "PACOTE 5.7.2.1.1: P0 Hotfix de crash em runtime no Dashboard (import ausente de RefreshCw em App.tsx)."
+            "PACOTE 5.7.2.1.1: P0 Hotfix de crash em runtime no Dashboard (import ausente de RefreshCw em App.tsx).",
+            "PACOTE 5.7.2.1.2: Redesenho landscape do ReconnectAgentModal, tokens de tema Light/Dark e diagnósticos honestos de reconexão."
           ]
         },
         {

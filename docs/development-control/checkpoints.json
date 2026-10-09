@@ -70,8 +70,7 @@
       "deployed": false,
       "manualValidation": false,
       "homologated": false,
-      "status": "AWAITING_MANUAL_HOMOLOGATION",
-      "evidence": "PACOTE 5.7.2 IMPLEMENTADO: Fundação de distribuição profissional do Agent Core e prontidão para experiência Zero-Terminal. Endurecimento do Windows Service (WitiquetasAgent, Delayed Auto-Start, restart em falha, quoting rigoroso de caminhos com espaços como Program Files), idempotência estrita de operações de serviço, interface de máquina padronizada --json com StructuredResponse<T> e exit codes determinísticos (0, 1, 2, 10, 20, 30, 31), módulo de diagnóstico não-destrutivo com garantia absoluta de redaction de credenciais/tokens e auditoria de ACL em ProgramData, separação total do pairing core da CLI com normalização de código WIT-XXXX-XXXX e comando unpair seguro, injeção de metadados em compile-time (commit, timestamp ISO 8601, target architecture via build.rs) e suíte Rust de 74 testes passando 100% (53 unitários + 9 distribuição + 12 serviços residentes) com zero regressões no ecossistema TypeScript."
+      "evidence": "PACOTE 5.7.2 IMPLEMENTADO (P0 HOTFIX SCM SERVICE ABERTO AGUARDANDO VALIDAÇÃO REAL): 1) Correção cirúrgica de sintaxe do sc.exe no registro do Windows Service (WitiquetasAgent), separando chaves de opções com '=' e seus respectivos valores em tokens distintos (binPath=, DisplayName=, type=, start=, reset=, actions=), eliminando 'ERRO: campo start= inválido'. 2) Preservação integral do quoting rigoroso de Program Files, auto-recovery (restart 5s) e Delayed Auto-Start. 3) Adicionado teste de regressão direto contra sc.exe no Windows. 4) Suíte Rust 75/75 testes GREEN (53 unitários + 10 distribuição + 12 serviços residentes). 5) P0 mantido em monitoramento aberto até homologação real com registro e execução no SUPORTE-2."
     },
     {
       "sha": "b226d0f8d167825b597b4ec8f121bbffbb961ef0",

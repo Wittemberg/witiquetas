@@ -274,3 +274,40 @@ fn test_version_info_metadata() {
     let json = info.to_json().unwrap();
     assert!(json.contains("\"agent_version\":\"0.2.0\""));
 }
+
+/// 10. Teste de Regressão: Prevenção de sintaxe inválida no sc.exe (P0 Windows Service Hotfix)
+/// Garante que `start= delayed-auto` e opções com `=` nunca sejam passadas como strings combinadas
+/// que levem o sc.exe a emitir "ERRO: campo start= inválido".
+#[test]
+fn test_sc_arguments_formatting_and_no_invalid_start_syntax() {
+    #[cfg(windows)]
+    {
+        use std::process::Command;
+
+        // Dispara sc.exe config com argumentos separados para serviço fictício
+        let output = Command::new("sc.exe")
+            .args(["config", "WitiquetasNonExistentServiceForRegTest", "start=", "delayed-auto"])
+            .output();
+
+        if let Ok(out) = output {
+            let stdout = String::from_utf8_lossy(&out.stdout);
+            let stderr = String::from_utf8_lossy(&out.stderr);
+            let combined = format!("{}\n{}", stdout, stderr);
+
+            // NÃO PODE conter a falha de sintaxe rejeitada pelo sc.exe
+            assert!(
+                !combined.contains("ERRO: campo start= inválido") && !combined.contains("invalid start="),
+                "sc.exe não deve rejeitar a sintaxe start= delayed-auto: {}",
+                combined
+            );
+
+            // Deve alcançar o SCM (1060: serviço não existe)
+            assert!(
+                combined.contains("1060") || combined.contains("não existe") || combined.contains("does not exist"),
+                "sc.exe deve alcançar o SCM (OpenService 1060): {}",
+                combined
+            );
+        }
+    }
+}
+

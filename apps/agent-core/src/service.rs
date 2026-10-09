@@ -220,7 +220,7 @@ pub mod win {
         let current_exe = env::current_exe()?;
         let exe_path_str = current_exe.to_str().ok_or("Caminho do executável inválido")?;
 
-        let bin_path_arg = format_sc_binpath_arg(exe_path_str);
+        let bin_path_val = format_service_bin_path(exe_path_str);
         let (is_installed, current_state) = query_raw_service().unwrap_or((false, "NOT_INSTALLED".to_string()));
 
         let action_status = if is_installed {
@@ -229,21 +229,28 @@ pub mod win {
                 .args([
                     "config",
                     SERVICE_NAME,
-                    &bin_path_arg,
-                    &format!("DisplayName= {}", SERVICE_DISPLAY_NAME),
-                    "start= delayed-auto",
+                    "binPath=",
+                    &bin_path_val,
+                    "DisplayName=",
+                    SERVICE_DISPLAY_NAME,
+                    "type=",
+                    "own",
+                    "start=",
+                    "delayed-auto",
                 ])
                 .output()?;
 
             if !sc_config.status.success() {
                 let err = String::from_utf8_lossy(&sc_config.stderr);
+                let stdout = String::from_utf8_lossy(&sc_config.stdout);
+                let msg = if !err.trim().is_empty() { err } else { stdout };
                 return Ok(ServiceOperationResult {
                     success: false,
                     service_name: SERVICE_NAME.to_string(),
                     action: "install".to_string(),
                     status: "config_failed".to_string(),
-                    message: format!("Falha ao reconfigurar serviço: {}", err.trim()),
-                    details: Some(err.to_string()),
+                    message: format!("Falha ao reconfigurar serviço: {}", msg.trim()),
+                    details: Some(msg.to_string()),
                 });
             }
             "updated"
@@ -253,16 +260,21 @@ pub mod win {
                 .args([
                     "create",
                     SERVICE_NAME,
-                    &bin_path_arg,
-                    &format!("DisplayName= {}", SERVICE_DISPLAY_NAME),
-                    "start= auto",
+                    "binPath=",
+                    &bin_path_val,
+                    "DisplayName=",
+                    SERVICE_DISPLAY_NAME,
+                    "type=",
+                    "own",
+                    "start=",
+                    "auto",
                 ])
                 .output()?;
 
             if !sc_create.status.success() {
                 let err = String::from_utf8_lossy(&sc_create.stderr);
                 let stdout = String::from_utf8_lossy(&sc_create.stdout);
-                let msg = if !err.is_empty() { err } else { stdout };
+                let msg = if !err.trim().is_empty() { err } else { stdout };
                 return Ok(ServiceOperationResult {
                     success: false,
                     service_name: SERVICE_NAME.to_string(),
@@ -273,9 +285,9 @@ pub mod win {
                 });
             }
 
-            // Aplicar Delayed Auto-Start
+            // Aplicar Delayed Auto-Start via sc config com tokens separados
             let _ = Command::new("sc.exe")
-                .args(["config", SERVICE_NAME, "start= delayed-auto"])
+                .args(["config", SERVICE_NAME, "start=", "delayed-auto"])
                 .output();
 
             "created"
@@ -291,8 +303,10 @@ pub mod win {
             .args([
                 "failure",
                 SERVICE_NAME,
-                "reset= 86400",
-                "actions= restart/5000/restart/5000/restart/5000",
+                "reset=",
+                "86400",
+                "actions=",
+                "restart/5000/restart/5000/restart/5000",
             ])
             .output();
 

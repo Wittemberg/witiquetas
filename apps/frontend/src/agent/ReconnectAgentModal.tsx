@@ -24,6 +24,8 @@ interface ReconnectAgentModalProps {
   onReinstall?: () => void;
 }
 
+export type VerificationState = 'IDLE' | 'CHECKING' | 'OFFLINE_RESULT' | 'ONLINE_RESULT' | 'ERROR_RESULT';
+
 export const ReconnectAgentModal: React.FC<ReconnectAgentModalProps> = ({
   isOpen,
   agent,
@@ -32,40 +34,88 @@ export const ReconnectAgentModal: React.FC<ReconnectAgentModalProps> = ({
   onReinstall,
 }) => {
   const [isChecking, setIsChecking] = useState(false);
-  const [feedback, setFeedback] = useState<{
-    type: 'success' | 'warning' | 'info';
-    message: string;
-  } | null>(null);
+  const [verificationState, setVerificationState] = useState<VerificationState>('IDLE');
+  const [errorMessage, setErrorMessage] = useState<string>('');
 
   if (!isOpen || !agent) return null;
 
   const isOnline = agent.status === 'ONLINE';
   const isRevoked = agent.status === 'REVOKED' || agent.status === 'UNAUTHORIZED';
 
-  // Diagnóstico determinístico e honesto (Track C)
+  // Diagnóstico determinístico e honesto atualizado in-place (Track A & Track C)
   const getDiagnosticInfo = () => {
-    if (isOnline) {
+    if (verificationState === 'CHECKING') {
       return {
-        category: 'ONLINE',
-        badge: 'Operacional',
-        badgeClass: 'badge-success',
-        title: 'Serviço ativo e comunicando',
-        detail: 'O Agent está conectado à nuvem e transmitindo heartbeats normalmente.',
+        category: 'CHECKING',
+        badge: 'Consultando Nuvem...',
+        badgeClass: 'badge-info',
+        borderColor: 'var(--accent-blue)',
+        backgroundColor: 'rgba(59, 130, 246, 0.08)',
+        icon: <RefreshCw size={15} className="spin" color="var(--accent-blue)" style={{ flexShrink: 0 }} />,
+        title: 'Verificando heartbeats',
+        detail: `Consultando servidores da nuvem em busca de transmissões recentes de ${agent.machineName}...`,
       };
     }
+
+    if (verificationState === 'ONLINE_RESULT' || isOnline) {
+      return {
+        category: 'ONLINE',
+        badge: verificationState === 'ONLINE_RESULT' ? 'Conexão Restabelecida' : 'Operacional',
+        badgeClass: 'badge-success',
+        borderColor: 'var(--status-success)',
+        backgroundColor: 'rgba(16, 185, 129, 0.08)',
+        icon: <CheckCircle2 size={15} color="var(--status-success)" style={{ flexShrink: 0 }} />,
+        title: 'Serviço ativo e comunicando',
+        detail: 'O Agent está conectado à nuvem e transmitindo heartbeats normalmente. Pronto para processar impressões.',
+      };
+    }
+
+    if (verificationState === 'OFFLINE_RESULT') {
+      return {
+        category: 'OFFLINE_RESULT',
+        badge: 'Verificado: Sem Resposta',
+        badgeClass: 'badge-warning',
+        borderColor: 'var(--status-warning)',
+        backgroundColor: 'rgba(245, 158, 11, 0.08)',
+        icon: <AlertCircle size={15} color="var(--status-warning)" style={{ flexShrink: 0 }} />,
+        title: 'Nenhum sinal recente na nuvem',
+        detail: `Nenhum sinal recente recebido do computador ${agent.machineName} (último contato: ${formatLastSeen(agent.lastSeenAt)}). O equipamento permanece offline nos servidores.`,
+      };
+    }
+
+    if (verificationState === 'ERROR_RESULT') {
+      return {
+        category: 'ERROR_RESULT',
+        badge: 'Falha na Consulta',
+        badgeClass: 'badge-danger',
+        borderColor: 'var(--status-danger)',
+        backgroundColor: 'rgba(239, 68, 68, 0.08)',
+        icon: <AlertCircle size={15} color="var(--status-danger)" style={{ flexShrink: 0 }} />,
+        title: 'Erro ao consultar servidores',
+        detail: errorMessage || 'Falha ao consultar status com o servidor. Verifique sua conexão com a internet.',
+      };
+    }
+
     if (isRevoked) {
       return {
         category: 'AUTH_ERROR',
         badge: 'Credencial Revogada',
         badgeClass: 'badge-secondary',
+        borderColor: 'var(--status-danger)',
+        backgroundColor: 'rgba(239, 68, 68, 0.08)',
+        icon: <ShieldAlert size={15} color="var(--status-danger)" style={{ flexShrink: 0 }} />,
         title: 'Acesso desautorizado',
         detail: 'A credencial deste agente foi revogada na administração. É necessário realizar um novo pareamento para autorizá-lo novamente.',
       };
     }
+
     return {
       category: 'OFFLINE',
       badge: 'Sem Heartbeat Recente',
       badgeClass: 'badge-danger',
+      borderColor: 'var(--status-warning)',
+      backgroundColor: 'rgba(245, 158, 11, 0.08)',
+      icon: <Radio size={15} color="var(--status-warning)" style={{ flexShrink: 0 }} />,
       title: 'Serviço local sem resposta na nuvem',
       detail: `Nenhum sinal recebido nos últimos 2 minutos (última comunicação registrada: ${formatLastSeen(agent.lastSeenAt)}).`,
     };
@@ -75,27 +125,20 @@ export const ReconnectAgentModal: React.FC<ReconnectAgentModalProps> = ({
 
   const handleCheckConnection = async () => {
     setIsChecking(true);
-    setFeedback(null);
+    setVerificationState('CHECKING');
+    setErrorMessage('');
     try {
       if (onRefresh) {
         await onRefresh();
       }
       if (agent.status === 'ONLINE') {
-        setFeedback({
-          type: 'success',
-          message: 'Conexão restabelecida! O Agent está Online e pronto para processar impressões.',
-        });
+        setVerificationState('ONLINE_RESULT');
       } else {
-        setFeedback({
-          type: 'warning',
-          message: `Nenhum sinal recente recebido do computador ${agent.machineName}. O agente permanece offline nos servidores da nuvem. Verifique se o equipamento está ligado e conectado à rede.`,
-        });
+        setVerificationState('OFFLINE_RESULT');
       }
     } catch (err: any) {
-      setFeedback({
-        type: 'warning',
-        message: err.message || 'Falha ao consultar status com o servidor.',
-      });
+      setVerificationState('ERROR_RESULT');
+      setErrorMessage(err.message || 'Falha ao consultar status com o servidor.');
     } finally {
       setIsChecking(false);
     }
@@ -348,25 +391,25 @@ export const ReconnectAgentModal: React.FC<ReconnectAgentModalProps> = ({
               gap: '0.85rem',
             }}
           >
-            {/* Painel de Diagnóstico */}
+            {/* Painel de Diagnóstico & Resultado da Verificação (In-Place) */}
             <div
+              data-testid="reconnect-diagnostic-panel"
               style={{
-                padding: '0.9rem 1rem',
+                padding: '0.85rem 1rem',
                 borderRadius: '10px',
-                border: `1px solid ${isOnline ? 'var(--status-success)' : isRevoked ? 'var(--status-danger)' : 'var(--status-warning)'}`,
-                backgroundColor: isOnline
-                  ? 'rgba(16, 185, 129, 0.08)'
-                  : isRevoked
-                  ? 'rgba(239, 68, 68, 0.08)'
-                  : 'rgba(245, 158, 11, 0.08)',
+                border: `1px solid ${diagnostic.borderColor}`,
+                backgroundColor: diagnostic.backgroundColor,
                 display: 'flex',
                 flexDirection: 'column',
                 gap: '0.35rem',
+                minHeight: '82px',
+                transition: 'all 0.2s ease',
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', flexWrap: 'wrap' }}>
-                <span style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-                  Diagnóstico Técnico:
+                <span style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-primary)', display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+                  {diagnostic.icon}
+                  <span>Diagnóstico Técnico:</span>
                 </span>
                 <span
                   className={`badge ${diagnostic.badgeClass}`}
@@ -375,7 +418,7 @@ export const ReconnectAgentModal: React.FC<ReconnectAgentModalProps> = ({
                   {diagnostic.badge}
                 </span>
               </div>
-              <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: 1.45 }}>
                 <strong>{diagnostic.title}:</strong> {diagnostic.detail}
               </div>
             </div>
@@ -423,36 +466,6 @@ export const ReconnectAgentModal: React.FC<ReconnectAgentModalProps> = ({
               A ação <em>Verificar Conexão Agora</em> consulta os servidores da nuvem para checar se novos heartbeats foram recebidos; ela não emite comandos remotos para ligar o computador ou iniciar serviços locais.
               Controle facilitado de 1 clique pela bandeja do sistema (Tray Companion) será introduzido nos próximos pacotes da Fase 5.
             </div>
-
-            {/* Feedback Dinâmico pós-verificação */}
-            {feedback && (
-              <div
-                style={{
-                  padding: '0.75rem 0.9rem',
-                  borderRadius: '8px',
-                  display: 'flex',
-                  alignItems: 'flex-start',
-                  gap: '0.55rem',
-                  fontSize: '0.78rem',
-                  lineHeight: 1.4,
-                  backgroundColor:
-                    feedback.type === 'success'
-                      ? 'rgba(16, 185, 129, 0.12)'
-                      : 'rgba(245, 158, 11, 0.12)',
-                  border: `1px solid ${
-                    feedback.type === 'success' ? 'var(--status-success)' : 'var(--status-warning)'
-                  }`,
-                  color: 'var(--text-primary)',
-                }}
-              >
-                {feedback.type === 'success' ? (
-                  <CheckCircle2 size={16} color="var(--status-success)" style={{ flexShrink: 0, marginTop: '2px' }} />
-                ) : (
-                  <AlertCircle size={16} color="var(--status-warning)" style={{ flexShrink: 0, marginTop: '2px' }} />
-                )}
-                <span>{feedback.message}</span>
-              </div>
-            )}
           </div>
         </div>
 
@@ -504,7 +517,15 @@ export const ReconnectAgentModal: React.FC<ReconnectAgentModalProps> = ({
               }}
             >
               <RefreshCw size={15} className={isChecking ? 'spin' : ''} />
-              <span>{isChecking ? 'Consultando Servidor...' : 'Verificar Conexão Agora'}</span>
+              <span>
+                {isChecking
+                  ? 'Consultando Servidor...'
+                  : verificationState === 'ONLINE_RESULT'
+                  ? 'Conexão Restabelecida'
+                  : verificationState === 'OFFLINE_RESULT'
+                  ? 'Verificar Novamente'
+                  : 'Verificar Conexão Agora'}
+              </span>
             </button>
 
             <button

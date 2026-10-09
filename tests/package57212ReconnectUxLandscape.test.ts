@@ -254,4 +254,48 @@ test('SUÍTE PACKAGE 5.7.2.1.2 — RECONNECT UX LANDSCAPE, THEMES & OFFLINE DIAG
       assert.ok(appHtml.length > 200);
     }
   });
+
+  // =========================================================================
+  // GATE 6: TRACK A (FOLLOW-UP) — ATUALIZAÇÃO IN-PLACE SEM SALTO VERTICAL
+  // =========================================================================
+  await t.test('Gate 6: Diagnóstico atualiza in-place sem caixa separada appended e suporta 5 estados', () => {
+    const modalPath = path.resolve('apps/frontend/src/agent/ReconnectAgentModal.tsx');
+    const modalContent = fs.readFileSync(modalPath, 'utf8');
+
+    // 1. Suporte aos 5 estados de verificação
+    assert.ok(modalContent.includes('IDLE'), 'Deve definir estado IDLE');
+    assert.ok(modalContent.includes('CHECKING'), 'Deve definir estado CHECKING');
+    assert.ok(modalContent.includes('OFFLINE_RESULT'), 'Deve definir estado OFFLINE_RESULT');
+    assert.ok(modalContent.includes('ONLINE_RESULT'), 'Deve definir estado ONLINE_RESULT');
+    assert.ok(modalContent.includes('ERROR_RESULT'), 'Deve definir estado ERROR_RESULT');
+
+    // 2. Não possui bloco separado {feedback && ...} que gerava expansão vertical e scroll
+    assert.equal(
+      modalContent.includes('{feedback &&'),
+      false,
+      'Não deve injetar caixa de feedback separada que expande a altura do modal'
+    );
+
+    // 3. Painel de diagnóstico possui id de teste e minHeight para estabilidade visual
+    assert.ok(
+      modalContent.includes('data-testid="reconnect-diagnostic-panel"'),
+      'Deve possuir container de diagnóstico identificado'
+    );
+    assert.ok(
+      modalContent.includes('minHeight: \'82px\'') || modalContent.includes('minHeight'),
+      'Deve possuir minHeight para garantir estabilidade dimensional sem layout shift'
+    );
+
+    // 4. Renderização do painel no estado inicial
+    const html = renderToStaticMarkup(
+      React.createElement(ReconnectAgentModal, {
+        isOpen: true,
+        agent: mockOfflineAgent,
+        onClose: () => {},
+      })
+    );
+    assert.ok(html.includes('data-testid="reconnect-diagnostic-panel"'));
+    assert.ok(html.includes('Verificar Conexão Agora'));
+  });
 });
+

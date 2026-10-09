@@ -1,14 +1,14 @@
 {
   "name": "witiquetas-frontend",
   "version": "5.7.2.1.2",
-  "commit": "3b72c6b6265ee14f2f9a9b88c2bc8dcc2dde384d",
-  "candidateSha": "3b72c6b6265ee14f2f9a9b88c2bc8dcc2dde384d",
-  "runningSha": "3b72c6b6265ee14f2f9a9b88c2bc8dcc2dde384d",
-  "shortCommit": "3b72c6b",
-  "shortSha": "3b72c6b",
-  "governanceSha": "3b72c6b6265ee14f2f9a9b88c2bc8dcc2dde384d",
-  "status": "IMPLEMENTED_AWAITING_MANUAL_HOMOLOGATION",
+  "commit": "6130f7356b572ff2ca31d3e0bea10c95dd1f2c29",
+  "candidateSha": "6130f7356b572ff2ca31d3e0bea10c95dd1f2c29",
+  "runningSha": "6130f7356b572ff2ca31d3e0bea10c95dd1f2c29",
+  "shortCommit": "6130f73",
+  "shortSha": "6130f73",
+  "governanceSha": "6130f7356b572ff2ca31d3e0bea10c95dd1f2c29",
+  "status": "MANUAL_HOMOLOGATED_WITH_MINOR_FOLLOWUP",
   "package": "5.7.2.1.2 — Reconnect UX Landscape + Light Theme + Offline Diagnostics",
   "phase": "Fase 5 — Administração e Governança da Aplicação",
-  "timestamp": "2026-10-08T14:35:00Z"
+  "timestamp": "2026-10-09T10:15:00Z"
 }

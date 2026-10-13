@@ -6,6 +6,8 @@ import {
   getSizesByNiche,
   calculateOrientation,
   formatDimensionLabel,
+  INDUSTRIAL_LABEL_PRESETS,
+  createCustomLabelSize,
 } from '@witiquetas/label-schema';
 import { isNicheAllowed, hasPermission } from '../auth/session.js';
 import { useEditorStore, formatDimensionBR } from './useEditorStore';
@@ -36,7 +38,9 @@ import {
   Activity,
   FlaskConical,
   Droplet,
-  Archive
+  Archive,
+  SlidersHorizontal,
+  Sliders,
 } from 'lucide-react';
 
 interface WizardProps {
@@ -61,6 +65,10 @@ export default function NewTemplateWizard({ isOpen, onClose, onSuccess }: Wizard
   const [step, setStep] = useState<'niche' | 'size'>('niche');
   const [selectedNiche, setSelectedNiche] = useState<NicheDefinition | null>(null);
   const [selectedSize, setSelectedSize] = useState<NicheSizeItem | null>(null);
+  const [sizeMode, setSizeMode] = useState<'catalog' | 'custom'>('catalog');
+  const [customWidthMm, setCustomWidthMm] = useState<string>('100');
+  const [customHeightMm, setCustomHeightMm] = useState<string>('200');
+  const [customDimensionError, setCustomDimensionError] = useState<string>('');
   const [searchNiche, setSearchNiche] = useState('');
   const [searchSize, setSearchSize] = useState('');
   const [customTitle, setCustomTitle] = useState('');
@@ -131,6 +139,8 @@ export default function NewTemplateWizard({ isOpen, onClose, onSuccess }: Wizard
 
   const handleSelectNiche = (niche: NicheDefinition) => {
     setSelectedNiche(niche);
+    setSizeMode('catalog');
+    setCustomDimensionError('');
     const sizes = getSizesByNiche(niche.id);
     if (sizes.length > 0) {
       setSelectedSize(sizes[0]);
@@ -138,16 +148,66 @@ export default function NewTemplateWizard({ isOpen, onClose, onSuccess }: Wizard
     setStep('size');
   };
 
-  const handleCreate = () => {
-    if (!selectedSize || !selectedNiche) return;
+  const handleCustomDimensionChange = (newWidthStr: string, newHeightStr: string) => {
+    setCustomWidthMm(newWidthStr);
+    setCustomHeightMm(newHeightStr);
 
-    const safeSizeLabel = selectedSize.label || `${selectedSize.widthMm}x${selectedSize.heightMm}mm`;
+    const w = parseFloat(newWidthStr.replace(',', '.'));
+    const h = parseFloat(newHeightStr.replace(',', '.'));
+
+    if (isNaN(w) || w <= 0) {
+      setCustomDimensionError('A largura deve ser um número positivo maior que zero.');
+      return;
+    }
+    if (isNaN(h) || h <= 0) {
+      setCustomDimensionError('A altura/comprimento deve ser um número positivo maior que zero.');
+      return;
+    }
+
+    setCustomDimensionError('');
+    try {
+      const customSize = createCustomLabelSize(w, h);
+      setSelectedSize({
+        ...customSize,
+        featured: false,
+        order: 999,
+        label: `${formatNumBR(w)} × ${formatNumBR(h)} mm (Personalizado)`,
+      });
+    } catch (err: any) {
+      setCustomDimensionError(err.message || 'Dimensões inválidas.');
+    }
+  };
+
+  const handleCreate = () => {
+    if (!selectedNiche) return;
+
+    let targetWidthMm: number;
+    let targetHeightMm: number;
+    let safeSizeLabel: string;
+
+    if (sizeMode === 'custom') {
+      const w = parseFloat(customWidthMm.replace(',', '.'));
+      const h = parseFloat(customHeightMm.replace(',', '.'));
+      if (isNaN(w) || w <= 0 || isNaN(h) || h <= 0) {
+        setCustomDimensionError('Informe valores positivos válidos para largura e altura.');
+        return;
+      }
+      targetWidthMm = w;
+      targetHeightMm = h;
+      safeSizeLabel = `${formatNumBR(w)} × ${formatNumBR(h)} mm`;
+    } else {
+      if (!selectedSize) return;
+      targetWidthMm = selectedSize.widthMm;
+      targetHeightMm = selectedSize.heightMm;
+      safeSizeLabel = selectedSize.label || `${selectedSize.widthMm}x${selectedSize.heightMm}mm`;
+    }
+
     const safeTitle = customTitle.trim() || `${selectedNiche.name} - ${safeSizeLabel}`;
 
     createNewDocument({
       title: safeTitle,
-      widthMm: selectedSize.widthMm,
-      heightMm: selectedSize.heightMm,
+      widthMm: targetWidthMm,
+      heightMm: targetHeightMm,
       dpi: 203,
       nicheName: selectedNiche.name,
     });
@@ -264,40 +324,255 @@ export default function NewTemplateWizard({ isOpen, onClose, onSuccess }: Wizard
               <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.35fr) minmax(330px, 0.8fr)', gap: '1.25rem', alignItems: 'start' }}>
                 {/* Coluna Esquerda: Busca e Grid de Formatos */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                  <div className="size-search-bar" style={{ height: '40px', borderRadius: '10px' }}>
-                    <Search size={16} color="var(--text-muted)" />
-                    <input
-                      type="text"
-                      className="size-search-input"
-                      placeholder="Buscar tamanho (ex: 100x30, 50x40...)"
-                      value={searchSize}
-                      onChange={(e) => setSearchSize(e.target.value)}
-                    />
+                  {/* Seletor de Modo: Catálogo Homologado vs Dimensões Personalizadas */}
+                  <div
+                    style={{
+                      display: 'flex',
+                      gap: '0.5rem',
+                      background: 'var(--bg-input)',
+                      padding: '0.25rem',
+                      borderRadius: '10px',
+                      border: '1px solid var(--border-color)',
+                    }}
+                  >
+                    <button
+                      type="button"
+                      className={`btn ${sizeMode === 'catalog' ? 'btn-primary' : ''}`}
+                      style={{
+                        flex: 1,
+                        fontSize: '0.78rem',
+                        padding: '0.4rem 0.6rem',
+                        borderRadius: '8px',
+                        border: 'none',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '0.4rem',
+                      }}
+                      onClick={() => {
+                        setSizeMode('catalog');
+                        if (availableSizes.length > 0 && (!selectedSize || selectedSize.id.startsWith('custom-'))) {
+                          setSelectedSize(availableSizes[0]);
+                        }
+                      }}
+                    >
+                      <Layers size={14} />
+                      <span>Formatos do Nicho ({availableSizes.length})</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      className={`btn ${sizeMode === 'custom' ? 'btn-primary' : ''}`}
+                      style={{
+                        flex: 1,
+                        fontSize: '0.78rem',
+                        padding: '0.4rem 0.6rem',
+                        borderRadius: '8px',
+                        border: 'none',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '0.4rem',
+                      }}
+                      onClick={() => {
+                        setSizeMode('custom');
+                        handleCustomDimensionChange(customWidthMm, customHeightMm);
+                      }}
+                    >
+                      <Sliders size={14} />
+                      <span>Dimensões Personalizadas</span>
+                    </button>
                   </div>
 
-                  <div className="wizard-size-grid">
-                    {availableSizes.map((size) => {
-                      const isSelected = selectedSize?.id === size.id;
-                      return (
-                        <div
-                          key={size.id}
-                          className={`wizard-size-card ${isSelected ? 'selected' : ''}`}
-                          onClick={() => setSelectedSize(size)}
-                        >
-                          {size.featured && <span className="wizard-size-badge">MAIS USADO</span>}
-                          {isSelected && (
-                            <div className="wizard-size-check">
-                              <Check size={13} />
+                  {sizeMode === 'catalog' ? (
+                    <>
+                      <div className="size-search-bar" style={{ height: '40px', borderRadius: '10px' }}>
+                        <Search size={16} color="var(--text-muted)" />
+                        <input
+                          type="text"
+                          className="size-search-input"
+                          placeholder="Buscar tamanho (ex: 100x30, 50x40...)"
+                          value={searchSize}
+                          onChange={(e) => setSearchSize(e.target.value)}
+                        />
+                      </div>
+
+                      <div className="wizard-size-grid">
+                        {availableSizes.map((size) => {
+                          const isSelected = selectedSize?.id === size.id;
+                          return (
+                            <div
+                              key={size.id}
+                              className={`wizard-size-card ${isSelected ? 'selected' : ''}`}
+                              onClick={() => setSelectedSize(size)}
+                            >
+                              {size.featured && <span className="wizard-size-badge">MAIS USADO</span>}
+                              {isSelected && (
+                                <div className="wizard-size-check">
+                                  <Check size={13} />
+                                </div>
+                              )}
+                              <div className="wizard-size-card-content">
+                                <div className="wizard-size-dimension">{formatNumBR(size.widthMm)} × {formatNumBR(size.heightMm)}</div>
+                                <div className="wizard-size-unit">mm</div>
+                              </div>
                             </div>
-                          )}
-                          <div className="wizard-size-card-content">
-                            <div className="wizard-size-dimension">{formatNumBR(size.widthMm)} × {formatNumBR(size.heightMm)}</div>
-                            <div className="wizard-size-unit">mm</div>
+                          );
+                        })}
+                      </div>
+                    </>
+                  ) : (
+                    /* Painel de Configuração de Dimensões Personalizadas */
+                    <div
+                      style={{
+                        padding: '1.25rem',
+                        backgroundColor: 'var(--bg-card)',
+                        borderRadius: '12px',
+                        border: '1px solid var(--border-color)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '1rem',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <SlidersHorizontal size={18} color="var(--accent-blue)" />
+                        <div>
+                          <div style={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                            Dimensões Sob Medida
+                          </div>
+                          <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
+                            Suporta formatos industriais com comprimento de até 200 mm ou mais.
                           </div>
                         </div>
-                      );
-                    })}
-                  </div>
+                      </div>
+
+                      {/* Presets Rápidos Industriais */}
+                      <div>
+                        <span style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-muted)', display: 'block', marginBottom: '0.35rem' }}>
+                          Presets Industriais Longos:
+                        </span>
+                        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                          {INDUSTRIAL_LABEL_PRESETS.map((preset) => (
+                            <button
+                              key={preset.id}
+                              type="button"
+                              className="btn btn-secondary"
+                              style={{
+                                fontSize: '0.75rem',
+                                padding: '0.3rem 0.65rem',
+                                borderRadius: '6px',
+                                border:
+                                  customWidthMm === preset.widthMm.toString() &&
+                                  customHeightMm === preset.heightMm.toString()
+                                    ? '1px solid var(--accent-blue)'
+                                    : '1px solid var(--border-color)',
+                              }}
+                              onClick={() => {
+                                handleCustomDimensionChange(
+                                  preset.widthMm.toString(),
+                                  preset.heightMm.toString()
+                                );
+                              }}
+                            >
+                              {preset.name}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Campos Numéricos de Largura e Altura */}
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                        <div>
+                          <label
+                            style={{
+                              display: 'block',
+                              fontSize: '0.76rem',
+                              fontWeight: 700,
+                              color: 'var(--text-primary)',
+                              marginBottom: '0.35rem',
+                            }}
+                          >
+                            Largura (mm):
+                          </label>
+                          <input
+                            type="number"
+                            step="0.5"
+                            min="10"
+                            max="220"
+                            className="size-search-input"
+                            style={{
+                              width: '100%',
+                              height: '40px',
+                              padding: '0 0.75rem',
+                              borderRadius: '8px',
+                              border: '1px solid var(--border-color)',
+                              background: 'var(--bg-input)',
+                              fontSize: '0.85rem',
+                              color: 'var(--text-primary)',
+                              boxSizing: 'border-box',
+                            }}
+                            value={customWidthMm}
+                            onChange={(e) => handleCustomDimensionChange(e.target.value, customHeightMm)}
+                          />
+                          <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '0.2rem', display: 'block' }}>
+                            Padrão cabeçote térmico: até 104 mm
+                          </span>
+                        </div>
+
+                        <div>
+                          <label
+                            style={{
+                              display: 'block',
+                              fontSize: '0.76rem',
+                              fontWeight: 700,
+                              color: 'var(--text-primary)',
+                              marginBottom: '0.35rem',
+                            }}
+                          >
+                            Altura / Comprimento (mm):
+                          </label>
+                          <input
+                            type="number"
+                            step="0.5"
+                            min="10"
+                            max="500"
+                            className="size-search-input"
+                            style={{
+                              width: '100%',
+                              height: '40px',
+                              padding: '0 0.75rem',
+                              borderRadius: '8px',
+                              border: '1px solid var(--border-color)',
+                              background: 'var(--bg-input)',
+                              fontSize: '0.85rem',
+                              color: 'var(--text-primary)',
+                              boxSizing: 'border-box',
+                            }}
+                            value={customHeightMm}
+                            onChange={(e) => handleCustomDimensionChange(customWidthMm, e.target.value)}
+                          />
+                          <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '0.2rem', display: 'block' }}>
+                            Comprimento contínuo: até 200 mm+
+                          </span>
+                        </div>
+                      </div>
+
+                      {customDimensionError && (
+                        <div
+                          style={{
+                            padding: '0.5rem 0.75rem',
+                            borderRadius: '6px',
+                            backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                            border: '1px solid var(--status-danger)',
+                            color: 'var(--status-danger)',
+                            fontSize: '0.76rem',
+                          }}
+                        >
+                          {customDimensionError}
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   {/* Nome do Modelo Reposicionado Imediatamente Abaixo da Seleção */}
                   <div style={{ marginTop: '0.5rem' }}>

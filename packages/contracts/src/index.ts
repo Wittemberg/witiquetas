@@ -120,6 +120,65 @@ export interface PrinterProfileDTO {
   isHomologated: boolean;
 }
 
+export interface LabelDimensionsValidationResult {
+  valid: boolean;
+  warnings: string[];
+  errors: string[];
+}
+
+/**
+ * Validação de dimensões da etiqueta contra as capacidades da impressora física.
+ * Não restringe o comprimento pelo limite de largura do cabeçote (maxWidthMm).
+ */
+export function validateLabelDimensionsAgainstPrinter(
+  dimensions: { widthMm: number; heightMm: number },
+  printerCapabilities?: Partial<PrinterCapabilitiesDTO> | null
+): LabelDimensionsValidationResult {
+  const result: LabelDimensionsValidationResult = {
+    valid: true,
+    warnings: [],
+    errors: [],
+  };
+
+  if (!dimensions || typeof dimensions.widthMm !== 'number' || typeof dimensions.heightMm !== 'number') {
+    result.valid = false;
+    result.errors.push('Dimensões da etiqueta não informadas ou inválidas.');
+    return result;
+  }
+
+  if (dimensions.widthMm <= 0) {
+    result.valid = false;
+    result.errors.push('A largura da etiqueta deve ser maior que zero.');
+  }
+
+  if (dimensions.heightMm <= 0) {
+    result.valid = false;
+    result.errors.push('A altura/comprimento da etiqueta deve ser maior que zero.');
+  }
+
+  if (!result.valid) {
+    return result;
+  }
+
+  if (printerCapabilities?.maxWidthMm && typeof printerCapabilities.maxWidthMm === 'number' && printerCapabilities.maxWidthMm > 0) {
+    const maxWidth = printerCapabilities.maxWidthMm;
+    if (dimensions.widthMm > maxWidth) {
+      result.valid = false;
+      result.errors.push(
+        `Largura da etiqueta (${dimensions.widthMm}mm) excede a largura máxima suportada pelo cabeçote da impressora (${maxWidth}mm).`
+      );
+    }
+  }
+
+  if (dimensions.heightMm > 150) {
+    result.warnings.push(
+      `Etiqueta com comprimento estendido (${dimensions.heightMm}mm): verifique se o sensor de mídia da impressora suporta etiquetas longas de até 200mm.`
+    );
+  }
+
+  return result;
+}
+
 // ==========================================
 // LOCAL AGENTS & PAIRING
 // ==========================================

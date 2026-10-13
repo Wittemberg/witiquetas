@@ -659,3 +659,96 @@ export function getSizesByNiche(nicheIdOrSlug: string): NicheSizeItem[] {
 
   return items;
 }
+
+// 7. SUPORTE A PRESETS INDUSTRIAIS & DIMENSÕES PERSONALIZADAS (TRACK B)
+export const INDUSTRIAL_LABEL_PRESETS: LabelSize[] = [
+  createSize(100, 200),
+  createSize(105, 200),
+];
+
+/**
+ * Cria dinamicamente uma dimensão de etiqueta personalizada com validação numérica positiva.
+ */
+export function createCustomLabelSize(widthMm: number, heightMm: number): LabelSize {
+  if (typeof widthMm !== 'number' || isNaN(widthMm) || widthMm <= 0) {
+    throw new Error(`Largura inválida: ${widthMm}. A largura deve ser um número positivo maior que zero.`);
+  }
+  if (typeof heightMm !== 'number' || isNaN(heightMm) || heightMm <= 0) {
+    throw new Error(`Altura/comprimento inválido: ${heightMm}. A altura deve ser um número positivo maior que zero.`);
+  }
+
+  const id = `custom-${widthMm.toString().replace('.', '_')}x${heightMm.toString().replace('.', '_')}`;
+  return {
+    id,
+    widthMm,
+    heightMm,
+    name: formatDimension(widthMm, heightMm),
+    active: true,
+  };
+}
+
+export interface LabelPrinterValidationResult {
+  valid: boolean;
+  warnings: string[];
+  errors: string[];
+}
+
+/**
+ * Validação de dimensões da etiqueta contra capacidades físicas da impressora.
+ * 
+ * Regra física canônica:
+ * - A largura máxima de impressão (maxWidthMm) restringe estritamente a LARGURA da etiqueta (eixo X).
+ * - O comprimento/altura da etiqueta (eixo Y) NÃO é limitado por maxWidthMm (pode ter até 200mm+ em rolo contínuo).
+ * - Se as capacidades da impressora não estiverem disponíveis, NÃO fazer suposições falsas.
+ */
+export function validateLabelDimensionsAgainstPrinter(
+  dimensions: { widthMm: number; heightMm: number },
+  printerCapabilities?: { maxWidthMm?: number; notes?: string }
+): LabelPrinterValidationResult {
+  const result: LabelPrinterValidationResult = {
+    valid: true,
+    warnings: [],
+    errors: [],
+  };
+
+  if (!dimensions || typeof dimensions.widthMm !== 'number' || typeof dimensions.heightMm !== 'number') {
+    result.valid = false;
+    result.errors.push('Dimensões da etiqueta não informadas ou inválidas.');
+    return result;
+  }
+
+  if (dimensions.widthMm <= 0) {
+    result.valid = false;
+    result.errors.push('A largura da etiqueta deve ser maior que zero.');
+  }
+
+  if (dimensions.heightMm <= 0) {
+    result.valid = false;
+    result.errors.push('A altura/comprimento da etiqueta deve ser maior que zero.');
+  }
+
+  if (!result.valid) {
+    return result;
+  }
+
+  // Se a impressora informar maxWidthMm explicitamente:
+  if (printerCapabilities && typeof printerCapabilities.maxWidthMm === 'number' && printerCapabilities.maxWidthMm > 0) {
+    const maxWidth = printerCapabilities.maxWidthMm;
+    if (dimensions.widthMm > maxWidth) {
+      result.valid = false;
+      result.errors.push(
+        `Largura da etiqueta (${dimensions.widthMm}mm) excede a largura máxima suportada pelo cabeçote da impressora (${maxWidth}mm).`
+      );
+    }
+  }
+
+  // Nota de comprimento industrial (até 200mm perfeitamente suportado)
+  if (dimensions.heightMm > 150) {
+    result.warnings.push(
+      `Etiqueta longa (${dimensions.heightMm}mm): certifique-se de que o ribbon e o sensor de gap/tarja da impressora suportem etiquetas estendidas de até 200mm.`
+    );
+  }
+
+  return result;
+}
+

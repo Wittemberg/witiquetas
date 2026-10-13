@@ -1,9 +1,9 @@
 {
   "checkpoints": [
     {
-      "sha": "c7cfa7b0f9aa82d5c3db62c01ceae7bfe46d91fe",
-      "shortSha": "c7cfa7b",
-      "date": "2026-10-13T14:12:00Z",
+      "sha": "5d2c2a236244cc333a5394b1af684bd43a84ab64",
+      "shortSha": "5d2c2a2",
+      "date": "2026-10-13T18:15:00Z",
       "phase": "5",
       "patch": "5.7.2.1.3",
       "title": "5.7.2.1.3 — P0 Hotfix: Editor Save Failure on Industrial & Custom Labels",
@@ -14,10 +14,10 @@
       ],
       "testsPassed": true,
       "deployed": true,
-      "manualValidation": false,
-      "homologated": false,
-      "status": "P0_OPEN_AWAITING_MANUAL_HOMOLOGATION",
-      "evidence": "P0 HOTFIX E DIAGNÓSTICO EMPÍRICO EM PRODUÇÃO (AWAITING MANUAL HOMOLOGATION): 1) Diagnóstico Real Comprovado em Produção: Na rota server-authoritative POST /api/templates, a validação de allowedNiches retornava HTTP 403 Forbidden (NICHE_NOT_ALLOWED) para 100% dos modelos (Logística, Uso Geral e Varejo) porque no PostgreSQL a tabela role_niches possuía 3 registros parciais para o perfil ADMIN todos com valor 'false' (niche-produto, niche-sangue, niche-gondola) e omitia os outros 8 nichos. Em EffectiveConfigurationService.resolve, a ausência de guarda anti-lockout para ADMIN e a ausência de fallback para nichos não configurados resultavam em allowedNiches=[] para o usuário admin. 2) Guarda Anti-Lockout de ADMIN: Em EffectiveConfigurationService.ts, adicionada garantia irrestrita de que o papel ADMIN possui acesso a todos os nichos da empresa/plataforma. Para outros papéis, nichos não cadastrados em role_niches herdam o perfil padrão canônico. 3) Bootstrap Idempotente: Em adminBootstrapService.ts, bootstrapCompanyNicheProfiles agora assegura que ADMIN tenha todos os nichos autorizados e preenche nichos ausentes nos demais perfis. 4) Preservação de Nicho: Em templateRepository.createTemplate e useEditorStore.ts, dto.nicheId e dto.nicheName são agora preservados do documento. 5) NichesAdminView: Corrigida coerção indevida de undefined para false no carregamento do acesso a nichos por perfil. 6) Validação: 224/224 testes automatizados GREEN, incluindo cenários E e F de Anti-Lockout. Testes empíricos em produção confirmados com 201 Created e 200 OK update."
+      "manualValidation": true,
+      "homologated": true,
+      "status": "CLOSED — MANUAL_HOMOLOGATED",
+      "evidence": "P0 HOTFIX HOMOLOGADO MANUALMENTE E FORMALMENTE ENCERRADO (CLOSED — MANUAL_HOMOLOGATED): 1) Diagnóstico e Histórico de Falhas: No commit c7cfa7b, o salvamento de modelos apresentava 'Erro' com 0/3 testes manuais aprovados. A reprodução em browser autenticado revelou HTTP 403 Forbidden (NICHE_NOT_ALLOWED) na rota server-authoritative POST /api/templates para todos os modelos (Logística 100x200mm, Uso Geral 80x180mm e Varejo 100x50mm). 2) Causa Raiz: No banco PostgreSQL, a tabela role_niches possuía apenas 3 registros parciais para o perfil ADMIN (role-default-admin), todos como false (niche-produto, niche-sangue, niche-gondola), omitindo os demais 8 nichos. No EffectiveConfigurationService.resolve, a ausência de guarda anti-lockout para ADMIN e a falta de fallback canônico colapsavam allowedNiches para [], bloqueando o salvamento. 3) Correção do EffectiveConfigurationService: Implementada guarda anti-lockout explícita e irrestrita garantindo que ADMIN tenha acesso a todos os nichos disponíveis da empresa, além de fallback canônico de perfil padrão para nichos não configurados nos demais papéis. 4) Bootstrap Idempotente: Em adminBootstrapService.ts, bootstrapCompanyNicheProfiles agora assegura que ADMIN tenha todos os 11 nichos autorizados e preenche nichos ausentes nos demais perfis sem reativar nichos desabilitados pela empresa. 5) Preservação de Nicho: Em templateRepository.createTemplate e useEditorStore.ts, dto.document.nicheId e dto.document.nicheName são estritamente preservados do documento. Em NichesAdminView.tsx, corrigida a coerção indevida de undefined para false. 6) Regressões e Security Gate (8/8 Gates Validados): Isolamento multi-tenant estrito mantido; ADMIN limitado à própria empresa; nichos desabilitados pela empresa continuam bloqueados inclusive para ADMIN; nichos inválidos rejeitados com 400; restrições explícitas de outros papéis respeitadas; distinção semântica entre não configurado e negação explícita; bootstrap sem reativação indevida; ADMIN sem privilégios PLATFORM_DEVELOPER nem bypass. Suíte completa com 231/231 testes PASS. 7) Baseline Funcional Homologada: Commit funcional 5d2c2a236244cc333a5394b1af684bd43a84ab64, CI Run 38444222119 SUCCESS, imagens imutáveis promovidas no GHCR com candidate = stable = running e /api/health HEALTHY. 8) Homologação Manual do Usuário (3/3 PASS): Aprovada formalmente pelo usuário em produção em todos os 3 cenários reais (Logística 100x200mm PASS, Uso Geral 80x180mm PASS, Varejo 100x50mm PASS)."
     },
     {
       "sha": "6130f7356b572ff2ca31d3e0bea10c95dd1f2c29",

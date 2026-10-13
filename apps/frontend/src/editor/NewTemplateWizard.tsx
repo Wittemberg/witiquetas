@@ -209,6 +209,7 @@ export default function NewTemplateWizard({ isOpen, onClose, onSuccess }: Wizard
       widthMm: targetWidthMm,
       heightMm: targetHeightMm,
       dpi: 203,
+      nicheId: selectedNiche.id,
       nicheName: selectedNiche.name,
     });
 

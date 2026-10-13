@@ -1,6 +1,25 @@
 {
   "checkpoints": [
     {
+      "sha": "26e354dd3d4d0f5d36846df1450e28aeec72c02d",
+      "shortSha": "26e354d",
+      "date": "2026-10-13T13:52:00Z",
+      "phase": "5",
+      "patch": "5.7.2.1.3",
+      "title": "5.7.2.1.3 — P0 Hotfix: Editor Save Failure on Industrial & Custom Labels",
+      "type": "HOTFIX",
+      "capabilities": [
+        "cap-editor-niche-governance",
+        "cap-custom-label-dimensions"
+      ],
+      "testsPassed": true,
+      "deployed": false,
+      "manualValidation": false,
+      "homologated": false,
+      "status": "P0_OPEN_AWAITING_MANUAL_HOMOLOGATION",
+      "evidence": "P0 HOTFIX IMPLEMENTADO (AWAITING MANUAL HOMOLOGATION): 1) Causa Raiz: NewTemplateWizard não repassava selectedNiche.id para createNewDocument, deixando o documento sem nicheId e forçando injeção incondicional de elementos de varejo (price com 'produto.preco' e barcode com 'produto.ean'), os quais violam as políticas de nichos industriais/não-varejo (ex: Logística, Patrimônio, Uso Geral) provocando HTTP 400 Bad Request ao salvar. 2) Correção em NewTemplateWizard: selectedNiche.id repassado explicitamente como nicheId. 3) Correção em useEditorStore: createNewDocument agora normaliza nicheId, respeita as políticas de isElementAllowed e isFieldAllowed antes de injetar elementos iniciais, vinculando os metadados corretos do nicho no documento. 4) Feedback Visual no EditorLayout: estado 'error' agora mantém o botão 'Tentar Novamente' acessível e exibe tooltip com o diagnóstico detalhado em saveErrorMessage. 5) Suíte de regressão focada tests/package572SaveIndustrialTemplateRegression.test.ts cobrindo cenários 100x200mm, 105x200mm, 80x180mm e preservação de compatibilidade legada com 100x50mm (varejo), 100% GREEN."
+    },
+    {
       "sha": "6130f7356b572ff2ca31d3e0bea10c95dd1f2c29",
       "shortSha": "6130f73",
       "date": "2026-10-08T14:35:00Z",

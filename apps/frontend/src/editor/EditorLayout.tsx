@@ -643,14 +643,14 @@ export default function EditorLayout({
               </span>
             </div>
 
-            {saveStatus === 'unsaved' && canSaveCurrentDocument && (
+            {(saveStatus === 'unsaved' || saveStatus === 'error') && canSaveCurrentDocument && (
               <button
                 className="btn"
                 style={{
                   padding: '0.18rem 0.45rem',
                   fontSize: '0.7rem',
                   fontWeight: 700,
-                  background: 'var(--accent-blue)',
+                  background: saveStatus === 'error' ? 'var(--status-danger)' : 'var(--accent-blue)',
                   color: '#ffffff',
                   border: 'none',
                   borderRadius: '4px',
@@ -660,10 +660,10 @@ export default function EditorLayout({
                   flexShrink: 0,
                 }}
                 onClick={() => saveDocumentToBackend()}
-                title="Salvar modelo no servidor (Ctrl+S)"
+                title={saveStatus === 'error' ? (saveErrorMessage || 'Erro ao salvar. Clique para tentar novamente.') : 'Salvar modelo no servidor (Ctrl+S)'}
               >
                 <Save size={11} />
-                <span>Salvar</span>
+                <span>{saveStatus === 'error' ? 'Tentar Novamente' : 'Salvar'}</span>
               </button>
             )}
 

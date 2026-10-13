@@ -7,7 +7,7 @@ import {
 } from '@witiquetas/label-schema';
 import { type QRCodeLibraryItemDTO, type PrinterDTO } from '@witiquetas/contracts';
 import { normalizeElementGeometry, normalizeDocumentGeometry, constrainElementToLabel, constrainGroupMovement, validateDocumentBounds, SAFE_AREA_MARGIN_MM } from './bounds.ts';
-import { isElementAllowed, hasPermission } from '../auth/session.js';
+import { isElementAllowed, isFieldAllowed, resolveCanonicalNicheId, hasPermission } from '../auth/session.js';
 
 // Converter Milímetros ➔ Pixels com base no DPI (ex: 203 DPI = ~8 dots/mm)
 export function mmToPx(mm: number, dpi: number = 203): number {
@@ -358,6 +358,7 @@ export interface CreateNewDocumentParams {
   widthMm: number;
   heightMm: number;
   dpi?: 203 | 300 | 600;
+  nicheId?: string;
   nicheName?: string;
 }
 
@@ -518,9 +519,15 @@ export const useEditorStore = create<EditorState>((set, get, api) => {
 
   setSaveStatus: (status) => set({ saveStatus: status }),
 
-  createNewDocument: ({ title, widthMm, heightMm, dpi = 203, nicheName }) => {
+  createNewDocument: ({ title, widthMm, heightMm, dpi = 203, nicheId, nicheName }) => {
     const orientation = calculateOrientation(widthMm, heightMm);
+    const resolvedNiche = nicheId || resolveCanonicalNicheId(nicheName);
     const elements: LabelElement[] = [];
+
+    const canAddPrice = isElementAllowed(resolvedNiche, 'price') && isFieldAllowed(resolvedNiche, 'produto.preco');
+    const canAddBarcode = isElementAllowed(resolvedNiche, 'barcode');
+    const canAddBarcodeEanField = isFieldAllowed(resolvedNiche, 'produto.ean');
+    const canAddProductDescField = isFieldAllowed(resolvedNiche, 'produto.descricao');
 
     if (widthMm >= 40 && heightMm >= 20) {
       elements.push({
@@ -528,7 +535,7 @@ export const useEditorStore = create<EditorState>((set, get, api) => {
         name: 'Nome do Produto',
         type: 'text',
         text: 'NOME / DESCRIÇÃO DO PRODUTO',
-        field: 'produto.descricao',
+        ...(canAddProductDescField ? { field: 'produto.descricao' } : {}),
         x: Math.round(widthMm * 0.05),
         y: Math.round(heightMm * 0.08),
         width: Math.round(widthMm * 0.9),
@@ -543,40 +550,44 @@ export const useEditorStore = create<EditorState>((set, get, api) => {
       });
 
       if (heightMm >= 30) {
-        elements.push({
-          id: `elem-price-${Date.now() + 1}`,
-          name: 'Preço Promocional',
-          type: 'price',
-          field: 'produto.preco',
-          prefix: 'R$',
-          fontFamily: 'Roboto',
-          x: Math.round(widthMm * 0.55),
-          y: Math.round(heightMm * 0.35),
-          width: Math.round(widthMm * 0.4),
-          height: Math.round(heightMm * 0.3),
-          integerFontSize: Math.min(26, Math.max(14, Math.round(heightMm * 0.5))),
-          fractionFontSize: Math.min(16, Math.max(10, Math.round(heightMm * 0.3))),
-          currencyFontSize: 10,
-          color: '#dc2626',
-          locked: false,
-          visible: true,
-        });
+        if (canAddPrice) {
+          elements.push({
+            id: `elem-price-${Date.now() + 1}`,
+            name: 'Preço Promocional',
+            type: 'price',
+            field: 'produto.preco',
+            prefix: 'R$',
+            fontFamily: 'Roboto',
+            x: Math.round(widthMm * 0.55),
+            y: Math.round(heightMm * 0.35),
+            width: Math.round(widthMm * 0.4),
+            height: Math.round(heightMm * 0.3),
+            integerFontSize: Math.min(26, Math.max(14, Math.round(heightMm * 0.5))),
+            fractionFontSize: Math.min(16, Math.max(10, Math.round(heightMm * 0.3))),
+            currencyFontSize: 10,
+            color: '#dc2626',
+            locked: false,
+            visible: true,
+          });
+        }
 
-        elements.push({
-          id: `elem-ean-${Date.now() + 2}`,
-          name: 'Código de Barras EAN',
-          type: 'barcode',
-          format: 'EAN13',
-          field: 'produto.ean',
-          value: '7894900011517',
-          x: Math.round(widthMm * 0.05),
-          y: Math.round(heightMm * 0.45),
-          width: Math.min(widthMm * 0.48, 50),
-          height: Math.round(heightMm * 0.4),
-          showText: true,
-          locked: false,
-          visible: true,
-        });
+        if (canAddBarcode) {
+          elements.push({
+            id: `elem-ean-${Date.now() + 2}`,
+            name: 'Código de Barras EAN',
+            type: 'barcode',
+            format: 'EAN13',
+            ...(canAddBarcodeEanField ? { field: 'produto.ean' } : {}),
+            value: '7894900011517',
+            x: Math.round(widthMm * 0.05),
+            y: Math.round(heightMm * 0.45),
+            width: Math.min(widthMm * 0.48, 50),
+            height: Math.round(heightMm * 0.4),
+            showText: true,
+            locked: false,
+            visible: true,
+          });
+        }
       }
     } else {
       elements.push({
@@ -584,7 +595,7 @@ export const useEditorStore = create<EditorState>((set, get, api) => {
         name: 'Item / Código',
         type: 'text',
         text: 'ITEM REF',
-        field: 'produto.descricao',
+        ...(canAddProductDescField ? { field: 'produto.descricao' } : {}),
         x: 1,
         y: 1,
         width: widthMm - 2,
@@ -602,6 +613,8 @@ export const useEditorStore = create<EditorState>((set, get, api) => {
     const newDoc: LabelDocument = {
       schemaVersion: 1,
       title: title || `${nicheName || 'Etiqueta'} (${widthMm}x${heightMm}mm)`,
+      nicheId: resolvedNiche,
+      nicheName: nicheName || undefined,
       dimensions: {
         widthMm,
         heightMm,

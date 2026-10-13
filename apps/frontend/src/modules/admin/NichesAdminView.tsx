@@ -159,7 +159,8 @@ export const NichesAdminView: React.FC<NichesAdminViewProps> = ({ onConfigChange
           roles.map(async (r) => {
             try {
               const res = await AdminApi.fetchRoleNiches(r.id);
-              accessMap[r.id] = Boolean(res.nicheAccess?.[nicheId]);
+              const val = res.nicheAccess?.[nicheId];
+              accessMap[r.id] = val !== undefined ? Boolean(val) : (r.code === 'OPERATOR' ? false : true);
             } catch {
               accessMap[r.id] = true;
             }

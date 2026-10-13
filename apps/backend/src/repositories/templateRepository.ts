@@ -405,8 +405,8 @@ export const templateRepository = {
     const companyId = companyIdOverride || dto.companyId || 'comp-default';
     const now = new Date().toISOString();
     const title = dto.name || dto.title || 'Novo Modelo de Etiqueta';
-    const nicheId = dto.nicheId || normalizeNicheId(dto.nicheName);
-    const nicheName = dto.nicheName || 'Varejo / Supermercado';
+    const nicheId = dto.nicheId || dto.document?.nicheId || normalizeNicheId(dto.nicheName || dto.document?.nicheName);
+    const nicheName = dto.nicheName || dto.document?.nicheName || 'Varejo / Supermercado';
 
     const document: LabelDocument = {
       ...dto.document,

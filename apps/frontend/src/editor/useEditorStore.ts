@@ -1310,6 +1310,8 @@ export const useEditorStore = create<EditorState>((set, get, api) => {
         const created = await templatesApi.createTemplate({
           title: document.title || 'Etiqueta Térmica',
           name: document.title || 'Etiqueta Térmica',
+          nicheId: document.nicheId,
+          nicheName: document.nicheName,
           scope: 'COMPANY',
           document,
         });

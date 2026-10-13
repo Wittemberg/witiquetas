@@ -80,6 +80,14 @@ export const EffectiveConfigurationService = {
           userPermissions.add(p);
         }
 
+        // Se o usuário possui o papel ADMIN, ele possui acesso irrestrito a todos os nichos (Guarda Anti-Lockout)
+        if (role.code === 'ADMIN') {
+          for (const n of NICHES) {
+            roleAllowedNiches!.add(n.id);
+          }
+          continue;
+        }
+
         const nicheAccess = await RoleRepository.getRoleNicheAccess(role.id);
         const configuredNicheIds = Object.keys(nicheAccess);
         if (configuredNicheIds.length === 0) {
@@ -92,7 +100,7 @@ export const EffectiveConfigurationService = {
               }
             }
           } else {
-            // ADMIN, DESIGNER, SUPERVISOR: acesso a todos os nichos
+            // DESIGNER, SUPERVISOR: acesso a todos os nichos
             for (const n of NICHES) {
               roleAllowedNiches!.add(n.id);
             }
@@ -101,6 +109,19 @@ export const EffectiveConfigurationService = {
           for (const [nid, allowed] of Object.entries(nicheAccess)) {
             if (allowed) {
               roleAllowedNiches!.add(nid);
+            }
+          }
+          // Nichos da plataforma não explicitamente cadastrados em nicheAccess herdam o default canônico do perfil
+          for (const n of NICHES) {
+            if (!(n.id in nicheAccess)) {
+              if (role.code === 'OPERATOR') {
+                const profile = getDefaultNicheProfile(n.id);
+                if (profile?.operationalForOperator) {
+                  roleAllowedNiches!.add(n.id);
+                }
+              } else {
+                roleAllowedNiches!.add(n.id);
+              }
             }
           }
         }

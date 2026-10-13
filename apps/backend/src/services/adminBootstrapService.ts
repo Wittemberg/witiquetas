@@ -275,14 +275,29 @@ export async function bootstrapCompanyNicheProfiles(companyId: string): Promise<
   const roles = await RoleRepository.listByCompany(companyId);
   for (const role of roles) {
     const existingNicheAccess = await RoleRepository.getRoleNicheAccess(role.id);
-    if (Object.keys(existingNicheAccess).length === 0) {
-      if (role.code === 'ADMIN' || role.code === 'DESIGNER' || role.code === 'SUPERVISOR') {
+    if (role.code === 'ADMIN') {
+      // ADMIN sempre possui todos os nichos habilitados
+      for (const profile of allProfiles) {
+        if (existingNicheAccess[profile.nicheId] !== true) {
+          await RoleRepository.setRoleNicheAccess(role.id, profile.nicheId, true);
+        }
+      }
+    } else if (Object.keys(existingNicheAccess).length === 0) {
+      if (role.code === 'DESIGNER' || role.code === 'SUPERVISOR') {
         for (const profile of allProfiles) {
           await RoleRepository.setRoleNicheAccess(role.id, profile.nicheId, true);
         }
       } else if (role.code === 'OPERATOR') {
         for (const profile of allProfiles) {
           await RoleRepository.setRoleNicheAccess(role.id, profile.nicheId, profile.operationalForOperator);
+        }
+      }
+    } else {
+      // Para perfis com configuração parcial, provisiona novos nichos ausentes com os defaults
+      for (const profile of allProfiles) {
+        if (!(profile.nicheId in existingNicheAccess)) {
+          const allowed = role.code === 'OPERATOR' ? profile.operationalForOperator : true;
+          await RoleRepository.setRoleNicheAccess(role.id, profile.nicheId, allowed);
         }
       }
     }

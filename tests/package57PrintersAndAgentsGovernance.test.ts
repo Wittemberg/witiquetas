@@ -341,15 +341,20 @@ test('SUÍTE COMPLETA — PACKAGE 5.7 & P0 RESOLUTION (PRINTERS & AGENTS GOVERNA
   });
 
   // =========================================================================
-  // GATE 17: FILA DE IMPRESSÃO VOLÁTIL PRESERVADA PARA PACKAGE 5.7.1
+  // GATE 17: FILA DE IMPRESSÃO PERSISTENTE E SEGURANÇA DE LEASES (PACKAGE 5.7.1)
   // =========================================================================
-  await t.test('Gate 17: Semântica da Print Queue preservada sem alteração antecipada do Package 5.7.1', async () => {
+  await t.test('Gate 17: Persistência transacional e FOR UPDATE SKIP LOCKED ativas no Package 5.7.1', async () => {
     const printJobsRoute = path.resolve('apps/backend/src/routes/printJobs.ts');
     const content = fs.readFileSync(printJobsRoute, 'utf-8');
 
-    // Confirma que as stores em memória continuam intactas para o 5.7.1
-    assert.ok(content.includes('printJobsStore'), 'printJobsStore deve permanecer para ser migrado no 5.7.1');
-    assert.strictEqual(content.includes('SKIP LOCKED'), false, 'SKIP LOCKED não deve ter sido introduzido antecipadamente nesta fase');
-    assert.strictEqual(content.includes('FOR UPDATE'), false, 'FOR UPDATE não deve ter sido introduzido antecipadamente nesta fase');
+    // Confirma que o repositório transacional está conectado e o store mantido para retrocompatibilidade
+    assert.ok(content.includes('printJobsStore'), 'printJobsStore deve permanecer para retrocompatibilidade');
+    assert.ok(content.includes('PrintJobRepository'), 'PrintJobRepository deve estar conectado à rota');
+
+    const repoPath = path.resolve('apps/backend/src/repositories/printJobRepository.ts');
+    assert.ok(fs.existsSync(repoPath), 'printJobRepository.ts deve existir');
+    const repoContent = fs.readFileSync(repoPath, 'utf-8');
+    assert.ok(repoContent.includes('SKIP LOCKED'), 'SKIP LOCKED deve estar implementado no claim transacional');
+    assert.ok(repoContent.includes('FOR UPDATE'), 'FOR UPDATE deve estar ativo para isolamento de concorrência');
   });
 });

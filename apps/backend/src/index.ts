@@ -216,6 +216,7 @@ import authRouter from './routes/auth';
 import sessionRouter from './routes/session';
 import developmentControlRouter from './routes/developmentControl.js';
 import adminRouter from './routes/admin.js';
+import { LeaseReaperService } from './services/leaseReaperService.js';
 
 // Suporta tanto rotas diretas quanto rotas com prefixo /api (conforme Traefik/Nginx)
 app.use('/auth', authRouter);
@@ -268,6 +269,7 @@ app.listen(PORT, async () => {
   console.log(`[Witiquetas Backend] Rodando na porta ${PORT} (ENV: ${process.env.NODE_ENV || 'development'})`);
   try {
     await initDatabase();
+    LeaseReaperService.start();
   } catch (err: any) {
     console.error('[Database] Falha crítica no bootstrap do banco:', err.message);
     if (process.env.NODE_ENV === 'production') {

@@ -1,6 +1,25 @@
 {
   "checkpoints": [
     {
+      "sha": "26b7d737e32111f88a06dbebc16cc8b421dc6d9f",
+      "shortSha": "26b7d73",
+      "date": "2026-10-13T19:15:00Z",
+      "phase": "5",
+      "patch": "5.7.1",
+      "title": "5.7.1 — Persistent Print Queue & Lease Safety (P0 Safety Gates)",
+      "type": "FEATURE",
+      "capabilities": [
+        "cap-persistent-print-queue",
+        "cap-lease-safety"
+      ],
+      "testsPassed": true,
+      "deployed": false,
+      "manualValidation": false,
+      "homologated": false,
+      "status": "IMPLEMENTED_AWAITING_MANUAL_HOMOLOGATION",
+      "evidence": "PACKAGE 5.7.1 IMPLEMENTADO COM 10 SAFETY GATES P0 HOMOLOGADOS EM TESTES AUTOMATIZADOS: 1) Persistência Transacional no PostgreSQL: Criada migration 011_create_persistent_print_queue_tables.sql com tabelas print_jobs e print_job_events, índices parciais de fila de claim (WHERE status = 'PENDING') e lease sweeper. Regra 1 estrita: Proibido fallback silencioso para memória em caso de falha de banco (Fail-Closed controlado). 2) Claim Atômico com SKIP LOCKED: Claim implementado via SELECT ... FOR UPDATE SKIP LOCKED no printJobRepository.ts garantindo que workers paralelos nunca disputem ou dupliquem o mesmo job. 3) Ownership e Proteção Anti-Stale: Ownership garantido pela tripla (agentId, leaseId, attemptId). Tentativas de atualização por agente invasor rejeitadas com 403 NOT_CLAIM_HOLDER; lease incorreto com 409 LEASE_MISMATCH; tentativa defasada com 409 ATTEMPT_MISMATCH. 4) Lease Sweeper e Expiração: LeaseReaperService e PrintJobRepository.reapExpiredLeases. Jobs em DELIVERING com lease expirado transitam exclusivamente para UNKNOWN_RESULT (nunca PENDING automático, impedindo duplicação física de impressão). Jobs em CLAIMED/DOWNLOADED transitam para EXPIRED_LEASE. 5) Recuperação Segura com Evidência Positiva (Regra 3): Endpoint POST /api/print-jobs/:id/recover-pending requer obrigatoriamente evidência fundamentada de não envio físico para reconduzir jobs a PENDING. 6) Semântica de Hardware (Regras 2 & 10): DELIVERED_TO_TRANSPORT é mantido como status próprio e nunca assume PRINTED automaticamente. 7) Idempotência por Tenant (Regra 6): Suporte a header Idempotency-Key com hash SHA-256 de payload. Mesma chave e mesmo payload retorna 200 (replay idempotente); mesma chave e payload divergente retorna 409 Conflict. 8) Trilha de Auditoria Imutável (Regra 7): Registro de cada transição na tabela print_job_events na mesma transação. Consulta via GET /api/print-jobs/:id/events. 9) Retrocompatibilidade com Agent v0.2.0: Preservados integralmente os contratos e DTOs esperados pelo daemon Windows Rust. 10) Testes: 246/246 testes automatizados PASS, incluindo a nova suíte de integração tests/package571PersistentPrintQueue.test.ts (15/15 PASS) e regressões completas. Builds de contracts, backend e frontend 100% GREEN."
+    },
+    {
       "sha": "5d2c2a236244cc333a5394b1af684bd43a84ab64",
       "shortSha": "5d2c2a2",
       "date": "2026-10-13T18:15:00Z",

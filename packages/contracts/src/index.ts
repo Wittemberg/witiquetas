@@ -419,6 +419,7 @@ export interface CreatePrintJobDTO {
   encoding?: string;
   copies?: number;
   data?: Record<string, string>;
+  idempotencyKey?: string;
 }
 
 export interface PrintJobClaimRequestDTO {
@@ -481,6 +482,7 @@ export interface PrintJobDTO {
   checksumSha256: string; // Hash SHA-256 de integridade
   attempts: number;
   maxAttempts: number;
+  idempotencyKey?: string;
   leaseId?: string;
   claimedByAgentId?: string;
   claimedAt?: string;
@@ -492,6 +494,20 @@ export interface PrintJobDTO {
   createdAt: string;
   updatedAt: string;
   completedAt?: string;
+}
+
+export interface PrintJobEventDTO {
+  id: number;
+  jobId: string;
+  companyId: string;
+  fromStatus?: string | null;
+  toStatus: string;
+  agentId?: string | null;
+  leaseId?: string | null;
+  attemptId?: string | null;
+  executionTimeMs?: number | null;
+  error?: string | null;
+  createdAt: string;
 }
 
 export interface UpdatePrintJobStatusDTO {

@@ -108,6 +108,32 @@ function mapRowToEventDTO(row: any): PrintJobEventDTO {
 export const testMemJobs = new Map<string, PrintJobDTO>();
 export const testMemEvents: PrintJobEventDTO[] = [];
 
+// Validação canônica do fingerprint de idempotência física (GATE 2)
+export function checkIdempotencyMatch(
+  existing: any,
+  incoming: PrintJobDTO
+): { match: boolean; divergentFields: string[] } {
+  const divergent: string[] = [];
+  const existingPrinter = existing.printer_id || existing.printerId;
+  const existingCopies = Number(existing.copies);
+  const existingStrategy = existing.copy_strategy || existing.copyStrategy;
+  const existingLanguage = existing.language;
+  const existingEncoding = existing.encoding;
+  const existingChecksum = existing.checksum_sha256 || existing.checksumSha256;
+
+  if (existingPrinter !== incoming.printerId) divergent.push(`printerId ('${existingPrinter}' vs '${incoming.printerId}')`);
+  if (existingCopies !== Number(incoming.copies)) divergent.push(`copies (${existingCopies} vs ${incoming.copies})`);
+  if (existingStrategy !== incoming.copyStrategy) divergent.push(`copyStrategy ('${existingStrategy}' vs '${incoming.copyStrategy}')`);
+  if (existingLanguage !== incoming.language) divergent.push(`language ('${existingLanguage}' vs '${incoming.language}')`);
+  if (existingEncoding !== incoming.encoding) divergent.push(`encoding ('${existingEncoding}' vs '${incoming.encoding}')`);
+  if (existingChecksum !== incoming.checksumSha256) divergent.push(`payloadChecksum ('${existingChecksum}' vs '${incoming.checksumSha256}')`);
+
+  return {
+    match: divergent.length === 0,
+    divergentFields: divergent,
+  };
+}
+
 export class PrintJobRepository {
   /**
    * Limpa o store de testes em memória (isolamento de suítes de teste)
@@ -137,7 +163,8 @@ export class PrintJobRepository {
 
           if (existingRes.rows.length > 0) {
             const existingRow = existingRes.rows[0];
-            if (existingRow.checksum_sha256 === job.checksumSha256) {
+            const { match, divergentFields } = checkIdempotencyMatch(existingRow, job);
+            if (match) {
               await client.query('COMMIT');
               return {
                 job: mapRowToDTO(existingRow),
@@ -146,7 +173,7 @@ export class PrintJobRepository {
             } else {
               await client.query('ROLLBACK');
               const err: any = new Error(
-                `Conflito de idempotência: a chave '${idempotencyKey}' já foi utilizada para outro payload.`
+                `Conflito de idempotência: a chave '${idempotencyKey}' já foi utilizada com parâmetros divergentes: ${divergentFields.join(', ')}.`
               );
               err.statusCode = 409;
               err.code = 'IDEMPOTENCY_PAYLOAD_MISMATCH';
@@ -218,11 +245,12 @@ export class PrintJobRepository {
     if (idempotencyKey) {
       for (const existing of testMemJobs.values()) {
         if (existing.companyId === job.companyId && existing.idempotencyKey === idempotencyKey) {
-          if (existing.checksumSha256 === job.checksumSha256) {
+          const { match, divergentFields } = checkIdempotencyMatch(existing, job);
+          if (match) {
             return { job: existing, idempotentReplay: true };
           } else {
             const err: any = new Error(
-              `Conflito de idempotência: a chave '${idempotencyKey}' já foi utilizada para outro payload.`
+              `Conflito de idempotência: a chave '${idempotencyKey}' já foi utilizada com parâmetros divergentes: ${divergentFields.join(', ')}.`
             );
             err.statusCode = 409;
             err.code = 'IDEMPOTENCY_PAYLOAD_MISMATCH';
@@ -863,17 +891,20 @@ export class PrintJobRepository {
   }
 
   /**
-   * Retorna um job para PENDING somente com EVIDÊNCIA POSITIVA de que nenhum byte foi transmitido.
-   * Regra 3: Exigir evidência positiva de não envio antes de retornar um job para PENDING.
+   * Retorna um job para PENDING somente com COMPROVAÇÃO OBJETIVA de que nenhum byte foi transmitido.
+   * GATE 1: Uma justificativa textual não constitui evidência técnica. Exige comprovação objetiva no banco.
+   * Resultados ambíguos (UNKNOWN_RESULT) são rejeitados aqui e devem usar resolveAmbiguousJob.
    */
   static async recoverToPendingWithPositiveEvidence(
     companyId: string,
     jobId: string,
-    evidenceReason: string
+    evidenceReason: string,
+    operatorId?: string
   ): Promise<PrintJobDTO> {
     if (!evidenceReason || evidenceReason.trim().length < 5) {
       throw new Error('Evidência positiva de não envio é obrigatória e deve ser fundamentada.');
     }
+    const operator = operatorId || 'sistema/operador';
 
     if (pgPool) {
       const client = await pgPool.connect();
@@ -891,8 +922,16 @@ export class PrintJobRepository {
         }
 
         const job = selectRes.rows[0];
-        const allowedSources: PrintJobDeliveryStatus[] = ['EXPIRED_LEASE', 'FAILED'];
 
+        // 1. Rejeição explícita de UNKNOWN_RESULT
+        if (job.status === 'UNKNOWN_RESULT') {
+          await client.query('ROLLBACK');
+          throw new Error(
+            `Status 'UNKNOWN_RESULT' é ambíguo e não possui comprovação técnica de zero bytes. Requer resolução manual explícita pelo operador.`
+          );
+        }
+
+        const allowedSources: PrintJobDeliveryStatus[] = ['EXPIRED_LEASE', 'FAILED'];
         if (!allowedSources.includes(job.status)) {
           await client.query('ROLLBACK');
           throw new Error(
@@ -900,7 +939,29 @@ export class PrintJobRepository {
           );
         }
 
+        // 2. Comprovação objetiva: zero bytes transmitidos
+        if (job.delivered_to_transport_at) {
+          await client.query('ROLLBACK');
+          throw new Error(
+            `OBJECTIVE_PROOF_FAILED: Job possui timestamp de entrega ao transporte físico (${job.delivered_to_transport_at}). Impossível comprovar ausência de envio de bytes.`
+          );
+        }
+
+        // 3. Verificação de eventos históricos: nunca pode ter passado por DELIVERING
+        const eventsCheck = await client.query(
+          `SELECT id, to_status FROM print_job_events
+           WHERE job_id = $1 AND to_status IN ('DELIVERING', 'DELIVERED_TO_TRANSPORT', 'PRINTED')`,
+          [jobId]
+        );
+        if (eventsCheck.rows.length > 0) {
+          await client.query('ROLLBACK');
+          throw new Error(
+            `OBJECTIVE_PROOF_FAILED: Histórico do job registra fase de transmissão física ('${eventsCheck.rows[0].to_status}'). Requer resolução manual explícita.`
+          );
+        }
+
         const now = new Date().toISOString();
+        const auditMsg = `[Operador: ${operator}] Reconduzido a PENDING sob comprovação objetiva: ${evidenceReason}`;
         const updateRes = await client.query(
           `UPDATE print_jobs
            SET status = 'PENDING',
@@ -913,13 +974,13 @@ export class PrintJobRepository {
                updated_at = $2
            WHERE id = $3
            RETURNING *`,
-          [`Reconduzido a PENDING sob evidência positiva: ${evidenceReason}`, now, jobId]
+          [auditMsg, now, jobId]
         );
 
         await client.query(
-          `INSERT INTO print_job_events (job_id, company_id, from_status, to_status, created_at, error)
-           VALUES ($1, $2, $3, 'PENDING', $4, $5)`,
-          [jobId, companyId, job.status, now, `Recuperado sob evidência positiva: ${evidenceReason}`]
+          `INSERT INTO print_job_events (job_id, company_id, from_status, to_status, agent_id, created_at, error)
+           VALUES ($1, $2, $3, 'PENDING', $4, $5, $6)`,
+          [jobId, companyId, job.status, null, now, auditMsg]
         );
 
         await client.query('COMMIT');
@@ -936,20 +997,50 @@ export class PrintJobRepository {
       throw new Error('Persistência indisponível: pool PostgreSQL não inicializado em produção.');
     }
 
+    // Modo in-memory parity
     const job = testMemJobs.get(jobId);
     if (!job || job.companyId !== companyId) {
       throw new Error(`Job '${jobId}' não encontrado.`);
     }
 
+    if (job.status === 'UNKNOWN_RESULT') {
+      throw new Error(
+        `Status 'UNKNOWN_RESULT' é ambíguo e não possui comprovação técnica de zero bytes. Requer resolução manual explícita pelo operador.`
+      );
+    }
+
+    const allowedSources: PrintJobDeliveryStatus[] = ['EXPIRED_LEASE', 'FAILED'];
+    if (!allowedSources.includes(job.status)) {
+      throw new Error(
+        `Job com status '${job.status}' não pode ser reconduzido a PENDING. Apenas status comprovadamente sem envio (${allowedSources.join(', ')}) são elegíveis.`
+      );
+    }
+
+    if (job.deliveredToTransportAt) {
+      throw new Error(
+        `OBJECTIVE_PROOF_FAILED: Job possui timestamp de entrega ao transporte físico (${job.deliveredToTransportAt}). Impossível comprovar ausência de envio de bytes.`
+      );
+    }
+
+    const hasDeliveringEvent = testMemEvents.some(
+      (ev) => ev.jobId === jobId && ['DELIVERING', 'DELIVERED_TO_TRANSPORT', 'PRINTED'].includes(ev.toStatus)
+    );
+    if (hasDeliveringEvent) {
+      throw new Error(
+        `OBJECTIVE_PROOF_FAILED: Histórico do job registra fase de transmissão física ('DELIVERING'). Requer resolução manual explícita.`
+      );
+    }
+
     const fromStatus = job.status;
     const now = new Date().toISOString();
+    const auditMsg = `[Operador: ${operator}] Reconduzido a PENDING sob comprovação objetiva: ${evidenceReason}`;
     job.status = 'PENDING';
     job.leaseId = undefined;
     job.claimedByAgentId = undefined;
     job.claimedAt = undefined;
     job.leaseExpiresAt = undefined;
     job.attemptId = undefined;
-    job.error = `Reconduzido a PENDING sob evidência positiva: ${evidenceReason}`;
+    job.error = auditMsg;
     job.updatedAt = now;
 
     testMemEvents.push({
@@ -962,11 +1053,285 @@ export class PrintJobRepository {
       leaseId: null,
       attemptId: null,
       executionTimeMs: null,
-      error: job.error,
+      error: auditMsg,
       createdAt: now,
     });
 
     return job;
+  }
+
+  /**
+   * Resolução manual e explícita de jobs com resultado ambíguo (UNKNOWN_RESULT).
+   * GATE 1:
+   * - Mantém UNKNOWN_RESULT no histórico sem sobrescrever.
+   * - Exige decisão manual explícita e justificativa do operador.
+   * - Para CONFIRM_FAILED_AND_RETRY: cria nova tentativa auditável sem auto-reexecução.
+   */
+  static async resolveAmbiguousJob(
+    companyId: string,
+    jobId: string,
+    params: {
+      decision: 'CONFIRM_FAILED_AND_RETRY' | 'CONFIRM_DELIVERED' | 'CANCEL';
+      justification: string;
+      operatorId: string;
+    }
+  ): Promise<{ originalJob: PrintJobDTO; retryJob?: PrintJobDTO; decision: string }> {
+    const { decision, justification, operatorId } = params;
+
+    if (pgPool) {
+      const client = await pgPool.connect();
+      try {
+        await client.query('BEGIN');
+
+        const selectRes = await client.query(
+          `SELECT * FROM print_jobs WHERE id = $1 AND company_id = $2 FOR UPDATE`,
+          [jobId, companyId]
+        );
+
+        if (selectRes.rows.length === 0) {
+          await client.query('ROLLBACK');
+          throw new Error(`Job '${jobId}' não encontrado.`);
+        }
+
+        const job = selectRes.rows[0];
+        if (job.status !== 'UNKNOWN_RESULT') {
+          await client.query('ROLLBACK');
+          throw new Error(
+            `Apenas jobs com status 'UNKNOWN_RESULT' podem ser resolvidos via este procedimento. Status atual: '${job.status}'.`
+          );
+        }
+
+        const now = new Date().toISOString();
+        let retryJob: PrintJobDTO | undefined;
+        let finalStatus: PrintJobDeliveryStatus;
+
+        if (decision === 'CONFIRM_FAILED_AND_RETRY') {
+          finalStatus = 'FAILED';
+          const auditMsg = `[Resolução Manual - Operador: ${operatorId}] Confirmada falha física e solicitada nova tentativa: ${justification}`;
+
+          // Atualiza o job original mantendo histórico de auditoria
+          await client.query(
+            `UPDATE print_jobs
+             SET status = 'FAILED',
+                 error = $1,
+                 updated_at = $2
+             WHERE id = $3`,
+            [auditMsg, now, jobId]
+          );
+
+          await client.query(
+            `INSERT INTO print_job_events (job_id, company_id, from_status, to_status, agent_id, lease_id, attempt_id, created_at, error)
+             VALUES ($1, $2, 'UNKNOWN_RESULT', 'FAILED', $3, $4, $5, $6, $7)`,
+            [jobId, companyId, job.claimed_by_agent_id, job.lease_id, job.attempt_id, now, auditMsg]
+          );
+
+          // Cria nova tentativa auditável em PENDING com novo ID
+          const newJobId = `job-retry-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
+          const insertRetrySql = `
+            INSERT INTO print_jobs (
+              id, company_id, printer_id, status, language, encoding, copies, copy_strategy,
+              payload, payload_base64, payload_bytes_length, checksum_sha256, attempts, max_attempts,
+              created_at, updated_at, error
+            ) VALUES (
+              $1, $2, $3, 'PENDING', $4, $5, $6, $7, $8, $9, $10, $11, 0, $12, $13, $14, $15
+            ) RETURNING *
+          `;
+
+          const retryRes = await client.query(insertRetrySql, [
+            newJobId,
+            companyId,
+            job.printer_id,
+            job.language,
+            job.encoding,
+            job.copies,
+            job.copy_strategy,
+            job.payload,
+            job.payload_base64,
+            job.payload_bytes_length,
+            job.checksum_sha256,
+            job.max_attempts || 3,
+            now,
+            now,
+            `Criado a partir da resolução manual do job ambíguo '${jobId}' por '${operatorId}'`,
+          ]);
+
+          await client.query(
+            `INSERT INTO print_job_events (job_id, company_id, from_status, to_status, created_at, error)
+             VALUES ($1, $2, NULL, 'PENDING', $3, $4)`,
+            [newJobId, companyId, now, `Nova tentativa auditável gerada da resolução manual de '${jobId}'`]
+          );
+
+          retryJob = mapRowToDTO(retryRes.rows[0]);
+        } else if (decision === 'CONFIRM_DELIVERED') {
+          finalStatus = 'PRINTED';
+          const auditMsg = `[Resolução Manual - Operador: ${operatorId}] Confirmada entrega física manual: ${justification}`;
+          await client.query(
+            `UPDATE print_jobs
+             SET status = 'PRINTED',
+                 completed_at = $1,
+                 error = $2,
+                 updated_at = $3
+             WHERE id = $4`,
+            [now, auditMsg, now, jobId]
+          );
+
+          await client.query(
+            `INSERT INTO print_job_events (job_id, company_id, from_status, to_status, agent_id, created_at, error)
+             VALUES ($1, $2, 'UNKNOWN_RESULT', 'PRINTED', $3, $4, $5)`,
+            [jobId, companyId, null, now, auditMsg]
+          );
+        } else {
+          finalStatus = 'CANCELLED';
+          const auditMsg = `[Resolução Manual - Operador: ${operatorId}] Cancelado após resultado ambíguo: ${justification}`;
+          await client.query(
+            `UPDATE print_jobs
+             SET status = 'CANCELLED',
+                 error = $1,
+                 updated_at = $2
+             WHERE id = $3`,
+            [auditMsg, now, jobId]
+          );
+
+          await client.query(
+            `INSERT INTO print_job_events (job_id, company_id, from_status, to_status, created_at, error)
+             VALUES ($1, $2, 'UNKNOWN_RESULT', 'CANCELLED', $3, $4)`,
+            [jobId, companyId, now, auditMsg]
+          );
+        }
+
+        const updatedOriginal = await client.query(`SELECT * FROM print_jobs WHERE id = $1`, [jobId]);
+        await client.query('COMMIT');
+
+        return {
+          originalJob: mapRowToDTO(updatedOriginal.rows[0]),
+          retryJob,
+          decision,
+        };
+      } catch (err) {
+        await client.query('ROLLBACK').catch(() => {});
+        throw err;
+      } finally {
+        client.release();
+      }
+    }
+
+    if (isProduction) {
+      throw new Error('Persistência indisponível: pool PostgreSQL não inicializado em produção.');
+    }
+
+    // Modo in-memory
+    const job = testMemJobs.get(jobId);
+    if (!job || job.companyId !== companyId) {
+      throw new Error(`Job '${jobId}' não encontrado.`);
+    }
+
+    if (job.status !== 'UNKNOWN_RESULT') {
+      throw new Error(
+        `Apenas jobs com status 'UNKNOWN_RESULT' podem ser resolvidos via este procedimento. Status atual: '${job.status}'.`
+      );
+    }
+
+    const now = new Date().toISOString();
+    let retryJob: PrintJobDTO | undefined;
+
+    if (decision === 'CONFIRM_FAILED_AND_RETRY') {
+      const auditMsg = `[Resolução Manual - Operador: ${operatorId}] Confirmada falha física e solicitada nova tentativa: ${justification}`;
+      job.status = 'FAILED';
+      job.error = auditMsg;
+      job.updatedAt = now;
+
+      testMemEvents.push({
+        id: testMemEvents.length + 1,
+        jobId,
+        companyId,
+        fromStatus: 'UNKNOWN_RESULT',
+        toStatus: 'FAILED',
+        agentId: job.claimedByAgentId || null,
+        leaseId: job.leaseId || null,
+        attemptId: job.attemptId || null,
+        executionTimeMs: null,
+        error: auditMsg,
+        createdAt: now,
+      });
+
+      const newJobId = `job-retry-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
+      retryJob = {
+        ...job,
+        id: newJobId,
+        status: 'PENDING',
+        attempts: 0,
+        leaseId: undefined,
+        attemptId: undefined,
+        claimedByAgentId: undefined,
+        claimedAt: undefined,
+        leaseExpiresAt: undefined,
+        deliveredToTransportAt: undefined,
+        completedAt: undefined,
+        error: `Criado a partir da resolução manual do job ambíguo '${jobId}' por '${operatorId}'`,
+        createdAt: now,
+        updatedAt: now,
+      };
+      testMemJobs.set(newJobId, retryJob);
+
+      testMemEvents.push({
+        id: testMemEvents.length + 1,
+        jobId: newJobId,
+        companyId,
+        fromStatus: null,
+        toStatus: 'PENDING',
+        agentId: null,
+        leaseId: null,
+        attemptId: null,
+        executionTimeMs: null,
+        error: `Nova tentativa auditável gerada da resolução manual de '${jobId}'`,
+        createdAt: now,
+      });
+    } else if (decision === 'CONFIRM_DELIVERED') {
+      const auditMsg = `[Resolução Manual - Operador: ${operatorId}] Confirmada entrega física manual: ${justification}`;
+      job.status = 'PRINTED';
+      job.completedAt = now;
+      job.error = auditMsg;
+      job.updatedAt = now;
+
+      testMemEvents.push({
+        id: testMemEvents.length + 1,
+        jobId,
+        companyId,
+        fromStatus: 'UNKNOWN_RESULT',
+        toStatus: 'PRINTED',
+        agentId: null,
+        leaseId: null,
+        attemptId: null,
+        executionTimeMs: null,
+        error: auditMsg,
+        createdAt: now,
+      });
+    } else {
+      const auditMsg = `[Resolução Manual - Operador: ${operatorId}] Cancelado após resultado ambíguo: ${justification}`;
+      job.status = 'CANCELLED';
+      job.error = auditMsg;
+      job.updatedAt = now;
+
+      testMemEvents.push({
+        id: testMemEvents.length + 1,
+        jobId,
+        companyId,
+        fromStatus: 'UNKNOWN_RESULT',
+        toStatus: 'CANCELLED',
+        agentId: null,
+        leaseId: null,
+        attemptId: null,
+        executionTimeMs: null,
+        error: auditMsg,
+        createdAt: now,
+      });
+    }
+
+    return {
+      originalJob: job,
+      retryJob,
+      decision,
+    };
   }
 
   /**

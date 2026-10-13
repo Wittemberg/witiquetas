@@ -364,11 +364,12 @@ router.get('/:id/events', authenticateWebUser, async (req: Request, res: Respons
   }
 });
 
-// 4.2. Recuperação Segura para PENDING com Evidência Positiva de Não Envio (Regra 3)
+// 4.2. Recuperação Segura para PENDING com Comprovação Objetiva de Não Envio (Regra 3 & GATE 1)
 router.post('/:id/recover-pending', authenticateWebUser, async (req: Request, res: Response) => {
   const user = (req as any).user as AuthWebUser;
   const authCompanyId = user.companyId;
   const evidenceReason = req.body?.evidenceReason;
+  const operatorId = user.id || 'operador-autenticado';
 
   if (!evidenceReason || typeof evidenceReason !== 'string' || evidenceReason.trim().length < 5) {
     return res.status(400).json({
@@ -381,17 +382,70 @@ router.post('/:id/recover-pending', authenticateWebUser, async (req: Request, re
     const job = await PrintJobRepository.recoverToPendingWithPositiveEvidence(
       authCompanyId || '*',
       req.params.id,
-      evidenceReason
+      evidenceReason,
+      operatorId
     );
     return res.json({
       success: true,
       job,
-      message: `Job '${job.id}' recuperado para PENDING sob evidência positiva.`,
+      message: `Job '${job.id}' recuperado para PENDING sob comprovação objetiva.`,
     });
   } catch (err: any) {
     return res.status(400).json({
       error: err.message,
       code: 'RECOVERY_NOT_ALLOWED',
+    });
+  }
+});
+
+// 4.3. Resolução Manual Explícita de Resultados Ambíguos (UNKNOWN_RESULT) (GATE 1)
+router.post('/:id/resolve-ambiguous', authenticateWebUser, async (req: Request, res: Response) => {
+  const user = (req as any).user as AuthWebUser;
+  const authCompanyId = user.companyId;
+  const { decision, justification, manualConfirmation } = req.body || {};
+  const operatorId = user.id || 'operador-autenticado';
+
+  if (!manualConfirmation) {
+    return res.status(400).json({
+      error: 'Confirmação manual explícita (manualConfirmation: true) é obrigatória para resolver resultado ambíguo.',
+      code: 'MANUAL_CONFIRMATION_REQUIRED',
+    });
+  }
+
+  const validDecisions = ['CONFIRM_FAILED_AND_RETRY', 'CONFIRM_DELIVERED', 'CANCEL'];
+  if (!decision || !validDecisions.includes(decision)) {
+    return res.status(400).json({
+      error: `Decisão inválida. Valores aceitos: ${validDecisions.join(', ')}.`,
+      code: 'INVALID_DECISION',
+    });
+  }
+
+  if (!justification || typeof justification !== 'string' || justification.trim().length < 10) {
+    return res.status(400).json({
+      error: 'Justificativa técnica/operacional detalhada (mínimo 10 caracteres) é obrigatória.',
+      code: 'JUSTIFICATION_REQUIRED',
+    });
+  }
+
+  try {
+    const result = await PrintJobRepository.resolveAmbiguousJob(
+      authCompanyId || '*',
+      req.params.id,
+      {
+        decision,
+        justification: justification.trim(),
+        operatorId,
+      }
+    );
+    return res.json({
+      success: true,
+      ...result,
+      message: `Job ambíguo '${req.params.id}' resolvido com decisão '${decision}' pelo operador '${operatorId}'.`,
+    });
+  } catch (err: any) {
+    return res.status(400).json({
+      error: err.message,
+      code: 'AMBIGUOUS_RESOLUTION_ERROR',
     });
   }
 });

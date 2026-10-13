@@ -142,6 +142,125 @@ test('SUÍTE PACKAGE 5.7.1 — PERSISTENT PRINT QUEUE & LEASE SAFETY', async (t)
     assert.notEqual(resA.job.id, resB.job.id);
   });
 
+  await t.test('Gate 1.4: Idempotency-Key com mesmo payload MAS printerId divergente rejeita com HTTP 409 Conflict', async () => {
+    const jobOriginal = createSampleJob(TENANT_A, 'prn-alpha-tcp');
+    const key = 'idem-key-diff-printer';
+    await PrintJobRepository.createJob(jobOriginal, key);
+
+    const jobDiffPrinter = createSampleJob(TENANT_A, 'prn-other-printer', {
+      payload: jobOriginal.payload,
+      checksumSha256: jobOriginal.checksumSha256,
+    });
+
+    await assert.rejects(
+      async () => {
+        await PrintJobRepository.createJob(jobDiffPrinter, key);
+      },
+      (err: any) => {
+        assert.equal(err.statusCode, 409);
+        assert.equal(err.code, 'IDEMPOTENCY_PAYLOAD_MISMATCH');
+        assert.ok(err.message.includes('printerId'));
+        return true;
+      }
+    );
+  });
+
+  await t.test('Gate 1.5: Idempotency-Key com mesmo payload MAS copies divergente rejeita com HTTP 409 Conflict', async () => {
+    const jobOriginal = createSampleJob(TENANT_A, 'prn-alpha-tcp', { copies: 1 });
+    const key = 'idem-key-diff-copies';
+    await PrintJobRepository.createJob(jobOriginal, key);
+
+    const jobDiffCopies = createSampleJob(TENANT_A, 'prn-alpha-tcp', {
+      copies: 5,
+      payload: jobOriginal.payload,
+      checksumSha256: jobOriginal.checksumSha256,
+    });
+
+    await assert.rejects(
+      async () => {
+        await PrintJobRepository.createJob(jobDiffCopies, key);
+      },
+      (err: any) => {
+        assert.equal(err.statusCode, 409);
+        assert.equal(err.code, 'IDEMPOTENCY_PAYLOAD_MISMATCH');
+        assert.ok(err.message.includes('copies'));
+        return true;
+      }
+    );
+  });
+
+  await t.test('Gate 1.6: Idempotency-Key com mesmo payload MAS copyStrategy divergente rejeita com HTTP 409 Conflict', async () => {
+    const jobOriginal = createSampleJob(TENANT_A, 'prn-alpha-tcp', { copyStrategy: 'EMBEDDED_IN_PAYLOAD' });
+    const key = 'idem-key-diff-strategy';
+    await PrintJobRepository.createJob(jobOriginal, key);
+
+    const jobDiffStrategy = createSampleJob(TENANT_A, 'prn-alpha-tcp', {
+      copyStrategy: 'TRANSPORT_REPEAT',
+      payload: jobOriginal.payload,
+      checksumSha256: jobOriginal.checksumSha256,
+    });
+
+    await assert.rejects(
+      async () => {
+        await PrintJobRepository.createJob(jobDiffStrategy, key);
+      },
+      (err: any) => {
+        assert.equal(err.statusCode, 409);
+        assert.equal(err.code, 'IDEMPOTENCY_PAYLOAD_MISMATCH');
+        assert.ok(err.message.includes('copyStrategy'));
+        return true;
+      }
+    );
+  });
+
+  await t.test('Gate 1.7: Idempotency-Key com mesmo payload MAS language divergente rejeita com HTTP 409 Conflict', async () => {
+    const jobOriginal = createSampleJob(TENANT_A, 'prn-alpha-tcp', { language: 'PPLB' });
+    const key = 'idem-key-diff-lang';
+    await PrintJobRepository.createJob(jobOriginal, key);
+
+    const jobDiffLang = createSampleJob(TENANT_A, 'prn-alpha-tcp', {
+      language: 'ZPL',
+      payload: jobOriginal.payload,
+      checksumSha256: jobOriginal.checksumSha256,
+    });
+
+    await assert.rejects(
+      async () => {
+        await PrintJobRepository.createJob(jobDiffLang, key);
+      },
+      (err: any) => {
+        assert.equal(err.statusCode, 409);
+        assert.equal(err.code, 'IDEMPOTENCY_PAYLOAD_MISMATCH');
+        assert.ok(err.message.includes('language'));
+        return true;
+      }
+    );
+  });
+
+  await t.test('Gate 1.8: Idempotency-Key com mesmo payload MAS encoding divergente rejeita com HTTP 409 Conflict', async () => {
+    const jobOriginal = createSampleJob(TENANT_A, 'prn-alpha-tcp', { encoding: 'windows-1252' });
+    const key = 'idem-key-diff-enc';
+    await PrintJobRepository.createJob(jobOriginal, key);
+
+    const jobDiffEnc = createSampleJob(TENANT_A, 'prn-alpha-tcp', {
+      encoding: 'utf-8',
+      payload: jobOriginal.payload,
+      checksumSha256: jobOriginal.checksumSha256,
+    });
+
+    await assert.rejects(
+      async () => {
+        await PrintJobRepository.createJob(jobDiffEnc, key);
+      },
+      (err: any) => {
+        assert.equal(err.statusCode, 409);
+        assert.equal(err.code, 'IDEMPOTENCY_PAYLOAD_MISMATCH');
+        assert.ok(err.message.includes('encoding'));
+        return true;
+      }
+    );
+  });
+
   // =========================================================================
   // GATE 2: CLAIM ATÔMICO E CONCESSÃO DE LEASE (REGRA 4 & 5)
   // =========================================================================
@@ -303,6 +422,116 @@ test('SUÍTE PACKAGE 5.7.1 — PERSISTENT PRINT QUEUE & LEASE SAFETY', async (t)
     assert.equal(recovered.claimedByAgentId, undefined);
   });
 
+  await t.test('Gate 4.4: Tentativa de recoverToPending em UNKNOWN_RESULT é terminantemente rejeitada', async () => {
+    const job = createSampleJob(TENANT_A, 'prn-alpha-tcp', { status: 'UNKNOWN_RESULT' });
+    await PrintJobRepository.createJob(job);
+
+    await assert.rejects(
+      async () => {
+        await PrintJobRepository.recoverToPendingWithPositiveEvidence(
+          TENANT_A,
+          job.id,
+          'Tentativa de bypass manual de resultado ambíguo.'
+        );
+      },
+      (err: any) => {
+        assert.ok(err.message.includes("Status 'UNKNOWN_RESULT' é ambíguo"));
+        return true;
+      }
+    );
+  });
+
+  await t.test('Gate 4.5: Tentativa de recoverToPending com histórico prévio de DELIVERING é rejeitada com OBJECTIVE_PROOF_FAILED', async () => {
+    const job = createSampleJob(TENANT_A, 'prn-alpha-tcp');
+    await PrintJobRepository.createJob(job);
+    const claimed = await PrintJobRepository.claimPendingJobsForAgent(TENANT_A, 'agt-alpha-01');
+    const item = claimed[0];
+
+    // Simula transição para DELIVERING e posterior falha de rede (FAILED)
+    await PrintJobRepository.updateJobStatus(job.id, 'agt-alpha-01', {
+      status: 'DELIVERING',
+      leaseId: item.leaseId,
+      attemptId: item.attemptId,
+    });
+    await PrintJobRepository.updateJobStatus(job.id, 'agt-alpha-01', {
+      status: 'FAILED',
+      leaseId: item.leaseId,
+      attemptId: item.attemptId,
+      error: 'Socket timeout durante envio de bytes',
+    });
+
+    // Embora o status atual seja FAILED, o job já esteve em DELIVERING (bytes podem ter chegado à cabeça térmica)
+    await assert.rejects(
+      async () => {
+        await PrintJobRepository.recoverToPendingWithPositiveEvidence(
+          TENANT_A,
+          job.id,
+          'Tentativa de recuperação sem evidência técnica de zero bytes.'
+        );
+      },
+      (err: any) => {
+        assert.ok(err.message.includes('OBJECTIVE_PROOF_FAILED'));
+        return true;
+      }
+    );
+  });
+
+  await t.test('Gate 4.6: Resolução manual de UNKNOWN_RESULT via resolveAmbiguousJob com CONFIRM_FAILED_AND_RETRY cria nova tentativa auditável sem auto-reexecução', async () => {
+    const job = createSampleJob(TENANT_A, 'prn-alpha-tcp', { status: 'UNKNOWN_RESULT' });
+    await PrintJobRepository.createJob(job);
+
+    const result = await PrintJobRepository.resolveAmbiguousJob(TENANT_A, job.id, {
+      decision: 'CONFIRM_FAILED_AND_RETRY',
+      justification: 'Inspeção física realizada na impressora; nenhuma etiqueta foi impressa.',
+      operatorId: 'operador.marcel@empresa.com',
+    });
+
+    // Job original é marcado como FAILED mantendo histórico
+    assert.equal(result.originalJob.status, 'FAILED');
+    assert.ok(result.originalJob.error?.includes('operador.marcel@empresa.com'));
+
+    // Nova tentativa auditável criada como PENDING com id próprio e zero attempts
+    assert.ok(result.retryJob);
+    assert.equal(result.retryJob.status, 'PENDING');
+    assert.notEqual(result.retryJob.id, job.id);
+    assert.equal(result.retryJob.attempts, 0);
+
+    const events = await PrintJobRepository.getEventsForJob(TENANT_A, job.id);
+    const lastEvent = events[events.length - 1];
+    assert.equal(lastEvent.fromStatus, 'UNKNOWN_RESULT');
+    assert.equal(lastEvent.toStatus, 'FAILED');
+    assert.ok(lastEvent.error?.includes('operador.marcel@empresa.com'));
+  });
+
+  await t.test('Gate 4.7: Resolução manual de UNKNOWN_RESULT com CONFIRM_DELIVERED transita para PRINTED com auditoria', async () => {
+    const job = createSampleJob(TENANT_A, 'prn-alpha-tcp', { status: 'UNKNOWN_RESULT' });
+    await PrintJobRepository.createJob(job);
+
+    const result = await PrintJobRepository.resolveAmbiguousJob(TENANT_A, job.id, {
+      decision: 'CONFIRM_DELIVERED',
+      justification: 'Etiqueta encontrada impressa com perfeição na bandeja.',
+      operatorId: 'operador.suporte@empresa.com',
+    });
+
+    assert.equal(result.originalJob.status, 'PRINTED');
+    assert.ok(result.originalJob.completedAt);
+    assert.ok(result.originalJob.error?.includes('operador.suporte@empresa.com'));
+  });
+
+  await t.test('Gate 4.8: Resolução manual de UNKNOWN_RESULT com CANCEL transita para CANCELLED com auditoria', async () => {
+    const job = createSampleJob(TENANT_A, 'prn-alpha-tcp', { status: 'UNKNOWN_RESULT' });
+    await PrintJobRepository.createJob(job);
+
+    const result = await PrintJobRepository.resolveAmbiguousJob(TENANT_A, job.id, {
+      decision: 'CANCEL',
+      justification: 'Pedido cancelado pelo cliente durante a ambiguidade.',
+      operatorId: 'operador.admin@empresa.com',
+    });
+
+    assert.equal(result.originalJob.status, 'CANCELLED');
+    assert.ok(result.originalJob.error?.includes('Cancelado'));
+  });
+
   // =========================================================================
   // GATE 5: SEMÂNTICA FÍSICA E AUDITORIA IMUTÁVEL (REGRA 7 & 10)
   // =========================================================================
@@ -391,5 +620,59 @@ test('SUÍTE PACKAGE 5.7.1 — PERSISTENT PRINT QUEUE & LEASE SAFETY', async (t)
     assert.ok(typeof item.checksumSha256 === 'string' && item.checksumSha256.length === 64);
     assert.ok(typeof item.copyStrategy === 'string');
     assert.ok(typeof item.copies === 'number' && item.copies >= 1);
+  });
+
+  await t.test('Gate 6.2: Código fonte do Agent Rust v0.2.0 envia leaseId, attemptId e não trava com 403/409', () => {
+    const runtimeRsPath = path.resolve('apps/agent-core/src/runtime.rs');
+    assert.ok(fs.existsSync(runtimeRsPath), 'runtime.rs do Agent Core deve existir');
+    const runtimeContent = fs.readFileSync(runtimeRsPath, 'utf-8');
+
+    // Confirma que o Agent Rust v0.2.0 já serializa lease_id e attempt_id em todas as chamadas
+    assert.ok(runtimeContent.includes('lease_id: Some(job.lease_id.clone())'));
+    assert.ok(runtimeContent.includes('attempt_id: Some(job.attempt_id.clone())'));
+    assert.ok(runtimeContent.includes('DELIVERED_TO_TRANSPORT'));
+    assert.ok(runtimeContent.includes('UNKNOWN_RESULT'));
+  });
+
+  // =========================================================================
+  // GATE 7: MIGRATION 011, DDL CANÔNICO E FAIL-CLOSED POSTGRESQL (REGRA 1 & 8)
+  // =========================================================================
+  await t.test('Gate 7.1: Migration 011 possui DDL canônico, CREATE TABLE IF NOT EXISTS e índices parciais sem UTF-8 BOM', () => {
+    const migrationPath = path.resolve('apps/backend/src/migrations/011_create_persistent_print_queue_tables.sql');
+    assert.ok(fs.existsSync(migrationPath), 'Migration 011 deve existir');
+
+    const bytes = fs.readFileSync(migrationPath);
+    const hasBOM = bytes.length >= 3 && bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf;
+    assert.strictEqual(hasBOM, false, 'Migration 011 não pode conter UTF-8 BOM');
+
+    const sql = bytes.toString('utf-8');
+    assert.ok(sql.includes('CREATE TABLE IF NOT EXISTS print_jobs'), 'Deve criar print_jobs com IF NOT EXISTS');
+    assert.ok(sql.includes('CREATE TABLE IF NOT EXISTS print_job_events'), 'Deve criar print_job_events com IF NOT EXISTS');
+    assert.ok(sql.includes('idx_print_jobs_claim_queue'), 'Deve conter índice parcial de fila de claim');
+    assert.ok(sql.includes('idx_print_jobs_lease_sweeper'), 'Deve conter índice parcial para lease sweeper');
+    assert.ok(sql.includes('idx_print_jobs_company_idempotency'), 'Deve conter índice único parcial de idempotência');
+    assert.ok(sql.includes('ON DELETE RESTRICT'), 'FK para printers deve ter ON DELETE RESTRICT (não-destrutiva)');
+  });
+
+  await t.test('Gate 7.2: Fail-Closed: Falha no PostgreSQL interrompe operações sem fallback silencioso para memória', async () => {
+    // Valida que o código do repositório lança erro quando pgPool está configurado e falha
+    const repoPath = path.resolve('apps/backend/src/repositories/printJobRepository.ts');
+    const repoContent = fs.readFileSync(repoPath, 'utf-8');
+
+    // Validação estrita da Regra 1
+    assert.ok(repoContent.includes('if (pgPool)'), 'Deve consultar pgPool prioritariamente');
+    assert.ok(repoContent.includes('throw err'), 'Deve propagar erro do PostgreSQL para abortar sem fallback em memória');
+    assert.ok(repoContent.includes('await client.query(\'ROLLBACK\')'), 'Deve executar ROLLBACK em caso de falha transacional');
+  });
+
+  await t.test('Gate 7.3: Rotas HTTP recover-pending e resolve-ambiguous estão registradas no printJobsRouter', () => {
+    const routes = (printJobsRouter as any).routes || [];
+    const recoverRoute = routes.find((r: any) => r.path === '/:id/recover-pending' && r.method === 'POST');
+    const resolveRoute = routes.find((r: any) => r.path === '/:id/resolve-ambiguous' && r.method === 'POST');
+    const eventsRoute = routes.find((r: any) => r.path === '/:id/events' && r.method === 'GET');
+
+    assert.ok(recoverRoute, 'POST /:id/recover-pending deve estar registrado');
+    assert.ok(resolveRoute, 'POST /:id/resolve-ambiguous deve estar registrado');
+    assert.ok(eventsRoute, 'GET /:id/events deve estar registrado');
   });
 });

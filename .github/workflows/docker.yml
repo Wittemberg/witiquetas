@@ -125,6 +125,7 @@ jobs:
         if: failure()
         run: |
           cat test-output.txt
+          node -e "const fs = require('fs'); if (fs.existsSync('test-output.txt')) { const txt = fs.readFileSync('test-output.txt', 'utf8').replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A'); console.log('::error title=PostgreSQL Gate Output::' + txt); }"
           echo "### PostgreSQL Integration Gate Output" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
           cat test-output.txt >> $GITHUB_STEP_SUMMARY

@@ -8,6 +8,7 @@ const __dirname = path.dirname(__filename);
 const ZOD_SHIM_URL = pathToFileURL(path.join(__dirname, 'zod-shim.js')).href;
 const EXPRESS_SHIM_URL = pathToFileURL(path.join(__dirname, 'express-shim.js')).href;
 const PG_SHIM_URL = pathToFileURL(path.join(__dirname, 'pg-shim.js')).href;
+const PG_REAL_URL = pathToFileURL(path.join(__dirname, 'pg-adapter.js')).href;
 const DOTENV_SHIM_URL = pathToFileURL(path.join(__dirname, 'dotenv-shim.js')).href;
 const KONVA_SHIM_URL = pathToFileURL(path.join(__dirname, 'konva-shim.js')).href;
 const USE_IMAGE_SHIM_URL = pathToFileURL(path.join(__dirname, 'use-image-shim.js')).href;
@@ -21,7 +22,7 @@ export async function resolve(specifier, context, nextResolve) {
   }
   if (specifier === 'pg') {
     if (process.env.DATABASE_URL) {
-      return nextResolve(specifier, context);
+      return { format: 'module', shortCircuit: true, url: PG_REAL_URL };
     }
     return { format: 'module', shortCircuit: true, url: PG_SHIM_URL };
   }

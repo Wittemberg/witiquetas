@@ -11,6 +11,10 @@ export const dbUrl = process.env.DATABASE_URL;
 export const isProduction = process.env.NODE_ENV === 'production';
 export let pgPool: Pool | null = null;
 
+export function setPgPool(newPool: Pool | null): void {
+  pgPool = newPool;
+}
+
 if (dbUrl) {
   pgPool = new Pool({
     connectionString: dbUrl,

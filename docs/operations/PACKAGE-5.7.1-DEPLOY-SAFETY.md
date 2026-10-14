@@ -53,7 +53,7 @@ O `git diff main..HEAD` comprova alterações restritas a:
   - `idx_print_jobs_lease_sweeper`: Indexa apenas `WHERE status IN ('CLAIMED', 'DOWNLOADED', 'DELIVERING')`.
   - `idx_print_jobs_company_idempotency`: Garante unicidade `(company_id, idempotency_key) WHERE idempotency_key IS NOT NULL`.
 - **Segurança de Reexecução:** Todas as instruções DDL utilizam `CREATE TABLE IF NOT EXISTS` e `CREATE INDEX IF NOT EXISTS`. A migration é 100% idempotente.
-- **Impacto e Locks:** Como as tabelas são novas, o tempo de execução é inferior a 100 milissegundos. Não gera locks exclusivos em tabelas de produção existentes.
+- **Impacto e Locks:** Como são tabelas novas (`print_jobs` e `print_job_events`), o DDL não reescreve dados das tabelas existentes. A criação de chaves estrangeiras referenciando tabelas existentes (`companies`, `printers`, `agents`, `print_job_batches`) adquire lock do tipo `SHARE ROW EXCLUSIVE` sobre as tabelas referenciadas durante a validação da constraint. Em tabelas com baixa concorrência DDL o overhead é mínimo, mas a migração deve ser aplicada fora de transações concorrentes longas para prevenir fila de locks.
 
 ### 2.2 Checklist Pré-Migration
 - [ ] Verificar integridade do cluster PostgreSQL de produção (`SELECT version();`).
@@ -136,22 +136,145 @@ stateDiagram-v2
 
 ## 4. ETAPA 4 — PLANO DE HOMOLOGAÇÃO NÃO FÍSICA
 
-Todos os testes de homologação pré-deploy devem ser realizados em ambiente isolado (sem comunicação de rede com impressoras térmicas reais):
+### 4.1 Protocolo de Isolamento de Rede e Hardware (Prevenção Total de Transmissão Física)
+Para assegurar risco zero de emissão acidental de etiquetas térmicas em impressoras físicas reais durante a homologação:
+1. **Ausência de Rotas para Impressoras Físicas:** Todas as impressoras de teste cadastradas no ambiente isolado possuem o campo `ip` configurado como `NULL` ou associado a endereços de loopback (`127.0.0.1`) ou blocos reservados não roteáveis conforme RFC 5737 (`192.0.2.1` / TEST-NET-1). O tráfego de rede para a porta padrão RAW TCP (9100) é estritamente bloqueado ou redirecionado para um receptor mock em memória.
+2. **Ausência de Agents de Produção:** A homologação é executada exclusivamente sob tenants de teste isolados (`comp-pg-alpha`, `comp-pg-beta` ou `comp-test-homolog`). Nenhum token de agente físico em produção possui vínculo com estes tenants.
+3. **Agentes Virtuais e Emulados:** Os testes de consumo, claim, lease e reporte utilizam chamadas REST sintéticas ou agentes virtuais de teste, garantindo que nenhum daemon ativo em estações de trabalho de produção processe os envelopes gerados.
+4. **Verificação de Zero Bytes:** Nenhum job transiciona para `DELIVERED_TO_TRANSPORT` a menos que seja explicitamente comandado pelo roteiro não físico para aferir a máquina de estados.
 
-| Cenário | Pré-condições | Procedimento Operacional | Resultado Esperado | Evidência / Critério PASS |
-| :--- | :--- | :--- | :--- | :--- |
-| **A. Criação de Job** | Tenant ativo, impressora cadastrada. | Enviar `POST /api/print-jobs` com payload PPLB. | Job gravado em `print_jobs` com status `PENDING` e evento em `print_job_events`. | HTTP 201; SELECT confirma linha no banco; PASS. |
-| **B. Restart do Backend** | Job criado em `PENDING`. | Reiniciar container do backend / encerrar pool de conexões. | Ao retornar, job continua `PENDING`, dados intactos, sem corrupção. | Consulta via API retorna os mesmos dados; PASS. |
-| **C. Concorrência de Claim** | 10 jobs `PENDING` criados. | 5 chamadas simultâneas de claim para a mesma fila. | Cada worker recebe exatamente seus jobs sem repetição de IDs. | Zero IDs duplicados entre os 5 lotes; PASS. |
-| **D. Falha de Banco** | Pool apontado para IP inacessível. | Tentar criar job ou reivindicar. | Erro explícito de banco lançado imediatamente sem fallback em memória. | Requisição falha com 500/503; memória vazia; PASS. |
-| **E. Rollback em Falha** | Job em `CLAIMED` por Agente 1. | Agente 2 tenta transicionar job do Agente 1. | Backend recusa com 403 `NOT_CLAIM_HOLDER` e executa rollback. | Status permanece `CLAIMED` no Agente 1; PASS. |
-| **F. Expiração de Lease** | Job em `CLAIMED` com lease expirado. | Executar ciclo do sweeper (`reapExpiredLeases`). | Job transiciona para `EXPIRED_LEASE`; evento registrado. | SELECT confirma `status = 'EXPIRED_LEASE'`; PASS. |
-| **G. Resultado Ambíguo** | Job em `DELIVERING` com lease expirado. | Executar ciclo do sweeper. | Job transiciona obrigatoriamente para `UNKNOWN_RESULT`. | Status é `UNKNOWN_RESULT`; NÃO volta a `PENDING`; PASS. |
-| **H. Idempotência por Chave** | Chave `idem-test-01`. | Enviar duas vezes o mesmo payload; enviar terceira vez com copies alterado. | 1ª: HTTP 201; 2ª: HTTP 200 (replay do mesmo ID); 3ª: HTTP 409 (mismatch). | IDs idênticos nas chamadas 1 e 2; erro 409 na 3; PASS. |
-| **I. Isolamento Multi-Tenant** | Empresas Alpha e Beta com mesma chave. | Alpha cria job; Beta cria job com mesma Idempotency-Key. | Jobs criados com IDs distintos; Agent de Beta não enxerga jobs de Alpha. | Zero vazamento cruzado; PASS. |
-| **J. Auditoria Append-Only** | Job percorre ciclo completo até transporte. | Consultar `GET /api/print-jobs/:id/events`. | 5 eventos em ordem cronológica estrita: PENDING, CLAIMED, DOWNLOADED, DELIVERING, DELIVERED. | Array com 5 itens imutáveis; PASS. |
-| **K. Resolução Manual** | Job em `UNKNOWN_RESULT`. | Operador chama `resolve-ambiguous` com `CONFIRM_FAILED_AND_RETRY`. | Original vira `FAILED`; novo job com novo ID é criado em `PENDING`. | Original FAILED, novo PENDING com attempts 0; PASS. |
-| **L. Compatibilidade Agent** | Daemon Rust compilado (PE x64). | Executar `--help` e simular handshake de polling. | Resposta compatível com envelopamento V1 e payload contracts. | Exit code 0, schema validado; PASS. |
+### 4.2 Matriz de Cobertura: CI Automated vs. Homologação Adicional
+
+| Cenário | Descrição | Status no CI (PostgreSQL 14 Real) | Homologação Adicional Necessária? |
+| :---: | :--- | :--- | :--- |
+| **A** | Criação de Job e Persistência | **100% PASS** (Gate PG.A - Run #198) | Opcional (reprodução assistida via curl). |
+| **B** | Restart / Reconexão sem Corrupção | **100% PASS** (Gate PG.B - Run #198) | Opcional (reprodução assistida via container restart). |
+| **C** | Concorrência de Claim (5 workers) | **100% PASS** (Gates PG.C e PG.D - Run #198) | Totalmente coberto por teste automatizado real. |
+| **D** | Falha de Banco e Fail-Closed | **100% PASS** (Gate PG.M - Run #198) | Totalmente coberto por teste automatizado real. |
+| **E** | Rollback Transacional e Guarda 403 | **100% PASS** (Gate PG.F - Run #198) | Totalmente coberto por teste automatizado real. |
+| **F** | Expiração de Lease em CLAIMED | **100% PASS** (Gate PG.J - Run #198) | Totalmente coberto por teste automatizado real. |
+| **G** | Resultado Ambíguo em DELIVERING | **100% PASS** (Gate PG.K - Run #198) | Totalmente coberto por teste automatizado real. |
+| **H** | Idempotência por Chave e Fingerprint | **100% PASS** (Gates PG.H e PG.I - Run #198) | Totalmente coberto por teste automatizado real. |
+| **I** | Isolamento Multi-Tenant Estrito | **100% PASS** (Gate PG.L - Run #198) | Totalmente coberto por teste automatizado real. |
+| **J** | Auditoria Append-Only Imutável | **100% PASS** (Gate PG.G - Run #198) | Totalmente coberto por teste automatizado real. |
+| **K** | Resolução Manual de UNKNOWN_RESULT | **100% PASS** (Gate PG.N - Run #198) | **SIM (Validação Interativa):** Testar validação de operador autenticado e rejeição de justificativa curta (< 10 caracteres). |
+| **L** | Compatibilidade Agent PE x64 (Rust) | **100% PASS** (Build x64 PE no runner Windows) | **SIM (Validação Assistida):** Execução do executável PE gerado em ambiente Windows isolado com backend local. |
+
+### 4.3 Roteiro Operacional e Evidências Executáveis (Cenários A–L)
+
+```bash
+# -------------------------------------------------------------------------
+# CENÁRIO A: CRIAÇÃO E PERSISTÊNCIA RELACIONAL DE JOB
+# -------------------------------------------------------------------------
+curl -s -X POST "http://localhost:3000/api/print-jobs" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TEST_USER_TOKEN" \
+  -d '{
+    "companyId": "comp-pg-alpha",
+    "printerId": "prn-pg-alpha-1",
+    "language": "PPLB",
+    "encoding": "windows-1252",
+    "copies": 1,
+    "payload": "N\nq800\nQ600,24\nB50,50,0,1,2,4,80,B,\"123456789\"\nP1\n"
+  }'
+# SQL de Verificação:
+# SELECT id, status, company_id, printer_id, checksum_sha256 FROM print_jobs WHERE id = '$JOB_ID';
+# Critério PASS: HTTP 201; status == 'PENDING'; 1 linha em print_jobs; 1 evento em print_job_events.
+
+# -------------------------------------------------------------------------
+# CENÁRIO B: REINICIALIZAÇÃO DO BACKEND E POOL
+# -------------------------------------------------------------------------
+# Ação: Reiniciar serviço backend isolado (docker restart backend_isolated)
+curl -s "http://localhost:3000/api/print-jobs/$JOB_ID" \
+  -H "Authorization: Bearer $TEST_USER_TOKEN"
+# Critério PASS: HTTP 200; job permanece intacto com status 'PENDING' e dados inalterados.
+
+# -------------------------------------------------------------------------
+# CENÁRIO C: CONCORRÊNCIA DE CLAIM (FOR UPDATE SKIP LOCKED)
+# -------------------------------------------------------------------------
+# Disparo concorrente por 5 workers sintéticos (agt-worker-1 a 5) solicitando 2 jobs cada:
+curl -s -X POST "http://localhost:3000/api/print-jobs/claim" \
+  -H "Authorization: Bearer $AGENT_TOKEN" \
+  -d '{"agentId": "agt-worker-1", "printerIds": ["prn-pg-alpha-1"], "limit": 2}'
+# SQL de Verificação:
+# SELECT claimed_by_agent_id, COUNT(*) FROM print_jobs WHERE status = 'CLAIMED' GROUP BY claimed_by_agent_id;
+# Critério PASS: Zero colisão ou sobreposição de IDs entre workers; claims distribuídos de forma estritamente disjunta.
+
+# -------------------------------------------------------------------------
+# CENÁRIO D: FAIL-CLOSED SEM FALLBACK EM MEMÓRIA
+# -------------------------------------------------------------------------
+# Ação: Parar o banco temporariamente ou apontar DATABASE_URL para porta fechada.
+curl -s -o /dev/null -w "%{http_code}" -X POST "http://localhost:3000/api/print-jobs" \
+  -H "Content-Type: application/json" -d '{"companyId":"comp-pg-alpha", ...}'
+# Critério PASS: Código HTTP 500/503 imediato. Zero fallback silencioso para memória.
+
+# -------------------------------------------------------------------------
+# CENÁRIO E: ROLLBACK TRANSACTION EM CONFLITO DE OWNERSHIP
+# -------------------------------------------------------------------------
+curl -s -X PATCH "http://localhost:3000/api/print-jobs/$JOB_ID/status" \
+  -H "Authorization: Bearer $AGENT_2_TOKEN" \
+  -d '{"agentId": "agt-worker-2", "status": "DOWNLOADED", "leaseId": "lease-invalido"}'
+# Critério PASS: HTTP 403 (NOT_CLAIM_HOLDER) ou 409; Rollback executado; banco mantém status e agentId original.
+
+# -------------------------------------------------------------------------
+# CENÁRIO F: EXPIRAÇÃO DE LEASE EM CLAIMED
+# -------------------------------------------------------------------------
+# Simulação no banco: UPDATE print_jobs SET lease_expires_at = NOW() - INTERVAL '10s' WHERE id = '$JOB_ID';
+# Disparo do Reaper: Acionamento de reapExpiredLeases()
+# Critério PASS: Job transiciona para EXPIRED_LEASE; evento correspondente registrado.
+
+# -------------------------------------------------------------------------
+# CENÁRIO G: RESULTADO AMBÍGUO EM DELIVERING (PROIBIDO RETORNO AUTOMÁTICO)
+# -------------------------------------------------------------------------
+# Simulação: Job em DELIVERING com lease_expires_at expirado.
+# Disparo do Reaper: reapExpiredLeases()
+# Critério PASS: Status transiciona compulsoriamente para UNKNOWN_RESULT. Proibido retornar para PENDING.
+
+# -------------------------------------------------------------------------
+# CENÁRIO H: IDEMPOTÊNCIA POR FINGERPRINT DE 6 PARÂMETROS
+# -------------------------------------------------------------------------
+# 1ª Chamada: POST com Idempotency-Key: 'idem-test-alpha' -> HTTP 201 Created (Novo Job).
+# 2ª Chamada: POST com mesma chave e mesmo payload -> HTTP 200 OK (Retorna mesmo jobId / Replay).
+# 3ª Chamada: POST com mesma chave MAS copies divergente -> HTTP 409 Conflict (IDEMPOTENCY_PAYLOAD_MISMATCH).
+# Critério PASS: Replay idempotente seguro e bloqueio 409 imediato em caso de divergência de fingerprint.
+
+# -------------------------------------------------------------------------
+# CENÁRIO I: ISOLAMENTO MULTI-TENANT ESTRITO
+# -------------------------------------------------------------------------
+# Tenant Alpha cria job com chave 'chave-global-1'.
+# Tenant Beta cria job com mesma chave 'chave-global-1'.
+# Critério PASS: Ambos os jobs criados com sucesso e IDs distintos. Agent de Beta não visualiza jobs de Alpha.
+
+# -------------------------------------------------------------------------
+# CENÁRIO J: TRILHA DE AUDITORIA APPEND-ONLY IMUTÁVEL
+# -------------------------------------------------------------------------
+curl -s "http://localhost:3000/api/print-jobs/$JOB_ID/events" \
+  -H "Authorization: Bearer $TEST_USER_TOKEN"
+# SQL de Verificação:
+# SELECT from_status, to_status, created_at FROM print_job_events WHERE job_id = '$JOB_ID' ORDER BY created_at ASC;
+# Critério PASS: Trilha imutável em ordem sequencial estrita (PENDING -> CLAIMED -> DOWNLOADED -> DELIVERING -> DELIVERED).
+
+# -------------------------------------------------------------------------
+# CENÁRIO K: RESOLUÇÃO MANUAL DE UNKNOWN_RESULT
+# -------------------------------------------------------------------------
+curl -s -X POST "http://localhost:3000/api/print-jobs/$JOB_ID/resolve-ambiguous" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $ADMIN_TOKEN" \
+  -d '{
+    "decision": "CONFIRM_FAILED_AND_RETRY",
+    "operatorNotes": "Verificação física realizada; bobina presa e zero etiquetas emitidas."
+  }'
+# Critério PASS: Job original vira FAILED; novo job independente é criado em PENDING com attempts = 0.
+# Teste de Borda: Requisição com operatorNotes < 10 chars rejeita com HTTP 400.
+
+# -------------------------------------------------------------------------
+# CENÁRIO L: COMPATIBILIDADE AGENT WINDOWS X64 (PE RUST)
+# -------------------------------------------------------------------------
+# Executar binário compilado no runner Windows:
+./bin/agents/witiquetas-agent-windows-x64.exe --version
+./bin/agents/witiquetas-agent-windows-x64.exe --help
+# Critério PASS: Exit code 0, saída padronizada v0.2.0, binário PE válido (> 1 MB, SHA-256 verificado).
+```
 
 ---
 
@@ -179,9 +302,9 @@ Todos os testes de homologação pré-deploy devem ser realizados em ambiente is
 ### 5.2 Critérios Objetivos de GO / NO-GO
 - **Critérios para GO (Prosseguir):**
   - Backup do banco concluído com sucesso e verificado.
-  - Migration 011 executada em menos de 1 segundo sem erros.
-  - Endpoint `/api/health` retornando 200 OK em menos de 30 segundos após o redeploy.
-  - Zero erros 500 no log do backend durante inicialização do pool PostgreSQL.
+  - Migration 011 executada com sucesso, sem erros de syntax/constraints e sem bloqueios de lock prolongados.
+  - Endpoint `/api/health` retornando status HEALTHY (código HTTP 200) com validação estável de PostgreSQL e MinIO após a estabilização do container.
+  - Zero erros 500 no log do backend durante inicialização do pool PostgreSQL e ativação do Lease Reaper.
 - **Critérios para NO-GO (Abortar Imediatamente e Conter):**
   - Falha de conexão com PostgreSQL na inicialização.
   - Divergência no commit reportado por `/api/version`.
@@ -195,13 +318,21 @@ Todos os testes de homologação pré-deploy devem ser realizados em ambiente is
 | Cenário de Contingência | Ação Imediata de Contenção | Procedimento de Rollback | Preservação de Dados |
 | :--- | :--- | :--- | :--- |
 | **1. Migration Parcial** | Interromper aplicação; inspecionar `pg_stat_activity`. | Resolver lock pendente; reexecutar script (é idempotente). | Tabelas parciais mantidas; zero DROP. |
-| **2. Backend Incompatível** | Reapontar tag `:stable` para a imagem anterior homologada (`5d2c2a236244cc333a5394b1af684bd43a84ab64`). | Acionar webhook do Portainer para subir a versão anterior. | Tabelas `print_jobs` e `print_job_events` permanecem intactas no banco. |
+| **2. Backend Incompatível** | Reapontar tag `:stable` para a imagem real em execução comprovada em produção: commit `8505ca5f76756da15d536241409ed4604496fc50` (governanceSha `5d2c2a236244cc333a5394b1af684bd43a84ab64`, imagem `ghcr.io/wittemberg/witiquetas-backend:candidate-8505ca5f76756da15d536241409ed4604496fc50`). | Acionar webhook do Portainer para subir a versão anterior homologada. | Tabelas `print_jobs` e `print_job_events` permanecem intactas no banco. |
 | **3. Falha de Conexão DB** | Verificar credenciais e conectividade de rede do container. | Se indisponibilidade do banco for persistente, parar backend para evitar estados inconsistentes (Fail-Closed). | Sem corrupção; dados preservados. |
 | **4. Erro de Inicialização** | Capturar logs do container (`docker service logs witiquetas_backend`). | Rollback para imagem anterior via script de rollback. | Logs preservados para análise forense. |
 | **5. Sweeper Anômalo** | Desativar temporariamente o job agendado via flag de configuração. | Inspecionar queries de sweep com `EXPLAIN ANALYZE`. | Zero perda de registros; auditoria preservada. |
 | **6. Jobs Pendentes no Deploy** | Jobs `PENDING` permanecem seguros no PostgreSQL. | O novo backend assume a fila e continua o atendimento ordenado. | Zero perda de jobs pendentes. |
 | **7. Jobs em DELIVERING no Deploy** | Conexões cortadas pelo restart expiram o lease. | Sweeper move para `UNKNOWN_RESULT`; operador avalia sem risco de duplicação. | Zero reimpressão automática descontrolada. |
 | **8. Jobs em UNKNOWN_RESULT** | Registros isolados aguardando confirmação. | Manter bloqueados até decisão explícita via `resolve-ambiguous`. | Impossível reimpressão acidental. |
+
+### 6.1 Garantia Estrutural contra Reenvio ou Consumo de Jobs Ambíguos no Rollback
+Em caso de acionamento do procedimento de rollback para a versão de produção anterior (`8505ca5` / `5d2c2a2`), a segurança física é garantida por desenho arquitetural:
+1. **Armazenamento Puramente em Memória na Versão Anterior:** O código do backend na baseline anterior gerenciava jobs através de um `Map` local (`const printJobsStore = new Map<string, PrintJobDTO>()`).
+2. **Inexistência de Mapeamento Relacional:** A versão anterior não possui repositório de persistência de jobs (`printJobRepository.ts` relacional), não emite consultas SQL (`SELECT`, `UPDATE` ou `claim`) sobre as tabelas `print_jobs` e `print_job_events`, e desconhece por completo a existência dessas tabelas no banco de dados.
+3. **Isolamento Total dos Registros:** Qualquer job que tenha sido gravado no banco relacional pelo Package 5.7.1 — esteja em `PENDING`, `CLAIMED`, `DELIVERING`, `EXPIRED_LEASE` ou `UNKNOWN_RESULT` — permanece estático e inacessível para o backend antigo.
+4. **Impossibilidade Matemática de Reenvio:** Como a versão revertida não consulta a tabela relacional, é estruturalmente impossível que ela leia, reivindique, tente despachar ou reenvie qualquer job persistido ou ambíguo para os agentes locais ou impressoras físicas.
+5. **Preservação de Evidências:** Os dados em `print_jobs` e `print_job_events` mantêm-se íntegros para fins de auditoria, diagnóstico forense e reconciliação manual sem qualquer risco operacional.
 
 ---
 

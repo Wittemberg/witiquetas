@@ -58,8 +58,17 @@ test('SUÍTE PACKAGE 5.7.1 — POSTGRESQL 14 REAL INTEGRATION GATE', async (t) =
   });
   setPgPool(testPool);
 
-  // 2. Aplica todas as migrations oficiais em ordem sequencial
-  const client = await testPool.connect();
+  // 2. Aplica todas as migrations oficiais em ordem sequencial com retry de conexão
+  let client: any;
+  for (let attempt = 1; attempt <= 10; attempt++) {
+    try {
+      client = await testPool.connect();
+      break;
+    } catch (err) {
+      if (attempt === 10) throw err;
+      await new Promise((r) => setTimeout(r, 1000));
+    }
+  }
   try {
     const migrations = getMigrationsList();
     for (const m of migrations) {
@@ -96,7 +105,7 @@ test('SUÍTE PACKAGE 5.7.1 — POSTGRESQL 14 REAL INTEGRATION GATE', async (t) =
       ON CONFLICT (id) DO NOTHING;
     `);
   } finally {
-    client.release();
+    if (client) client.release();
   }
 
   // =========================================================================
@@ -376,7 +385,8 @@ test('SUÍTE PACKAGE 5.7.1 — POSTGRESQL 14 REAL INTEGRATION GATE', async (t) =
   // GATE M: FAIL-CLOSED SEM FALLBACK EM MEMÓRIA
   // =========================================================================
   await t.test('Gate M: Falha no PostgreSQL interrompe operações imediatamente sem fallback silencioso', async () => {
-    // Configura pool apontando para porta inacessível simulando queda do banco
+    // Salva pool saudável antes de simular falha
+    const healthyPool = pgPool;
     const deadPool = new Pool({
       connectionString: 'postgresql://invalid_user:invalid_pass@127.0.0.1:54399/invalid_db',
       connectionTimeoutMillis: 500,
@@ -394,8 +404,9 @@ test('SUÍTE PACKAGE 5.7.1 — POSTGRESQL 14 REAL INTEGRATION GATE', async (t) =
       }
     );
 
-    // Restaura pool saudável
-    setPgPool(pgPool);
+    // Restaura pool saudável e encerra deadPool
+    setPgPool(healthyPool);
+    await deadPool.end().catch(() => {});
   });
 
   // =========================================================================

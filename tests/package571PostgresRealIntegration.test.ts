@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { Pool } from 'pg';
 import crypto from 'node:crypto';
 import { PrintJobRepository } from '../apps/backend/src/repositories/printJobRepository.js';
-import { pgPool, setPgPool, getMigrationsList } from '../apps/backend/src/db.js';
+import { pgPool, setPgPool, getPgPool, getMigrationsList } from '../apps/backend/src/db.js';
 import type { PrintJobDTO } from '@witiquetas/contracts';
 
 const databaseUrl = process.env.DATABASE_URL;
@@ -326,7 +326,7 @@ test('SUÍTE PACKAGE 5.7.1 — POSTGRESQL 14 REAL INTEGRATION GATE', async (t) =
     assert.equal(claimed.length, 1);
 
     // Força lease expirado no PostgreSQL
-    await pgPool!.query(
+    await (getPgPool() || pgPool)!.query(
       `UPDATE print_jobs SET lease_expires_at = NOW() - INTERVAL '10 seconds' WHERE id = $1`,
       [jobClaimed.id]
     );
@@ -341,7 +341,7 @@ test('SUÍTE PACKAGE 5.7.1 — POSTGRESQL 14 REAL INTEGRATION GATE', async (t) =
       attemptId: claimedD[0].attemptId,
     });
 
-    await pgPool!.query(
+    await (getPgPool() || pgPool)!.query(
       `UPDATE print_jobs SET lease_expires_at = NOW() - INTERVAL '10 seconds' WHERE id = $1`,
       [jobDelivering.id]
     );
@@ -386,7 +386,7 @@ test('SUÍTE PACKAGE 5.7.1 — POSTGRESQL 14 REAL INTEGRATION GATE', async (t) =
   // =========================================================================
   await t.test('Gate M: Falha no PostgreSQL interrompe operações imediatamente sem fallback silencioso', async () => {
     // Salva pool saudável antes de simular falha
-    const healthyPool = pgPool;
+    const healthyPool = getPgPool() || pgPool;
     const deadPool = new Pool({
       connectionString: 'postgresql://invalid_user:invalid_pass@127.0.0.1:54399/invalid_db',
       connectionTimeoutMillis: 500,
@@ -429,14 +429,18 @@ test('SUÍTE PACKAGE 5.7.1 — POSTGRESQL 14 REAL INTEGRATION GATE', async (t) =
     assert.equal(resolution.retryJob.attempts, 0);
 
     // Valida diretamente no PostgreSQL
-    const resSqlOriginal = await pgPool!.query(`SELECT status, error FROM print_jobs WHERE id = $1`, [job.id]);
+    const activePool = getPgPool() || pgPool;
+    const resSqlOriginal = await activePool!.query(`SELECT status, error FROM print_jobs WHERE id = $1`, [job.id]);
     assert.equal(resSqlOriginal.rows[0].status, 'FAILED');
 
-    const resSqlRetry = await pgPool!.query(`SELECT status, attempts FROM print_jobs WHERE id = $1`, [resolution.retryJob.id]);
+    const resSqlRetry = await activePool!.query(`SELECT status, attempts FROM print_jobs WHERE id = $1`, [resolution.retryJob.id]);
     assert.equal(resSqlRetry.rows[0].status, 'PENDING');
     assert.equal(resSqlRetry.rows[0].attempts, 0);
   });
 
   // Fecha conexões após todos os testes
-  await pgPool!.end();
+  const finalPool = getPgPool() || pgPool;
+  if (finalPool) {
+    await finalPool.end().catch(() => {});
+  }
 });

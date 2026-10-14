@@ -15,6 +15,10 @@ export function setPgPool(newPool: Pool | null): void {
   pgPool = newPool;
 }
 
+export function getPgPool(): Pool | null {
+  return pgPool;
+}
+
 if (dbUrl) {
   pgPool = new Pool({
     connectionString: dbUrl,

@@ -20,6 +20,9 @@ export async function resolve(specifier, context, nextResolve) {
     return { format: 'module', shortCircuit: true, url: EXPRESS_SHIM_URL };
   }
   if (specifier === 'pg') {
+    if (process.env.DATABASE_URL) {
+      return nextResolve(specifier, context);
+    }
     return { format: 'module', shortCircuit: true, url: PG_SHIM_URL };
   }
   if (specifier === 'dotenv') {

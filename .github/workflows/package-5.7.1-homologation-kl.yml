@@ -63,7 +63,11 @@ jobs:
           $env:NODE_ENV = "test"
           $env:AGENT_EXE_PATH = "bin/agents/witiquetas-agent-windows-x64.exe"
           node --loader ./tests/ts-loader.js --test tests/package571HomologationGateKL.test.ts 2>&1 | Tee-Object -FilePath homolog-output.txt
-          if ($LASTEXITCODE -ne 0) {
+          $testExitCode = $LASTEXITCODE
+          if ($testExitCode -ne 0) {
+            Write-Host "--- HOMOLOGATION OUTPUT ON FAILURE ---"
+            Get-Content homolog-output.txt
+            node -e "const fs = require('fs'); if (fs.existsSync('homolog-output.txt')) { const txt = fs.readFileSync('homolog-output.txt', 'utf8').replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A'); console.log('::error title=Homologation Gate Output::' + txt); }"
             Write-Error "Falha na suíte de homologação K/L!"
             exit 1
           }

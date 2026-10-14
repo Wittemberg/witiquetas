@@ -56,7 +56,16 @@ test('SUÍTE PACKAGE 5.7.1 — HOMOLOGATION GATE CENÁRIOS K E L (ISOLADO)', asy
   });
   setPgPool(pool);
 
-  const client = await pool.connect();
+  let client: any;
+  for (let attempt = 1; attempt <= 10; attempt++) {
+    try {
+      client = await pool.connect();
+      break;
+    } catch (err) {
+      if (attempt === 10) throw err;
+      await new Promise((r) => setTimeout(r, 1000));
+    }
+  }
 
   try {
     // 2. Aplica todas as migrations na ordem oficial

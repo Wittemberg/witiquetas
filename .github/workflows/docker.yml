@@ -115,7 +115,21 @@ jobs:
           DATABASE_URL: postgresql://witiquetas_test:ci_test_password@127.0.0.1:5432/witiquetas_test
           NODE_ENV: test
         run: |
-          node --loader ./tests/ts-loader.js --test tests/package571PostgresRealIntegration.test.ts
+          set -o pipefail
+          node --loader ./tests/ts-loader.js --test tests/package571PostgresRealIntegration.test.ts 2>&1 | tee test-output.txt
+
+      - name: Surface Test Output on Failure
+        if: failure()
+        run: |
+          echo "::error file=tests/package571PostgresRealIntegration.test.ts::$(tail -n 30 test-output.txt | tr '\r\n' '  ')"
+
+      - name: Upload Test Output Artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: postgres-test-output
+          path: test-output.txt
+          if-no-files-found: ignore
 
   build-and-deploy:
     name: Build & Push Docker Images

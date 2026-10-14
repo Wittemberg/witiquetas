@@ -1,16 +1,17 @@
 # Witiquetas — Estado Atual
 
 Atualizado em:
-2026-09-28
+2026-10-14
 
 ## Fase atual
 
-Fase 5 — Administração e Governança da Aplicação (conforme `docs/development-control/project.json`).
+Fase 5.7.1 — Persistent Print Queue & Lease Safety (Fase 5 — Administração e Governança da Aplicação).
 
 ## Status
 
-Pacotes 5.6 (Integration Foundation) e 5.6.1 (Integration Administration UX & Editing) formalmente HOMOLOGADOS com sucesso pelo usuário. Baseline homologada: commit `6436984`.
-Implantação do fluxo harness-skills + OpenSpec para governança e execução de agentes. Nenhum código de runtime foi alterado.
+Implementado, validado tecnicamente, aguardando homologação manual controlada.
+Baseline técnica validada: commit `904caa1b8036393d558dc4d15645de8b6f60f2fa` na branch `validation/package-5.7.1-postgres-gate`.
+Status DCC: `IMPLEMENTED_AWAITING_MANUAL_HOMOLOGATION` (deployed: false).
 
 ## Mudança OpenSpec ativa
 
@@ -30,21 +31,27 @@ Referência canônica: `docs/development-control/project.json` e `docs/developme
 ## Última evidência válida
 
 Commit:
-`6436984` (main — homologado pelo usuário) / `c6b18c1` (governança)
+`904caa1b8036393d558dc4d15645de8b6f60f2fa` (branch `validation/package-5.7.1-postgres-gate`)
+
+CI / Pipelines:
+GitHub Actions Run `#198` (Run ID `38645989365`) — **100% SUCCESS**
 
 Testes:
-`node --loader ./tests/ts-loader.js --test tests/package561IntegrationUxAndEdit.test.ts tests/package56IntegrationFoundation.test.ts`
+- PostgreSQL 14 Real Gate: 11/11 subtestes PASS (`tests/package571PostgresRealIntegration.test.ts`)
+- Suíte de Regressão: 260/260 testes automatizados PASS
+- Builds de Produção: `@witiquetas/contracts`, `@witiquetas/backend`, `@witiquetas/frontend` e Agent Windows PE x64 (Rust) 100% GREEN
 
 Resultado:
-Suíte de integração aprovada, 0 falhas. Homologação manual de 5.6 e 5.6.1 confirmada com sucesso pelo usuário.
+Validação técnica completa em ambiente PostgreSQL 14 isolado. SQLSTATE 42703 corrigido.
 
 ## Trabalho em andamento
 
-Reconciliação pós-auditoria, registro formal da homologação dos Pacotes 5.6/5.6.1 e planejamento da execução do Package 5.7 (Printers & Local Agents Governance).
+Preparação concluída da documentação operacional e checklist de homologação: `docs/operations/PACKAGE-5.7.1-DEPLOY-SAFETY.md`.
 
 ## Próximo passo autorizado
 
-Package 5.7 — Printers & Local Agents Governance (migração do cadastro de impressoras para PostgreSQL com isolamento multi-tenant).
+Homologação não-física com Agent virtual conforme plano (12 cenários A a L de `docs/operations/PACKAGE-5.7.1-DEPLOY-SAFETY.md`).
+Proibido: deploy em produção, merge na main, envio de bytes para impressoras físicas.
 
 ## Referências
 

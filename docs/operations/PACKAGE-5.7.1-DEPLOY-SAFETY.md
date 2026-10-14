@@ -336,19 +336,46 @@ Em caso de acionamento do procedimento de rollback para a versão de produção 
 
 ---
 
+### 4.4 Auditoria de Isolamento do Host de Desenvolvimento e Bloqueio de Execução Live (BLOCKED_ENVIRONMENT)
+
+Em 14/10/2026, foi executada a sonda de pré-homologação no host de desenvolvimento Windows (`SUPORTE-2`), com os seguintes resultados:
+
+1. **Auditoria de Conectividade e Serviços do Host:**
+   - **Serviço Local de Produção Ativo:** O comando `--diagnostics --json` revelou que o host possui o Windows Service `WitiquetasAgent` ativo (`serviceInstalled: true, serviceState: "running"`), autenticado e pareado diretamente com o ambiente de **PRODUÇÃO** (`backendUrl: "https://witiquetas.wrtec.com.br"`, `agentId: "agent-1791229418695"`).
+   - **Ausência de PostgreSQL Local:** Verificação de serviços (`Get-Service *postgres*`) e porta (`Test-NetConnection -Port 5432 -ComputerName 127.0.0.1`) confirmou `TcpTestSucceeded: False`. Não existe banco PostgreSQL isolado em execução no host local.
+   - **Ausência de Docker:** O utilitário `docker` não está instalado no host, inviabilizando container de banco descartável local.
+   - **Risco de Segurança Identificado:** Executar o daemon com identidade sobrescrita ou rodar testes locais de envio de rede no host `SUPORTE-2` violaria as regras P0 de isolamento ("Nenhum Agent instalado de produção conectado" e "Bloqueio comprovado de saída TCP 9100").
+
+2. **Validação Técnica do Binário Windows PE x64 (Rust):**
+   - **Compilação Release Concluída:** `cargo build --release --manifest-path apps/agent-core/Cargo.toml`
+   - **Arquivo Gerado:** `apps/agent-core/target/release/witiquetas-agent-core.exe`
+   - **Tamanho:** 5.224.960 bytes (~5.2 MB)
+   - **SHA-256:** `BE7B22160086246A9CCA8DAEA51584571F3A63FBC58C20B0E697C7F4F2FA64C3`
+   - **Suíte de Testes Rust:** 75/75 testes PASS (53 lib tests + 10 distribution foundation + 12 resident service).
+   - **Comandos CLI Executados com Sucesso:**
+     - `--version`: `witiquetas-agent-core v0.2.0 (commit: d2d58643, built: 2026-10-14T22:56:56Z, target: x86_64-pc-windows-msvc)` -> PASS.
+     - `--help`: Retorno padronizado de operações de serviço, pareamento e flags -> PASS.
+     - `--diagnostics --json`: Emissão estruturada com schemaVersion 1 e redaction de tokens -> PASS.
+
+3. **Status dos Cenários K e L:**
+   - **Cenário K (Resolução Manual UNKNOWN_RESULT):** 100% verificado e aprovado nos testes automatizados reais contra PostgreSQL 14 no GitHub Actions Run #198 (Gate PG.N) e testes de contrato (Gates 4.4 a 4.8 em `tests/package571PersistentPrintQueue.test.ts`). Homologação manual live no host local: **BLOQUEADA** por ausência de PostgreSQL isolado local.
+   - **Cenário L (Agent Windows x64 Handshake Live):** Binário PE x64 validado e íntegro. Execução contínua em polling/claim no host `SUPORTE-2`: **BLOQUEADA** (`BLOCKED_ENVIRONMENT`) para proteger o agente de produção `agent-1791229418695` e evitar concorrência com o serviço de produção ativo.
+
+---
+
 ## 7. ETAPA 7 — GOVERNANÇA DCC
 
 - **Pacote:** Package 5.7.1 — Persistent Print Queue & Lease Safety
 - **Fase Atual:** Fase 5 — Administração e Governança da Aplicação
 - **Baseline Validada:** Commit `904caa1b8036393d558dc4d15645de8b6f60f2fa`
-- **Validação de CI:** GitHub Actions Run #198 — **100% SUCCESS**
+- **Validação de CI:** GitHub Actions Run #198 / Run #200 — **100% SUCCESS**
 - **Regressão Global:** 260/260 testes automatizados PASS
-- **PostgreSQL Gate:** 11/11 subtestes PASS (PostgreSQL 14 real)
+- **PostgreSQL Gate:** 11/11 subtestes PASS (PostgreSQL 14 real no GitHub Actions)
 - **Status DCC Mantido:** `IMPLEMENTED_AWAITING_MANUAL_HOMOLOGATION`
 - **Flag Deployed:** `false`
-- **Próxima Etapa:** Execução dos 12 cenários de homologação não física pelo operador humano em ambiente controlado.
+- **Status da Homologação Assistida no Host Local:** `BLOCKED_ENVIRONMENT` (Host de desenvolvimento possui agente de produção ativo e não possui PostgreSQL isolado; proibida execução que comprometa o isolamento).
 
 ---
 
 ### DECLARAÇÃO DE ENCERRAMENTO DA TAREFA:
-**`READY_FOR_CONTROLLED_HOMOLOGATION`**
+**`BLOCKED_ENVIRONMENT`** (Interrompido com segurança conforme regra mandatória: ambiente local sem isolamento estrito contra o agente de produção ativo).

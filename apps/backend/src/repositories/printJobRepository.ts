@@ -115,17 +115,20 @@ export function checkIdempotencyMatch(
 ): { match: boolean; divergentFields: string[] } {
   const divergent: string[] = [];
   const existingPrinter = existing.printer_id || existing.printerId;
-  const existingCopies = Number(existing.copies);
-  const existingStrategy = existing.copy_strategy || existing.copyStrategy;
+  const existingCopies = Number(existing.copies ?? 1);
+  const incomingCopies = Number(incoming.copies ?? 1);
+  const existingStrategy = existing.copy_strategy || existing.copyStrategy || 'EMBEDDED_IN_PAYLOAD';
+  const incomingStrategy = incoming.copyStrategy || 'EMBEDDED_IN_PAYLOAD';
   const existingLanguage = existing.language;
-  const existingEncoding = existing.encoding;
+  const existingEncoding = existing.encoding || 'windows-1252';
+  const incomingEncoding = incoming.encoding || 'windows-1252';
   const existingChecksum = existing.checksum_sha256 || existing.checksumSha256;
 
   if (existingPrinter !== incoming.printerId) divergent.push(`printerId ('${existingPrinter}' vs '${incoming.printerId}')`);
-  if (existingCopies !== Number(incoming.copies)) divergent.push(`copies (${existingCopies} vs ${incoming.copies})`);
-  if (existingStrategy !== incoming.copyStrategy) divergent.push(`copyStrategy ('${existingStrategy}' vs '${incoming.copyStrategy}')`);
+  if (existingCopies !== incomingCopies) divergent.push(`copies (${existingCopies} vs ${incomingCopies})`);
+  if (existingStrategy !== incomingStrategy) divergent.push(`copyStrategy ('${existingStrategy}' vs '${incomingStrategy}')`);
   if (existingLanguage !== incoming.language) divergent.push(`language ('${existingLanguage}' vs '${incoming.language}')`);
-  if (existingEncoding !== incoming.encoding) divergent.push(`encoding ('${existingEncoding}' vs '${incoming.encoding}')`);
+  if (existingEncoding !== incomingEncoding) divergent.push(`encoding ('${existingEncoding}' vs '${incomingEncoding}')`);
   if (existingChecksum !== incoming.checksumSha256) divergent.push(`payloadChecksum ('${existingChecksum}' vs '${incoming.checksumSha256}')`);
 
   return {

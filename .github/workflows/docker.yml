@@ -109,6 +109,9 @@ jobs:
         run: |
           npm --prefix packages/label-schema run build
           npm --prefix packages/contracts run build
+          npm --prefix packages/printer-core run build
+          npm --prefix packages/printer-ppla run build
+          npm --prefix packages/printer-pplb run build
 
       - name: Execute Dedicated PostgreSQL 14 Integration Test Suite
         env:
@@ -121,7 +124,7 @@ jobs:
       - name: Surface Test Output on Failure
         if: failure()
         run: |
-          echo "::error file=tests/package571PostgresRealIntegration.test.ts::$(tail -n 30 test-output.txt | tr '\r\n' '  ')"
+          cat test-output.txt
 
       - name: Upload Test Output Artifact
         if: always()

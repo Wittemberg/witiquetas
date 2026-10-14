@@ -125,6 +125,10 @@ jobs:
         if: failure()
         run: |
           cat test-output.txt
+          echo "### PostgreSQL Integration Gate Output" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          cat test-output.txt >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
 
       - name: Upload Test Output Artifact
         if: always()

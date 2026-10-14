@@ -182,6 +182,10 @@ test('SUÍTE PACKAGE 5.7.1 — POSTGRESQL 14 REAL INTEGRATION GATE', async (t) =
       if (client) client.release();
     }
 
+    async function cleanTables() {
+      await activePool.query('DELETE FROM print_jobs');
+    }
+
     // =========================================================================
     // GATE A: MIGRATION 011 E CONSTRAINTS NO POSTGRESQL REAL
     // =========================================================================
@@ -207,6 +211,7 @@ test('SUÍTE PACKAGE 5.7.1 — POSTGRESQL 14 REAL INTEGRATION GATE', async (t) =
     // GATE B: CRIAÇÃO DE JOBS PERSISTENTES
     // =========================================================================
     await t.test('Gate B: Criação de job persiste registro físico no PostgreSQL com status PENDING', async () => {
+      await cleanTables();
       const job = createSampleJob('comp-pg-alpha', 'prn-pg-alpha-1');
       const created = await PrintJobRepository.createJob(job);
       assert.equal(created.job.id, job.id);
@@ -224,6 +229,7 @@ test('SUÍTE PACKAGE 5.7.1 — POSTGRESQL 14 REAL INTEGRATION GATE', async (t) =
     // GATES C & D: CLAIM CONCORRENTE COM 5 CONEXÕES E FOR UPDATE SKIP LOCKED
     // =========================================================================
     await t.test('Gates C & D: 5 workers concorrentes via SKIP LOCKED dividem 10 jobs sem duplicidade', async () => {
+      await cleanTables();
       const TENANT = 'comp-pg-alpha';
       const PRINTER = 'prn-pg-alpha-1';
       const TOTAL_JOBS = 10;
@@ -278,6 +284,7 @@ test('SUÍTE PACKAGE 5.7.1 — POSTGRESQL 14 REAL INTEGRATION GATE', async (t) =
     // GATE E: PERSISTÊNCIA APÓS REINICIALIZAÇÃO DO POOL DE CONEXÕES
     // =========================================================================
     await t.test('Gate E: Dados persistem intactos após fechamento e recriação do pool de conexões', async () => {
+      await cleanTables();
       const job = createSampleJob('comp-pg-alpha', 'prn-pg-alpha-1');
       await PrintJobRepository.createJob(job);
 
@@ -302,12 +309,14 @@ test('SUÍTE PACKAGE 5.7.1 — POSTGRESQL 14 REAL INTEGRATION GATE', async (t) =
     // GATE F: ROLLBACK TRANSACIONAL EM FALHA
     // =========================================================================
     await t.test('Gate F: Transição inválida ou falha de chave estrangeira executa ROLLBACK sem sujeira', async () => {
+      await cleanTables();
       const job = createSampleJob('comp-pg-alpha', 'prn-pg-alpha-1');
       await PrintJobRepository.createJob(job);
 
       // Reivindica com worker 1
       const claimed = await PrintJobRepository.claimPendingJobsForAgent('comp-pg-alpha', 'agt-pg-worker-1');
       assert.equal(claimed.length, 1);
+      assert.equal(claimed[0].jobId, job.id);
 
       // Tenta atualizar com agente não detentor de claim -> 403 NOT_CLAIM_HOLDER e ROLLBACK
       const badUpdate = await PrintJobRepository.updateJobStatus(job.id, 'agt-pg-worker-999', {
@@ -327,11 +336,13 @@ test('SUÍTE PACKAGE 5.7.1 — POSTGRESQL 14 REAL INTEGRATION GATE', async (t) =
     // GATE G: ATOMICIDADE DE JOB + EVENTO DE AUDITORIA
     // =========================================================================
     await t.test('Gate G: Ciclo de vida grava eventos de auditoria na mesma transação atômica', async () => {
+      await cleanTables();
       const job = createSampleJob('comp-pg-alpha', 'prn-pg-alpha-1');
       await PrintJobRepository.createJob(job);
 
       const claimed = await PrintJobRepository.claimPendingJobsForAgent('comp-pg-alpha', 'agt-pg-worker-1');
       assert.equal(claimed.length, 1);
+      assert.equal(claimed[0].jobId, job.id);
       const item = claimed[0];
 
       await PrintJobRepository.updateJobStatus(job.id, 'agt-pg-worker-1', {
@@ -364,6 +375,7 @@ test('SUÍTE PACKAGE 5.7.1 — POSTGRESQL 14 REAL INTEGRATION GATE', async (t) =
     // GATES H & I: IDEMPOTÊNCIA POR TENANT E DIVERGÊNCIA FÍSICA (409)
     // =========================================================================
     await t.test('Gate H & I: Idempotency-Key retorna mesmo job se igual e 409 se parâmetro físico diverge', async () => {
+      await cleanTables();
       const jobOriginal = createSampleJob('comp-pg-alpha', 'prn-pg-alpha-1', { copies: 2 });
       const IDEM_KEY = `idem-pg-${Date.now()}`;
 
@@ -398,11 +410,13 @@ test('SUÍTE PACKAGE 5.7.1 — POSTGRESQL 14 REAL INTEGRATION GATE', async (t) =
     // GATES J & K: LEASE EXPIRADO EM DELIVERING (UNKNOWN_RESULT) E EM CLAIMED (EXPIRED_LEASE)
     // =========================================================================
     await t.test('Gates J & K: Lease sweeper real transiciona DELIVERING para UNKNOWN_RESULT e CLAIMED para EXPIRED_LEASE', async () => {
+      await cleanTables();
       // 1. Job em CLAIMED com lease expirado
       const jobClaimed = createSampleJob('comp-pg-alpha', 'prn-pg-alpha-1');
       await PrintJobRepository.createJob(jobClaimed);
       const claimed = await PrintJobRepository.claimPendingJobsForAgent('comp-pg-alpha', 'agt-pg-worker-1');
       assert.equal(claimed.length, 1);
+      assert.equal(claimed[0].jobId, jobClaimed.id);
 
       // Força lease expirado no PostgreSQL
       await activePool.query(
@@ -414,6 +428,9 @@ test('SUÍTE PACKAGE 5.7.1 — POSTGRESQL 14 REAL INTEGRATION GATE', async (t) =
       const jobDelivering = createSampleJob('comp-pg-alpha', 'prn-pg-alpha-2');
       await PrintJobRepository.createJob(jobDelivering);
       const claimedD = await PrintJobRepository.claimPendingJobsForAgent('comp-pg-alpha', 'agt-pg-worker-2');
+      assert.equal(claimedD.length, 1);
+      assert.equal(claimedD[0].jobId, jobDelivering.id);
+
       await PrintJobRepository.updateJobStatus(jobDelivering.id, 'agt-pg-worker-2', {
         status: 'DELIVERING',
         leaseId: claimedD[0].leaseId,
@@ -440,6 +457,7 @@ test('SUÍTE PACKAGE 5.7.1 — POSTGRESQL 14 REAL INTEGRATION GATE', async (t) =
     // GATE L: ISOLAMENTO MULTI-TENANT ENTRE EMPRESAS
     // =========================================================================
     await t.test('Gate L: Chaves de idempotência e filas de claim são 100% isoladas por empresa', async () => {
+      await cleanTables();
       const SHARED_KEY = `idem-cross-tenant-${Date.now()}`;
 
       // Empresa Alpha cria com SHARED_KEY
@@ -464,6 +482,7 @@ test('SUÍTE PACKAGE 5.7.1 — POSTGRESQL 14 REAL INTEGRATION GATE', async (t) =
     // GATE M: FAIL-CLOSED SEM FALLBACK EM MEMÓRIA
     // =========================================================================
     await t.test('Gate M: Falha no PostgreSQL interrompe operações imediatamente sem fallback silencioso', async () => {
+      await cleanTables();
       // Salva activePool antes de simular falha
       const deadPool = new Pool({
         connectionString: 'postgresql://invalid_user:invalid_pass@127.0.0.1:54399/invalid_db',
@@ -491,12 +510,14 @@ test('SUÍTE PACKAGE 5.7.1 — POSTGRESQL 14 REAL INTEGRATION GATE', async (t) =
     // GATE N: RESOLUÇÃO MANUAL DE UNKNOWN_RESULT SEM REEXECUÇÃO AUTOMÁTICA
     // =========================================================================
     await t.test('Gate N: Resolução manual de UNKNOWN_RESULT com CONFIRM_FAILED_AND_RETRY gera nova tentativa auditável', async () => {
+      await cleanTables();
       // 1. Cria job através da máquina de estados legítima
       const job = createSampleJob('comp-pg-alpha', 'prn-pg-alpha-1');
       await PrintJobRepository.createJob(job);
 
       const claimed = await PrintJobRepository.claimPendingJobsForAgent('comp-pg-alpha', 'agt-pg-worker-1');
       assert.equal(claimed.length, 1);
+      assert.equal(claimed[0].jobId, job.id);
 
       // 2. Transiciona para DELIVERING
       await PrintJobRepository.updateJobStatus(job.id, 'agt-pg-worker-1', {

@@ -50,42 +50,11 @@ jobs:
           Write-Host "SHA-256 do Binario Windows: $hash"
           echo "AGENT_SHA256=$hash" >> $env:GITHUB_ENV
 
-      - name: Setup and Start PostgreSQL on Windows Runner
+      - name: Setup and Start PostgreSQL 14 on Windows Runner
         shell: pwsh
         run: |
-          # 1. Detectar servico PostgreSQL nativo no runner Windows
-          $pgService = Get-Service | Where-Object { $_.Name -like "postgresql*" }
-          if (-not $pgService) {
-            Write-Host "Instalando PostgreSQL 14 via Chocolatey..."
-            choco install postgresql14 --params '/Password:root' -y --no-progress
-            $pgService = Get-Service | Where-Object { $_.Name -like "postgresql*" }
-          }
-          Set-Service -Name $pgService.Name -StartupType Automatic
-          Start-Service -Name $pgService.Name
-          Write-Host "Servico PostgreSQL iniciado: $($pgService.Name)"
-
-          # 2. Localizar binarios
-          $pgBin = $env:PGBIN
-          if (-not $pgBin -or -not (Test-Path $pgBin)) {
-            $cand = Get-ChildItem "C:\Program Files\PostgreSQL" -Directory -ErrorAction SilentlyContinue | Sort-Object Name -Descending | Select-Object -First 1
-            if ($cand) { $pgBin = "$($cand.FullName)\bin" }
-          }
-          Write-Host "PGBIN: $pgBin"
-
-          # 3. Aguardar disponibilidade
-          $ready = $false
-          for ($i = 1; $i -le 15; $i++) {
-            & "$pgBin\pg_isready.exe" -h 127.0.0.1 -p 5432
-            if ($LASTEXITCODE -eq 0) { $ready = $true; break }
-            Start-Sleep -Seconds 2
-          }
-          if (-not $ready) { throw "PostgreSQL nao respondeu na porta 5432!" }
-
-          # 4. Criar banco descartavel exclusivo witiquetas_homolog
-          $env:PGPASSWORD = "root"
-          & "$pgBin\psql.exe" -h 127.0.0.1 -p 5432 -U postgres -c "ALTER USER postgres WITH PASSWORD 'root';" -ErrorAction SilentlyContinue
-          & "$pgBin\createdb.exe" -h 127.0.0.1 -p 5432 -U postgres witiquetas_homolog -ErrorAction SilentlyContinue
-          Write-Host "Banco witiquetas_homolog pronto para homologacao descartavel."
+          Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
+          & ./scripts/setup-postgres14-runner.ps1
 
       - name: Execute Homologation Gate Suite (Scenarios K & L)
         shell: pwsh
@@ -103,15 +72,8 @@ jobs:
         if: always()
         shell: pwsh
         run: |
-          Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value "### Package 5.7.1 — Disposable Homologation Gate (Scenarios K & L)"
-          Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value "- **Runner:** Windows Server (Isolated GitHub Actions VM)"
-          Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value "- **Target Executable SHA-256:** \`$env:AGENT_SHA256\`"
-          Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value "- **Database:** PostgreSQL on 127.0.0.1 (Ephemeral)"
-          Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value '```'
-          if (Test-Path homolog-output.txt) {
-            Get-Content homolog-output.txt | Add-Content -Path $env:GITHUB_STEP_SUMMARY
-          }
-          Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value '```'
+          Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
+          & ./scripts/publish-homolog-summary.ps1
 
       - name: Upload Homologation Output Artifact
         if: always()

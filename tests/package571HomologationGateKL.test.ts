@@ -65,6 +65,14 @@ test('SUÍTE PACKAGE 5.7.1 — HOMOLOGATION GATE CENÁRIOS K E L (ISOLADO)', asy
       await client.query(m.sql);
     }
 
+    // Validação estrita da Migration 011: tabelas print_jobs e print_job_events
+    const m011Check = await client.query(`
+      SELECT table_name FROM information_schema.tables 
+      WHERE table_schema = 'public' AND table_name IN ('print_jobs', 'print_job_events');
+    `);
+    assert.equal(m011Check.rows.length, 2, 'Migration 011: tabelas print_jobs e print_job_events devem existir no schema');
+    console.log('[Migration 011] VALIDATION PASS: tabelas print_jobs e print_job_events confirmadas.');
+
     // 3. Provisiona dados isolados de homologação (tenants, impressoras e sessões web)
     const TENANT_K = 'comp-homolog-k';
     const TENANT_L = 'comp-homolog-l';
@@ -495,10 +503,35 @@ test('SUÍTE PACKAGE 5.7.1 — HOMOLOGATION GATE CENÁRIOS K E L (ISOLADO)', asy
         assert.equal(recoverJson.data.backendReachable, true, 'Backend deve voltar a estar acessível');
       });
 
-      await t.test('CENÁRIO L.7: Comprovação de bloqueio de saída TCP 9100 e ausência de impressoras físicas', () => {
-        // Verificação: Impressoras de homologação usam apenas loopback ou sem IP
-        // Nenhuma conexão de rede física para impressoras reais
-        assert.ok(true, 'Roteamento físico para porta 9100 bloqueado; tráfego contido no runner descartável');
+      await t.test('CENÁRIO L.7: Comprovação de bloqueio de saída TCP 9100 e ausência de impressoras físicas', async () => {
+        // 1. Provar que nenhuma impressora de homologação aponta para IP externo ou de produção
+        const prnRes = await client.query(`SELECT id, ip, status FROM printers WHERE company_id IN ('${TENANT_K}', '${TENANT_L}');`);
+        for (const row of prnRes.rows) {
+          assert.equal(row.ip, '127.0.0.1', 'Impressoras de homologação devem estar estritamente contidas em loopback');
+        }
+
+        // 2. Provar que tentativas de conexão na porta 9100 resultam em recusa/timeout (sem impressoras físicas conectadas)
+        const net = await import('node:net');
+        const socketResult = await new Promise<string>((resolve) => {
+          const s = new net.Socket();
+          s.setTimeout(1000);
+          s.on('connect', () => {
+            s.destroy();
+            resolve('CONNECTED_UNEXPECTED');
+          });
+          s.on('timeout', () => {
+            s.destroy();
+            resolve('TIMEOUT_SAFE');
+          });
+          s.on('error', (err) => {
+            s.destroy();
+            resolve(`REFUSED_SAFE: ${err.message}`);
+          });
+          s.connect(9100, '127.0.0.1');
+        });
+
+        assert.notEqual(socketResult, 'CONNECTED_UNEXPECTED', 'Porta 9100 não deve ter impressora física respondendo!');
+        console.log(`[Cenário L.7] VALIDATION PASS: Conexão física TCP 9100 contida com status: ${socketResult}`);
       });
 
       // Limpeza do arquivo de identidade temporário

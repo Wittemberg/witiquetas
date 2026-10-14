@@ -301,7 +301,7 @@ export class PrintJobRepository {
 
         // Query atômica com SKIP LOCKED evitando contenção concorrente
         const selectSql = `
-          SELECT j.*, p.name as printer_name, p.protocol as printer_protocol, p.host as printer_host,
+          SELECT j.*, p.name as printer_name, p.protocol as printer_protocol, p.ip as printer_host,
                  p.port as printer_port, p.serial_port as printer_serial_port, p.baud_rate as printer_baud_rate,
                  p.spooler_name as printer_spooler_name
           FROM print_jobs j

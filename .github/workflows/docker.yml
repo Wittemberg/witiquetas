@@ -105,11 +105,10 @@ jobs:
       - name: Install Dependencies
         run: npm ci
 
-      - name: Build Core Packages for PostgreSQL Gate
+      - name: Build Core TypeScript Packages for PostgreSQL Gate
         run: |
           npm --prefix packages/label-schema run build
           npm --prefix packages/contracts run build
-          npm --prefix apps/backend run build
 
       - name: Execute Dedicated PostgreSQL 14 Integration Test Suite
         env:

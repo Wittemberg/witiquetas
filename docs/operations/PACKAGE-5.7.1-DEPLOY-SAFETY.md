@@ -2,11 +2,11 @@
 ## FILA PERSISTENTE DE IMPRESSÃO, LEASE SAFETY E RECUPERAÇÃO TRANSACIONAL
 
 > **Documento Canônico de Operações, Auditoria e Governança DCC**  
-> **Status DCC:** `IMPLEMENTED_AWAITING_MANUAL_HOMOLOGATION`  
+> **Status DCC:** `READY_FOR_RELEASE_REVIEW`  
 > **Branch de Validação:** `validation/package-5.7.1-postgres-gate`  
-> **Commit Validado:** `904caa1b8036393d558dc4d15645de8b6f60f2fa`  
-> **CI Run Homologado:** GitHub Actions Run `#198` — **SUCCESS**  
-> **Banco de Dados:** PostgreSQL 14 (Testado em container real de serviço no GitHub Actions)  
+> **Commit Validado:** `b86f64173b0505ad647e0eb3f45e1db8cf352e0a`  
+> **CI Runs Homologados:** GitHub Actions Runs `#38666388916` (K/L Gate) & `#38666388948` (PostgreSQL 14 Gate) — **100% SUCCESS**  
+> **Banco de Dados:** PostgreSQL 14 (Testado em container real de serviço e cluster efêmero no GitHub Actions)  
 > **Data:** 14 de Outubro de 2026  
 > **Regra Suprema:** *PUSH != DEPLOY | BUILD VERDE != PRODUÇÃO | DEPLOY FÍSICO PROIBIDO NESTA ETAPA*.
 
@@ -391,18 +391,19 @@ Para superar o bloqueio ambiental do host `SUPORTE-2` sem comprometer a integrid
 ---
 
 ## 7. ETAPA 7 — GOVERNANÇA DCC
-
+ 
 - **Pacote:** Package 5.7.1 — Persistent Print Queue & Lease Safety
 - **Fase Atual:** Fase 5 — Administração e Governança da Aplicação
-- **Baseline Validada:** Commit `904caa1b8036393d558dc4d15645de8b6f60f2fa`
-- **Validação de CI:** GitHub Actions Run #198 / Run #200 — **100% SUCCESS**
+- **Baseline Validada:** Commit `b86f64173b0505ad647e0eb3f45e1db8cf352e0a`
+- **Validação de CI:** 
+  * Disposable Homologation Gate K/L (`package-5.7.1-homologation-kl.yml`, Run `#38666388916`, Job `116199198915`): **100% SUCCESS** (Cenários K e L validados com evidências reais)
+  * PostgreSQL 14 Integration Gate (`docker.yml`, Run `#38666388948`): **100% SUCCESS** (11/11 subtestes PASS)
 - **Regressão Global:** 260/260 testes automatizados PASS
-- **PostgreSQL Gate:** 11/11 subtestes PASS (PostgreSQL 14 real no GitHub Actions)
-- **Status DCC Mantido:** `IMPLEMENTED_AWAITING_MANUAL_HOMOLOGATION`
+- **Status DCC:** `READY_FOR_RELEASE_REVIEW`
 - **Flag Deployed:** `false`
-- **Workflow de Homologação Descartável (K & L):** `.github/workflows/package-5.7.1-homologation-kl.yml` implantado e ativado no GitHub Actions.
+- **Homologação Não-Física:** 12/12 cenários homologados com evidências formais registradas.
 
 ---
 
 ### DECLARAÇÃO DE ENCERRAMENTO DA TAREFA:
-**`READY_FOR_RELEASE_REVIEW`** (Sujeito à execução 100% verde do workflow de homologação descartável K/L no GitHub Actions).
+**`READY_FOR_RELEASE_REVIEW`** — Validação técnica, homologação não-física e gates concluídos com êxito integral. Aguardando revisão de release e autorização para agendamento de janela de deploy. Zero impacto em produção. Zero envio para impressoras físicas.

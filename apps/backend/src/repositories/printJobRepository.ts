@@ -1110,7 +1110,7 @@ export class PrintJobRepository {
 
         if (decision === 'CONFIRM_FAILED_AND_RETRY') {
           finalStatus = 'FAILED';
-          const auditMsg = `[Resolução Manual - Operador: ${operatorId}] Confirmada falha física e solicitada nova tentativa: ${justification}`;
+          const auditMsg = `[Resolução Manual - Decisão: ${decision} - Operador: ${operatorId}] Confirmada falha física e solicitada nova tentativa: ${justification}`;
 
           // Atualiza o job original mantendo histórico de auditoria
           await client.query(

@@ -439,6 +439,8 @@ router.post('/:id/resolve-ambiguous', authenticateWebUser, async (req: Request, 
     );
     return res.json({
       success: true,
+      oldJobStatus: result.originalJob.status,
+      newJobId: result.retryJob ? result.retryJob.id : null,
       ...result,
       message: `Job ambíguo '${req.params.id}' resolvido com decisão '${decision}' pelo operador '${operatorId}'.`,
     });

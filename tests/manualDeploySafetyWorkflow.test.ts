@@ -109,3 +109,32 @@ test('5. WORKFLOW AUDIT: Ausencia de canais alternativos de deploy desprotegidos
     );
   }
 });
+
+test('6. POSTGRES GATE ARCHITECTURE: Execucao obrigatoria com PostgreSQL 14 isolado sem duplicacao no runner geral', () => {
+  const content = fs.readFileSync(workflowPath, 'utf8');
+
+  // 1. Deve existir o job dedicado postgres-integration-gate
+  assert.ok(content.includes('postgres-integration-gate:'), 'Deve existir job postgres-integration-gate');
+  const pgJobSection = content.split('postgres-integration-gate:')[1].split('build-and-test-candidates:')[0];
+
+  // 2. Job dedicado deve usar postgres:14-alpine como service e definir DATABASE_URL
+  assert.ok(pgJobSection.includes('image: postgres:14-alpine'), 'Job postgres-integration-gate deve usar imagem postgres:14-alpine');
+  assert.ok(pgJobSection.includes('DATABASE_URL: postgresql://'), 'Job postgres-integration-gate deve configurar DATABASE_URL');
+  assert.ok(pgJobSection.includes('tests/package571PostgresRealIntegration.test.ts'), 'Job postgres-integration-gate deve executar package571PostgresRealIntegration.test.ts');
+
+  // 3. build-and-test-candidates deve depender de postgres-integration-gate
+  assert.ok(content.includes('needs: [build-agent-windows, postgres-integration-gate]'), 'build-and-test-candidates deve ter postgres-integration-gate como dependencia');
+
+  // 4. build-and-test-candidates NAO deve duplicar a suite postgres real em seu runner geral (evita falha por ausencia de DATABASE_URL)
+  const candidateJobSection = content.split('build-and-test-candidates:')[1].split('deploy-production:')[0];
+  const testStepSection = candidateJobSection.split('Run TypeScript Automated Tests & Quality Gate')[1].split('- name: Set up Docker Buildx')[0];
+  assert.ok(
+    !testStepSection.includes('tests/package571PostgresRealIntegration.test.ts'),
+    'Runner geral nao deve duplicar package571PostgresRealIntegration.test.ts sem container PostgreSQL dedicado'
+  );
+  assert.ok(
+    testStepSection.includes('tests/package571PersistentPrintQueue.test.ts'),
+    'Runner geral deve manter a suite unitaria da fila persistente (package571PersistentPrintQueue.test.ts)'
+  );
+});
+

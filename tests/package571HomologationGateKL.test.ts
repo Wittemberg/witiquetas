@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import http from 'node:http';
-import { execFileSync } from 'node:child_process';
+import { execFile, execFileSync } from 'node:child_process';
 import express from 'express';
 import cors from 'cors';
 
@@ -32,6 +32,19 @@ function findAgentExecutable(): string | null {
     if (c && fs.existsSync(c)) return c;
   }
   return null;
+}
+
+function execAgentAsync(exe: string, args: string[], env: NodeJS.ProcessEnv): Promise<{ stdout: string; stderr: string }> {
+  return new Promise((resolve, reject) => {
+    execFile(exe, args, { encoding: 'utf8', env }, (error, stdout, stderr) => {
+      if (error) {
+        (error as any).stdout = stdout;
+        (error as any).stderr = stderr;
+        return reject(error);
+      }
+      resolve({ stdout: stdout || '', stderr: stderr || '' });
+    });
+  });
 }
 
 test('SUÍTE PACKAGE 5.7.1 — HOMOLOGATION GATE CENÁRIOS K E L (ISOLADO)', async (t) => {
@@ -398,7 +411,7 @@ test('SUÍTE PACKAGE 5.7.1 — HOMOLOGATION GATE CENÁRIOS K E L (ISOLADO)', asy
       const tempIdentityFile = path.join(os.tmpdir(), `witiquetas-agent-homolog-${Date.now()}.json`);
       const pairingCode = 'WIT-HOMO-LOG1';
 
-      await t.test('CENÁRIO L.3: Pareamento exclusivo de homologação contra backend descartável', () => {
+      await t.test('CENÁRIO L.3: Pareamento exclusivo de homologação contra backend descartável', async () => {
         // Registrar código de pareamento no backend em memória para tenant L
         pairingCodes.set(pairingCode, {
           pairingCode,
@@ -410,19 +423,16 @@ test('SUÍTE PACKAGE 5.7.1 — HOMOLOGATION GATE CENÁRIOS K E L (ISOLADO)', asy
         });
 
         // Executar pareamento headless com isolamento de identidade via WITIQUETAS_CONFIG_PATH
-        const pairOut = execFileSync(
+        const { stdout } = await execAgentAsync(
           agentExe,
           ['--pair', '--code', pairingCode, '--backend-url', BASE_URL, '--json'],
           {
-            encoding: 'utf8',
-            env: {
-              ...process.env,
-              WITIQUETAS_CONFIG_PATH: tempIdentityFile,
-            },
+            ...process.env,
+            WITIQUETAS_CONFIG_PATH: tempIdentityFile,
           }
         );
 
-        const pairJson = JSON.parse(pairOut);
+        const pairJson = JSON.parse(stdout);
         assert.equal(pairJson.success, true, 'Pareamento deve ter sucesso');
         assert.ok(fs.existsSync(tempIdentityFile), 'Arquivo de identidade isolado deve ter sido gravado');
 
@@ -431,16 +441,17 @@ test('SUÍTE PACKAGE 5.7.1 — HOMOLOGATION GATE CENÁRIOS K E L (ISOLADO)', asy
         assert.ok(idContent.token, 'Token do agente deve estar salvo');
       });
 
-      await t.test('CENÁRIO L.4: Diagnóstico e Handshake real com backend', () => {
-        const diagOut = execFileSync(agentExe, ['--diagnostics', '--json'], {
-          encoding: 'utf8',
-          env: {
+      await t.test('CENÁRIO L.4: Diagnóstico e Handshake real com backend', async () => {
+        const { stdout } = await execAgentAsync(
+          agentExe,
+          ['--diagnostics', '--json'],
+          {
             ...process.env,
             WITIQUETAS_CONFIG_PATH: tempIdentityFile,
-          },
-        });
+          }
+        );
 
-        const diagJson = JSON.parse(diagOut);
+        const diagJson = JSON.parse(stdout);
         assert.equal(diagJson.success, true);
         assert.equal(diagJson.data.paired, true, 'Deve reportar pareado com arquivo isolado');
         assert.equal(diagJson.data.backendReachable, true, 'Backend deve estar acessível');
@@ -466,13 +477,14 @@ test('SUÍTE PACKAGE 5.7.1 — HOMOLOGATION GATE CENÁRIOS K E L (ISOLADO)', asy
         `);
 
         // Executar um ciclo de polling com o agente real
-        execFileSync(agentExe, ['--single-run'], {
-          encoding: 'utf8',
-          env: {
+        await execAgentAsync(
+          agentExe,
+          ['--single-run'],
+          {
             ...process.env,
             WITIQUETAS_CONFIG_PATH: tempIdentityFile,
-          },
-        });
+          }
+        );
 
         // Verificar no banco que o job foi reivindicado pelo agente de homologação
         const jobCheck = await client.query(`SELECT status, claimed_by_agent_id, lease_id, attempt_id FROM print_jobs WHERE id = '${jobLId}';`);
@@ -488,16 +500,17 @@ test('SUÍTE PACKAGE 5.7.1 — HOMOLOGATION GATE CENÁRIOS K E L (ISOLADO)', asy
 
         // Tentar rodar single-run com backend desligado: agente não deve entrar em pânico nem travar
         try {
-          execFileSync(agentExe, ['--single-run'], {
-            encoding: 'utf8',
-            env: {
+          await execAgentAsync(
+            agentExe,
+            ['--single-run'],
+            {
               ...process.env,
               WITIQUETAS_CONFIG_PATH: tempIdentityFile,
-            },
-          });
+            }
+          );
         } catch (err: any) {
           // Erro de conexão esperado (exit code não-zero)
-          assert.ok(err.status !== 0, 'Deve retornar erro controlado de conexão');
+          assert.ok(err.status !== 0 || err.code !== 0, 'Deve retornar erro controlado de conexão');
         }
 
         // Reabrir o servidor
@@ -506,14 +519,15 @@ test('SUÍTE PACKAGE 5.7.1 — HOMOLOGATION GATE CENÁRIOS K E L (ISOLADO)', asy
         });
 
         // Executar diagnóstico novamente: deve restabelecer conectividade
-        const recoverOut = execFileSync(agentExe, ['--diagnostics', '--json'], {
-          encoding: 'utf8',
-          env: {
+        const { stdout } = await execAgentAsync(
+          agentExe,
+          ['--diagnostics', '--json'],
+          {
             ...process.env,
             WITIQUETAS_CONFIG_PATH: tempIdentityFile,
-          },
-        });
-        const recoverJson = JSON.parse(recoverOut);
+          }
+        );
+        const recoverJson = JSON.parse(stdout);
         assert.equal(recoverJson.data.backendReachable, true, 'Backend deve voltar a estar acessível');
       });
 

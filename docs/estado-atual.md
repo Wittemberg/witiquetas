@@ -1,7 +1,7 @@
 # Witiquetas — Estado Atual
 
 Atualizado em:
-2026-10-14
+2026-10-15
 
 ## Fase atual
 
@@ -9,9 +9,9 @@ Fase 5.7.1 — Persistent Print Queue & Lease Safety (Fase 5 — Administração
 
 ## Status
 
-Implementado, validado tecnicamente, aguardando homologação manual controlada.
-Baseline técnica validada: commit `904caa1b8036393d558dc4d15645de8b6f60f2fa` na branch `validation/package-5.7.1-postgres-gate`.
-Status DCC: `IMPLEMENTED_AWAITING_MANUAL_HOMOLOGATION` (deployed: false).
+Homologado com sucesso integral em ambiente isolado de CI, aguardando revisão final de release.
+Baseline validada: commit `b86f64173b0505ad647e0eb3f45e1db8cf352e0a` na branch `validation/package-5.7.1-postgres-gate`.
+Status DCC: `READY_FOR_RELEASE_REVIEW` (deployed: false, manualValidation: true, homologated: true).
 
 ## Mudança OpenSpec ativa
 
@@ -31,27 +31,29 @@ Referência canônica: `docs/development-control/project.json` e `docs/developme
 ## Última evidência válida
 
 Commit:
-`904caa1b8036393d558dc4d15645de8b6f60f2fa` (branch `validation/package-5.7.1-postgres-gate`)
+`b86f64173b0505ad647e0eb3f45e1db8cf352e0a` (branch `validation/package-5.7.1-postgres-gate`)
 
 CI / Pipelines:
-GitHub Actions Run `#198` (Run ID `38645989365`) — **100% SUCCESS**
+- GitHub Actions Run `#38666388916` (K/L Homologation Gate, Job `116199198915` em runner `windows-latest` + PostgreSQL 14 real) — **100% SUCCESS** (15/15 subtestes PASS)
+- GitHub Actions Run `#38666388948` (PostgreSQL 14 Real Gate) — **100% SUCCESS** (11/11 subtestes PASS)
 
 Testes:
+- Cenários K (K.1 a K.8) e L (L.1 a L.7) aprovados com evidências formais registradas
 - PostgreSQL 14 Real Gate: 11/11 subtestes PASS (`tests/package571PostgresRealIntegration.test.ts`)
 - Suíte de Regressão: 260/260 testes automatizados PASS
 - Builds de Produção: `@witiquetas/contracts`, `@witiquetas/backend`, `@witiquetas/frontend` e Agent Windows PE x64 (Rust) 100% GREEN
 
 Resultado:
-Validação técnica completa em ambiente PostgreSQL 14 isolado. SQLSTATE 42703 corrigido.
+Validação técnica e homologação não-física 100% concluídas. Bloqueio e contenção de porta TCP 9100 comprovados.
 
 ## Trabalho em andamento
 
-Preparação concluída da documentação operacional e checklist de homologação: `docs/operations/PACKAGE-5.7.1-DEPLOY-SAFETY.md`.
+Revisão final de release (Final Release Review) para abertura de Pull Request para a `main`.
 
 ## Próximo passo autorizado
 
-Homologação não-física com Agent virtual conforme plano (12 cenários A a L de `docs/operations/PACKAGE-5.7.1-DEPLOY-SAFETY.md`).
-Proibido: deploy em produção, merge na main, envio de bytes para impressoras físicas.
+Abertura de Pull Request para a `main` e agendamento de janela controlada de deploy após aprovação humana.
+Proibido: merge não autorizado na main, deploy automático em produção, envio de bytes para impressoras físicas.
 
 ## Referências
 

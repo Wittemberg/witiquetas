@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - 'validation/**'
   workflow_dispatch:
     inputs:
       deploy_production:
@@ -79,9 +80,75 @@ jobs:
           path: bin/agents/witiquetas-agent-windows-x64.exe
           if-no-files-found: error
 
+  postgres-integration-gate:
+    name: PostgreSQL Integration Gate — Package 5.7.1
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:14-alpine
+        env:
+          POSTGRES_DB: witiquetas_test
+          POSTGRES_USER: witiquetas_test
+          POSTGRES_PASSWORD: ci_test_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js for PostgreSQL Gate
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Build Core TypeScript Packages for PostgreSQL Gate
+        run: |
+          npm --prefix packages/label-schema run build
+          npm --prefix packages/contracts run build
+          npm --prefix packages/printer-core run build
+          npm --prefix packages/printer-ppla run build
+          npm --prefix packages/printer-pplb run build
+
+      - name: Execute Dedicated PostgreSQL 14 Integration Test Suite
+        env:
+          DATABASE_URL: postgresql://witiquetas_test:ci_test_password@127.0.0.1:5432/witiquetas_test
+          NODE_ENV: test
+        run: |
+          set -o pipefail
+          node --loader ./tests/ts-loader.js --test tests/package571PostgresRealIntegration.test.ts 2>&1 | tee test-output.txt
+
+      - name: Surface Test Output on Failure
+        if: failure()
+        run: |
+          cat test-output.txt
+          node -e "const fs = require('fs'); if (fs.existsSync('test-output.txt')) { const txt = fs.readFileSync('test-output.txt', 'utf8').replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A'); console.log('::error title=PostgreSQL Gate Output::' + txt); }"
+          echo "### PostgreSQL Integration Gate Output" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          cat test-output.txt >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload Test Output Artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: postgres-test-output
+          path: test-output.txt
+          if-no-files-found: ignore
+
   build-and-test-candidates:
     name: Build & Validate Candidate Images
-    needs: build-agent-windows
+    needs: [build-agent-windows, postgres-integration-gate]
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
 
     steps:
@@ -120,7 +187,7 @@ jobs:
 
       - name: Run TypeScript Automated Tests & Quality Gate
         run: |
-          node --loader ./tests/ts-loader.js --test tests/package5701AgentPairingHotfix.test.ts tests/platformDeveloperSessionStability.test.ts tests/package57PrintersAndAgentsGovernance.test.ts tests/package56IntegrationFoundation.test.ts tests/package561IntegrationUxAndEdit.test.ts tests/p0HotfixDuplicateAndPrintersIsolation.test.ts tests/authSessionRbac.test.ts tests/adminRbacFoundation.test.ts tests/adminManagement.test.ts tests/webPrintFlow.test.ts tests/devControlInvariants.test.ts tests/dccBomRobustness.test.ts tests/package572SaveIndustrialTemplateRegression.test.ts tests/manualDeploySafetyWorkflow.test.ts
+          node --loader ./tests/ts-loader.js --test tests/package5701AgentPairingHotfix.test.ts tests/platformDeveloperSessionStability.test.ts tests/package57PrintersAndAgentsGovernance.test.ts tests/package56IntegrationFoundation.test.ts tests/package561IntegrationUxAndEdit.test.ts tests/p0HotfixDuplicateAndPrintersIsolation.test.ts tests/authSessionRbac.test.ts tests/adminRbacFoundation.test.ts tests/adminManagement.test.ts tests/webPrintFlow.test.ts tests/devControlInvariants.test.ts tests/dccBomRobustness.test.ts tests/package572SaveIndustrialTemplateRegression.test.ts tests/package571PersistentPrintQueue.test.ts tests/package571PostgresRealIntegration.test.ts tests/manualDeploySafetyWorkflow.test.ts
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3

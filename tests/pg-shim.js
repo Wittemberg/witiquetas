@@ -11,6 +11,9 @@ export class Pool {
   async query(sql, params) {
     return { rows: [{ current_time: new Date(), db_name: 'witiquetas_test', version_info: 'PostgreSQL Test' }], rowCount: 1 };
   }
+  async end() {
+    return;
+  }
 }
 
 export default { Pool };

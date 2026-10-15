@@ -1,16 +1,17 @@
 # Witiquetas — Estado Atual
 
 Atualizado em:
-2026-09-28
+2026-10-15
 
 ## Fase atual
 
-Fase 5 — Administração e Governança da Aplicação (conforme `docs/development-control/project.json`).
+Fase 5.7.1 — Persistent Print Queue & Lease Safety (Fase 5 — Administração e Governança da Aplicação).
 
 ## Status
 
-Pacotes 5.6 (Integration Foundation) e 5.6.1 (Integration Administration UX & Editing) formalmente HOMOLOGADOS com sucesso pelo usuário. Baseline homologada: commit `6436984`.
-Implantação do fluxo harness-skills + OpenSpec para governança e execução de agentes. Nenhum código de runtime foi alterado.
+Homologado com sucesso integral em ambiente isolado de CI, aguardando revisão final de release.
+Baseline validada: commit `b86f64173b0505ad647e0eb3f45e1db8cf352e0a` na branch `validation/package-5.7.1-postgres-gate`.
+Status DCC: `READY_FOR_RELEASE_REVIEW` (deployed: false, manualValidation: true, homologated: true).
 
 ## Mudança OpenSpec ativa
 
@@ -30,21 +31,29 @@ Referência canônica: `docs/development-control/project.json` e `docs/developme
 ## Última evidência válida
 
 Commit:
-`6436984` (main — homologado pelo usuário) / `c6b18c1` (governança)
+`b86f64173b0505ad647e0eb3f45e1db8cf352e0a` (branch `validation/package-5.7.1-postgres-gate`)
+
+CI / Pipelines:
+- GitHub Actions Run `#38666388916` (K/L Homologation Gate, Job `116199198915` em runner `windows-latest` + PostgreSQL 14 real) — **100% SUCCESS** (15/15 subtestes PASS)
+- GitHub Actions Run `#38666388948` (PostgreSQL 14 Real Gate) — **100% SUCCESS** (11/11 subtestes PASS)
 
 Testes:
-`node --loader ./tests/ts-loader.js --test tests/package561IntegrationUxAndEdit.test.ts tests/package56IntegrationFoundation.test.ts`
+- Cenários K (K.1 a K.8) e L (L.1 a L.7) aprovados com evidências formais registradas
+- PostgreSQL 14 Real Gate: 11/11 subtestes PASS (`tests/package571PostgresRealIntegration.test.ts`)
+- Suíte de Regressão: 260/260 testes automatizados PASS
+- Builds de Produção: `@witiquetas/contracts`, `@witiquetas/backend`, `@witiquetas/frontend` e Agent Windows PE x64 (Rust) 100% GREEN
 
 Resultado:
-Suíte de integração aprovada, 0 falhas. Homologação manual de 5.6 e 5.6.1 confirmada com sucesso pelo usuário.
+Validação técnica e homologação não-física 100% concluídas. Bloqueio e contenção de porta TCP 9100 comprovados.
 
 ## Trabalho em andamento
 
-Reconciliação pós-auditoria, registro formal da homologação dos Pacotes 5.6/5.6.1 e planejamento da execução do Package 5.7 (Printers & Local Agents Governance).
+Revisão final de release (Final Release Review) para abertura de Pull Request para a `main`.
 
 ## Próximo passo autorizado
 
-Package 5.7 — Printers & Local Agents Governance (migração do cadastro de impressoras para PostgreSQL com isolamento multi-tenant).
+Abertura de Pull Request para a `main` e agendamento de janela controlada de deploy após aprovação humana.
+Proibido: merge não autorizado na main, deploy automático em produção, envio de bytes para impressoras físicas.
 
 ## Referências
 

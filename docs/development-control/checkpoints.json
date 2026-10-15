@@ -1,6 +1,25 @@
 {
   "checkpoints": [
     {
+      "sha": "b86f64173b0505ad647e0eb3f45e1db8cf352e0a",
+      "shortSha": "b86f641",
+      "date": "2026-10-14T22:48:00Z",
+      "phase": "5",
+      "patch": "5.7.1",
+      "title": "5.7.1 — Persistent Print Queue & Lease Safety (P0 Safety Gates)",
+      "type": "FEATURE",
+      "capabilities": [
+        "cap-persistent-print-queue",
+        "cap-lease-safety"
+      ],
+      "testsPassed": true,
+      "deployed": false,
+      "manualValidation": true,
+      "homologated": true,
+      "status": "READY_FOR_RELEASE_REVIEW",
+      "evidence": "PACKAGE 5.7.1 HOMOLOGADO COM SUCESSO TOTAL EM AMBIENTE ISOLADO DE CI: 1) Commit validado: b86f64173b0505ad647e0eb3f45e1db8cf352e0a na branch validation/package-5.7.1-postgres-gate. 2) Homologation Gate K/L (GitHub Actions Run #38666388916, Job 116199198915, runner windows-latest + PostgreSQL 14 real): 100% SUCCESS. Cenário K (K.1 a K.8) 100% PASS (rejeição 401 sem auth, rejeição 403 operador não autorizado/tenant divergente, rejeição 400 justificativa < 10 chars, transição para UNKNOWN_RESULT via lease sweeper em DELIVERING, resolução manual com CONFIRM_FAILED_AND_RETRY, confirmação relacional de original FAILED e novo job PENDING attempts 0, trilha imutável em print_job_events, garantia contra auto-reexecução). Cenário L (L.1 a L.7) 100% PASS (binário nativo PE x64 > 1MB validado com SHA-256 c34fdd93f9d7dda3b936e7825bfba3da59ac0774cb14fd6b71b847a187dd84ae, --version e --help exit code 0, pareamento headless isolado via WITIQUETAS_CONFIG_PATH com token salvo, handshake e diagnóstico com backendReachable: true, ciclo de claim com --single-run gerando leaseId e attemptId, perda e recuperação graciosa de conectividade, comprovação de bloqueio de porta TCP 9100 e ausência de impressoras físicas). 3) PostgreSQL 14 Real Gate (Run #38666388948): 11/11 subtestes PASS. 4) Regressão Completa: 260/260 testes PASS. 5) Status DCC: Transicionado formalmente para READY_FOR_RELEASE_REVIEW. Main e produção preservadas."
+    },
+    {
       "sha": "5d2c2a236244cc333a5394b1af684bd43a84ab64",
       "shortSha": "5d2c2a2",
       "date": "2026-10-13T18:15:00Z",

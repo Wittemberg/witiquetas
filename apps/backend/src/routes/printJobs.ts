@@ -34,37 +34,16 @@ const router = Router();
 
 export const DEFAULT_PRINT_JOB_MAX_ATTEMPTS = 3;
 
-export const VALID_DELIVERY_STATUSES: PrintJobDeliveryStatus[] = [
-  'PENDING',
-  'CLAIMED',
-  'DOWNLOADED',
-  'DELIVERING',
-  'DELIVERED_TO_TRANSPORT',
-  'PRINTED',
-  'FAILED',
-  'CANCELLED',
-  'UNKNOWN_RESULT',
-  'EXPIRED_LEASE',
-];
+import {
+  PrintJobRepository,
+  testMemJobs,
+  VALID_DELIVERY_STATUSES,
+  isValidStatusTransition,
+} from '../repositories/printJobRepository.js';
 
-const VALID_TRANSITIONS: Record<PrintJobDeliveryStatus, PrintJobDeliveryStatus[]> = {
-  PENDING: ['CLAIMED', 'CANCELLED'],
-  CLAIMED: ['DOWNLOADED', 'DELIVERING', 'FAILED', 'CANCELLED', 'EXPIRED_LEASE'],
-  DOWNLOADED: ['DELIVERING', 'FAILED', 'CANCELLED', 'EXPIRED_LEASE'],
-  DELIVERING: ['DELIVERED_TO_TRANSPORT', 'PRINTED', 'FAILED', 'UNKNOWN_RESULT', 'CANCELLED'],
-  DELIVERED_TO_TRANSPORT: ['PRINTED', 'UNKNOWN_RESULT', 'FAILED'],
-  PRINTED: [],
-  FAILED: ['PENDING'],
-  CANCELLED: [],
-  UNKNOWN_RESULT: ['DELIVERED_TO_TRANSPORT', 'PRINTED', 'FAILED'],
-  EXPIRED_LEASE: ['PENDING', 'FAILED', 'UNKNOWN_RESULT'],
-};
+export { VALID_DELIVERY_STATUSES, isValidStatusTransition };
 
-export function isValidStatusTransition(from: PrintJobDeliveryStatus, to: PrintJobDeliveryStatus): boolean {
-  if (from === to) return true;
-  const allowed = VALID_TRANSITIONS[from];
-  return !!allowed && allowed.includes(to);
-}
+const printJobsStore = testMemJobs;
 
 export function detectCopyStrategy(payload: string, language: string): CopyStrategy {
   const normLang = (language || 'PPLB').toUpperCase();
@@ -83,10 +62,8 @@ export function detectCopyStrategy(payload: string, language: string): CopyStrat
   return 'TRANSPORT_REPEAT';
 }
 
-const printJobsStore = new Map<string, PrintJobDTO>();
-
 // 1. Criar novo Job de Impressão (Exclusivo Web/Admin / ERP Autenticado — Agents NÃO podem criar jobs)
-router.post('/', authenticateWebUser, (req: Request, res: Response) => {
+router.post('/', authenticateWebUser, async (req: Request, res: Response) => {
   const user = (req as any).user as AuthWebUser;
   const authCompanyId = user.companyId;
 
@@ -171,6 +148,7 @@ router.post('/', authenticateWebUser, (req: Request, res: Response) => {
 
   const jobId = `job-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
   const now = new Date().toISOString();
+  const idempotencyKey = (req.headers['idempotency-key'] as string) || (body as any)?.idempotencyKey;
 
   const newJob: PrintJobDTO = {
     id: jobId,
@@ -188,17 +166,40 @@ router.post('/', authenticateWebUser, (req: Request, res: Response) => {
     checksumSha256,
     attempts: 0,
     maxAttempts: DEFAULT_PRINT_JOB_MAX_ATTEMPTS,
+    idempotencyKey: idempotencyKey || undefined,
     createdAt: now,
     updatedAt: now,
   };
 
-  printJobsStore.set(jobId, newJob);
+  try {
+    const result = await PrintJobRepository.createJob(newJob, idempotencyKey);
+    if (result.idempotentReplay) {
+      return res.status(200).json({
+        success: true,
+        job: result.job,
+        idempotentReplay: true,
+        message: `Job de impressão '${result.job.id}' recuperado via Idempotency-Key.`,
+      });
+    }
 
-  res.status(201).json({
-    success: true,
-    job: newJob,
-    message: `Job de impressão '${jobId}' enfileirado com sucesso para a impressora '${printer.name}'.`,
-  });
+    return res.status(201).json({
+      success: true,
+      job: result.job,
+      message: `Job de impressão '${result.job.id}' enfileirado com sucesso para a impressora '${printer.name}'.`,
+    });
+  } catch (err: any) {
+    if (err?.code === 'IDEMPOTENCY_PAYLOAD_MISMATCH' || err?.statusCode === 409) {
+      return res.status(409).json({
+        error: err.message,
+        code: 'IDEMPOTENCY_PAYLOAD_MISMATCH',
+      });
+    }
+    console.error('[PrintJobs] Erro transacional ao criar job:', err);
+    return res.status(500).json({
+      error: 'Falha de persistência transacional no PostgreSQL ao salvar o job de impressão.',
+      code: 'PERSISTENCE_ERROR',
+    });
+  }
 });
 
 // 2. Função Centralizada de Claim de Jobs Pendentes para o Agente Autenticado
@@ -270,147 +271,185 @@ export function claimPendingJobsForAgent(agent: AgentRecord): PrintJobItemDTO[] 
 }
 
 // 2. Buscar Jobs Pendentes (Consumido pelo Agente Local Obrigatoriamente Autenticado)
-router.get('/pending', authenticateAgent, (req: Request, res: Response) => {
+router.get('/pending', authenticateAgent, async (req: Request, res: Response) => {
   const agent = (req as any).agent as AgentRecord;
   if (!agent) {
     return res.status(401).json({ error: 'Agente não autenticado.' });
   }
 
-  const jobs = claimPendingJobsForAgent(agent);
-
-  res.json({
-    total: jobs.length,
-    jobs,
-  });
+  try {
+    const jobs = await PrintJobRepository.claimPendingJobsForAgent(agent.companyId, agent.id);
+    return res.json({
+      total: jobs.length,
+      jobs,
+    });
+  } catch (err: any) {
+    console.error('[PrintJobs] Erro transacional no claim de jobs:', err);
+    return res.status(500).json({
+      error: 'Falha transacional ao buscar jobs pendentes.',
+      code: 'CLAIM_TRANSACTION_ERROR',
+    });
+  }
 });
 
 // 3. Atualizar Status do Job (Reportado pelo Agente Local Obrigatoriamente Autenticado)
-router.patch('/:id/status', authenticateAgent, (req: Request, res: Response) => {
+router.patch('/:id/status', authenticateAgent, async (req: Request, res: Response) => {
   const agent = (req as any).agent as AgentRecord;
-  const job = printJobsStore.get(req.params.id);
-  if (!job) {
-    return res.status(404).json({ error: `Job de impressão '${req.params.id}' não encontrado.` });
-  }
-
   const body = req.body as UpdatePrintJobStatusDTO;
+
   if (!body.status) {
     return res.status(400).json({ error: 'Campo status é obrigatório.' });
   }
 
-  // 1. Validação em runtime de status válido
-  if (!VALID_DELIVERY_STATUSES.includes(body.status)) {
-    return res.status(400).json({
-      error: `Status de entrega '${body.status}' inválido.`,
-      allowedStatuses: VALID_DELIVERY_STATUSES,
-    });
-  }
-
-  // 2. Validação do agente detentor do claim
-  if (job.claimedByAgentId && job.claimedByAgentId !== agent.id) {
-    return res.status(403).json({
-      error: `Agente autenticado ('${agent.id}') não é o detentor do claim do job (detentor: '${job.claimedByAgentId}').`,
-    });
-  }
-
-  // Consistência se body.agentId foi fornecido
   if (body.agentId && body.agentId !== agent.id) {
     return res.status(403).json({
       error: `Inconsistência no body: agentId ('${body.agentId}') difere do agente autenticado ('${agent.id}').`,
     });
   }
 
-  // 3. Validação de leaseId OBRIGATÓRIO após o claim
-  if (job.status !== 'PENDING' && job.status !== 'CANCELLED') {
-    if (!body.leaseId) {
-      return res.status(400).json({
-        error: 'Campo leaseId é obrigatório para atualização de status de jobs reivindicados.',
+  try {
+    const result = await PrintJobRepository.updateJobStatus(req.params.id, agent.id, body);
+    if (result.status !== 200) {
+      return res.status(result.status).json({
+        error: result.error,
+        code: result.code,
       });
     }
 
-    if (job.leaseId && body.leaseId !== job.leaseId) {
-      return res.status(409).json({
-        error: `Lease ID mismatch: o lease '${body.leaseId}' não corresponde ao lease ativo '${job.leaseId}'.`,
-      });
-    }
-
-    // 4. Verificação de expiração do lease
-    if (job.leaseExpiresAt && new Date(job.leaseExpiresAt).getTime() < Date.now()) {
-      return res.status(409).json({
-        error: `Lease expirado em ${job.leaseExpiresAt}. O job não pode mais ser atualizado sob este lease.`,
-      });
-    }
-  }
-
-  // 5. Validação de attemptId OBRIGATÓRIO para transições da tentativa física
-  const physicalAttemptStatuses: PrintJobDeliveryStatus[] = [
-    'DOWNLOADED',
-    'DELIVERING',
-    'DELIVERED_TO_TRANSPORT',
-    'PRINTED',
-    'FAILED',
-    'UNKNOWN_RESULT',
-  ];
-
-  if (physicalAttemptStatuses.includes(body.status)) {
-    if (!body.attemptId) {
-      return res.status(400).json({
-        error: `Campo attemptId é obrigatório para o status '${body.status}'.`,
-      });
-    }
-
-    if (job.attemptId && body.attemptId !== job.attemptId) {
-      return res.status(409).json({
-        error: `Attempt ID mismatch: a tentativa '${body.attemptId}' não corresponde à tentativa ativa '${job.attemptId}'.`,
-      });
-    }
-  }
-
-  // 6. Validação da máquina de estados
-  if (!isValidStatusTransition(job.status, body.status)) {
-    return res.status(409).json({
-      error: `Transição de estado inválida: não é permitido transicionar de '${job.status}' para '${body.status}'.`,
+    return res.json({
+      success: true,
+      job: result.job,
+      idempotentReplay: result.idempotentReplay,
+    });
+  } catch (err: any) {
+    console.error('[PrintJobs] Erro ao atualizar status do job:', err);
+    return res.status(500).json({
+      error: 'Falha ao persistir transição de status no PostgreSQL.',
+      code: 'STATUS_PERSISTENCE_ERROR',
     });
   }
-
-  job.status = body.status;
-  job.updatedAt = new Date().toISOString();
-  if (body.executionTimeMs !== undefined) job.executionTimeMs = body.executionTimeMs;
-
-  if (body.status === 'DELIVERED_TO_TRANSPORT') {
-    job.deliveredToTransportAt = new Date().toISOString();
-  } else if (body.status === 'PRINTED') {
-    job.completedAt = new Date().toISOString();
-  } else if (body.status === 'FAILED') {
-    job.error = body.error || 'Erro durante a transmissão dos bytes para a impressora.';
-  } else if (body.status === 'UNKNOWN_RESULT') {
-    job.error = body.error || 'Resultado da impressão ambíguo (queda de conexão durante o envio).';
-  }
-
-  printJobsStore.set(job.id, job);
-
-  res.json({
-    success: true,
-    job,
-  });
 });
 
 // 4. Listar Histórico de Jobs (Exclusivo Web/Admin e Filtrado por Tenant)
-router.get('/', authenticateWebUser, (req: Request, res: Response) => {
+router.get('/', authenticateWebUser, async (req: Request, res: Response) => {
+  const user = (req as any).user as AuthWebUser;
+  const authCompanyId = user.companyId || '*';
+
+  try {
+    const jobs = await PrintJobRepository.listByCompany(authCompanyId, 100);
+    return res.json({
+      total: jobs.length,
+      jobs,
+    });
+  } catch (err: any) {
+    console.error('[PrintJobs] Erro ao listar jobs:', err);
+    return res.status(500).json({ error: 'Falha ao consultar fila de impressão.', code: 'QUERY_ERROR' });
+  }
+});
+
+// 4.1. Trilha Imutável de Eventos de Auditoria do Job
+router.get('/:id/events', authenticateWebUser, async (req: Request, res: Response) => {
+  const user = (req as any).user as AuthWebUser;
+  const authCompanyId = user.companyId || '*';
+
+  try {
+    const events = await PrintJobRepository.getEventsForJob(authCompanyId, req.params.id);
+    return res.json({
+      total: events.length,
+      events,
+    });
+  } catch (err: any) {
+    console.error('[PrintJobs] Erro ao consultar eventos do job:', err);
+    return res.status(500).json({ error: 'Falha ao consultar auditoria de eventos.', code: 'AUDIT_QUERY_ERROR' });
+  }
+});
+
+// 4.2. Recuperação Segura para PENDING com Comprovação Objetiva de Não Envio (Regra 3 & GATE 1)
+router.post('/:id/recover-pending', authenticateWebUser, async (req: Request, res: Response) => {
   const user = (req as any).user as AuthWebUser;
   const authCompanyId = user.companyId;
+  const evidenceReason = req.body?.evidenceReason;
+  const operatorId = user.id || 'operador-autenticado';
 
-  let jobs = Array.from(printJobsStore.values()).sort(
-    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-  );
-
-  if (authCompanyId && authCompanyId !== '*') {
-    jobs = jobs.filter((j) => j.companyId === authCompanyId);
+  if (!evidenceReason || typeof evidenceReason !== 'string' || evidenceReason.trim().length < 5) {
+    return res.status(400).json({
+      error: 'Evidência positiva fundamentada de não envio é obrigatória para recondução a PENDING.',
+      code: 'POSITIVE_EVIDENCE_REQUIRED',
+    });
   }
 
-  res.json({
-    total: jobs.length,
-    jobs,
-  });
+  try {
+    const job = await PrintJobRepository.recoverToPendingWithPositiveEvidence(
+      authCompanyId || '*',
+      req.params.id,
+      evidenceReason,
+      operatorId
+    );
+    return res.json({
+      success: true,
+      job,
+      message: `Job '${job.id}' recuperado para PENDING sob comprovação objetiva.`,
+    });
+  } catch (err: any) {
+    return res.status(400).json({
+      error: err.message,
+      code: 'RECOVERY_NOT_ALLOWED',
+    });
+  }
+});
+
+// 4.3. Resolução Manual Explícita de Resultados Ambíguos (UNKNOWN_RESULT) (GATE 1)
+router.post('/:id/resolve-ambiguous', authenticateWebUser, async (req: Request, res: Response) => {
+  const user = (req as any).user as AuthWebUser;
+  const authCompanyId = user.companyId;
+  const { decision, justification, manualConfirmation } = req.body || {};
+  const operatorId = user.id || 'operador-autenticado';
+
+  if (!manualConfirmation) {
+    return res.status(400).json({
+      error: 'Confirmação manual explícita (manualConfirmation: true) é obrigatória para resolver resultado ambíguo.',
+      code: 'MANUAL_CONFIRMATION_REQUIRED',
+    });
+  }
+
+  const validDecisions = ['CONFIRM_FAILED_AND_RETRY', 'CONFIRM_DELIVERED', 'CANCEL'];
+  if (!decision || !validDecisions.includes(decision)) {
+    return res.status(400).json({
+      error: `Decisão inválida. Valores aceitos: ${validDecisions.join(', ')}.`,
+      code: 'INVALID_DECISION',
+    });
+  }
+
+  if (!justification || typeof justification !== 'string' || justification.trim().length < 10) {
+    return res.status(400).json({
+      error: 'Justificativa técnica/operacional detalhada (mínimo 10 caracteres) é obrigatória.',
+      code: 'JUSTIFICATION_REQUIRED',
+    });
+  }
+
+  try {
+    const result = await PrintJobRepository.resolveAmbiguousJob(
+      authCompanyId || '*',
+      req.params.id,
+      {
+        decision,
+        justification: justification.trim(),
+        operatorId,
+      }
+    );
+    return res.json({
+      success: true,
+      oldJobStatus: result.originalJob.status,
+      newJobId: result.retryJob ? result.retryJob.id : null,
+      ...result,
+      message: `Job ambíguo '${req.params.id}' resolvido com decisão '${decision}' pelo operador '${operatorId}'.`,
+    });
+  } catch (err: any) {
+    return res.status(400).json({
+      error: err.message,
+      code: 'AMBIGUOUS_RESOLUTION_ERROR',
+    });
+  }
 });
 
 export const printJobBatchesStore = new Map<string, PrintJobBatchDTO>();

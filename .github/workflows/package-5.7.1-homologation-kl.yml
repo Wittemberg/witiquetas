@@ -1,0 +1,88 @@
+name: Package 5.7.1 — Disposable Homologation Gate (Scenarios K & L)
+
+on:
+  push:
+    branches:
+      - 'validation/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  homologation-kl-gate:
+    name: Isolated Homologation Gate (Scenarios K & L)
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Build Core TypeScript Packages
+        shell: pwsh
+        run: |
+          npm --prefix packages/label-schema run build
+          npm --prefix packages/contracts run build
+          npm --prefix packages/printer-core run build
+          npm --prefix packages/printer-ppla run build
+          npm --prefix packages/printer-pplb run build
+          npm --prefix apps/backend run build
+
+      - name: Build Windows Agent PE x64 (Rust Release)
+        shell: pwsh
+        run: |
+          cargo build --release --manifest-path apps/agent-core/Cargo.toml
+          New-Item -ItemType Directory -Force -Path "bin/agents"
+          Copy-Item apps/agent-core/target/release/witiquetas-agent-core.exe bin/agents/witiquetas-agent-windows-x64.exe -Force
+          $hash = (Get-FileHash bin/agents/witiquetas-agent-windows-x64.exe -Algorithm SHA256).Hash
+          Write-Host "SHA-256 do Binario Windows: $hash"
+          echo "AGENT_SHA256=$hash" >> $env:GITHUB_ENV
+
+      - name: Setup and Start PostgreSQL 14 on Windows Runner
+        shell: pwsh
+        run: |
+          Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
+          & ./scripts/setup-postgres14-runner.ps1
+
+      - name: Execute Homologation Gate Suite (Scenarios K & L)
+        shell: pwsh
+        run: |
+          $env:DATABASE_URL = "postgresql://postgres:root@127.0.0.1:5432/witiquetas_homolog"
+          $env:NODE_ENV = "test"
+          $env:AGENT_EXE_PATH = "bin/agents/witiquetas-agent-windows-x64.exe"
+          node --loader ./tests/ts-loader.js --test tests/package571HomologationGateKL.test.ts 2>&1 | Tee-Object -FilePath homolog-output.txt
+          $testExitCode = $LASTEXITCODE
+          if ($testExitCode -ne 0) {
+            Write-Host "--- HOMOLOGATION OUTPUT ON FAILURE ---"
+            Get-Content homolog-output.txt
+            node -e "const fs = require('fs'); if (fs.existsSync('homolog-output.txt')) { const txt = fs.readFileSync('homolog-output.txt', 'utf8').replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A'); console.log('::error title=Homologation Gate Output::' + txt); }"
+            Write-Error "Falha na suíte de homologação K/L!"
+            exit 1
+          }
+
+      - name: Publish Homologation Summary to Step Summary
+        if: always()
+        shell: pwsh
+        run: |
+          Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
+          & ./scripts/publish-homolog-summary.ps1
+
+      - name: Upload Homologation Output Artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: homologation-kl-output
+          path: homolog-output.txt
+          if-no-files-found: ignore

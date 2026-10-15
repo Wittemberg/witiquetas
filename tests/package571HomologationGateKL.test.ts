@@ -264,13 +264,12 @@ test('SUÍTE PACKAGE 5.7.1 — HOMOLOGATION GATE CENÁRIOS K E L (ISOLADO)', asy
       `);
 
       // Claim pelo agente
-      const repo = new PrintJobRepository();
-      const claimed = await repo.claimPendingJobsForAgent(TENANT_K, 'agt-homolog-k-worker', ['prn-homolog-k-1'], 1);
+      const claimed = await PrintJobRepository.claimPendingJobsForAgent(TENANT_K, 'agt-homolog-k-worker', ['prn-homolog-k-1'], 1);
       assert.equal(claimed.length, 1);
       assert.equal(claimed[0].id, targetJobKId);
 
       // Transição para DELIVERING
-      await repo.updateJobStatus(
+      await PrintJobRepository.updateJobStatus(
         TENANT_K,
         targetJobKId,
         'DELIVERING',
@@ -287,8 +286,8 @@ test('SUÍTE PACKAGE 5.7.1 — HOMOLOGATION GATE CENÁRIOS K E L (ISOLADO)', asy
       `);
 
       // Disparo do Reaper
-      const reaped = await repo.reapExpiredLeases();
-      assert.ok(reaped.unknownCount >= 1, 'Job em DELIVERING deve ter virado UNKNOWN_RESULT');
+      const reaped = await PrintJobRepository.reapExpiredLeases();
+      assert.ok(reaped.unknownResultCount >= 1, 'Job em DELIVERING deve ter virado UNKNOWN_RESULT');
 
       // Verificação no banco
       const checkRes = await client.query(`SELECT status FROM print_jobs WHERE id = '${targetJobKId}';`);
@@ -347,8 +346,7 @@ test('SUÍTE PACKAGE 5.7.1 — HOMOLOGATION GATE CENÁRIOS K E L (ISOLADO)', asy
 
     await t.test('CENÁRIO K.8: Garantia contra auto-reexecução descontrolada', async () => {
       // Disparar reapExpiredLeases novamente
-      const repo = new PrintJobRepository();
-      await repo.reapExpiredLeases();
+      await PrintJobRepository.reapExpiredLeases();
 
       // Original continua FAILED
       const origCheck = await client.query(`SELECT status FROM print_jobs WHERE id = '${targetJobKId}';`);

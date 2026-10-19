@@ -147,10 +147,14 @@ if [ -z "$APP_DB_URL" ]; then
   exit 1
 fi
 
-# Parse da URL do banco (sem expor senha)
-# Formato: postgresql://user:password@host:port/database ou postgresql://host/database
-DB_HOST_CONFIG=$(echo "$APP_DB_URL" | sed -E 's|.*@([^:/]+).*|\1|; s|.*://([^:/]+).*|\1|')
-DB_NAME_CONFIG=$(echo "$APP_DB_URL" | sed -E 's|.*/([^?]+).*|\1|')
+# Parse da URL do banco de forma segura (sem expor credenciais)
+# Trata formatos postgresql://user:pass@host:port/database e postgres://host/database
+CLEAN_DB_URL="${APP_DB_URL%%\?*}"
+DB_NAME_CONFIG="${CLEAN_DB_URL##*/}"
+NO_PROTO_URL="${CLEAN_DB_URL#*://}"
+AUTH_HOST_PART="${NO_PROTO_URL%%/*}"
+HOST_PORT_PART="${AUTH_HOST_PART##*@}"
+DB_HOST_CONFIG="${HOST_PORT_PART%%:*}"
 
 echo "   Configuração efetiva da aplicação: Host='${DB_HOST_CONFIG}', Database='${DB_NAME_CONFIG}'"
 
@@ -474,31 +478,46 @@ DO \$\$
 DECLARE
   r RECORD;
   orphan_count BIGINT;
-  total_orphans BIGINT := 0;
   v_sql TEXT;
 BEGIN
   FOR r IN (
+    WITH fk_elements AS (
+      SELECT
+        c.oid AS con_oid,
+        c.conname AS fk_name,
+        src_tbl.relname AS source_table,
+        tgt_tbl.relname AS target_table,
+        i.pos,
+        src_col.attname AS source_col,
+        tgt_col.attname AS target_col
+      FROM pg_constraint c
+      JOIN pg_class src_tbl ON src_tbl.oid = c.conrelid
+      JOIN pg_class tgt_tbl ON tgt_tbl.oid = c.confrelid
+      CROSS JOIN LATERAL generate_subscripts(c.conkey, 1) AS i(pos)
+      JOIN pg_attribute src_col ON src_col.attrelid = c.conrelid AND src_col.attnum = c.conkey[i.pos]
+      JOIN pg_attribute tgt_col ON tgt_col.attrelid = c.confrelid AND tgt_col.attnum = c.confkey[i.pos]
+      WHERE c.contype = 'f' AND c.connamespace = 'public'::regnamespace
+    )
     SELECT
-      c.conname AS fk_name,
-      src_tbl.relname AS source_table,
-      tgt_tbl.relname AS target_table,
-      src_col.attname AS source_col,
-      tgt_col.attname AS target_col
-    FROM pg_constraint c
-    JOIN pg_class src_tbl ON src_tbl.oid = c.conrelid
-    JOIN pg_class tgt_tbl ON tgt_tbl.oid = c.confrelid
-    JOIN pg_attribute src_col ON src_col.attrelid = c.conrelid AND src_col.attnum = c.conkey[1]
-    JOIN pg_attribute tgt_col ON tgt_col.attrelid = c.confrelid AND tgt_col.attnum = c.confkey[1]
-    WHERE c.contype = 'f' AND c.connamespace = 'public'::regnamespace
+      fk_name,
+      source_table,
+      target_table,
+      string_agg(format('s.%I = t.%I', source_col, target_col), ' AND ' ORDER BY pos) AS join_clause,
+      string_agg(format('s.%I IS NOT NULL', source_col), ' AND ' ORDER BY pos) AS not_null_clause
+    FROM fk_elements
+    GROUP BY con_oid, fk_name, source_table, target_table
   ) LOOP
     v_sql := format(
-      'SELECT count(*) FROM %I s LEFT JOIN %I t ON s.%I = t.%I WHERE s.%I IS NOT NULL AND t.%I IS NULL',
-      r.source_table, r.target_table, r.source_col, r.target_col, r.source_col, r.target_col
+      'SELECT count(*) FROM %I s LEFT JOIN %I t ON %s WHERE %s AND t.ctid IS NULL',
+      r.source_table,
+      r.target_table,
+      r.join_clause,
+      r.not_null_clause
     );
     EXECUTE v_sql INTO orphan_count;
     IF orphan_count > 0 THEN
-      RAISE EXCEPTION 'VIOLACAO DE FK: Constraint % possui % registros orfaos em %.%',
-        r.fk_name, orphan_count, r.source_table, r.source_col;
+      RAISE EXCEPTION 'VIOLACAO DE FK: Constraint % possui % registros orfaos em %',
+        r.fk_name, orphan_count, r.source_table;
     END IF;
   END LOOP;
 END \$\$;

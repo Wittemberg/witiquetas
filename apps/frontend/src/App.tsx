@@ -454,6 +454,30 @@ export default function App() {
           />
         );
 
+      case 'updates':
+        if (
+          !hasAnyPermission(['updates.view', 'updates.manage']) &&
+          !sessionContext?.roles?.some((r: any) => r.code === 'ADMIN') &&
+          !sessionContext?.isDeveloper
+        ) {
+          return (
+            <AccessDeniedView
+              onGoHome={() => {
+                setCurrentModule('home');
+                window.location.hash = '#home';
+              }}
+            />
+          );
+        }
+        return (
+          <AdminPage
+            sessionContext={sessionContext}
+            onUpdateSessionContext={setSessionContext}
+            onGoHome={() => setCurrentModule('home')}
+            initialTab="updates"
+          />
+        );
+
       case 'admin':
         if (
           !hasAnyPermission([
@@ -473,6 +497,8 @@ export default function App() {
             'printers.manage',
             'agents.view',
             'agents.manage',
+            'updates.view',
+            'updates.manage',
           ])
         ) {
           return (

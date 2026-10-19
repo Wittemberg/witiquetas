@@ -216,6 +216,7 @@ import authRouter from './routes/auth';
 import sessionRouter from './routes/session';
 import developmentControlRouter from './routes/developmentControl.js';
 import adminRouter from './routes/admin.js';
+import updatesRouter from './routes/updates.js';
 import { LeaseReaperService } from './services/leaseReaperService.js';
 
 // Suporta tanto rotas diretas quanto rotas com prefixo /api (conforme Traefik/Nginx)
@@ -227,6 +228,9 @@ app.use('/api/session', sessionRouter);
 
 app.use('/admin', adminRouter);
 app.use('/api/admin', adminRouter);
+
+app.use('/updates', updatesRouter);
+app.use('/api/updates', updatesRouter);
 
 app.use('/development-control', developmentControlRouter);
 app.use('/api/development-control', developmentControlRouter);

@@ -1577,6 +1577,30 @@
           "notes": [
             "Operações estritamente cadastradas, tipadas, versionadas e auditáveis classificadas em DIAGNOSTIC, SAFE_MAINTENANCE e CRITICAL_MAINTENANCE. Operações críticas com dry-run, impacto estimado, confirmação explícita, motivo e reautenticação TOTP. Proibido terminal/shell/SQL arbitrário."
           ]
+        },
+        {
+          "id": "cap-updates-center",
+          "name": "Central de Atualizações da Plataforma (Updates Center — Sprint 1)",
+          "description": "Fundação arquitetural, contratos, RBAC e interface administrativa para consulta de versões ativas, histórico de releases, visualizador e editor de notas de versão (Sprint 1: Zero Deploy Mecânico).",
+          "module": "admin",
+          "weight": 2,
+          "mvp": false,
+          "status": "HOMOLOGATED",
+          "manualValidation": true,
+          "physicalValidation": false,
+          "frozen": false,
+          "evidence": [
+            "tests/updatesCenterFoundation.test.ts",
+            "docs/architecture/UPDATES-CENTER-ARCHITECTURE.md",
+            "docs/decisions/ADR-006-central-de-atualizacoes.md"
+          ],
+          "dependencies": [
+            "cap-company-settings",
+            "cap-session-context"
+          ],
+          "notes": [
+            "SPRINT 1: Arquitetura canônica, DTOs (@witiquetas/contracts), rotas /api/updates, aba Atualizações em AdminPage, editor de notas de versão e salvaguarda estrita contra deploy mecânico ativo."
+          ]
         }
       ]
     },

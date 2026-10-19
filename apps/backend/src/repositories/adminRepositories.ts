@@ -57,6 +57,17 @@ export const CANONICAL_PERMISSIONS: PermissionCatalogItemDTO[] = [
   { code: 'devcontrol.manage', name: 'Gerenciar DevControl', description: 'Executar comandos e configurações no DevControl', category: 'Governança' },
 ];
 
+// Permissões da Central de Atualizações (Fase 5 — Sprint 1)
+export const UPDATES_PERMISSIONS: PermissionCatalogItemDTO[] = [
+  { code: 'updates.view', name: 'Visualizar Atualizações', description: 'Visualizar versão atual, histórico e notas de versão da plataforma', category: 'Atualizações' },
+  { code: 'updates.manage', name: 'Gerenciar Atualizações', description: 'Cadastrar, editar e gerenciar notas de versão e parâmetros de atualização', category: 'Atualizações' },
+];
+
+export const ALL_SYSTEM_PERMISSIONS: PermissionCatalogItemDTO[] = [
+  ...CANONICAL_PERMISSIONS,
+  ...UPDATES_PERMISSIONS,
+];
+
 /**
  * Catálogo das 23 permissões administráveis pelo tenant (exclui permissões de plataforma do DevControl).
  * 25 = catálogo completo da plataforma
@@ -589,7 +600,7 @@ export const RoleRepository = {
     if (!role) throw new Error(`foreign_key_violation: role '${roleId}' not found`);
 
     // Validar se permissionCode é canônico
-    const validPerm = CANONICAL_PERMISSIONS.find((p) => p.code === permissionCode);
+    const validPerm = ALL_SYSTEM_PERMISSIONS.find((p) => p.code === permissionCode);
     if (!validPerm) {
       throw new Error(`invalid_permission: '${permissionCode}' does not exist in canonical catalog`);
     }
@@ -814,7 +825,7 @@ export const RoleRepository = {
     if (!role) throw new Error(`role_not_found: role '${roleId}' not found`);
 
     for (const perm of permissions) {
-      if (!CANONICAL_PERMISSIONS.some((p) => p.code === perm)) {
+      if (!ALL_SYSTEM_PERMISSIONS.some((p) => p.code === perm)) {
         throw new Error(`invalid_permission: '${perm}' does not exist in canonical catalog`);
       }
     }

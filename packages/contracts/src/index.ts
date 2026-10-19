@@ -1013,4 +1013,104 @@ export const INTEGRATION_PRESETS: IntegrationPresetDTO[] = [
   },
 ];
 
+// ==========================================
+// CENTRAL DE ATUALIZAÇÕES (UPDATES CENTER) — SPRINT 1
+// ==========================================
+
+export type ReleaseChannel = 'STABLE' | 'BETA' | 'NIGHTLY';
+
+export type UpdateStatus =
+  | 'UP_TO_DATE'
+  | 'UPDATE_AVAILABLE'
+  | 'DOWNLOADING'
+  | 'READY_TO_APPLY'
+  | 'APPLYING'
+  | 'FAILED'
+  | 'ROLLED_BACK';
+
+export type ReleaseType =
+  | 'MAJOR'
+  | 'MINOR'
+  | 'PATCH'
+  | 'HOTFIX'
+  | 'SECURITY'
+  | 'FEATURE'
+  | 'IMPROVEMENT';
+
+export type ReleaseComponent =
+  | 'BACKEND'
+  | 'FRONTEND'
+  | 'AGENT_WINDOWS'
+  | 'DATABASE_MIGRATION'
+  | 'FULL_STACK';
+
+export interface ReleaseManifestDTO {
+  manifestVersion: '1.0';
+  version: string;
+  releaseDate: string;
+  channel: ReleaseChannel;
+  type: ReleaseType;
+  title: string;
+  summary: string;
+  changelogMarkdown: string;
+  highlights: string[];
+  breakingChanges: string[];
+  requiredMigrations: string[];
+  minAgentVersion?: string;
+  components: {
+    backendImage?: string;
+    frontendImage?: string;
+    agentWindowsSha256?: string;
+    agentWindowsDownloadUrl?: string;
+  };
+  author: {
+    name: string;
+    email?: string;
+  };
+  createdAt: string;
+  publishedAt?: string;
+  status: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
+}
+
+export interface UpdateCenterOverviewDTO {
+  currentVersion: {
+    version: string;
+    commit: string;
+    shortCommit: string;
+    builtAt: string;
+    environment: string;
+    package: string;
+    phase: string;
+  };
+  channel: ReleaseChannel;
+  status: UpdateStatus;
+  latestRelease?: ReleaseManifestDTO;
+  hasUpdate: boolean;
+  lastCheckedAt: string;
+  historyCount: number;
+  canManageUpdates: boolean;
+  deployMechanismActive: boolean;
+}
+
+export interface UpdateCheckResultDTO {
+  checkedAt: string;
+  channel: ReleaseChannel;
+  status: UpdateStatus;
+  hasUpdate: boolean;
+  currentVersion: string;
+  latestVersion?: string;
+  message: string;
+  release?: ReleaseManifestDTO;
+}
+
+export interface UpdateReleaseNoteDTO {
+  title?: string;
+  summary?: string;
+  changelogMarkdown?: string;
+  highlights?: string[];
+  breakingChanges?: string[];
+  channel?: ReleaseChannel;
+  type?: ReleaseType;
+}
+
 

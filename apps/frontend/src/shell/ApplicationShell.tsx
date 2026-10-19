@@ -52,10 +52,11 @@ export const ApplicationShell: React.FC<ApplicationShellProps> = ({
   const isIntegrations = currentModule === 'integrations';
   const isPrinters = currentModule === 'printers';
   const isAgents = currentModule === 'agents';
+  const isUpdates = currentModule === 'updates';
 
   const activeItem =
     navItems.find((item) => item.id === currentModule) ||
-    (isIntegrations || isPrinters || isAgents ? navItems.find((item) => item.id === 'admin') : undefined);
+    (isIntegrations || isPrinters || isAgents || isUpdates ? navItems.find((item) => item.id === 'admin') : undefined);
 
   const moduleTitle = isIntegrations
     ? 'Administração — Integrações'
@@ -63,6 +64,8 @@ export const ApplicationShell: React.FC<ApplicationShellProps> = ({
     ? 'Administração — Impressoras'
     : isAgents
     ? 'Administração — Agentes de Impressão'
+    : isUpdates
+    ? 'Administração — Central de Atualizações'
     : activeItem
     ? activeItem.label
     : currentModule === 'editor'

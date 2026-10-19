@@ -89,13 +89,13 @@ O `git diff main..HEAD` comprova alterações restritas a:
     
     **Garantias Formais de Auditoria:**
     1. *Sem flags interativas/TTY:* `docker exec -i` (sem `-t`) em todo o fluxo de dump e restore.
-    2. *Vinculação Inequívoca pela Aplicação:* Extração da `DATABASE_URL` efetiva do container backend ativo e validação exata do container PostgreSQL correspondente (recusa seleção ambígua).
-    3. *Consistência Temporal Estrita:* Snapshot via `pg_dump -Fc` gerado como ponto de partida inicial; inventário e contagens catalogados diretamente a partir do snapshot consistente.
-    4. *Verificação de Extensões:* Inventário das extensões instaladas no PostgreSQL de produção e garantia de disponibilidade na instância isolada de restauração.
+    2. *Vinculação Inequívoca e Rejeição de Ambiguidade:* Exige exatamente 1 container backend ativo (recusa seleção arbitrária); extrai a `DATABASE_URL` efetiva e rejeita `localhost`/`127.0.0.1` como identificador suficiente, exigindo correspondência estrita de rede e alias.
+    3. *Consistência Temporal e Fotografia T0:* O snapshot atômico (`pg_dump -Fc`) é gerado como ponto inicial invariante. Contagens posteriores da produção não são presumidas como mesma fotografia transacional de T0 (auditoria de dispersão sem falso positivo).
+    4. *Compatibilidade de Extensões:* Mapeia extensões na origem e valida disponibilidade na imagem de teste sem pré-criação conflitante.
     5. *Validação Estrutural Prévia:* Validação de TOC via `pg_restore --list`.
     6. *Restauração Estrita:* `pg_restore --exit-on-error` com exigência incondicional de exit code 0.
-    7. *Auditoria de Definições Estruturais:* Comparação 1:1 de DDLs, tipos de colunas, definições exatas de índices (incluindo predicados e parciais), sequências e definições de constraints via `pg_get_constraintdef()`.
-    8. *Auditoria Abrangente de Integridade Referencial:* Varredura dinâmica em **100% de todas as Foreign Keys** do schema `public`, exigindo **ZERO registros órfãos**.
+    7. *Auditoria Estrutural Expandida:* Comparação 1:1 de Tabelas, Colunas, Índices (incluindo predicados e parciais), Sequências, Constraints, Views, Funções/Procedures, Triggers e Políticas de Row Level Security (RLS).
+    8. *Auditoria de Integridade Referencial com Semântica de NULL:* Varredura dinâmica em 100% das Foreign Keys (simples e compostas), respeitando a semântica formal do PostgreSQL para `MATCH SIMPLE` (satisfeita se qualquer coluna for NULL) e `MATCH FULL`.
     9. *Instância Efêmera Segura e Isolada:* Execução em `postgres:14-alpine` descartável com `--network none`, autenticação local `trust` (sem senhas estáticas), zero portas publicadas e zero volumes de produção montados.
     10. *Execução Exclusivamente Read-Only na Produção:* Zero instruções DDL/DML contra a base ativa; fail-closed com preservação total de artefatos para análise forense em caso de erro.
 

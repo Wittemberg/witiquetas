@@ -7,36 +7,37 @@
 # GARANTIAS E AUDITORIA DE SEGURANÇA (AUDITADA):
 # 1. Sem flags interativas/TTY: docker exec -i (NUNCA -t para streams binários).
 # 2. Identificação Inequívoca da Produção:
-#    - Extrai a configuração efetiva da aplicação (DATABASE_URL) a partir do
-#      container backend ativo.
-#    - Conecta e valida inequivocamente que o container PostgreSQL de destino é
-#      exatamente aquele que atende à aplicação ativa, recusando seleção ambígua.
+#    - Exige exatamente 1 container backend ativo; recusa seleção arbitrária se
+#      houver múltiplos containers backend sem especificação explícita.
+#    - Extrai DATABASE_URL efetiva e recusa 'localhost'/'127.0.0.1' como identificador
+#      suficiente em redes Docker isoladas, exigindo matching estrito por rede e alias.
 # 3. Consistência Temporal Garantida:
-#    - O snapshot do dump (pg_dump -Fc) é gerado PRIMEIRO.
-#    - O inventário canônico e contagens de validação são extraídos A PARTIR
-#      DO PRÓPRIO DUMP RESTAURADO na instância de teste (ou snapshot consistente),
-#      eliminando falsos positivos causados por concorrência/atividades em produção.
-# 4. Verificação de Extensões PostgreSQL:
-#    - Inventaria extensões instaladas no banco de origem e valida sua
-#      disponibilidade e compatibilidade na instância efêmera de teste.
-# 5. Comparação Estrutural Completa (Definições e não apenas nomes):
-#    - Compara DDLs canônicos de tabelas, tipos de colunas, constraints,
-#      definições completas de índices parciais e sequências.
-# 6. Auditoria Abrangente de Integridade Referencial:
-#    - Valida status de validação de todas as constraints (pg_constraint).
-#    - Executa consulta dinâmica que valida 100% de todas as Foreign Keys existentes
-#      no banco, garantindo ZERO registros órfãos em todo o catálogo relacional.
-# 7. Autenticação Local Segura sem Senha Fixa:
-#    - Container efêmero de teste utiliza autenticação local 'trust' (POSTGRES_HOST_AUTH_METHOD=trust)
-#      ou segredo randômico descartável em memória, rodando isolado em --network none.
-# 8. Tratamento de Bancos sem Tabelas:
-#    - Trata elegantemente schemas vazios ou bancos recém-iniciados sem quebra de sintaxe SQL.
-# 9. Execução Estritamente Read-Only na Produção:
-#    - Nenhuma instrução DDL, DML ou de escrita é executada contra a base de produção.
-# 10. Fail-Closed e Preservação de Evidências:
-#     - 'set -euo pipefail', nenhum mascaramento por '|| true'.
-#     - Preserva artefatos em /opt/backups/witiquetas em caso de erro para análise forense.
-#     - Zero exposição de credenciais em logs ou disco.
+#    - O snapshot (pg_dump -Fc) é gerado primeiro, capturando a fotografia transacional
+#      atômica (T0) com isolamento Repeatable Read.
+#    - O inventário e a integridade são validados diretamente a partir do snapshot
+#      restaurado (TOC e banco efêmero).
+#    - Registra explicitamente que contagens posteriores da produção não representam
+#      a mesma fotografia transacional de T0 (auditoria de dispersão sem falso positivo).
+# 4. Verificação e Compatibilidade de Extensões:
+#    - Mapeia extensões na origem e valida disponibilidade na imagem de restauração.
+#    - Não pré-instala extensões que o dump restaura para evitar conflitos de ownership
+#      ou duplicação com 'pg_restore --exit-on-error'.
+# 5. Comparação Estrutural Completa e Abrangente:
+#    - Compara DDLs, tabelas, colunas, tipos, índices (incluindo predicados e parciais),
+#      sequências, constraints, views, funções, triggers e políticas RLS.
+# 6. Auditoria de Integridade Referencial Robusta:
+#    - Trata Foreign Keys simples e compostas, multi-schema, e respeita a semântica
+#      de NULL (MATCH SIMPLE: se qualquer coluna for NULL, a constraint é satisfeita;
+#      MATCH FULL: nenhuma coluna pode ser NULL a menos que todas sejam NULL).
+# 7. Instância Efêmera Descartável e Segura:
+#    - postgres:14-alpine rodando em isolamento total (--network none, sem portas expostas,
+#      sem volumes de produção montados) e autenticação local segura (trust para socket interno).
+# 8. Tratamento Defensivo de Schemas e Execução Read-Only na Produção:
+#    - Nenhuma escrita contra a produção. Tratamento de schemas sem tabelas.
+# 9. Fail-Closed e Preservação de Evidências:
+#    - set -euo pipefail, sem mascaramento por '|| true' em comandos críticos.
+#    - Preserva artefatos em /opt/backups/witiquetas em caso de erro para análise forense.
+#    - Zero segredos em disco, logs ou repositório.
 # ==============================================================================
 
 set -euo pipefail
@@ -125,30 +126,40 @@ echo "   Espaço disponível em ${BACKUP_ROOT}: $((AVAIL_KB / 1024))MB (Requisit
 # ------------------------------------------------------------------------------
 echo "🔍 [2/10] Identificando PostgreSQL pela configuração efetiva da aplicação..."
 
-# Localizar o container backend em execução
+# Localizar containers backend em execução
 BACKEND_CONTAINERS=$(docker ps --filter "status=running" --filter "name=backend" --format "{{.ID}} {{.Names}}")
 BACKEND_COUNT=$(echo "$BACKEND_CONTAINERS" | grep -c . || true)
 
 if [ "$BACKEND_COUNT" -eq 0 ]; then
   echo "❌ ERRO: Nenhum container backend em execução encontrado no host." >&2
   exit 1
+elif [ "$BACKEND_COUNT" -gt 1 ]; then
+  echo "❌ ERRO AMBIGUIDADE: Múltiplos containers backend encontrados em execução (${BACKEND_COUNT}):" >&2
+  echo "$BACKEND_CONTAINERS" >&2
+  echo "   Recusando seleção arbitrária. Apenas 1 container backend ativo deve responder pela stack de produção." >&2
+  exit 1
 fi
 
-# Obter o ID do primeiro container backend correspondente
-BACKEND_CONTAINER_ID=$(echo "$BACKEND_CONTAINERS" | head -1 | awk '{print $1}')
-BACKEND_CONTAINER_NAME=$(echo "$BACKEND_CONTAINERS" | head -1 | awk '{print $2}')
+BACKEND_CONTAINER_ID=$(echo "$BACKEND_CONTAINERS" | awk '{print $1}')
+BACKEND_CONTAINER_NAME=$(echo "$BACKEND_CONTAINERS" | awk '{print $2}')
 echo "   Container Backend Ativo: ${BACKEND_CONTAINER_NAME} (${BACKEND_CONTAINER_ID})"
+
+# Obter as redes às quais o backend está conectado
+BACKEND_NETWORKS=$(docker inspect "$BACKEND_CONTAINER_ID" --format '{{range $k, $v := .NetworkSettings.Networks}}{{$k}} {{end}}')
+if [ -z "$BACKEND_NETWORKS" ]; then
+  echo "❌ ERRO: O container backend não está conectado a nenhuma rede Docker." >&2
+  exit 1
+fi
 
 # Extrair DATABASE_URL efetiva do backend
 APP_DB_URL=$(docker inspect "$BACKEND_CONTAINER_ID" --format '{{range .Config.Env}}{{println .}}{{end}}' | grep '^DATABASE_URL=' | head -1 | cut -d= -f2- || true)
 
 if [ -z "$APP_DB_URL" ]; then
-  echo "❌ ERRO: DATABASE_URL não encontrada no container backend de produção." >&2
+  echo "❌ ERRO: DATABASE_URL não configurada no container backend de produção." >&2
   exit 1
 fi
 
 # Parse da URL do banco de forma segura (sem expor credenciais)
-# Trata formatos postgresql://user:pass@host:port/database e postgres://host/database
 CLEAN_DB_URL="${APP_DB_URL%%\?*}"
 DB_NAME_CONFIG="${CLEAN_DB_URL##*/}"
 NO_PROTO_URL="${CLEAN_DB_URL#*://}"
@@ -163,7 +174,14 @@ if [ "$DB_NAME_CONFIG" != "$TARGET_DB" ]; then
   exit 1
 fi
 
-# Localizar o container PostgreSQL correspondente
+# Recusar 'localhost' ou '127.0.0.1' como identificação inequívoca no ambiente de container
+if [ "$DB_HOST_CONFIG" = "localhost" ] || [ "$DB_HOST_CONFIG" = "127.0.0.1" ]; then
+  echo "❌ ERRO: DB_HOST_CONFIG configurado como '${DB_HOST_CONFIG}'. Em ambientes Docker Swarm/Compose," >&2
+  echo "   a aplicação deve conectar via service name/alias de rede para garantir identificação inequívoca." >&2
+  exit 1
+fi
+
+# Localizar o container PostgreSQL que responde ao DB_HOST_CONFIG na mesma rede do backend
 PG_CONTAINERS=$(docker ps --filter "status=running" --format "{{.ID}} {{.Names}} {{.Image}}")
 PG_CONTAINER_ID=""
 PG_CONTAINER_NAME=""
@@ -172,37 +190,43 @@ PG_MATCH_COUNT=0
 
 while read -r cid cname cimage; do
   [ -z "$cid" ] && continue
-  
-  # Checar se responde a pg_isready
-  if docker exec -i "$cid" pg_isready -q >/dev/null 2>&1; then
-    # Checar se o database existe dentro da instância
-    if docker exec -i "$cid" psql -U postgres -lqt 2>/dev/null | cut -d \| -f 1 | grep -qw "${TARGET_DB}"; then
-      # Checar se atende pelo hostname/service configurado na rede Docker ou pelo nome
-      IS_TARGET_HOST=0
-      if [ "$DB_HOST_CONFIG" = "localhost" ] || [ "$DB_HOST_CONFIG" = "127.0.0.1" ]; then
-        IS_TARGET_HOST=1
-      elif echo "$cname" | grep -qw "$DB_HOST_CONFIG" || [ "$cname" = "$DB_HOST_CONFIG" ]; then
-        IS_TARGET_HOST=1
-      else
-        # Verificar se algum network alias ou nome do serviço bate com o DB_HOST_CONFIG
-        ALIASES=$(docker inspect "$cid" --format '{{range .NetworkSettings.Networks}}{{range .Aliases}}{{.}} {{end}}{{end}}' 2>/dev/null || true)
-        if echo "$ALIASES" | grep -qw "$DB_HOST_CONFIG"; then
-          IS_TARGET_HOST=1
-        fi
-      fi
 
-      if [ $IS_TARGET_HOST -eq 1 ]; then
-        PG_CONTAINER_ID="$cid"
-        PG_CONTAINER_NAME="$cname"
-        PG_CONTAINER_IMAGE="$cimage"
-        PG_MATCH_COUNT=$((PG_MATCH_COUNT + 1))
-      fi
+  # 1. Deve compartilhar pelo menos uma rede com o backend
+  CONTAINER_NETS=$(docker inspect "$cid" --format '{{range $k, $v := .NetworkSettings.Networks}}{{$k}} {{end}}' 2>/dev/null || true)
+  SHARED_NET=0
+  for bnet in $BACKEND_NETWORKS; do
+    if echo "$CONTAINER_NETS" | grep -qw "$bnet"; then
+      SHARED_NET=1
+      break
+    fi
+  done
+  [ $SHARED_NET -eq 0 ] && continue
+
+  # 2. Deve corresponder ao hostname, nome do container ou network alias
+  MATCHES_HOST=0
+  if [ "$cname" = "$DB_HOST_CONFIG" ] || echo "$cname" | grep -qw "$DB_HOST_CONFIG"; then
+    MATCHES_HOST=1
+  else
+    ALIASES=$(docker inspect "$cid" --format '{{range .NetworkSettings.Networks}}{{range .Aliases}}{{.}} {{end}}{{end}}' 2>/dev/null || true)
+    if echo "$ALIASES" | grep -qw "$DB_HOST_CONFIG"; then
+      MATCHES_HOST=1
+    fi
+  fi
+  [ $MATCHES_HOST -eq 0 ] && continue
+
+  # 3. Deve responder a pg_isready e conter o banco TARGET_DB
+  if docker exec -i "$cid" pg_isready -q >/dev/null 2>&1; then
+    if docker exec -i "$cid" psql -U postgres -lqt 2>/dev/null | cut -d \| -f 1 | grep -qw "${TARGET_DB}"; then
+      PG_CONTAINER_ID="$cid"
+      PG_CONTAINER_NAME="$cname"
+      PG_CONTAINER_IMAGE="$cimage"
+      PG_MATCH_COUNT=$((PG_MATCH_COUNT + 1))
     fi
   fi
 done <<< "$PG_CONTAINERS"
 
 if [ "$PG_MATCH_COUNT" -ne 1 ]; then
-  echo "❌ ERRO: Seleção ambígua ou falha na identificação do container PostgreSQL (Matches encontrados: ${PG_MATCH_COUNT})." >&2
+  echo "❌ ERRO: Identificação de PostgreSQL ambígua ou falhou (Matches encontrados: ${PG_MATCH_COUNT})." >&2
   exit 1
 fi
 
@@ -256,7 +280,7 @@ done
 } >> "${EVIDENCE_FILE}"
 
 # ------------------------------------------------------------------------------
-# 4. GERAÇÃO DO SNAPSHOT COMPLETO (pg_dump -Fc) — SNAPSHOT CONSISTENTE INICIAL
+# 4. GERAÇÃO DO SNAPSHOT COMPLETO (pg_dump -Fc) — SNAPSHOT CONSISTENTE INICIAL (T0)
 # ------------------------------------------------------------------------------
 echo "📦 [4/10] Gerando snapshot de produção via pg_dump custom format (-Fc)..."
 # Usar docker exec -i (estritamente sem -t) e redirecionamento de leitura pura
@@ -356,20 +380,22 @@ if ! docker exec -i "${RESTORE_CONTAINER}" pg_isready -U postgres >/dev/null 2>&
   exit 1
 fi
 
-# Validar e habilitar extensões necessárias no banco efêmero
-echo "   Criando banco '${TARGET_DB}' no container isolado..."
-docker exec -i "${RESTORE_CONTAINER}" createdb -U postgres "${TARGET_DB}"
-
-# Pré-instalar extensões idênticas às de produção se suportadas
+# Validar que a imagem descartável possui as extensões disponíveis sem pré-criá-las
+# (o pg_restore recria extensões; pré-criá-las com --exit-on-error geraria conflito)
 if [ -n "$ORIGIN_EXTENSIONS" ]; then
   echo "$ORIGIN_EXTENSIONS" | while IFS='|' read -r extname extver; do
     [ -z "$extname" ] && continue
-    if [ "$extname" != "plpgsql" ]; then
-      echo "   Habilitando extensão '${extname}' no container isolado..."
-      docker exec -i "${RESTORE_CONTAINER}" psql -U postgres -d "${TARGET_DB}" -v ON_ERROR_STOP=1 -c "CREATE EXTENSION IF NOT EXISTS \"${extname}\";"
+    AVAIL=$(docker exec -i "${RESTORE_CONTAINER}" psql -U postgres -t -c "SELECT count(*) FROM pg_available_extensions WHERE name = '$extname';" | xargs)
+    if [ "$AVAIL" -eq 0 ]; then
+      echo "❌ ERRO: Extensão '$extname' presente na produção não está disponível na imagem postgres:14-alpine!" >&2
+      exit 1
     fi
   done
+  echo "   Extensões de produção validadas como disponíveis na imagem de teste."
 fi
+
+echo "   Criando banco '${TARGET_DB}' no container isolado..."
+docker exec -i "${RESTORE_CONTAINER}" createdb -U postgres "${TARGET_DB}"
 
 # ------------------------------------------------------------------------------
 # 9. RESTAURAÇÃO ESTREITA (pg_restore --exit-on-error)
@@ -386,27 +412,50 @@ echo "   pg_restore finalizado com código de saída 0."
 # ------------------------------------------------------------------------------
 echo "📊 [10/10] Executando auditoria estrutural detalhada e integridade referencial..."
 
-# Consulta SQL canônica para definições estruturais completas
+# Consulta SQL canônica para definições estruturais completas:
+# Tabelas, Colunas, Índices, Sequências, Constraints, Views, Funções, Triggers e RLS
 STRUCTURAL_INVENTORY_SQL="
-  -- Tabelas e tipos de colunas
-  SELECT 'COLUMNS:' AS item_type, table_name || '.' || column_name || '|' || data_type || '|' || is_nullable
+  -- 1. Colunas e tipos
+  SELECT 'COLUMNS:' AS item_type, table_schema || '.' || table_name || '.' || column_name || '|' || data_type || '|' || is_nullable
   FROM information_schema.columns
-  WHERE table_schema = 'public'
+  WHERE table_schema NOT IN ('pg_catalog', 'information_schema')
   UNION ALL
-  -- Índices e suas definições exatas (incluindo índices parciais e predicados)
-  SELECT 'INDEX_DEFS:' AS item_type, indexname || '|' || indexdef
+  -- 2. Definições de Índices (incluindo predicados e parciais)
+  SELECT 'INDEX_DEFS:' AS item_type, schemaname || '.' || indexname || '|' || indexdef
   FROM pg_indexes
-  WHERE schemaname = 'public'
+  WHERE schemaname NOT IN ('pg_catalog', 'information_schema')
   UNION ALL
-  -- Sequências
-  SELECT 'SEQUENCES:' AS item_type, sequence_name
+  -- 3. Sequências
+  SELECT 'SEQUENCES:' AS item_type, sequence_schema || '.' || sequence_name
   FROM information_schema.sequences
-  WHERE sequence_schema = 'public'
+  WHERE sequence_schema NOT IN ('pg_catalog', 'information_schema')
   UNION ALL
-  -- Constraints completas (PK, FK, Unique, Check) e suas definições
-  SELECT 'CONSTRAINTS:' AS item_type, conname || '|' || pg_get_constraintdef(oid)
-  FROM pg_constraint
-  WHERE connamespace = 'public'::regnamespace
+  -- 4. Constraints (PK, FK, Unique, Check) e suas definições exatas
+  SELECT 'CONSTRAINTS:' AS item_type, n.nspname || '.' || c.conname || '|' || pg_get_constraintdef(c.oid)
+  FROM pg_constraint c
+  JOIN pg_namespace n ON n.oid = c.connamespace
+  WHERE n.nspname NOT IN ('pg_catalog', 'information_schema')
+  UNION ALL
+  -- 5. Views
+  SELECT 'VIEWS:' AS item_type, table_schema || '.' || table_name || '|' || view_definition
+  FROM information_schema.views
+  WHERE table_schema NOT IN ('pg_catalog', 'information_schema')
+  UNION ALL
+  -- 6. Funções e Procedures
+  SELECT 'FUNCTIONS:' AS item_type, n.nspname || '.' || p.proname || '|' || pg_get_functiondef(p.oid)
+  FROM pg_proc p
+  JOIN pg_namespace n ON n.oid = p.pronamespace
+  WHERE n.nspname NOT IN ('pg_catalog', 'information_schema')
+  UNION ALL
+  -- 7. Triggers
+  SELECT 'TRIGGERS:' AS item_type, trigger_schema || '.' || trigger_name || '|' || event_manipulation || '|' || event_object_table
+  FROM information_schema.triggers
+  WHERE trigger_schema NOT IN ('pg_catalog', 'information_schema')
+  UNION ALL
+  -- 8. Políticas de Row Level Security (RLS)
+  SELECT 'RLS_POLICIES:' AS item_type, schemaname || '.' || tablename || '.' || policyname || '|' || cmd || '|' || qual
+  FROM pg_policies
+  WHERE schemaname NOT IN ('pg_catalog', 'information_schema')
   ORDER BY 1, 2;
 "
 
@@ -419,64 +468,70 @@ if [ "$ORIGIN_STRUCTURE" != "$RESTORED_STRUCTURE" ]; then
   diff -u <(echo "$ORIGIN_STRUCTURE") <(echo "$RESTORED_STRUCTURE") || true
   exit 1
 fi
-echo "   Definições estruturais completas (colunas, índices, constraints) 100% idênticas."
+echo "   Definições estruturais completas (colunas, índices, constraints, views, funções, triggers, RLS) 100% idênticas."
 
-# Coletar lista de tabelas do schema public
-PUBLIC_TABLES=$(docker exec -i "${RESTORE_CONTAINER}" psql -U postgres -d "${TARGET_DB}" -v ON_ERROR_STOP=1 -A -t -c "
-  SELECT tablename FROM pg_tables WHERE schemaname = 'public' ORDER BY tablename;
+# Coletar lista de tabelas de dados de todos os schemas de aplicação
+APP_TABLES=$(docker exec -i "${RESTORE_CONTAINER}" psql -U postgres -d "${TARGET_DB}" -v ON_ERROR_STOP=1 -A -t -c "
+  SELECT table_schema || '.' || table_name
+  FROM information_schema.tables
+  WHERE table_schema NOT IN ('pg_catalog', 'information_schema') AND table_type = 'BASE TABLE'
+  ORDER BY 1;
 ")
 
-TABLE_COUNT=$(echo "$PUBLIC_TABLES" | grep -c . || true)
-echo "   Tabelas no schema public: ${TABLE_COUNT}"
+TABLE_COUNT=$(echo "$APP_TABLES" | grep -c . || true)
+echo "   Tabelas de aplicação identificadas: ${TABLE_COUNT}"
 
 if [ "$TABLE_COUNT" -gt 0 ]; then
   ROW_COUNT_QUERY=""
-  for tbl in $PUBLIC_TABLES; do
+  for full_tbl in $APP_TABLES; do
+    s_name="${full_tbl%%.*}"
+    t_name="${full_tbl##*.}"
     if [ -z "$ROW_COUNT_QUERY" ]; then
-      ROW_COUNT_QUERY="SELECT '$tbl' AS tbl, count(*)::text AS cnt FROM \"$tbl\""
+      ROW_COUNT_QUERY="SELECT '$full_tbl' AS tbl, count(*)::text AS cnt FROM \"$s_name\".\"$t_name\""
     else
-      ROW_COUNT_QUERY="${ROW_COUNT_QUERY} UNION ALL SELECT '$tbl', count(*)::text FROM \"$tbl\""
+      ROW_COUNT_QUERY="${ROW_COUNT_QUERY} UNION ALL SELECT '$full_tbl', count(*)::text FROM \"$s_name\".\"$t_name\""
     fi
   done
   ROW_COUNT_QUERY="${ROW_COUNT_QUERY} ORDER BY 1;"
 
-  # Estratégia de Consistência Temporal e Auditoria de Dados:
-  # O dump binário (pg_dump -Fc) captura um snapshot atômico com isolamento transacional Repeatable Read.
-  # A consulta abaixo obtém a contagem de linhas catalogadas no snapshot restaurado (fotografia imutável do dump).
-  # Em seguida, compara com a contagem atual da origem para auditoria de dispersão/atividade.
+  # Coletar contagem no snapshot restaurado (fotografia transacional imutável de T0)
   RESTORED_ROW_COUNTS=$(docker exec -i "${RESTORE_CONTAINER}" psql -U postgres -d "${TARGET_DB}" -v ON_ERROR_STOP=1 -A -t -c "$ROW_COUNT_QUERY")
   ORIGIN_ROW_COUNTS=$(docker exec -i "$PG_CONTAINER_ID" psql -U postgres -d "${TARGET_DB}" -v ON_ERROR_STOP=1 -A -t -c "$ROW_COUNT_QUERY")
 
-  echo "   [Snapshot Restaurado vs Origem]"
+  echo "   [Auditoria de Linhas: Snapshot Restaurado vs Origem Atual]"
   if [ "$ORIGIN_ROW_COUNTS" != "$RESTORED_ROW_COUNTS" ]; then
-    echo "⚠️  AVISO DE DISPERSÃO TEMPORAL: Detectada atividade/escrita em produção durante a janela pós-dump:" >&2
+    echo "ℹ️  DISPERSÃO TEMPORAL REGISTRADA: Houve mutação transacional na produção pós-snapshot T0:"
     diff -u <(echo "$RESTORED_ROW_COUNTS") <(echo "$ORIGIN_ROW_COUNTS") || true
-    echo "   -> A integridade do SNAPSHOT RESTAURADO é válida e representa com fidelidade a fotografia do dump no momento T0."
+    echo "   -> A restauração foi comprovada contra o conteúdo do dump; as contagens posteriores da produção"
+    echo "      não representam a mesma fotografia transacional de T0 e não invalidam o backup íntegro."
   else
-    echo "   -> Contagem de linhas 100% idêntica entre o snapshot restaurado e a base de origem (zero dispersão em voo)."
+    echo "   -> Contagem de linhas idêntica entre o snapshot de T0 e a origem (zero atividade na janela)."
   fi
 
   {
-    echo "--- CONTAGEM DE LINHAS DO SNAPSHOT RESTAURADO (FOTOGRAFIA DO BACKUP) ---"
+    echo "--- CONTAGEM DE LINHAS DO SNAPSHOT RESTAURADO (FOTOGRAFIA IMUTÁVEL DE T0) ---"
     echo "$RESTORED_ROW_COUNTS"
     echo ""
-    echo "--- CONTAGEM DE LINHAS DA ORIGEM NO MOMENTO DA AUDITORIA ---"
+    echo "--- CONTAGEM DE LINHAS DA ORIGEM NO MOMENTO DA AUDITORIA (REFERÊNCIA DE DISPERSÃO) ---"
     echo "$ORIGIN_ROW_COUNTS"
     echo ""
   } >> "${EVIDENCE_FILE}"
-  echo "   Contagem de linhas registrada com sucesso para todas as ${TABLE_COUNT} tabelas."
+  echo "   Contagem de linhas catalogada com sucesso para todas as ${TABLE_COUNT} tabelas."
 else
-  echo "   Aviso: Schema public não possui tabelas de dados. Inventário registrado."
+  echo "   Aviso: Schemas de aplicação sem tabelas de dados. Inventário registrado."
   {
     echo "--- CONTAGEM DE LINHAS POR TABELA ---"
-    echo "Schema public sem tabelas de dados."
+    echo "Sem tabelas de dados nos schemas de aplicação."
     echo ""
   } >> "${EVIDENCE_FILE}"
 fi
 
 # Validar status de todas as constraints (convalidated)
 INVALID_CONSTRAINTS=$(docker exec -i "${RESTORE_CONTAINER}" psql -U postgres -d "${TARGET_DB}" -v ON_ERROR_STOP=1 -A -t -c "
-  SELECT conname FROM pg_constraint WHERE connamespace = 'public'::regnamespace AND NOT convalidated;
+  SELECT n.nspname || '.' || c.conname
+  FROM pg_constraint c
+  JOIN pg_namespace n ON n.oid = c.connamespace
+  WHERE n.nspname NOT IN ('pg_catalog', 'information_schema') AND NOT c.convalidated;
 ")
 
 if [ -n "$INVALID_CONSTRAINTS" ]; then
@@ -486,7 +541,7 @@ if [ -n "$INVALID_CONSTRAINTS" ]; then
 fi
 echo "   Todas as constraints estão ativas e validadas."
 
-# Auditoria Abrangente de 100% das Foreign Keys (Detecção Dinâmica de Órfãos)
+# Auditoria Abrangente de Foreign Keys com Semântica Estrita de NULL (MATCH SIMPLE e MATCH FULL)
 echo "   Executando varredura dinâmica de integridade em 100% das Foreign Keys..."
 
 FK_INTEGRITY_QUERY="
@@ -501,39 +556,60 @@ BEGIN
       SELECT
         c.oid AS con_oid,
         c.conname AS fk_name,
+        c.confmatchtype AS match_type,
+        src_ns.nspname AS source_schema,
         src_tbl.relname AS source_table,
+        tgt_ns.nspname AS target_schema,
         tgt_tbl.relname AS target_table,
         i.pos,
         src_col.attname AS source_col,
         tgt_col.attname AS target_col
       FROM pg_constraint c
       JOIN pg_class src_tbl ON src_tbl.oid = c.conrelid
+      JOIN pg_namespace src_ns ON src_ns.oid = src_tbl.relnamespace
       JOIN pg_class tgt_tbl ON tgt_tbl.oid = c.confrelid
+      JOIN pg_namespace tgt_ns ON tgt_ns.oid = tgt_tbl.relnamespace
       CROSS JOIN LATERAL generate_subscripts(c.conkey, 1) AS i(pos)
       JOIN pg_attribute src_col ON src_col.attrelid = c.conrelid AND src_col.attnum = c.conkey[i.pos]
       JOIN pg_attribute tgt_col ON tgt_col.attrelid = c.confrelid AND tgt_col.attnum = c.confkey[i.pos]
-      WHERE c.contype = 'f' AND c.connamespace = 'public'::regnamespace
+      WHERE c.contype = 'f' AND src_ns.nspname NOT IN ('pg_catalog', 'information_schema')
     )
     SELECT
       fk_name,
+      match_type,
+      source_schema,
       source_table,
+      target_schema,
       target_table,
       string_agg(format('s.%I = t.%I', source_col, target_col), ' AND ' ORDER BY pos) AS join_clause,
-      string_agg(format('s.%I IS NOT NULL', source_col), ' AND ' ORDER BY pos) AS not_null_clause
+      string_agg(format('s.%I IS NOT NULL', source_col), ' AND ' ORDER BY pos) AS all_not_null_clause,
+      string_agg(format('s.%I IS NULL', source_col), ' AND ' ORDER BY pos) AS all_null_clause
     FROM fk_elements
-    GROUP BY con_oid, fk_name, source_table, target_table
+    GROUP BY con_oid, fk_name, match_type, source_schema, source_table, target_schema, target_table
   ) LOOP
-    v_sql := format(
-      'SELECT count(*) FROM %I s LEFT JOIN %I t ON %s WHERE %s AND t.ctid IS NULL',
-      r.source_table,
-      r.target_table,
-      r.join_clause,
-      r.not_null_clause
-    );
+    -- Tratamento estrito de semântica de NULL do PostgreSQL:
+    -- MATCH SIMPLE ('s'): Chave é validada se TODAS as colunas forem NOT NULL. Se qualquer coluna for NULL, a constraint é satisfeita.
+    -- MATCH FULL ('f'): Ou todas as colunas são NOT NULL e apontam para destino válido, ou todas as colunas devem ser NULL.
+    IF r.match_type = 'f' THEN
+      -- Se houver mistura de NULL e NOT NULL, ou se todas forem NOT NULL sem alvo, viola a constraint
+      v_sql := format(
+        'SELECT count(*) FROM %I.%I s LEFT JOIN %I.%I t ON %s WHERE NOT (%s) AND (t.ctid IS NULL OR NOT (%s))',
+        r.source_schema, r.source_table, r.target_schema, r.target_table,
+        r.join_clause, r.all_null_clause, r.all_not_null_clause
+      );
+    ELSE
+      -- MATCH SIMPLE (padrão): requer validação apenas quando todas as colunas da chave composta são fornecidas (NOT NULL)
+      v_sql := format(
+        'SELECT count(*) FROM %I.%I s LEFT JOIN %I.%I t ON %s WHERE (%s) AND t.ctid IS NULL',
+        r.source_schema, r.source_table, r.target_schema, r.target_table,
+        r.join_clause, r.all_not_null_clause
+      );
+    END IF;
+
     EXECUTE v_sql INTO orphan_count;
     IF orphan_count > 0 THEN
-      RAISE EXCEPTION 'VIOLACAO DE FK: Constraint % possui % registros orfaos em %',
-        r.fk_name, orphan_count, r.source_table;
+      RAISE EXCEPTION 'VIOLACAO DE FK: Constraint % possui % registros orfaos em %.%',
+        r.fk_name, orphan_count, r.source_schema, r.source_table;
     END IF;
   END LOOP;
 END \$\$;

@@ -440,15 +440,22 @@ if [ "$TABLE_COUNT" -gt 0 ]; then
   done
   ROW_COUNT_QUERY="${ROW_COUNT_QUERY} ORDER BY 1;"
 
-  # Coleta no banco restaurado
+  # Coleta na base de produção (origem) e na base efêmera (restaurada)
+  ORIGIN_ROW_COUNTS=$(docker exec -i "$PG_CONTAINER_ID" psql -U postgres -d "${TARGET_DB}" -v ON_ERROR_STOP=1 -A -t -c "$ROW_COUNT_QUERY")
   RESTORED_ROW_COUNTS=$(docker exec -i "${RESTORE_CONTAINER}" psql -U postgres -d "${TARGET_DB}" -v ON_ERROR_STOP=1 -A -t -c "$ROW_COUNT_QUERY")
 
+  if [ "$ORIGIN_ROW_COUNTS" != "$RESTORED_ROW_COUNTS" ]; then
+    echo "❌ ERRO: Divergência detectada na contagem de linhas entre Origem e Restaurado!" >&2
+    diff -u <(echo "$ORIGIN_ROW_COUNTS") <(echo "$RESTORED_ROW_COUNTS") || true
+    exit 1
+  fi
+
   {
-    echo "--- CONTAGEM DE LINHAS POR TABELA (RESTORED SNAPSHOT) ---"
+    echo "--- CONTAGEM DE LINHAS POR TABELA (ORIGEM vs RESTAURADO: 100% IDÊNTICAS) ---"
     echo "$RESTORED_ROW_COUNTS"
     echo ""
   } >> "${EVIDENCE_FILE}"
-  echo "   Contagem de linhas catalogada com sucesso para todas as ${TABLE_COUNT} tabelas."
+  echo "   Contagem de linhas validada com sucesso: 100% idêntica entre Origem e Restaurado em todas as ${TABLE_COUNT} tabelas."
 else
   echo "   Aviso: Schema public não possui tabelas de dados. Inventário registrado."
   {

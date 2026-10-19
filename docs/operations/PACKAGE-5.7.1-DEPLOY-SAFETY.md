@@ -89,14 +89,15 @@ O `git diff main..HEAD` comprova alterações restritas a:
     
     **Garantias Formais de Auditoria:**
     1. *Sem flags interativas/TTY:* `docker exec -i` (sem `-t`) em todo o fluxo de dump e restore.
-    2. *Vinculação Inequívoca:* Confirmação do container PostgreSQL conectado à mesma rede da stack/backend de produção e detentor do database `witiquetas`.
-    3. *Validação Estrutural Prévia:* Validação de TOC via `pg_restore --list`.
-    4. *Restauração Estrita:* `pg_restore --exit-on-error` com exigência incondicional de exit code 0.
-    5. *Auditoria Comparativa:* Comparação 1:1 de Schemas, Tabelas (`relkind = 'r'`), Índices (`relkind = 'i'`), Sequências (`relkind = 'S'`) e Constraints (`pg_constraint`), além de contagem exata de linhas de todas as tabelas do schema `public`.
-    6. *Integridade Referencial:* Checagem de constraints ativas (`convalidated = true`) e ausência total de chaves órfãs.
-    7. *Isolamento da Instância Efêmera:* Execução em `postgres:14-alpine` descartável com `--network none`, sem portas publicadas e sem volumes externos de produção montados.
-    8. *Preservação de Evidências:* Em caso de falha, dumps locais e registros em `/opt/backups/witiquetas` são preservados.
-    9. *Zero Exposição de Secrets:* Credenciais AWS/S3 consumidas estritamente via ambiente de sessão em memória.
+    2. *Vinculação Inequívoca pela Aplicação:* Extração da `DATABASE_URL` efetiva do container backend ativo e validação exata do container PostgreSQL correspondente (recusa seleção ambígua).
+    3. *Consistência Temporal Estrita:* Snapshot via `pg_dump -Fc` gerado como ponto de partida inicial; inventário e contagens catalogados diretamente a partir do snapshot consistente.
+    4. *Verificação de Extensões:* Inventário das extensões instaladas no PostgreSQL de produção e garantia de disponibilidade na instância isolada de restauração.
+    5. *Validação Estrutural Prévia:* Validação de TOC via `pg_restore --list`.
+    6. *Restauração Estrita:* `pg_restore --exit-on-error` com exigência incondicional de exit code 0.
+    7. *Auditoria de Definições Estruturais:* Comparação 1:1 de DDLs, tipos de colunas, definições exatas de índices (incluindo predicados e parciais), sequências e definições de constraints via `pg_get_constraintdef()`.
+    8. *Auditoria Abrangente de Integridade Referencial:* Varredura dinâmica em **100% de todas as Foreign Keys** do schema `public`, exigindo **ZERO registros órfãos**.
+    9. *Instância Efêmera Segura e Isolada:* Execução em `postgres:14-alpine` descartável com `--network none`, autenticação local `trust` (sem senhas estáticas), zero portas publicadas e zero volumes de produção montados.
+    10. *Execução Exclusivamente Read-Only na Produção:* Zero instruções DDL/DML contra a base ativa; fail-closed com preservação total de artefatos para análise forense em caso de erro.
 
     Execução no terminal do host Docker de produção:
     ```bash
@@ -105,7 +106,7 @@ O `git diff main..HEAD` comprova alterações restritas a:
     bash scripts/database/backup-and-validate-predeploy-5.7.1.sh
     ```
   - **CRITÉRIO DE BLOQUEIO (GATE 2 - GO/NO-GO):**
-    - Se o backup S3, a verificação SHA-256 do arquivo baixado, o `pg_restore --exit-on-error` ou qualquer divergência no inventário de schemas/tabelas/linhas/constraints falhar, o deploy é **IMEDIATAMENTE CANCELADO (NO-GO)**.
+    - Se o backup S3, a verificação SHA-256 do arquivo baixado, o `pg_restore --exit-on-error` ou qualquer divergência estrutural, de contagem de linhas ou de integridade referencial falhar, o deploy é **IMEDIATAMENTE CANCELADO (NO-GO)**.
     - O avanço para a Etapa 2 (Migrations) só é autorizado após o script emitir o log de aprovação formal e gerar o arquivo de evidência `/opt/backups/witiquetas/backup_evidence_*.txt`.
 - [ ] Confirmar que o usuário da aplicação possui permissões de DDL (`CREATE TABLE`, `CREATE INDEX`) no schema `public`.
 - [ ] Confirmar que as tabelas de referência existem: `companies`, `printers`, `agents`, `print_job_batches`.

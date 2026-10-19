@@ -62,10 +62,10 @@ O `git diff main..HEAD` comprova alterações restritas a:
     ```bash
     TIMESTAMP=$(date +%Y%m%d_%H%M%S)
     PG_CONTAINER=$(docker ps -q -f name=postgres)
-    docker exec -t $PG_CONTAINER pg_dump -U witiquetas -d witiquetas -F c -b -v -f /tmp/pre-5.7.1-${TIMESTAMP}.dump
+    docker exec -i $PG_CONTAINER pg_dump -U witiquetas -d witiquetas -F c -b -v -f /tmp/pre-5.7.1-${TIMESTAMP}.dump
     mkdir -p /opt/backups/witiquetas
     docker cp ${PG_CONTAINER}:/tmp/pre-5.7.1-${TIMESTAMP}.dump /opt/backups/witiquetas/pre-5.7.1-${TIMESTAMP}.dump
-    docker exec ${PG_CONTAINER} rm -f /tmp/pre-5.7.1-${TIMESTAMP}.dump
+    docker exec -i ${PG_CONTAINER} rm -f /tmp/pre-5.7.1-${TIMESTAMP}.dump
     ```
   - **Tier 2 (Armazenamento Externo Independente / Off-Host — S3 WRTEC):**
     Envio obrigatório para bucket S3 isolado fora do cluster Swarm (`https://s3.wrtec.com.br`, bucket `witiquetas-bkp`, região `eu-south`).

@@ -74,20 +74,33 @@ cleanup() {
     echo "⚠️  EVIDÊNCIAS PRESERVADAS: Arquivos e logs em ${BACKUP_ROOT} mantidos para auditoria forense."
   fi
 
-  # Remover apenas o container efêmero de teste de restauração
+  # Remover container efêmero de teste de restauração
   if docker ps -a --format '{{.Names}}' 2>/dev/null | grep -q "^${RESTORE_CONTAINER}$"; then
     echo "🧹 Removendo container efêmero de teste: ${RESTORE_CONTAINER}"
-    docker rm -f "${RESTORE_CONTAINER}" >/dev/null 2>&1 || true
+    if ! docker rm -f "${RESTORE_CONTAINER}" >/dev/null 2>&1; then
+      echo "⚠️  AVISO CRÍTICO: Falha ao remover container efêmero de teste: ${RESTORE_CONTAINER}" >&2
+      exit_code=1
+    fi
   fi
 
   # Remover diretório de verificação apenas se tudo foi bem-sucedido
   if [ $exit_code -eq 0 ]; then
     if [ -d "${VERIFY_DIR}" ]; then
-      rm -rf "${VERIFY_DIR}"
+      if ! rm -rf "${VERIFY_DIR}"; then
+        echo "⚠️  AVISO CRÍTICO: Falha ao limpar diretório de verificação: ${VERIFY_DIR}" >&2
+        exit_code=1
+      fi
     fi
+  fi
+
+  if [ $exit_code -eq 0 ]; then
     echo "======================================================================"
     echo "✅ PROCEDIMENTO DE BACKUP E VALIDAÇÃO CONCLUÍDO COM SUCESSO! (GO)"
     echo "   Evidência salva em: ${EVIDENCE_FILE}"
+    echo "======================================================================"
+  else
+    echo "======================================================================"
+    echo "🚨 FALHA CRÍTICA NO BACKUP, VALIDAÇÃO OU LIMPEZA. DEPLOY BLOQUEADO (NO-GO)."
     echo "======================================================================"
   fi
   exit $exit_code
@@ -380,18 +393,21 @@ if ! docker exec -i "${RESTORE_CONTAINER}" pg_isready -U postgres >/dev/null 2>&
   exit 1
 fi
 
-# Validar que a imagem descartável possui as extensões disponíveis sem pré-criá-las
+# Validar que a imagem descartável possui as extensões e versões disponíveis sem pré-criá-las
 # (o pg_restore recria extensões; pré-criá-las com --exit-on-error geraria conflito)
 if [ -n "$ORIGIN_EXTENSIONS" ]; then
   echo "$ORIGIN_EXTENSIONS" | while IFS='|' read -r extname extver; do
     [ -z "$extname" ] && continue
-    AVAIL=$(docker exec -i "${RESTORE_CONTAINER}" psql -U postgres -t -c "SELECT count(*) FROM pg_available_extensions WHERE name = '$extname';" | xargs)
-    if [ "$AVAIL" -eq 0 ]; then
-      echo "❌ ERRO: Extensão '$extname' presente na produção não está disponível na imagem postgres:14-alpine!" >&2
+    AVAIL_ROW=$(docker exec -i "${RESTORE_CONTAINER}" psql -U postgres -t -c "
+      SELECT default_version FROM pg_available_extensions WHERE name = '$extname';
+    " | xargs || true)
+    if [ -z "$AVAIL_ROW" ]; then
+      echo "❌ ERRO: Extensão '$extname' presente na produção não está disponível na imagem de validação!" >&2
       exit 1
     fi
+    echo "   Extensão '$extname' validada: Origem v${extver}, Disponível v${AVAIL_ROW}."
   done
-  echo "   Extensões de produção validadas como disponíveis na imagem de teste."
+  echo "   Todas as extensões de produção estão disponíveis e compatíveis na imagem de teste."
 fi
 
 echo "   Criando banco '${TARGET_DB}' no container isolado..."
@@ -415,8 +431,8 @@ echo "📊 [10/10] Executando auditoria estrutural detalhada e integridade refer
 # Consulta SQL canônica para definições estruturais completas:
 # Tabelas, Colunas, Índices, Sequências, Constraints, Views, Funções, Triggers e RLS
 STRUCTURAL_INVENTORY_SQL="
-  -- 1. Colunas e tipos
-  SELECT 'COLUMNS:' AS item_type, table_schema || '.' || table_name || '.' || column_name || '|' || data_type || '|' || is_nullable
+  -- 1. Colunas, tipos, defaults e nullability
+  SELECT 'COLUMNS:' AS item_type, table_schema || '.' || table_name || '.' || column_name || '|' || data_type || '|' || is_nullable || '|' || coalesce(column_default, 'NULL')
   FROM information_schema.columns
   WHERE table_schema NOT IN ('pg_catalog', 'information_schema')
   UNION ALL
@@ -447,13 +463,13 @@ STRUCTURAL_INVENTORY_SQL="
   JOIN pg_namespace n ON n.oid = p.pronamespace
   WHERE n.nspname NOT IN ('pg_catalog', 'information_schema')
   UNION ALL
-  -- 7. Triggers
-  SELECT 'TRIGGERS:' AS item_type, trigger_schema || '.' || trigger_name || '|' || event_manipulation || '|' || event_object_table
+  -- 7. Triggers com definição completa de evento e ação
+  SELECT 'TRIGGERS:' AS item_type, trigger_schema || '.' || trigger_name || '|' || event_manipulation || '|' || event_object_table || '|' || action_statement || '|' || action_timing
   FROM information_schema.triggers
   WHERE trigger_schema NOT IN ('pg_catalog', 'information_schema')
   UNION ALL
-  -- 8. Políticas de Row Level Security (RLS)
-  SELECT 'RLS_POLICIES:' AS item_type, schemaname || '.' || tablename || '.' || policyname || '|' || cmd || '|' || qual
+  -- 8. Políticas de Row Level Security (RLS) completas (cmd, roles, qual, with_check)
+  SELECT 'RLS_POLICIES:' AS item_type, schemaname || '.' || tablename || '.' || policyname || '|' || cmd || '|' || array_to_string(roles, ',') || '|' || coalesce(qual, '') || '|' || coalesce(with_check, '')
   FROM pg_policies
   WHERE schemaname NOT IN ('pg_catalog', 'information_schema')
   ORDER BY 1, 2;
@@ -468,7 +484,7 @@ if [ "$ORIGIN_STRUCTURE" != "$RESTORED_STRUCTURE" ]; then
   diff -u <(echo "$ORIGIN_STRUCTURE") <(echo "$RESTORED_STRUCTURE") || true
   exit 1
 fi
-echo "   Definições estruturais completas (colunas, índices, constraints, views, funções, triggers, RLS) 100% idênticas."
+echo "   Definições estruturais completas (colunas, índices, constraints, views, funções, triggers, RLS) 100% idênticas ao snapshot T0."
 
 # Coletar lista de tabelas de dados de todos os schemas de aplicação
 APP_TABLES=$(docker exec -i "${RESTORE_CONTAINER}" psql -U postgres -d "${TARGET_DB}" -v ON_ERROR_STOP=1 -A -t -c "

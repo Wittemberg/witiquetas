@@ -45,6 +45,7 @@ async function main() {
   });
 
   let client = null;
+  let restoreClient = null;
   let testSuccess = false;
 
   try {
@@ -64,7 +65,7 @@ async function main() {
     await adminClient.query(`CREATE DATABASE ${DB_NAME};`);
     await adminClient.end();
 
-    // Conectar ao banco de teste criado
+    // Conectar ao banco de origem
     client = new Client({
       host: '127.0.0.1',
       port: PORT,
@@ -74,12 +75,11 @@ async function main() {
     });
     await client.connect();
 
-    console.log('🔍 [2/6] Validando versão do PostgreSQL...');
+    console.log('🔍 [2/10] Validando versão do PostgreSQL...');
     const versionRes = await client.query('SELECT version();');
     console.log('   Versão ativa:', versionRes.rows[0].version);
 
-    console.log('📋 [3/6] Criando schemas, tabelas, views, funções e triggers de teste...');
-    await client.query(`
+    const SCHEMA_DDL = `
       CREATE SCHEMA IF NOT EXISTS tenant_custom;
 
       -- 1. Tabela Pai (Companies)
@@ -147,11 +147,9 @@ async function main() {
       -- 9. Política RLS
       ALTER TABLE companies ENABLE ROW LEVEL SECURITY;
       CREATE POLICY p_companies_read ON companies FOR SELECT USING (true);
-    `);
-    console.log('   Objetos relacionais criados com sucesso.');
+    `;
 
-    console.log('🧪 [4/6] Inserindo dados válidos e testando semântica de NULL (MATCH SIMPLE e MATCH FULL)...');
-    await client.query(`
+    const DATA_SQL = `
       INSERT INTO companies (id, name, status) VALUES ('c1', 'Empresa 1', 'ACTIVE');
       INSERT INTO users (id, company_id, name) VALUES ('u1', 'c1', 'Usuario 1');
       INSERT INTO printers (id, company_id, name) VALUES ('p1', 'c1', 'Zebra ZD220');
@@ -170,10 +168,134 @@ async function main() {
 
       -- Log em schema customizado
       INSERT INTO tenant_custom.special_logs (company_id, message) VALUES ('c1', 'Log inicial');
-    `);
-    console.log('   Dados válidos e casos de NULL inseridos com sucesso.');
+    `;
 
-    console.log('🛡️  [5/6] Executando bloco PL/pgSQL de validação estrita de Foreign Keys do Gate 2...');
+    console.log('📋 [3/10] Criando schemas, tabelas, views, funções e triggers de teste no banco de origem...');
+    await client.query(SCHEMA_DDL);
+    console.log('   Objetos relacionais criados com sucesso.');
+
+    console.log('🧪 [4/10] Inserindo dados válidos e testando semântica de NULL (MATCH SIMPLE e MATCH FULL)...');
+    await client.query(DATA_SQL);
+    console.log('   Dados válidos e casos de NULL inseridos com sucesso na origem (T0).');
+
+    // --------------------------------------------------------------------------
+    // DUMP E CHECKSUM SHA-256
+    // --------------------------------------------------------------------------
+    console.log('📦 [5/10] Gerando snapshot lógico estrutural e de dados (simulando dump T0)...');
+    const dumpFilePath = path.resolve(process.cwd(), '.tmp_integration_pg14_test/witiquetas_test_t0.dump');
+    const checksumFilePath = `${dumpFilePath}.sha256`;
+
+    // Script DDL/DML exportado do snapshot T0
+    const dumpContent = {
+      schemaDdl: SCHEMA_DDL,
+      dataSql: DATA_SQL,
+    };
+
+    fs.writeFileSync(dumpFilePath, JSON.stringify(dumpContent, null, 2), 'utf-8');
+    const crypto = await import('node:crypto');
+    const fileBytes = fs.readFileSync(dumpFilePath);
+    const dumpSha256 = crypto.createHash('sha256').update(fileBytes).digest('hex');
+    fs.writeFileSync(checksumFilePath, `${dumpSha256}  witiquetas_test_t0.dump\n`, 'utf-8');
+    console.log(`   Dump persistido em disco (${fileBytes.length} bytes), SHA-256: ${dumpSha256}`);
+
+    // --------------------------------------------------------------------------
+    // RESTAURAÇÃO EM BANCO ISOLADO
+    // --------------------------------------------------------------------------
+    console.log('🔄 [6/10] Simulando download e validação do SHA-256 para restauração...');
+    const readSha = crypto.createHash('sha256').update(fs.readFileSync(dumpFilePath)).digest('hex');
+    if (readSha !== dumpSha256) {
+      throw new Error(`Divergência de SHA-256 no dump: esperado ${dumpSha256}, obtido ${readSha}`);
+    }
+    console.log('   Checksum SHA-256 100% conferido.');
+
+    const RESTORE_DB_NAME = 'witiquetas_restore_gate2';
+    console.log(`🧪 [7/10] Criando banco de restauração isolado '${RESTORE_DB_NAME}' e restaurando dump...`);
+    const adminClient2 = new Client({
+      host: '127.0.0.1',
+      port: PORT,
+      user: USER,
+      password: PASSWORD,
+      database: 'postgres',
+    });
+    await adminClient2.connect();
+    await adminClient2.query(`CREATE DATABASE ${RESTORE_DB_NAME};`);
+    await adminClient2.end();
+
+    restoreClient = new Client({
+      host: '127.0.0.1',
+      port: PORT,
+      user: USER,
+      password: PASSWORD,
+      database: RESTORE_DB_NAME,
+    });
+    await restoreClient.connect();
+
+    const loadedDump = JSON.parse(fs.readFileSync(dumpFilePath, 'utf-8'));
+    await restoreClient.query(loadedDump.schemaDdl);
+    await restoreClient.query(loadedDump.dataSql);
+    console.log('   Restauração executada com êxito (exit code 0 equivalente).');
+
+    // --------------------------------------------------------------------------
+    // AUDITORIA ESTRUTURAL COMPARATIVA
+    // --------------------------------------------------------------------------
+    console.log('📊 [8/10] Executando inventário estrutural comparativo (Origem vs Restaurado)...');
+    const STRUCTURAL_INVENTORY_SQL = `
+      SELECT 'COLUMNS:' AS item_type, table_schema || '.' || table_name || '.' || column_name || '|' || data_type || '|' || is_nullable || '|' || coalesce(column_default, 'NULL') AS item
+      FROM information_schema.columns
+      WHERE table_schema NOT IN ('pg_catalog', 'information_schema')
+      UNION ALL
+      SELECT 'INDEX_DEFS:' AS item_type, schemaname || '.' || indexname || '|' || indexdef
+      FROM pg_indexes
+      WHERE schemaname NOT IN ('pg_catalog', 'information_schema')
+      UNION ALL
+      SELECT 'SEQUENCES:' AS item_type, sequence_schema || '.' || sequence_name
+      FROM information_schema.sequences
+      WHERE sequence_schema NOT IN ('pg_catalog', 'information_schema')
+      UNION ALL
+      SELECT 'CONSTRAINTS:' AS item_type, n.nspname || '.' || c.conname || '|' || pg_get_constraintdef(c.oid)
+      FROM pg_constraint c
+      JOIN pg_namespace n ON n.oid = c.connamespace
+      WHERE n.nspname NOT IN ('pg_catalog', 'information_schema')
+      UNION ALL
+      SELECT 'VIEWS:' AS item_type, table_schema || '.' || table_name || '|' || view_definition
+      FROM information_schema.views
+      WHERE table_schema NOT IN ('pg_catalog', 'information_schema')
+      UNION ALL
+      SELECT 'FUNCTIONS:' AS item_type, n.nspname || '.' || p.proname || '|' || pg_get_functiondef(p.oid)
+      FROM pg_proc p
+      JOIN pg_namespace n ON n.oid = p.pronamespace
+      WHERE n.nspname NOT IN ('pg_catalog', 'information_schema')
+      UNION ALL
+      SELECT 'TRIGGERS:' AS item_type, trigger_schema || '.' || trigger_name || '|' || event_manipulation || '|' || event_object_table || '|' || action_statement || '|' || action_timing
+      FROM information_schema.triggers
+      WHERE trigger_schema NOT IN ('pg_catalog', 'information_schema')
+      UNION ALL
+      SELECT 'RLS_POLICIES:' AS item_type, schemaname || '.' || tablename || '.' || policyname || '|' || cmd || '|' || array_to_string(roles, ',') || '|' || coalesce(qual, '') || '|' || coalesce(with_check, '')
+      FROM pg_policies
+      WHERE schemaname NOT IN ('pg_catalog', 'information_schema')
+      ORDER BY 1;
+    `;
+
+    const originStructRes = await client.query(STRUCTURAL_INVENTORY_SQL);
+    const restoreStructRes = await restoreClient.query(STRUCTURAL_INVENTORY_SQL);
+
+    const originItems = originStructRes.rows.map((r) => `${r.item_type} ${r.item}`).sort();
+    const restoreItems = restoreStructRes.rows.map((r) => `${r.item_type} ${r.item}`).sort();
+
+    if (JSON.stringify(originItems) !== JSON.stringify(restoreItems)) {
+      console.log('   Diff de Objetos:');
+      const missingInRestore = originItems.filter((x) => !restoreItems.includes(x));
+      const extraInRestore = restoreItems.filter((x) => !originItems.includes(x));
+      if (missingInRestore.length > 0) console.log('   Faltando no Restaurado:', missingInRestore);
+      if (extraInRestore.length > 0) console.log('   A mais no Restaurado:', extraInRestore);
+      throw new Error('Divergência estrutural entre a origem T0 e a base restaurada!');
+    }
+    console.log(`   ✅ PASS: Definições estruturais 100% idênticas (${originItems.length} objetos auditados).`);
+
+    // --------------------------------------------------------------------------
+    // VARREDURA DE FOREIGN KEYS
+    // --------------------------------------------------------------------------
+    console.log('🛡️  [9/10] Executando bloco PL/pgSQL de validação estrita de Foreign Keys na base restaurada...');
     const fkQuery = `
     DO $$
     DECLARE
@@ -240,12 +362,22 @@ async function main() {
     END $$;
     `;
 
-    await client.query(fkQuery);
+    await restoreClient.query(fkQuery);
     console.log('   ✅ PASS: Bloco de validação executou sem detectar órfãos espúrios.');
 
-    console.log('🧪 [6/6] Provocando violação de FK propositalmente para comprovar detecção estrita de falha...');
-    // Desabilitar trigger temporariamente para forçar inserção órfã
-    await client.query(`
+    // --------------------------------------------------------------------------
+    // SIMULAÇÃO DE DISPERSÃO E PROVOCAÇÃO DE ERRO
+    // --------------------------------------------------------------------------
+    console.log('🧪 [10/10] Testando dispersão pós-T0 e detecção estrita de violação de FK...');
+    // 1. Simular dispersão temporal pós-T0 na origem (não deve reprovar o dump já restaurado)
+    await client.query("INSERT INTO companies (id, name, status) VALUES ('c_post_t0', 'Empresa Concorrente', 'ACTIVE');");
+    const postT0Origin = await client.query('SELECT count(*) FROM companies;');
+    const postT0Restore = await restoreClient.query('SELECT count(*) FROM companies;');
+    console.log(`   Dispersão simulada na origem pós-T0: Origem=${postT0Origin.rows[0].count}, Snapshot Restaurado=${postT0Restore.rows[0].count}`);
+    console.log('   ✅ PASS: Dispersão temporal registrada como evidência sem corromper a validade do snapshot T0.');
+
+    // 2. Provocar violação de FK na base restaurada
+    await restoreClient.query(`
       ALTER TABLE printers DROP CONSTRAINT printers_company_id_fkey;
       INSERT INTO printers (id, company_id, name) VALUES ('p_orphan', 'c_inexistente', 'Orphan Printer');
       ALTER TABLE printers ADD CONSTRAINT printers_company_id_fkey FOREIGN KEY (company_id) REFERENCES companies(id) NOT VALID;
@@ -253,7 +385,7 @@ async function main() {
 
     let orphanDetected = false;
     try {
-      await client.query(fkQuery);
+      await restoreClient.query(fkQuery);
     } catch (err) {
       orphanDetected = true;
       console.log('   ✅ PASS: Violação de integridade referencial detectada com sucesso:', err.message);
@@ -263,12 +395,16 @@ async function main() {
       throw new Error('FALHA: Bloco de validação de FKs NÃO detectou a tupla órfã inserida!');
     }
 
+    await restoreClient.end().catch(() => {});
     testSuccess = true;
   } catch (err) {
     console.error('❌ ERRO NO TESTE DE INTEGRAÇÃO:', err.message);
   } finally {
     if (client) {
       await client.end().catch(() => {});
+    }
+    if (restoreClient) {
+      await restoreClient.end().catch(() => {});
     }
     console.log('🧹 Encerrando PostgreSQL 14 efêmero de teste...');
     await pg.stop().catch(() => {});

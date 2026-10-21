@@ -55,18 +55,66 @@ O `git diff main..HEAD` comprova alterações restritas a:
 - **Segurança de Reexecução:** Todas as instruções DDL utilizam `CREATE TABLE IF NOT EXISTS` e `CREATE INDEX IF NOT EXISTS`. A migration é 100% idempotente.
 - **Impacto e Locks:** Como são tabelas novas (`print_jobs` e `print_job_events`), o DDL não reescreve dados das tabelas existentes. A criação de chaves estrangeiras referenciando tabelas existentes (`companies`, `printers`, `agents`, `print_job_batches`) adquire lock do tipo `SHARE ROW EXCLUSIVE` sobre as tabelas referenciadas durante a validação da constraint. Em tabelas com baixa concorrência DDL o overhead é mínimo, mas a migração deve ser aplicada fora de transações concorrentes longas para prevenir fila de locks.
 
-### 2.2 Checklist Pré-Migration
+### 2.2 Checklist Pré-Migration e Política de Backup de 2 Níveis
 - [ ] Verificar integridade do cluster PostgreSQL de produção (`SELECT version();`).
-- [ ] Executar backup completo via `pg_dump` antes de qualquer alteração:
-  ```bash
-  pg_dump -h $DB_HOST -U $DB_USER -d $DB_NAME -F c -b -v -f "/backups/pre-5.7.1-$(date +%Y%m%d%H%M%S).dump"
-  ```
+- [ ] **BACKUP OBRIGATÓRIO DE DOIS NÍVEIS (DEPLOY BLOQUEADO SEM CONFIRMAÇÃO):**
+  - **Tier 1 (Host Local do Cluster):** Extração do container para o filesystem do host:
+    ```bash
+    TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+    PG_CONTAINER=$(docker ps -q -f name=postgres)
+    docker exec -i $PG_CONTAINER pg_dump -U witiquetas -d witiquetas -F c -b -v -f /tmp/pre-5.7.1-${TIMESTAMP}.dump
+    mkdir -p /opt/backups/witiquetas
+    docker cp ${PG_CONTAINER}:/tmp/pre-5.7.1-${TIMESTAMP}.dump /opt/backups/witiquetas/pre-5.7.1-${TIMESTAMP}.dump
+    docker exec -i ${PG_CONTAINER} rm -f /tmp/pre-5.7.1-${TIMESTAMP}.dump
+    ```
+  - **Tier 2 (Armazenamento Externo Independente / Off-Host — S3 WRTEC):**
+    Envio obrigatório para bucket S3 isolado fora do cluster Swarm (`https://s3.wrtec.com.br`, bucket `witiquetas-bkp`, região `eu-south`).
+    As credenciais devem ser fornecidas exclusivamente via variáveis de ambiente da sessão do operador (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`) — **PROIBIDO ARMAZENAR SECRETS EM CÓDIGO OU DOCUMENTAÇÃO**:
+    ```bash
+    # 1. Envio seguro para S3 (AWS CLI / MinIO Client)
+    aws --endpoint-url https://s3.wrtec.com.br --region eu-south s3 cp \
+      /opt/backups/witiquetas/pre-5.7.1-${TIMESTAMP}.dump \
+      s3://witiquetas-bkp/pre-5.7.1-${TIMESTAMP}.dump
+
+    aws --endpoint-url https://s3.wrtec.com.br --region eu-south s3 cp \
+      /opt/backups/witiquetas/pre-5.7.1-${TIMESTAMP}.dump.sha256 \
+      s3://witiquetas-bkp/pre-5.7.1-${TIMESTAMP}.dump.sha256
+
+    # 2. Confirmação de integridade remota
+    aws --endpoint-url https://s3.wrtec.com.br --region eu-south s3 ls \
+      s3://witiquetas-bkp/pre-5.7.1-${TIMESTAMP}.dump
+    ```
+  - **Automação Canônica do Backup e Restauração de Teste:**
+    O procedimento completo de segurança e auditoria pré-deploy está codificado no script [`scripts/database/backup-and-validate-predeploy-5.7.1.sh`](file:///scripts/database/backup-and-validate-predeploy-5.7.1.sh).
+    
+    **Garantias Formais de Auditoria:**
+    1. *Sem flags interativas/TTY:* `docker exec -i` (sem `-t`) em todo o fluxo de dump e restore.
+    2. *Vinculação Inequívoca e Rejeição de Ambiguidade:* Exige exatamente 1 container backend ativo (recusa seleção arbitrária); extrai a `DATABASE_URL` efetiva e rejeita `localhost`/`127.0.0.1` como identificador suficiente, exigindo correspondência estrita de rede e alias.
+    3. *Consistência Temporal e Fotografia T0:* O snapshot atômico (`pg_dump -Fc`) é gerado como ponto inicial invariante. Contagens posteriores da produção não são presumidas como mesma fotografia transacional de T0 (auditoria de dispersão sem falso positivo).
+    4. *Compatibilidade de Extensões:* Mapeia extensões na origem e valida disponibilidade na imagem de teste sem pré-criação conflitante.
+    5. *Validação Estrutural Prévia:* Validação de TOC via `pg_restore --list`.
+    6. *Restauração Estrita:* `pg_restore --exit-on-error` com exigência incondicional de exit code 0.
+    7. *Auditoria Estrutural Expandida:* Comparação 1:1 de Tabelas, Colunas, Índices (incluindo predicados e parciais), Sequências, Constraints, Views, Funções/Procedures, Triggers e Políticas de Row Level Security (RLS).
+    8. *Auditoria de Integridade Referencial com Semântica de NULL:* Varredura dinâmica em 100% das Foreign Keys (simples e compostas), respeitando a semântica formal do PostgreSQL para `MATCH SIMPLE` (satisfeita se qualquer coluna for NULL) e `MATCH FULL`.
+    9. *Instância Efêmera Segura e Isolada:* Execução em `postgres:14-alpine` descartável com `--network none`, autenticação local `trust` (sem senhas estáticas), zero portas publicadas e zero volumes de produção montados.
+    10. *Execução Exclusivamente Read-Only na Produção:* Zero instruções DDL/DML contra a base ativa; fail-closed com preservação total de artefatos para análise forense em caso de erro.
+
+    Execução no terminal do host Docker de produção:
+    ```bash
+    export AWS_ACCESS_KEY_ID="sua_chave"
+    export AWS_SECRET_ACCESS_KEY="seu_segredo"
+    bash scripts/database/backup-and-validate-predeploy-5.7.1.sh
+    ```
+  - **CRITÉRIO DE BLOQUEIO (GATE 2 - GO/NO-GO):**
+    - Se o backup S3, a verificação SHA-256 do arquivo baixado, o `pg_restore --exit-on-error` ou qualquer divergência estrutural, de contagem de linhas ou de integridade referencial falhar, o deploy é **IMEDIATAMENTE CANCELADO (NO-GO)**.
+    - O avanço para a Etapa 2 (Migrations) só é autorizado após o script emitir o log de aprovação formal e gerar o arquivo de evidência `/opt/backups/witiquetas/backup_evidence_*.txt`.
 - [ ] Confirmar que o usuário da aplicação possui permissões de DDL (`CREATE TABLE`, `CREATE INDEX`) no schema `public`.
 - [ ] Confirmar que as tabelas de referência existem: `companies`, `printers`, `agents`, `print_job_batches`.
 
 ### 2.3 Procedimento de Aplicação (Somente quando autorizado)
 ```bash
-psql -h $DB_HOST -U $DB_USER -d $DB_NAME -f apps/backend/src/migrations/011_create_persistent_print_queue_tables.sql
+# Execução com timeout estrito para prevenir lock contention prolongado
+psql -h $DB_HOST -U $DB_USER -d $DB_NAME -v ON_ERROR_STOP=1 -c "SET statement_timeout = '15s';" -f apps/backend/src/migrations/011_create_persistent_print_queue_tables.sql
 ```
 
 ### 2.4 Consultas SQL de Verificação Pós-Migration
@@ -131,6 +179,7 @@ stateDiagram-v2
 6. **Retry Gera Novo Job:** Quando a decisão for `CONFIRM_FAILED_AND_RETRY`, o job original é marcado imutavelmente como `FAILED`, e um novo registro independente com novo ID é inserido em `PENDING`.
 7. **Semântica de DELIVERED_TO_TRANSPORT:** `DELIVERED_TO_TRANSPORT` certifica apenas que os bytes foram aceitos pelo socket TCP do dispositivo ou spooler local; não comprova saída de mídia física.
 8. **Impossibilidade de Reimpressão por Sweeper:** O sweeper em background apenas transiciona jobs para `EXPIRED_LEASE` ou `UNKNOWN_RESULT`. Ele nunca cria novas tentativas e nunca reexecuta jobs.
+9. **Distinção Estrita entre DELIVERED_TO_TRANSPORT e PRINTED:** O status `PRINTED` só pode ser emitido pelo sistema quando houver confirmação de hardware por telemetria bidirecional comprovando a ejeção mecânica da etiqueta. Em canais unidirecionais comuns (RAW TCP porta 9100 ou impressoras sem sensor de saída), o estado terminal alcançável pelo transporte é estritamente `DELIVERED_TO_TRANSPORT`. É proibido assumir `PRINTED` sem comprovação física ou telemetria bidirecional real.
 
 ---
 
@@ -282,57 +331,81 @@ curl -s -X POST "http://localhost:3000/api/print-jobs/$JOB_ID/resolve-ambiguous"
 
 > [!IMPORTANT]
 > **ESTE PLANO NÃO DEVE SER EXECUTADO NESTA SESSÃO.**  
-> A execução requer aprovação formal prévia da governança.
+> A execução requer aprovação formal prévia da governança humana.
 
-### 5.1 Sequência Operacional Controlada (13 Passos)
-1. **Confirmação do Commit:** Validar que o commit em staging corresponde a `904caa1b8036393d558dc4d15645de8b6f60f2fa`.
-2. **Backup Pré-Deploy:** Executar `pg_dump` no banco de produção e armazenar o arquivo em local seguro.
-3. **Verificação de Variáveis:** Confirmar que `DATABASE_URL` aponta para o cluster PostgreSQL de produção com credenciais válidas.
-4. **Verificação de Permissões:** Validar permissão de DDL para o usuário da aplicação.
-5. **Conferência de Migrations:** Verificar que as migrations 001 a 010 estão aplicadas no banco.
-6. **Aplicação da Migration 011:** Executar o script `011_create_persistent_print_queue_tables.sql`.
-7. **Validação do Schema:** Executar queries de verificação da Etapa 2.4.
-8. **Promoção de Imagem:** Promover imagem imutável `ghcr.io/wittemberg/witiquetas-backend:candidate-904caa1` para `:production-904caa1` e atualizar a tag `:stable`.
-9. **Disparo do Redeploy Portainer:** Acionar webhook do Portainer para atualizar o serviço `witiquetas_backend`.
-10. **Validação de Healthcheck:** Consultar `GET https://witiquetas.wrtec.com.br/api/health` até obter `200 OK`.
-11. **Validação de Versão em Produção:** Confirmar em `/api/version` que o commit em execução é exatamente `904caa1`.
-12. **Smoke Tests Não Físicos:** Executar teste sintético de criação de job com tenant de teste, confirmando inserção relacional.
-13. **Homologação Final:** Assinar o encerramento do deploy na governança DCC.
+### 5.1 Sequência Operacional Controlada
+1. **Confirmação do Commit:** Validar que o commit a ser implantado corresponde exatamente ao HEAD homologado da `main`: `6b6d8c5ff9ce0934a4128ce0edf3e735bf36710f` (`6b6d8c5`), com CI Run `#214` SUCCESS.
+2. **Backup Pré-Deploy de Dois Níveis:** Executar dump completo conforme Seção 2.2, transferir para armazenamento externo independente (off-host) e validar integridade via `pg_restore --list`. **Deploy cancelado se o backup não for confirmado.**
+3. **Verificação de Variáveis e Permissões:** Confirmar que `DATABASE_URL` aponta para o cluster de produção e que o usuário possui permissão de DDL no schema `public`.
+4. **Aplicação Controlada da Migration 011:** Executar `011_create_persistent_print_queue_tables.sql` com `statement_timeout = '15s'` para prevenir lock contention prolongado sobre tabelas existentes.
+5. **Validação do Schema (Somente Leitura):** Executar queries de verificação da Seção 2.4 confirmando a existência de `print_jobs` e `print_job_events`.
+6. **Promoção de Imagem no GHCR:** Promover imagem candidata `ghcr.io/wittemberg/witiquetas-backend:candidate-6b6d8c5ff9ce0934a4128ce0edf3e735bf36710f` para `:production-6b6d8c5...` e `:stable`.
+7. **Disparo do Redeploy no Docker Swarm:** Acionar webhook do Portainer ou atualizar exclusivamente os serviços `witiquetas_backend` e `witiquetas_frontend` via rolling update. **Proibido reiniciar Docker daemon, Traefik, PostgreSQL ou outros serviços da máquina.**
+8. **Validação de Estabilização:** Aguardar estabilização do container (timeout máximo: 60 segundos).
+9. **Smoke Tests (100% Somente Leitura):**
+   - **PROIBIDO CRIAR JOBS REAIS OU SINTÉTICOS EM PRODUÇÃO NESTA ETAPA.**
+   - `GET /api/health`: Validar HTTP 200, status `HEALTHY`, PostgreSQL `OK` e MinIO `OK`.
+   - `GET /api/version`: Validar que o commit ativo é exatamente `6b6d8c5ff9ce0934a4128ce0edf3e735bf36710f`.
+   - `curl -I /api/agents/download/windows-x64`: Validar HTTP 200 e Content-Length > 1 MB sem executar download completo no host.
+   - Logs do container: Confirmar mensagem `[LeaseReaperService] iniciado com intervalo de 10s` e zero erros 5xx/FATAL.
+10. **Homologação Física Específica (Reservada):** Impressão real reservada exclusivamente para homologação assistida posterior, com autorização humana explícita, operador posicionado na impressora térmica e bobina de teste.
 
-### 5.2 Critérios Objetivos de GO / NO-GO
-- **Critérios para GO (Prosseguir):**
-  - Backup do banco concluído com sucesso e verificado.
-  - Migration 011 executada com sucesso, sem erros de syntax/constraints e sem bloqueios de lock prolongados.
-  - Endpoint `/api/health` retornando status HEALTHY (código HTTP 200) com validação estável de PostgreSQL e MinIO após a estabilização do container.
-  - Zero erros 500 no log do backend durante inicialização do pool PostgreSQL e ativação do Lease Reaper.
-- **Critérios para NO-GO (Abortar Imediatamente e Conter):**
-  - Falha de conexão com PostgreSQL na inicialização.
-  - Divergência no commit reportado por `/api/version`.
-  - Falha em qualquer das queries de validação de schema.
-  - Crash ou reinicialização em loop do container Portainer.
+### 5.2 Critérios Objetivos de GO / NO-GO e Timeouts Operacionais
+- **Timeouts Formais:**
+  - *Timeout de Lock da Migration:* 15 segundos (`SET statement_timeout = '15s'`). Se exceder, abortar transação imediatamente.
+  - *Timeout de Estabilização pós-Deploy:* 60 segundos para retorno HTTP 200 em `/api/health`.
+  - *Threshold de Erros:* 3 falhas HTTP 5xx consecutivas ou latência de consulta PostgreSQL $> 500\text{ ms}$ aciona gatilho NO-GO.
+- **Critérios para GO (Manter Versão 5.7.1):**
+  - Backup Tier 2 confirmado e íntegro no storage independente.
+  - Migration 011 concluída com exit code 0 sem locks pendentes.
+  - Endpoint `/api/health` retornando `HEALTHY` de forma estável.
+  - `/api/version` confirmando commit `6b6d8c5`.
+  - Zero erros de inicialização nos logs.
+- **Critérios para NO-GO (Rollback Imediato):**
+  - Falha de conexão com PostgreSQL ou MinIO no startup.
+  - `/api/version` divergente de `6b6d8c5` após 60 segundos.
+  - Falha nas queries de verificação de schema.
+  - Container em CrashLoopBackOff ou reinicializações em loop.
+  - Qualquer impacto ou lentidão reportada em stacks vizinhas no mesmo host Docker Swarm.
 
 ---
 
 ## 6. ETAPA 6 — CONTINGÊNCIA E ROLLBACK NÃO DESTRUTIVO
 
-| Cenário de Contingência | Ação Imediata de Contenção | Procedimento de Rollback | Preservação de Dados |
-| :--- | :--- | :--- | :--- |
-| **1. Migration Parcial** | Interromper aplicação; inspecionar `pg_stat_activity`. | Resolver lock pendente; reexecutar script (é idempotente). | Tabelas parciais mantidas; zero DROP. |
-| **2. Backend Incompatível** | Reapontar tag `:stable` para a imagem real em execução comprovada em produção: commit `8505ca5f76756da15d536241409ed4604496fc50` (governanceSha `5d2c2a236244cc333a5394b1af684bd43a84ab64`, imagem `ghcr.io/wittemberg/witiquetas-backend:candidate-8505ca5f76756da15d536241409ed4604496fc50`). | Acionar webhook do Portainer para subir a versão anterior homologada. | Tabelas `print_jobs` e `print_job_events` permanecem intactas no banco. |
-| **3. Falha de Conexão DB** | Verificar credenciais e conectividade de rede do container. | Se indisponibilidade do banco for persistente, parar backend para evitar estados inconsistentes (Fail-Closed). | Sem corrupção; dados preservados. |
-| **4. Erro de Inicialização** | Capturar logs do container (`docker service logs witiquetas_backend`). | Rollback para imagem anterior via script de rollback. | Logs preservados para análise forense. |
-| **5. Sweeper Anômalo** | Desativar temporariamente o job agendado via flag de configuração. | Inspecionar queries de sweep com `EXPLAIN ANALYZE`. | Zero perda de registros; auditoria preservada. |
-| **6. Jobs Pendentes no Deploy** | Jobs `PENDING` permanecem seguros no PostgreSQL. | O novo backend assume a fila e continua o atendimento ordenado. | Zero perda de jobs pendentes. |
-| **7. Jobs em DELIVERING no Deploy** | Conexões cortadas pelo restart expiram o lease. | Sweeper move para `UNKNOWN_RESULT`; operador avalia sem risco de duplicação. | Zero reimpressão automática descontrolada. |
-| **8. Jobs em UNKNOWN_RESULT** | Registros isolados aguardando confirmação. | Manter bloqueados até decisão explícita via `resolve-ambiguous`. | Impossível reimpressão acidental. |
+### 6.1 Tratamento Seguro de Jobs e Bloqueio de Claims
+- **PROIBIDO EXECUTAR UPDATE SQL MANUAL EM `print_jobs`:** Mutações manuais diretas contornam a máquina de estados, omitem auditoria em `print_job_events` e criam inconsistências relacionais.
+- **Bloqueio Estrutural de Novos Claims:**
+  - O rollback consiste em reverter os serviços `witiquetas_backend` e `witiquetas_frontend` para a imagem anterior estável (`8505ca5f76756da15d536241409ed4604496fc50`).
+  - A versão anterior opera exclusivamente com storage em memória (`printJobsStore = new Map()`), não possui rotas relacionais e desconhece por completo as tabelas `print_jobs` e `print_job_events`.
+  - Ao subir a versão anterior, nenhum claim sobre o banco PostgreSQL é emitido. Os jobs persistidos ficam imediatamente bloqueados e inacessíveis para os Agents locais, eliminando qualquer risco de processamento ou reenvio acidental.
+- **Tratamento de Jobs em `DELIVERING` e `UNKNOWN_RESULT`:**
+  - Jobs que estavam em `DELIVERING` e perderam conectividade têm seus leases expirados e são movidos para `UNKNOWN_RESULT` pelo Reaper antes da queda, ou permanecem com lease vencido.
+  - Jobs em `UNKNOWN_RESULT` permanecem gravados de forma estática no banco. Como o backend anterior não lê essa tabela, **NENHUMA REIMPRESSÃO AUTOMÁTICA É POSSÍVEL**.
+  - A integridade física e o histórico de auditoria em `print_job_events` são integralmente preservados para investigação forense posterior.
+- **Não Presunção de Reversibilidade de Dados:**
+  - O rollback reverte a versão da aplicação (código). Não se presume reversibilidade de estados físicos ou de rede já consumidos por impressoras.
+  - As tabelas `print_jobs` e `print_job_events` **NÃO DEVEM SER APAGADAS (SEM `DROP TABLE`)**, garantindo rastreabilidade forense total.
 
-### 6.1 Garantia Estrutural contra Reenvio ou Consumo de Jobs Ambíguos no Rollback
-Em caso de acionamento do procedimento de rollback para a versão de produção anterior (`8505ca5` / `5d2c2a2`), a segurança física é garantida por desenho arquitetural:
-1. **Armazenamento Puramente em Memória na Versão Anterior:** O código do backend na baseline anterior gerenciava jobs através de um `Map` local (`const printJobsStore = new Map<string, PrintJobDTO>()`).
-2. **Inexistência de Mapeamento Relacional:** A versão anterior não possui repositório de persistência de jobs (`printJobRepository.ts` relacional), não emite consultas SQL (`SELECT`, `UPDATE` ou `claim`) sobre as tabelas `print_jobs` e `print_job_events`, e desconhece por completo a existência dessas tabelas no banco de dados.
-3. **Isolamento Total dos Registros:** Qualquer job que tenha sido gravado no banco relacional pelo Package 5.7.1 — esteja em `PENDING`, `CLAIMED`, `DELIVERING`, `EXPIRED_LEASE` ou `UNKNOWN_RESULT` — permanece estático e inacessível para o backend antigo.
-4. **Impossibilidade Matemática de Reenvio:** Como a versão revertida não consulta a tabela relacional, é estruturalmente impossível que ela leia, reivindique, tente despachar ou reenvie qualquer job persistido ou ambíguo para os agentes locais ou impressoras físicas.
-5. **Preservação de Evidências:** Os dados em `print_jobs` e `print_job_events` mantêm-se íntegros para fins de auditoria, diagnóstico forense e reconciliação manual sem qualquer risco operacional.
+### 6.2 Sequência de Rollback
+1. Reverter serviço do Backend para a imagem anterior homologada:
+   ```bash
+   docker service update --image ghcr.io/wittemberg/witiquetas-backend:candidate-8505ca5f76756da15d536241409ed4604496fc50 witiquetas_backend
+   ```
+2. Reverter serviço do Frontend para a imagem anterior homologada:
+   ```bash
+   docker service update --image ghcr.io/wittemberg/witiquetas-frontend:candidate-8505ca5f76756da15d536241409ed4604496fc50 witiquetas_frontend
+   ```
+3. Validar restauração da versão anterior em `/api/version` (esperado: commit `8505ca5`).
+4. Manter as tabelas `print_jobs` e `print_job_events` intactas no banco de dados.
+
+---
+
+## 7. ESCOPO E FOCO ESTRITO DO PACKAGE 5.7.1
+- **Foco Único:** Fila persistente de impressão no PostgreSQL 14, lease safety e isolamento multi-tenant já homologados no commit `6b6d8c5`.
+- **Fora de Escopo:**
+  - A Central de Atualizações e a atualização automática remota de Agents **NÃO FAZEM PARTE** do Package 5.7.1.
+  - Nenhum contrato, DTO ou lógica de Agent será alterada nesta etapa.
+  - Os Agents Windows x64 v0.2.0 atualmente pareados e em execução são 100% retrocompatíveis com a fila persistente e não necessitam de atualização na janela de deploy.
 
 ---
 

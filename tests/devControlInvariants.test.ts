@@ -72,7 +72,7 @@ test('DCC INVARIANT A & G: Soma de pesos total e MVP é matematicamente consiste
     }
   }
 
-  assert.ok([354, 356].includes(totalWeight), 'Soma total de pesos deve ser 354 ou 356 após freeze do Editor/Central e expansão da Fase 5');
+  assert.ok([354, 356, 358].includes(totalWeight), 'Soma total de pesos deve ser 354, 356 ou 358 após freeze do Editor/Central e expansão da Fase 5');
   assert.equal(mvpTotalWeight, 211, 'Soma de pesos do MVP deve ser exatamente 211 com baseline homologado e governança multi-tenant');
 });
 

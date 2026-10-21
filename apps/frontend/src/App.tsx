@@ -46,6 +46,7 @@ import PrintCenterPage from './modules/printcenter/PrintCenterPage.js';
 import { PlaceholderModulePage } from './modules/common/PlaceholderModulePage.js';
 import { DevControlPage } from './modules/devcontrol/DevControlPage.js';
 import { AdminPage } from './modules/admin/AdminPage.js';
+import { WhatsNewModal } from './modules/admin/WhatsNewModal.js';
 import { templatesApi } from './services/templatesApi.js';
 import { useEditorStore } from './editor/useEditorStore.js';
 import { devControlApi } from './services/devControlApi.js';
@@ -454,6 +455,30 @@ export default function App() {
           />
         );
 
+      case 'updates':
+        if (
+          !hasAnyPermission(['updates.view', 'updates.manage']) &&
+          !sessionContext?.roles?.some((r: any) => r.code === 'ADMIN') &&
+          !sessionContext?.isDeveloper
+        ) {
+          return (
+            <AccessDeniedView
+              onGoHome={() => {
+                setCurrentModule('home');
+                window.location.hash = '#home';
+              }}
+            />
+          );
+        }
+        return (
+          <AdminPage
+            sessionContext={sessionContext}
+            onUpdateSessionContext={setSessionContext}
+            onGoHome={() => setCurrentModule('home')}
+            initialTab="updates"
+          />
+        );
+
       case 'admin':
         if (
           !hasAnyPermission([
@@ -473,6 +498,8 @@ export default function App() {
             'printers.manage',
             'agents.view',
             'agents.manage',
+            'updates.view',
+            'updates.manage',
           ])
         ) {
           return (
@@ -932,6 +959,12 @@ export default function App() {
           setDetailsAgent(null);
           setReconnectAgent(a);
         }}
+      />
+
+      {/* Modal Pós-Login de Novidades ("O que há de novo / What's New") */}
+      <WhatsNewModal
+        sessionContext={sessionContext}
+        onNavigateToUpdates={() => setCurrentModule('updates')}
       />
     </ApplicationShell>
   );

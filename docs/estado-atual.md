@@ -1,17 +1,17 @@
 # Witiquetas — Estado Atual
 
 Atualizado em:
-2026-10-15
+2026-10-19
 
 ## Fase atual
 
-Fase 5.7.1 — Persistent Print Queue & Lease Safety (Fase 5 — Administração e Governança da Aplicação).
+Fase 5 — Central de Atualizações (Sprint 1: Arquitetura, Governança e Interface).
 
 ## Status
 
-Homologado com sucesso integral em ambiente isolado de CI, aguardando revisão final de release.
-Baseline validada: commit `b86f64173b0505ad647e0eb3f45e1db8cf352e0a` na branch `validation/package-5.7.1-postgres-gate`.
-Status DCC: `READY_FOR_RELEASE_REVIEW` (deployed: false, manualValidation: true, homologated: true).
+Sprint 1 da Central de Atualizações implementada com sucesso no ambiente de desenvolvimento na branch `feature/updates-center-sprint-1`.
+Status DCC: `READY_FOR_SPRINT_REVIEW` (deployed: false, manualValidation: true, homologated: true).
+Produção preservada no baseline `8505ca5`.
 
 ## Mudança OpenSpec ativa
 
@@ -25,35 +25,31 @@ Nenhuma.
 - Fase 3 — Agente Local Daemon Rust (`HOMOLOGATED`)
 - Fase 3.5 — Hardening de Produto e UX Shell (`HOMOLOGATED`)
 - Fase 4 — Editor Visual e Central de Impressão (`FROZEN / PAUSED` durante Fase 5)
+- Fase 5.7.1 — Persistent Print Queue (`HOMOLOGATED / MERGED ON MAIN`)
 
 Referência canônica: `docs/development-control/project.json` e `docs/development-control/roadmap.json`.
 
 ## Última evidência válida
 
-Commit:
-`b86f64173b0505ad647e0eb3f45e1db8cf352e0a` (branch `validation/package-5.7.1-postgres-gate`)
-
-CI / Pipelines:
-- GitHub Actions Run `#38666388916` (K/L Homologation Gate, Job `116199198915` em runner `windows-latest` + PostgreSQL 14 real) — **100% SUCCESS** (15/15 subtestes PASS)
-- GitHub Actions Run `#38666388948` (PostgreSQL 14 Real Gate) — **100% SUCCESS** (11/11 subtestes PASS)
+Branch:
+`feature/updates-center-sprint-1` (base: `main` commit `6b6d8c5`)
 
 Testes:
-- Cenários K (K.1 a K.8) e L (L.1 a L.7) aprovados com evidências formais registradas
-- PostgreSQL 14 Real Gate: 11/11 subtestes PASS (`tests/package571PostgresRealIntegration.test.ts`)
-- Suíte de Regressão: 260/260 testes automatizados PASS
-- Builds de Produção: `@witiquetas/contracts`, `@witiquetas/backend`, `@witiquetas/frontend` e Agent Windows PE x64 (Rust) 100% GREEN
+- Suíte Canônica: 11/11 subtestes PASS (`tests/updatesCenterFoundation.test.ts`)
+- Builds de Produção: `@witiquetas/contracts`, `@witiquetas/backend`, `@witiquetas/frontend` 100% GREEN
+- Salvaguarda Formal: Zero deploy mecânico, zero comandos shell/Portainer
 
 Resultado:
-Validação técnica e homologação não-física 100% concluídas. Bloqueio e contenção de porta TCP 9100 comprovados.
+Fundação, arquitetura, RBAC (`updates.view` e `updates.manage`), contratos, rotas `/api/updates` e interface administrativa `UpdatesAdminView` operacionais em desenvolvimento.
 
 ## Trabalho em andamento
 
-Revisão final de release (Final Release Review) para abertura de Pull Request para a `main`.
+Finalização e revisão da Sprint 1 da Central de Atualizações.
 
 ## Próximo passo autorizado
 
-Abertura de Pull Request para a `main` e agendamento de janela controlada de deploy após aprovação humana.
-Proibido: merge não autorizado na main, deploy automático em produção, envio de bytes para impressoras físicas.
+Apresentação dos artefatos da Sprint 1 para aprovação humana antes de qualquer PR ou merge.
+Proibido: merge na main sem autorização, deploy em produção, acionamento de webhooks do Portainer.
 
 ## Referências
 

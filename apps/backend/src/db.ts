@@ -1,7 +1,8 @@
-import { Pool } from 'pg';
+import { Pool, type PoolClient } from 'pg';
 import dotenv from 'dotenv';
 import fs from 'node:fs';
 import path from 'node:path';
+import crypto from 'node:crypto';
 
 dotenv.config();
 
@@ -27,6 +28,179 @@ if (dbUrl) {
 } else if (isProduction) {
   console.error('[Database] FATAL: DATABASE_URL não configurada em produção.');
   process.exit(1);
+}
+
+
+/**
+ * Sanitiza URLs de banco de dados para logging seguro sem expor credenciais.
+ */
+export function sanitizeDbUrl(rawUrl?: string): string {
+  if (!rawUrl) return '';
+  try {
+    const parsed = new URL(rawUrl);
+    if (parsed.password) {
+      parsed.password = '***';
+    }
+    return parsed.toString();
+  } catch {
+    return rawUrl.replace(/(:\/\/[^:]+:)[^@]+(@)/, '$1***$2');
+  }
+}
+
+/**
+ * Determina se uma falha de conexão com o PostgreSQL é transitória/recuperável.
+ * Cobre falhas de resolução DNS, indisponibilidade momentânea, timeouts e recusa de conexão.
+ */
+export function isTransientDbError(err: any): boolean {
+  if (!err) return false;
+
+  const code = String(err.code || '');
+  const message = String(err.message || '').toLowerCase();
+
+  // Erros de rede/DNS do Node.js e sistema operacional
+  const transientNetworkCodes = [
+    'ENOTFOUND',
+    'EAI_AGAIN',
+    'ECONNREFUSED',
+    'ETIMEDOUT',
+    'ECONNRESET',
+    'EHOSTUNREACH',
+    'ENETUNREACH',
+    'EPIPE',
+    'EADDRNOTAVAIL',
+  ];
+  if (transientNetworkCodes.includes(code)) {
+    return true;
+  }
+
+  // SQLSTATEs transitórios do PostgreSQL
+  const transientSqlStates = [
+    '57P03', // cannot_connect_now
+    '53300', // too_many_connections
+    '08006', // connection_failure
+    '08001', // sqlclient_unable_to_establish_sqlconnection
+    '08004', // sqlserver_rejected_establishment_of_sqlconnection
+    '57014', // query_canceled / statement_timeout
+  ];
+  if (transientSqlStates.includes(code)) {
+    return true;
+  }
+
+  // Padrões de mensagens transitórias
+  if (
+    message.includes('getaddrinfo') ||
+    message.includes('connection terminated unexpectedly') ||
+    message.includes('timeout expired') ||
+    message.includes('terminating connection due to administrator command') ||
+    message.includes('server closed the connection unexpectedly') ||
+    message.includes('could not connect to server') ||
+    message.includes('connection refused')
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Determina se uma falha é permanente (ex.: autenticação inválida ou banco inexistente),
+ * onde retries seriam inúteis e devem ser abortados imediatamente.
+ */
+export function isPermanentDbError(err: any): boolean {
+  if (!err) return false;
+
+  const code = String(err.code || '');
+  const message = String(err.message || '').toLowerCase();
+
+  // SQLSTATEs permanentes do PostgreSQL
+  const permanentSqlStates = [
+    '28P01', // invalid_password
+    '28000', // invalid_authorization_specification
+    '3D000', // invalid_catalog_name (database não existe)
+  ];
+  if (permanentSqlStates.includes(code)) {
+    return true;
+  }
+
+  if (
+    message.includes('password authentication failed') ||
+    (message.includes('database') && message.includes('does not exist')) ||
+    (message.includes('role') && message.includes('does not exist'))
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+export interface DbRetryOptions {
+  maxRetries?: number;
+  initialDelayMs?: number;
+  maxDelayMs?: number;
+  totalTimeoutMs?: number;
+  backoffFactor?: number;
+}
+
+/**
+ * Estabelece conexão com o PostgreSQL com política de retry e backoff exponencial.
+ * Trata falhas transitórias de DNS e rede, abortando imediatamente diante de falhas permanentes.
+ */
+export async function connectWithRetry(
+  pool: Pool,
+  options?: DbRetryOptions
+): Promise<PoolClient> {
+  const maxRetries = options?.maxRetries ?? (Number(process.env.DB_CONNECT_MAX_RETRIES) || 5);
+  const initialDelayMs = options?.initialDelayMs ?? (Number(process.env.DB_CONNECT_INITIAL_DELAY_MS) || 1000);
+  const maxDelayMs = options?.maxDelayMs ?? (Number(process.env.DB_CONNECT_MAX_DELAY_MS) || 10000);
+  const totalTimeoutMs = options?.totalTimeoutMs ?? (Number(process.env.DB_CONNECT_TOTAL_TIMEOUT_MS) || 30000);
+  const backoffFactor = options?.backoffFactor ?? 2;
+
+  const startTime = Date.now();
+  let attempt = 0;
+  let currentDelay = initialDelayMs;
+
+  while (attempt < maxRetries) {
+    attempt++;
+    const elapsedMs = Date.now() - startTime;
+    if (elapsedMs >= totalTimeoutMs) {
+      const timeoutErr = new Error(`[Database] Tempo limite total de conexão com PostgreSQL esgotado (${elapsedMs}ms >= ${totalTimeoutMs}ms).`);
+      (timeoutErr as any).code = 'DB_TIMEOUT_EXCEEDED';
+      throw timeoutErr;
+    }
+
+    try {
+      console.log(`[Database] Tentando conexão com PostgreSQL (tentativa ${attempt}/${maxRetries})...`);
+      const client = await pool.connect();
+      console.log(`[Database] Conexão com PostgreSQL estabelecida com sucesso na tentativa ${attempt}.`);
+      return client;
+    } catch (err: any) {
+      const isPermanent = isPermanentDbError(err);
+      const isTransient = isTransientDbError(err);
+      const errCode = err.code || 'UNKNOWN';
+
+      if (isPermanent) {
+        console.error(`[Database] Erro permanente na conexão com o PostgreSQL detectado (código: ${errCode}). Abortando retries imediatamente.`);
+        throw err;
+      }
+
+      if (!isTransient) {
+        console.warn(`[Database] Erro de conexão não catalogado explicitamente (código: ${errCode}, mensagem: ${err.message}). Tratando como transitório.`);
+      }
+
+      if (attempt >= maxRetries) {
+        console.error(`[Database] Limite máximo de ${maxRetries} tentativas de conexão com PostgreSQL esgotado.`);
+        throw err;
+      }
+
+      const nextDelay = Math.min(currentDelay, maxDelayMs);
+      console.warn(`[Database] Falha transitória na tentativa ${attempt}/${maxRetries} (código: ${errCode}). Próxima tentativa em ${nextDelay}ms...`);
+
+      await new Promise((resolve) => setTimeout(resolve, nextDelay));
+      currentDelay = Math.round(currentDelay * backoffFactor);
+    }
+  }
+
+  throw new Error(`[Database] Falha crítica ao conectar ao PostgreSQL após ${maxRetries} tentativas.`);
 }
 
 /**
@@ -481,13 +655,238 @@ export function getMigrationsList(): Array<{ filename: string; sql: string }> {
           ON print_job_events (company_id, created_at DESC);
       `,
     },
+    {
+      filename: '012_create_user_release_views_table.sql',
+      sql: `
+        CREATE TABLE IF NOT EXISTS user_release_views (
+          company_id VARCHAR(64) NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+          user_id VARCHAR(64) NOT NULL,
+          release_version VARCHAR(32) NOT NULL,
+          viewed_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+          PRIMARY KEY (company_id, user_id, release_version),
+          CONSTRAINT fk_user_release_views_user FOREIGN KEY (company_id, user_id) REFERENCES users(company_id, id) ON DELETE CASCADE
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_user_release_views_user ON user_release_views (company_id, user_id);
+        CREATE INDEX IF NOT EXISTS idx_user_release_views_version ON user_release_views (release_version);
+      `,
+    },
   ];
 }
 
 /**
- * Inicialização e migração defensiva de tabelas no PostgreSQL
+ * Identificador constante de 64-bit para Advisory Lock de sessão do Witiquetas.
+ * Derivado de hash estável para evitar colisões com outros módulos do PostgreSQL.
+ * O Advisory Lock de sessão é liberado automaticamente caso o processo caia ou
+ * a conexão dedicada seja encerrada.
  */
-export async function initDatabase(): Promise<void> {
+export const WITIQUETAS_MIGRATION_LOCK_ID = 6289650392694114130n;
+
+/**
+ * Calcula o checksum SHA-256 de uma migration SQL após normalização de quebras de linha (CRLF/LF).
+ */
+export function calculateMigrationChecksum(sql: string): string {
+  const normalized = sql.replace(/\r\n/g, '\n').trim();
+  return crypto.createHash('sha256').update(normalized, 'utf-8').digest('hex');
+}
+
+/**
+ * Cria a tabela de controle de migrations schema_migrations se não existir.
+ */
+export async function ensureSchemaMigrationsTable(client: PoolClient): Promise<void> {
+  const ddl = `
+    CREATE TABLE IF NOT EXISTS schema_migrations (
+      id SERIAL PRIMARY KEY,
+      filename VARCHAR(255) NOT NULL UNIQUE,
+      checksum VARCHAR(64) NOT NULL,
+      applied_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+      execution_time_ms BIGINT NOT NULL DEFAULT 0
+    );
+    CREATE INDEX IF NOT EXISTS idx_schema_migrations_filename ON schema_migrations (filename);
+  `;
+  await client.query(ddl);
+}
+
+export interface AppliedMigrationRecord {
+  id: number;
+  filename: string;
+  checksum: string;
+  applied_at: Date;
+  execution_time_ms: number;
+}
+
+/**
+ * Obtém o mapa de migrations já aplicadas no banco de dados.
+ */
+export async function getAppliedMigrations(
+  client: PoolClient
+): Promise<Map<string, AppliedMigrationRecord>> {
+  const res = await client.query<AppliedMigrationRecord>(
+    'SELECT id, filename, checksum, applied_at, execution_time_ms FROM schema_migrations ORDER BY id ASC'
+  );
+  const map = new Map<string, AppliedMigrationRecord>();
+  for (const row of res.rows) {
+    map.set(row.filename, row);
+  }
+  return map;
+}
+
+export interface MigrationLockOptions {
+  timeoutMs?: number;
+  pollIntervalMs?: number;
+}
+
+/**
+ * Adquire um Advisory Lock de sessão exclusivo no PostgreSQL para migrações.
+ * Utiliza polling não-bloqueante com pg_try_advisory_lock para respeitar o timeout definido.
+ */
+export async function acquireMigrationLock(
+  client: PoolClient,
+  options?: MigrationLockOptions
+): Promise<void> {
+  const timeoutMs = options?.timeoutMs ?? (Number(process.env.MIGRATION_LOCK_TIMEOUT_MS) || 30000);
+  const pollIntervalMs = options?.pollIntervalMs ?? (Number(process.env.MIGRATION_LOCK_POLL_INTERVAL_MS) || 500);
+
+  const startTime = Date.now();
+  const lockIdStr = WITIQUETAS_MIGRATION_LOCK_ID.toString();
+
+  while (true) {
+    const res = await client.query<{ locked: boolean }>(
+      'SELECT pg_try_advisory_lock($1::bigint) AS locked',
+      [lockIdStr]
+    );
+
+    const locked = res.rows[0]?.locked === true;
+    if (locked) {
+      console.log(`[Database] Advisory Lock de migração adquirido com sucesso (Lock ID: ${lockIdStr}).`);
+      return;
+    }
+
+    const elapsed = Date.now() - startTime;
+    if (elapsed >= timeoutMs) {
+      const err = new Error(
+        `[Database] MIGRATION_LOCK_TIMEOUT: Não foi possível adquirir o lock exclusivo de migrações após ${elapsed}ms (timeout: ${timeoutMs}ms). Outra réplica pode estar em processo de migração.`
+      );
+      (err as any).code = 'MIGRATION_LOCK_TIMEOUT';
+      throw err;
+    }
+
+    console.log(
+      `[Database] Lock de migração em uso por outra réplica. Aguardando ${pollIntervalMs}ms (${elapsed}ms/${timeoutMs}ms decorridos)...`
+    );
+    await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+  }
+}
+
+/**
+ * Libera o Advisory Lock de sessão no PostgreSQL.
+ */
+export async function releaseMigrationLock(client: PoolClient): Promise<boolean> {
+  const lockIdStr = WITIQUETAS_MIGRATION_LOCK_ID.toString();
+  const res = await client.query<{ unlocked: boolean }>(
+    'SELECT pg_advisory_unlock($1::bigint) AS unlocked',
+    [lockIdStr]
+  );
+  const unlocked = res.rows[0]?.unlocked === true;
+  if (unlocked) {
+    console.log(`[Database] Advisory Lock de migração liberado com sucesso (Lock ID: ${lockIdStr}).`);
+  } else {
+    console.warn(`[Database] Aviso: pg_advisory_unlock retornou false para o Lock ID ${lockIdStr} (lock não pertencia a esta sessão ou já havia sido liberado).`);
+  }
+  return unlocked;
+}
+
+export interface MigrationExecutionResult {
+  applied: string[];
+  skipped: string[];
+  totalTimeMs: number;
+}
+
+/**
+ * Executa as migrations com verificação de idempotência, imutabilidade por checksum e transações dedicadas.
+ */
+export async function executeMigrationsWithControl(
+  client: PoolClient,
+  migrations: Array<{ filename: string; sql: string }>
+): Promise<MigrationExecutionResult> {
+  await ensureSchemaMigrationsTable(client);
+  const appliedMigrations = await getAppliedMigrations(client);
+
+  const applied: string[] = [];
+  const skipped: string[] = [];
+  const overallStart = Date.now();
+
+  for (const m of migrations) {
+    const currentChecksum = calculateMigrationChecksum(m.sql);
+    const existing = appliedMigrations.get(m.filename);
+
+    if (existing) {
+      if (existing.checksum !== currentChecksum) {
+        const errorMsg = `[Database] MIGRATION_CHECKSUM_MISMATCH: A migration "${m.filename}" já aplicada possui checksum divergente do arquivo local! Registrado: ${existing.checksum}, Local: ${currentChecksum}. Migrations aplicadas são imutáveis.`;
+        console.error(errorMsg);
+        const err = new Error(errorMsg);
+        (err as any).code = 'MIGRATION_CHECKSUM_MISMATCH';
+        (err as any).filename = m.filename;
+        (err as any).recordedChecksum = existing.checksum;
+        (err as any).currentChecksum = currentChecksum;
+        throw err;
+      }
+
+      console.log(`[Database] Migration "${m.filename}" já aplicada anteriormente com sucesso. Ignorando.`);
+      skipped.push(m.filename);
+      continue;
+    }
+
+    // Executa a migration pendente em transação atômica dedicada
+    console.log(`[Database] Aplicando migration pendente "${m.filename}" (checksum: ${currentChecksum.slice(0, 8)}...)...`);
+    const migStart = Date.now();
+    try {
+      await client.query('BEGIN');
+      await client.query(m.sql);
+      const executionTimeMs = Date.now() - migStart;
+      await client.query(
+        'INSERT INTO schema_migrations (filename, checksum, execution_time_ms) VALUES ($1, $2, $3)',
+        [m.filename, currentChecksum, executionTimeMs]
+      );
+      await client.query('COMMIT');
+
+      console.log(`[Database] Migration "${m.filename}" aplicada com sucesso em ${executionTimeMs}ms.`);
+      applied.push(m.filename);
+      appliedMigrations.set(m.filename, {
+        id: -1,
+        filename: m.filename,
+        checksum: currentChecksum,
+        applied_at: new Date(),
+        execution_time_ms: executionTimeMs,
+      });
+    } catch (migErr: any) {
+      console.error(`[Database] Falha crítica ao executar migration "${m.filename}". Realizando ROLLBACK da transação: ${migErr.message}`);
+      try {
+        await client.query('ROLLBACK');
+      } catch (rollbackErr: any) {
+        console.error(`[Database] Erro ao executar ROLLBACK: ${rollbackErr.message}`);
+      }
+      throw migErr;
+    }
+  }
+
+  return {
+    applied,
+    skipped,
+    totalTimeMs: Date.now() - overallStart,
+  };
+}
+
+export interface InitDatabaseOptions extends DbRetryOptions {
+  migrationLockTimeoutMs?: number;
+  migrationLockPollIntervalMs?: number;
+  skipMigrations?: boolean;
+}
+
+/**
+ * Inicialização e migração defensiva de tabelas no PostgreSQL com proteção de concorrência por Advisory Lock.
+ */
+export async function initDatabase(options?: InitDatabaseOptions): Promise<void> {
   if (!pgPool) {
     if (isProduction) {
       console.error('[Database] FATAL: DATABASE_URL não configurada em produção.');
@@ -497,21 +896,31 @@ export async function initDatabase(): Promise<void> {
     return;
   }
 
-  try {
-    const client = await pgPool.connect();
-    try {
-      const migrations = getMigrationsList();
-      for (const m of migrations) {
-        await client.query(m.sql);
-        console.log(`[Database] Migration "${m.filename}" verificada/executada com sucesso no PostgreSQL.`);
-      }
+  let client: PoolClient | null = null;
+  let lockAcquired = false;
 
-      // Executa o bootstrap idempotente de administração e RBAC
-      const { bootstrapAdminData } = await import('./services/adminBootstrapService.js');
-      await bootstrapAdminData();
-    } finally {
-      client.release();
+  try {
+    client = await connectWithRetry(pgPool, options);
+
+    if (!options?.skipMigrations) {
+      // 1. Adquire Advisory Lock de sessão exclusivo na mesma conexão dedicada
+      await acquireMigrationLock(client, {
+        timeoutMs: options?.migrationLockTimeoutMs,
+        pollIntervalMs: options?.migrationLockPollIntervalMs,
+      });
+      lockAcquired = true;
+
+      // 2. Executa as migrations com controle de histórico e atomicidade
+      const migrations = getMigrationsList();
+      const result = await executeMigrationsWithControl(client, migrations);
+      console.log(
+        `[Database] Ciclo de migrações concluído: ${result.applied.length} aplicadas, ${result.skipped.length} já presentes (${result.totalTimeMs}ms).`
+      );
     }
+
+    // 3. Executa o bootstrap idempotente de administração e RBAC
+    const { bootstrapAdminData } = await import('./services/adminBootstrapService.js');
+    await bootstrapAdminData();
   } catch (err: any) {
     console.error(`[Database] Erro ao inicializar esquema no PostgreSQL: ${err.message}`);
     if (isProduction) {
@@ -519,6 +928,17 @@ export async function initDatabase(): Promise<void> {
       process.exit(1);
     }
     throw err;
+  } finally {
+    if (lockAcquired && client) {
+      try {
+        await releaseMigrationLock(client);
+      } catch (unlockErr: any) {
+        console.warn(`[Database] Falha ao liberar advisory lock de migrações: ${unlockErr.message}`);
+      }
+    }
+    if (client) {
+      client.release();
+    }
   }
 }
 

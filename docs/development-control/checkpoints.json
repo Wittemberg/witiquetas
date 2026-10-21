@@ -1,6 +1,24 @@
 {
   "checkpoints": [
     {
+      "sha": "PENDING_COMMIT",
+      "shortSha": "PENDING",
+      "date": "2026-10-19T10:55:00Z",
+      "phase": "5",
+      "patch": "5.8.0-sprint1",
+      "title": "5.8.0 — Central de Atualizações (Sprint 1: Arquitetura, Governança e Interface)",
+      "type": "FEATURE",
+      "capabilities": [
+        "cap-updates-center"
+      ],
+      "testsPassed": true,
+      "deployed": false,
+      "manualValidation": true,
+      "homologated": true,
+      "status": "READY_FOR_SPRINT_REVIEW",
+      "evidence": "CENTRAL DE ATUALIZAÇÕES — SPRINT 1 IMPLEMENTADA E VALIDADA: 1) Inventário completo do ecossistema documentado em UPDATES-CENTER-ARCHITECTURE.md e ADR-006. 2) Contratos canônicos DTO em @witiquetas/contracts (ReleaseManifestDTO, UpdateCenterOverviewDTO, UpdateCheckResultDTO, UpdateReleaseNoteDTO). 3) Rotas REST em /api/updates (/overview, /history, /releases/:version, /check) com RBAC estrito (updates.view e updates.manage). 4) Interface administrativa rica em UpdatesAdminView.tsx com status da versão atual, visualizador de Release Notes (destaques, breaking changes, migrações, changelog), histórico e editor de notas com live preview. 5) Suíte de testes automatizados tests/updatesCenterFoundation.test.ts com 11/11 subtestes PASS. 6) Salvaguarda formal comprovada: zero chamadas a Docker, Swarm ou Portainer webhooks."
+    },
+    {
       "sha": "b86f64173b0505ad647e0eb3f45e1db8cf352e0a",
       "shortSha": "b86f641",
       "date": "2026-10-14T22:48:00Z",
@@ -892,6 +910,22 @@
       "testsPassed": true,
       "deployed": true,
       "manualValidation": false
+    },
+    {
+      "sha": "PENDING_COMMIT",
+      "shortSha": "PENDING",
+      "date": "2026-10-21T08:35:00Z",
+      "phase": "5",
+      "patch": "5.8.0",
+      "title": "feat(updates): Central de Atualizações Sprint 1 — resiliência PostgreSQL, advisory locks, histórico e modal pós-login O que há de novo",
+      "type": "FEATURE",
+      "capabilities": [
+        "cap-updates-center",
+        "cap-infra-storage-db"
+      ],
+      "testsPassed": true,
+      "deployed": false,
+      "manualValidation": true
     }
   ]
 }

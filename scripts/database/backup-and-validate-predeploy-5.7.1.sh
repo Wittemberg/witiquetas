@@ -47,7 +47,7 @@ BACKUP_ROOT="/opt/backups/witiquetas"
 S3_ENDPOINT="https://s3.wrtec.com.br"
 S3_BUCKET="s3://witiquetas-bkp/pre-deploy-5.7.1"
 S3_REGION="eu-south"
-TARGET_DB="witiquetas"
+TARGET_DB="${TARGET_DB:-witiquetas }"
 TIMESTAMP="$(date +%Y%m%d_%H%M%S)"
 DUMP_FILENAME="witiquetas_pre_5.7.1_${TIMESTAMP}.dump"
 CHECKSUM_FILENAME="${DUMP_FILENAME}.sha256"
@@ -142,12 +142,15 @@ echo "   Espaço disponível em ${BACKUP_ROOT}: $((AVAIL_KB / 1024))MB (Requisit
 # ------------------------------------------------------------------------------
 echo "🔍 [2/10] Identificando PostgreSQL pela configuração efetiva da aplicação..."
 
-# Localizar containers backend em execução
-BACKEND_CONTAINERS=$(docker ps --filter "status=running" --filter "name=backend" --format "{{.ID}} {{.Names}}")
+# Localizar container backend em execução (priorizando serviço Swarm 'witiquetas_backend')
+BACKEND_CONTAINERS=$(docker ps --filter "status=running" --filter "label=com.docker.swarm.service.name=witiquetas_backend" --format "{{.ID}} {{.Names}}")
+if [ -z "$BACKEND_CONTAINERS" ]; then
+  BACKEND_CONTAINERS=$(docker ps --filter "status=running" --filter "name=witiquetas_backend" --format "{{.ID}} {{.Names}}")
+fi
 BACKEND_COUNT=$(echo "$BACKEND_CONTAINERS" | grep -c . || true)
 
 if [ "$BACKEND_COUNT" -eq 0 ]; then
-  echo "❌ ERRO: Nenhum container backend em execução encontrado no host." >&2
+  echo "❌ ERRO: Nenhum container do serviço 'witiquetas_backend' em execução encontrado no host." >&2
   exit 1
 elif [ "$BACKEND_COUNT" -gt 1 ]; then
   echo "❌ ERRO AMBIGUIDADE: Múltiplos containers backend encontrados em execução (${BACKEND_COUNT}):" >&2
@@ -175,7 +178,7 @@ if [ -z "$APP_DB_URL" ]; then
   exit 1
 fi
 
-# Parse da URL do banco de forma segura (sem expor credenciais)
+# Parse da URL do banco de forma segura (preservando o nome exato e sem expor credenciais)
 CLEAN_DB_URL="${APP_DB_URL%%\?*}"
 DB_NAME_CONFIG="${CLEAN_DB_URL##*/}"
 NO_PROTO_URL="${CLEAN_DB_URL#*://}"
@@ -183,10 +186,14 @@ AUTH_HOST_PART="${NO_PROTO_URL%%/*}"
 HOST_PORT_PART="${AUTH_HOST_PART##*@}"
 DB_HOST_CONFIG="${HOST_PORT_PART%%:*}"
 
-echo "   Configuração efetiva da aplicação: Host='${DB_HOST_CONFIG}', Database='${DB_NAME_CONFIG}'"
+DB_NAME_HEX=$(printf '%s' "$DB_NAME_CONFIG" | od -A n -t x1 2>/dev/null | tr -d ' \n' || true)
+TARGET_DB_HEX=$(printf '%s' "$TARGET_DB" | od -A n -t x1 2>/dev/null | tr -d ' \n' || true)
+
+echo "   Configuração efetiva da aplicação: Host='${DB_HOST_CONFIG}', Database='${DB_NAME_CONFIG}' (hex: ${DB_NAME_HEX})"
+echo "   Target esperado para o backup: Database='${TARGET_DB}' (hex: ${TARGET_DB_HEX})"
 
 if [ "$DB_NAME_CONFIG" != "$TARGET_DB" ]; then
-  echo "❌ ERRO: O banco configurado no backend ('$DB_NAME_CONFIG') difere do target esperado ('$TARGET_DB')." >&2
+  echo "❌ ERRO: O banco configurado no backend ('$DB_NAME_CONFIG', hex: ${DB_NAME_HEX}) difere do target esperado ('$TARGET_DB', hex: ${TARGET_DB_HEX})." >&2
   exit 1
 fi
 
@@ -195,6 +202,15 @@ if [ "$DB_HOST_CONFIG" = "localhost" ] || [ "$DB_HOST_CONFIG" = "127.0.0.1" ]; t
   echo "❌ ERRO: DB_HOST_CONFIG configurado como '${DB_HOST_CONFIG}'. Em ambientes Docker Swarm/Compose," >&2
   echo "   a aplicação deve conectar via service name/alias de rede para garantir identificação inequívoca." >&2
   exit 1
+fi
+
+# Tentar resolver o hostname do banco a partir do backend (DNS/VIP interno da rede Docker/Swarm)
+RESOLVED_DB_IP=$(docker exec -i "$BACKEND_CONTAINER_ID" getent hosts "$DB_HOST_CONFIG" 2>/dev/null | awk '{print $1}' | head -1 || true)
+if [ -z "$RESOLVED_DB_IP" ]; then
+  RESOLVED_DB_IP=$(docker exec -i "$BACKEND_CONTAINER_ID" nslookup "$DB_HOST_CONFIG" 2>/dev/null | awk '/^Address: / { print $2 }' | tail -1 || true)
+fi
+if [ -n "$RESOLVED_DB_IP" ]; then
+  echo "   DNS da stack: Host '${DB_HOST_CONFIG}' resolve para VIP/IP ${RESOLVED_DB_IP}"
 fi
 
 # Localizar o container PostgreSQL que responde ao DB_HOST_CONFIG na mesma rede do backend
@@ -218,9 +234,11 @@ while read -r cid cname cimage; do
   done
   [ $SHARED_NET -eq 0 ] && continue
 
-  # 2. Deve corresponder ao hostname, nome do container ou network alias
+  # 2. Deve corresponder ao hostname, nome do container, alias, label Swarm/Compose ou VIP resolvido
   MATCHES_HOST=0
-  if [ "$cname" = "$DB_HOST_CONFIG" ] || echo "$cname" | grep -qw "$DB_HOST_CONFIG"; then
+
+  # 2a. Match por nome do container ou network aliases
+  if [ "$cname" = "$DB_HOST_CONFIG" ] || echo "$cname" | grep -q "${DB_HOST_CONFIG}"; then
     MATCHES_HOST=1
   else
     ALIASES=$(docker inspect "$cid" --format '{{range .NetworkSettings.Networks}}{{range .Aliases}}{{.}} {{end}}{{end}}' 2>/dev/null || true)
@@ -228,11 +246,40 @@ while read -r cid cname cimage; do
       MATCHES_HOST=1
     fi
   fi
+
+  # 2b. Match por label de serviço Docker Swarm ou Compose
+  if [ $MATCHES_HOST -eq 0 ]; then
+    SWARM_SVC=$(docker inspect "$cid" --format '{{index .Config.Labels "com.docker.swarm.service.name"}}' 2>/dev/null || true)
+    COMPOSE_SVC=$(docker inspect "$cid" --format '{{index .Config.Labels "com.docker.compose.service"}}' 2>/dev/null || true)
+    if [ "$SWARM_SVC" = "$DB_HOST_CONFIG" ] || echo "$SWARM_SVC" | grep -q "${DB_HOST_CONFIG}"; then
+      MATCHES_HOST=1
+    elif [ "$COMPOSE_SVC" = "$DB_HOST_CONFIG" ] || echo "$COMPOSE_SVC" | grep -q "${DB_HOST_CONFIG}"; then
+      MATCHES_HOST=1
+    fi
+  fi
+
+  # 2c. Match por VIP / IP resolvido via DNS da stack
+  if [ $MATCHES_HOST -eq 0 ] && [ -n "$RESOLVED_DB_IP" ]; then
+    CONTAINER_IPS=$(docker inspect "$cid" --format '{{range .NetworkSettings.Networks}}{{.IPAddress}} {{end}}' 2>/dev/null || true)
+    if echo "$CONTAINER_IPS" | grep -qw "$RESOLVED_DB_IP"; then
+      MATCHES_HOST=1
+    else
+      SWARM_SVC=$(docker inspect "$cid" --format '{{index .Config.Labels "com.docker.swarm.service.name"}}' 2>/dev/null || true)
+      if [ -n "$SWARM_SVC" ]; then
+        SVC_VIPS=$(docker service inspect "$SWARM_SVC" --format '{{range .Endpoint.VirtualIPs}}{{.Addr}} {{end}}' 2>/dev/null || true)
+        if echo "$SVC_VIPS" | grep -q "$RESOLVED_DB_IP"; then
+          MATCHES_HOST=1
+        fi
+      fi
+    fi
+  fi
+
   [ $MATCHES_HOST -eq 0 ] && continue
 
-  # 3. Deve responder a pg_isready e conter o banco TARGET_DB
+  # 3. Deve responder a pg_isready e conter o banco TARGET_DB (verificação exata no catálogo pg_database)
   if docker exec -i "$cid" pg_isready -q >/dev/null 2>&1; then
-    if docker exec -i "$cid" psql -U postgres -lqt 2>/dev/null | cut -d \| -f 1 | grep -qw "${TARGET_DB}"; then
+    DB_EXISTS=$(docker exec -i "$cid" psql -U postgres -t -A -c "SELECT count(*) FROM pg_database WHERE datname = '${TARGET_DB}';" 2>/dev/null || echo "0")
+    if [ "$DB_EXISTS" = "1" ]; then
       PG_CONTAINER_ID="$cid"
       PG_CONTAINER_NAME="$cname"
       PG_CONTAINER_IMAGE="$cimage"
@@ -421,7 +468,7 @@ if [ -n "$ORIGIN_EXTENSIONS" ]; then
 fi
 
 echo "   Criando banco '${TARGET_DB}' no container isolado..."
-docker exec -i "${RESTORE_CONTAINER}" createdb -U postgres "${TARGET_DB}"
+docker exec -i "${RESTORE_CONTAINER}" psql -U postgres -v ON_ERROR_STOP=1 -c "CREATE DATABASE \"${TARGET_DB}\";"
 
 # ------------------------------------------------------------------------------
 # 9. RESTAURAÇÃO ESTREITA (pg_restore --exit-on-error)

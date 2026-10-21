@@ -83,10 +83,17 @@ export class Request {}
 export class Response {}
 export class NextFunction {}
 
-export default {
-  Router,
-  Request,
-  Response,
-  NextFunction,
-  json: () => (req, res, next) => next && next(),
-};
+export function express() {
+  const router = Router();
+  router.set = function () { return router; };
+  router.listen = function (port, cb) { if (cb) cb(); return {}; };
+  return router;
+}
+
+express.Router = Router;
+express.Request = Request;
+express.Response = Response;
+express.NextFunction = NextFunction;
+express.json = () => (req, res, next) => next && next();
+
+export default express;

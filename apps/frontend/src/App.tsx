@@ -46,6 +46,7 @@ import PrintCenterPage from './modules/printcenter/PrintCenterPage.js';
 import { PlaceholderModulePage } from './modules/common/PlaceholderModulePage.js';
 import { DevControlPage } from './modules/devcontrol/DevControlPage.js';
 import { AdminPage } from './modules/admin/AdminPage.js';
+import { WhatsNewModal } from './modules/admin/WhatsNewModal.js';
 import { templatesApi } from './services/templatesApi.js';
 import { useEditorStore } from './editor/useEditorStore.js';
 import { devControlApi } from './services/devControlApi.js';
@@ -958,6 +959,12 @@ export default function App() {
           setDetailsAgent(null);
           setReconnectAgent(a);
         }}
+      />
+
+      {/* Modal Pós-Login de Novidades ("O que há de novo / What's New") */}
+      <WhatsNewModal
+        sessionContext={sessionContext}
+        onNavigateToUpdates={() => setCurrentModule('updates')}
       />
     </ApplicationShell>
   );

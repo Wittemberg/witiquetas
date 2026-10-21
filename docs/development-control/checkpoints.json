@@ -910,6 +910,22 @@
       "testsPassed": true,
       "deployed": true,
       "manualValidation": false
+    },
+    {
+      "sha": "PENDING_COMMIT",
+      "shortSha": "PENDING",
+      "date": "2026-10-21T08:35:00Z",
+      "phase": "5",
+      "patch": "5.8.0",
+      "title": "feat(updates): Central de Atualizações Sprint 1 — resiliência PostgreSQL, advisory locks, histórico e modal pós-login O que há de novo",
+      "type": "FEATURE",
+      "capabilities": [
+        "cap-updates-center",
+        "cap-infra-storage-db"
+      ],
+      "testsPassed": true,
+      "deployed": false,
+      "manualValidation": true
     }
   ]
 }

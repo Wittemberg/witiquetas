@@ -22,6 +22,10 @@ build/
 .env.test.local
 .env.production.local
 *.env
+*.key
+*.pem
+*.crt
+*.cert
 
 # Local recovery checkpoints
 .recovery/

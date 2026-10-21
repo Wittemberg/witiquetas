@@ -4,6 +4,8 @@ import type {
   UpdateCheckResultDTO,
   UpdateReleaseNoteDTO,
   ReleaseChannel,
+  WhatsNewResponseDTO,
+  MarkReleaseReadResponseDTO,
 } from '@witiquetas/contracts';
 import { getCsrfToken } from '../auth/session.js';
 
@@ -64,6 +66,17 @@ export const updatesApi = {
     return request<UpdateCheckResultDTO>('/api/updates/check', {
       method: 'POST',
       body: JSON.stringify({ channel }),
+    });
+  },
+
+  async getWhatsNew(): Promise<WhatsNewResponseDTO> {
+    return request<WhatsNewResponseDTO>('/api/updates/whats-new');
+  },
+
+  async markReleasesAsRead(versions: string[]): Promise<MarkReleaseReadResponseDTO> {
+    return request<MarkReleaseReadResponseDTO>('/api/updates/whats-new/mark-read', {
+      method: 'POST',
+      body: JSON.stringify({ versions }),
     });
   },
 };

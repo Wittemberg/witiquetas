@@ -6,7 +6,10 @@ import type {
   UpdateCenterOverviewDTO,
   UpdateCheckResultDTO,
   UpdateReleaseNoteDTO,
+  WhatsNewItemDTO,
+  WhatsNewResponseDTO,
 } from '@witiquetas/contracts';
+import { UserReleaseViewRepository } from '../repositories/userReleaseViewRepository.js';
 
 /**
  * Catálogo inicial canônico de versões históricas e releases da plataforma Witiquetas.
@@ -316,6 +319,53 @@ export class UpdatesCenterService {
   }
 
   /**
+   * Retorna as novidades não reconhecidas para um usuário específico em uma empresa.
+   * Filtra estritamente as releases com status 'PUBLISHED'.
+   */
+  public static async getWhatsNewForUser(
+    companyId: string,
+    userId: string
+  ): Promise<WhatsNewResponseDTO> {
+    const publishedReleases = Array.from(this.manifests.values())
+      .filter((m) => m.status === 'PUBLISHED')
+      .sort((a, b) => new Date(b.releaseDate).getTime() - new Date(a.releaseDate).getTime());
+
+    const readVersions = await UserReleaseViewRepository.getReadReleaseVersions(companyId, userId);
+
+    const unread = publishedReleases.filter((m) => !readVersions.has(m.version));
+
+    const unreadItems: WhatsNewItemDTO[] = unread.map((m) => ({
+      version: m.version,
+      releaseDate: m.releaseDate,
+      type: m.type,
+      title: m.title,
+      summary: m.summary,
+      highlights: m.highlights || [],
+      breakingChanges: m.breakingChanges || [],
+      changelogMarkdown: m.changelogMarkdown || '',
+      publishedAt: m.publishedAt,
+    }));
+
+    return {
+      unreadReleases: unreadItems,
+      hasUnread: unreadItems.length > 0,
+      totalUnread: unreadItems.length,
+      latestVersion: publishedReleases[0]?.version,
+    };
+  }
+
+  /**
+   * Marca uma ou mais releases como lidas/reconhecidas por um usuário de forma idempotente.
+   */
+  public static async markReleasesAsReadForUser(
+    companyId: string,
+    userId: string,
+    versions: string[]
+  ): Promise<string[]> {
+    return UserReleaseViewRepository.markReleasesAsRead(companyId, userId, versions);
+  }
+
+  /**
    * Reinicializa o store para testes unitários
    */
   public static resetForTests(): void {
@@ -323,5 +373,6 @@ export class UpdatesCenterService {
     this.currentChannel = 'STABLE';
     this.lastCheckedAt = new Date().toISOString();
     this.simulatedStatus = 'UP_TO_DATE';
+    UserReleaseViewRepository.resetForTests();
   }
 }

@@ -1113,4 +1113,35 @@ export interface UpdateReleaseNoteDTO {
   type?: ReleaseType;
 }
 
+// ==========================================
+// CENTRAL DE ATUALIZAÇÕES — MODAL "O QUE HÁ DE NOVO" (WHAT'S NEW)
+// ==========================================
 
+export interface WhatsNewItemDTO {
+  version: string;
+  releaseDate: string;
+  type: ReleaseType;
+  title: string;
+  summary: string;
+  highlights: string[];
+  breakingChanges: string[];
+  changelogMarkdown: string;
+  publishedAt?: string;
+}
+
+export interface WhatsNewResponseDTO {
+  unreadReleases: WhatsNewItemDTO[];
+  hasUnread: boolean;
+  totalUnread: number;
+  latestVersion?: string;
+}
+
+export interface MarkReleaseReadDTO {
+  version?: string;
+  versions?: string[];
+}
+
+export interface MarkReleaseReadResponseDTO {
+  success: boolean;
+  markedVersions: string[];
+}

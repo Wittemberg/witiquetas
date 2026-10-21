@@ -822,6 +822,19 @@ export default function EditorLayout({
             )}
           </div>
 
+          {/* Alternância de Tema */}
+          {onToggleTheme && (
+            <button
+              className="btn-theme-toggle"
+              onClick={onToggleTheme}
+              title={theme === 'dark' ? 'Alternar para Modo Claro' : 'Alternar para Modo Escuro'}
+              aria-label="Alternar tema"
+              style={{ width: '30px', height: '30px', borderRadius: '6px' }}
+            >
+              {theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
+            </button>
+          )}
+
           {/* Botão de Ação Primária: Imprimir */}
           <button
             className="btn btn-primary"

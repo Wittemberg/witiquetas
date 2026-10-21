@@ -136,10 +136,20 @@ export default function App() {
   const [sessionContext, setSessionContext] = useState<SessionContext | null>(null);
   const [sessionLoading, setSessionLoading] = useState<boolean>(true);
 
-  // Tema Claro / Escuro
+  // Tema Claro / Escuro (respeita preferência do usuário na plataforma com fallback inicial ao SO)
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
-    const saved = localStorage.getItem('witiquetas-theme');
-    return saved === 'light' ? 'light' : 'dark';
+    try {
+      const saved = localStorage.getItem('witiquetas-theme');
+      if (saved === 'light' || saved === 'dark') {
+        return saved;
+      }
+      if (typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) {
+        return 'light';
+      }
+    } catch {
+      // Fallback seguro em ambientes restritos
+    }
+    return 'dark';
   });
 
   useEffect(() => {

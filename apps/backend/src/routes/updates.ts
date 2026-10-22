@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { requireAuthenticatedUser, requireCsrf } from '../middleware/authMiddleware.js';
 import { UpdatesCenterService } from '../services/updatesCenterService.js';
+import { AdminAuditService } from '../services/adminAuditService.js';
 import type { UpdateReleaseNoteDTO, ReleaseChannel } from '@witiquetas/contracts';
 
 const router = Router();
@@ -108,7 +109,7 @@ router.post('/check', (req: Request, res: Response) => {
 });
 
 // 5. Cadastrar ou Atualizar Notas de Versão
-router.put('/releases/:version', requireCsrf, (req: Request, res: Response) => {
+router.put('/releases/:version', requireCsrf, async (req: Request, res: Response) => {
   if (!checkCanManage(req)) {
     return res.status(403).json({
       error: 'Permissão insuficiente para gerenciar notas de versão.',
@@ -137,7 +138,24 @@ router.put('/releases/:version', requireCsrf, (req: Request, res: Response) => {
   try {
     const authorName = req.principal?.user?.name || 'Administrador';
     const updated = UpdatesCenterService.updateReleaseNote(version, body, authorName);
-    return res.json(updated);
+        if (req.principal?.company?.id) {
+          await AdminAuditService.recordEvent({
+            companyId: req.principal.company.id,
+            actor: {
+              id: req.principal.user?.id || null,
+              name: req.principal.user?.name || authorName,
+              email: req.principal.user?.email || null,
+              ipAddress: (req.headers && (req.headers['x-forwarded-for'] as string)) || req.ip || req.socket?.remoteAddress || null,
+            },
+            action: 'release_note.update',
+            category: 'UPDATES',
+            severity: 'INFO',
+            targetId: version,
+            targetType: 'release_note',
+            details: { version, title: body.title, highlightsCount: body.highlights?.length ?? 0 },
+          });
+        }
+        return res.json(updated);
   } catch (err: any) {
     return res.status(err.statusCode || 500).json({
       error: err.message || 'Erro ao atualizar notas de versão.',

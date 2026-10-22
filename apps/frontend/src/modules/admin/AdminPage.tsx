@@ -12,6 +12,7 @@ import {
   Printer,
   Cpu,
   Sparkles,
+  ScrollText,
 } from 'lucide-react';
 import {
   SessionContext,
@@ -27,6 +28,7 @@ import { IntegrationsAdminView } from './IntegrationsAdminView.js';
 import { PrintersAdminView } from './PrintersAdminView.js';
 import { AgentsAdminView } from './AgentsAdminView.js';
 import { UpdatesAdminView } from './UpdatesAdminView.js';
+import { AuditAdminView } from './AuditAdminView.js';
 
 interface AdminPageProps {
   sessionContext: SessionContext;
@@ -35,7 +37,7 @@ interface AdminPageProps {
   initialTab?: AdminTab;
 }
 
-type AdminTab = 'company' | 'users' | 'roles' | 'niches' | 'integrations' | 'printers' | 'agents' | 'updates';
+type AdminTab = 'company' | 'users' | 'roles' | 'niches' | 'integrations' | 'printers' | 'agents' | 'updates' | 'audit';
 
 export const AdminPage: React.FC<AdminPageProps> = ({
   sessionContext,
@@ -57,12 +59,18 @@ export const AdminPage: React.FC<AdminPageProps> = ({
     hasAnyPermission(['updates.view', 'updates.manage']) ||
     sessionContext?.roles?.some((r) => r.code === 'ADMIN') ||
     Boolean(sessionContext?.isDeveloper);
+  const canViewAudit =
+    hasAnyPermission(['audit.view']) ||
+    sessionContext?.roles?.some((r) => r.code === 'ADMIN') ||
+    Boolean(sessionContext?.isDeveloper);
+
   const canManageUpdates =
     hasAnyPermission(['updates.manage']) ||
     sessionContext?.roles?.some((r) => r.code === 'ADMIN') ||
     Boolean(sessionContext?.isDeveloper);
 
   const getDefaultTab = (): AdminTab => {
+    if (initialTab === 'audit' && canViewAudit) return 'audit';
     if (initialTab === 'updates' && canViewUpdates) return 'updates';
     if (initialTab === 'printers' && canViewPrinters) return 'printers';
     if (initialTab === 'agents' && canViewAgents) return 'agents';
@@ -88,7 +96,8 @@ export const AdminPage: React.FC<AdminPageProps> = ({
   // Sincroniza initialTab se alterado externamente
   useEffect(() => {
     if (initialTab) {
-      if (initialTab === 'updates' && canViewUpdates) setActiveTab('updates');
+      if (initialTab === 'audit' && canViewAudit) setActiveTab('audit');
+      else if (initialTab === 'updates' && canViewUpdates) setActiveTab('updates');
       else if (initialTab === 'printers' && canViewPrinters) setActiveTab('printers');
       else if (initialTab === 'agents' && canViewAgents) setActiveTab('agents');
       else if (initialTab === 'integrations' && canViewIntegrations) setActiveTab('integrations');
@@ -97,7 +106,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({
       else if (initialTab === 'users' && canViewUsers) setActiveTab('users');
       else if (initialTab === 'company' && canViewCompany) setActiveTab('company');
     }
-  }, [initialTab, canViewUpdates, canViewPrinters, canViewAgents, canViewIntegrations, canViewNiches, canViewRoles, canViewUsers, canViewCompany]);
+  }, [initialTab, canViewAudit, canViewUpdates, canViewPrinters, canViewAgents, canViewIntegrations, canViewNiches, canViewRoles, canViewUsers, canViewCompany]);
 
 
   // Ajusta a aba se as permissões mudarem
@@ -238,6 +247,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({
             {activeTab === 'printers' && 'Impressoras'}
             {activeTab === 'agents' && 'Agentes de Impressão'}
             {activeTab === 'updates' && 'Atualizações'}
+            {activeTab === 'audit' && 'Auditoria'}
           </span>
         </div>
       </div>
@@ -383,6 +393,9 @@ export const AdminPage: React.FC<AdminPageProps> = ({
 
         {activeTab === 'updates' && canViewUpdates && (
           <UpdatesAdminView canManage={canManageUpdates} />
+        )}
+        {activeTab === 'audit' && canViewAudit && (
+          <AuditAdminView />
         )}
       </div>
     </div>

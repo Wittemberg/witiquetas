@@ -27,13 +27,19 @@ declare global {
  * Valida status ativo de usuário e empresa com revogação imediata em caso de inativação.
  */
 export async function requireAuthenticatedUser(req: Request, res: Response, next: NextFunction) {
-  const cookies = parseCookies(req.headers.cookie);
+  if (req.principal) {
+    (req as any).user = req.principal.user;
+    (req as any).company = req.principal.company;
+    return next();
+  }
+  const headers = req.headers || {};
+  const cookies = parseCookies(headers.cookie);
 
   // 1. Verificar Sessão Tenant Comercial (Cookie HttpOnly)
   const cookieToken = cookies[SESSION_COOKIE_NAME];
 
   // 2. Verificar Header Authorization (Bearer)
-  const authHeader = req.headers.authorization;
+  const authHeader = headers.authorization;
   const bearerToken = authHeader && authHeader.startsWith('Bearer ')
     ? authHeader.substring(7).trim()
     : undefined;
@@ -82,7 +88,7 @@ export async function requireAuthenticatedUser(req: Request, res: Response, next
 
   // 3. Verificar Sessão de Desenvolvedor da Plataforma (PLATFORM_DEVELOPER)
   const dccCookieToken = cookies[DCC_SESSION_COOKIE_NAME];
-  const dccHeaderToken = typeof req.headers['x-dcc-session'] === 'string' ? req.headers['x-dcc-session'].trim() : undefined;
+  const dccHeaderToken = typeof headers['x-dcc-session'] === 'string' ? (headers['x-dcc-session'] as string).trim() : undefined;
   const rawDccToken = dccCookieToken || dccHeaderToken;
 
   if (rawDccToken) {

@@ -1,3 +1,4 @@
+import type { PoolClient } from 'pg';
 import { getPgPool } from '../db.js';
 import {
   AdminAuditLogEntryDTO,
@@ -7,7 +8,7 @@ import {
 /**
  * Repositório para persistência append-only e consulta da trilha de auditoria administrativa.
  * Multi-tenant estrito: toda consulta exige company_id do contexto autenticado.
- * Opera no PostgreSQL ou em memória para testes unitários.
+ * Opera no PostgreSQL ou em memória exclusivamente para testes unitários (NODE_ENV === 'test').
  */
 export class AdminAuditRepository {
   private static memoryLogs: AdminAuditLogEntryDTO[] = [];
@@ -21,15 +22,12 @@ export class AdminAuditRepository {
 
   /**
    * Persiste um novo registro imutável de auditoria.
+   * Suporta PoolClient para consistência transacional quando fornecido pelo chamador.
    */
-  public static async create(entry: AdminAuditLogEntryDTO): Promise<AdminAuditLogEntryDTO> {
-    const pool = getPgPool();
-
-    if (!pool) {
-      this.memoryLogs.unshift({ ...entry });
-      return entry;
-    }
-
+  public static async create(
+    entry: AdminAuditLogEntryDTO,
+    client?: PoolClient
+  ): Promise<AdminAuditLogEntryDTO> {
     const query = `
       INSERT INTO admin_audit_logs (
         id, company_id, user_id, user_name, user_email,
@@ -55,6 +53,28 @@ export class AdminAuditRepository {
       entry.createdAt,
     ];
 
+    if (client) {
+      await client.query(query, values);
+      return entry;
+    }
+
+    const pool = getPgPool();
+
+    if (!pool) {
+      if (process.env.NODE_ENV === 'production') {
+        throw new Error(
+          '[AdminAuditRepository] Conexão com PostgreSQL indisponível. Armazenamento volátil em memória é estritamente proibido em ambiente de produção.'
+        );
+      }
+      if (process.env.NODE_ENV === 'test' || !process.env.NODE_ENV) {
+        this.memoryLogs.unshift({ ...entry });
+        return entry;
+      }
+      throw new Error(
+        '[AdminAuditRepository] Conexão com PostgreSQL indisponível. Armazenamento volátil em memória é estritamente proibido fora do ambiente de testes.'
+      );
+    }
+
     try {
       await pool.query(query, values);
       return entry;
@@ -78,31 +98,42 @@ export class AdminAuditRepository {
     const pool = getPgPool();
 
     if (!pool) {
-      // Filtragem em memória para testes unitários
-      let filtered = this.memoryLogs.filter((log) => log.companyId === companyId);
+      if (process.env.NODE_ENV === 'production') {
+        throw new Error(
+          '[AdminAuditRepository] Conexão com PostgreSQL indisponível para consulta de logs de auditoria em ambiente de produção.'
+        );
+      }
+      if (process.env.NODE_ENV === 'test' || !process.env.NODE_ENV) {
+        // Filtragem em memória para testes unitários
+        let filtered = this.memoryLogs.filter((log) => log.companyId === companyId);
 
-      if (filter.category) {
-        filtered = filtered.filter((log) => log.category === filter.category);
-      }
-      if (filter.action) {
-        filtered = filtered.filter((log) => log.action.toLowerCase().includes(filter.action!.toLowerCase()));
-      }
-      if (filter.userId) {
-        filtered = filtered.filter((log) => log.userId === filter.userId);
-      }
-      if (filter.startDate) {
-        const start = new Date(filter.startDate).getTime();
-        filtered = filtered.filter((log) => new Date(log.createdAt).getTime() >= start);
-      }
-      if (filter.endDate) {
-        const end = new Date(filter.endDate).getTime();
-        filtered = filtered.filter((log) => new Date(log.createdAt).getTime() <= end);
+        if (filter.category) {
+          filtered = filtered.filter((log) => log.category === filter.category);
+        }
+        if (filter.action) {
+          filtered = filtered.filter((log) => log.action.toLowerCase().includes(filter.action!.toLowerCase()));
+        }
+        if (filter.userId) {
+          filtered = filtered.filter((log) => log.userId === filter.userId);
+        }
+        if (filter.startDate) {
+          const start = new Date(filter.startDate).getTime();
+          filtered = filtered.filter((log) => new Date(log.createdAt).getTime() >= start);
+        }
+        if (filter.endDate) {
+          const end = new Date(filter.endDate).getTime();
+          filtered = filtered.filter((log) => new Date(log.createdAt).getTime() <= end);
+        }
+
+        const total = filtered.length;
+        const paginated = filtered.slice(offset, offset + limit);
+
+        return { logs: paginated, total };
       }
 
-      const total = filtered.length;
-      const paginated = filtered.slice(offset, offset + limit);
-
-      return { logs: paginated, total };
+      throw new Error(
+        '[AdminAuditRepository] Conexão com PostgreSQL indisponível para consulta de logs de auditoria fora do ambiente de testes.'
+      );
     }
 
     // Consulta SQL com parametrização dinâmica e segura

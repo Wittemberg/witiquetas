@@ -1,3 +1,4 @@
+process.env.NODE_ENV = 'test';
 import test from 'node:test';
 import assert from 'node:assert';
 import fs from 'node:fs';
@@ -136,7 +137,8 @@ test('SUÍTE CANÔNICA — AUDITORIA ADMINISTRATIVA (cap-admin-audit-log & cap-a
 
     const sql = fs.readFileSync(migrationPath, 'utf8');
     assert.ok(sql.includes('CREATE TABLE IF NOT EXISTS admin_audit_logs'), 'Deve criar a tabela admin_audit_logs');
-    assert.ok(sql.includes('company_id VARCHAR(64) NOT NULL REFERENCES companies(id)'), 'Deve ter FK para companies(id)');
+    assert.ok(sql.includes('company_id VARCHAR(64) NOT NULL REFERENCES companies(id) ON DELETE RESTRICT'), 'Deve ter FK com ON DELETE RESTRICT para companies(id)');
+    assert.ok(!sql.includes('ON DELETE CASCADE'), 'Não deve permitir ON DELETE CASCADE para evitar exclusão acidental do histórico');
     assert.ok(sql.includes('details JSONB'), 'Deve ter coluna details JSONB');
     assert.ok(sql.includes('idx_admin_audit_logs_company_created'), 'Deve possuir índice por company_id e created_at');
     assert.ok(sql.includes('idx_admin_audit_logs_company_category'), 'Deve possuir índice por company_id e category');
@@ -522,5 +524,125 @@ test('SUÍTE CANÔNICA — AUDITORIA ADMINISTRATIVA (cap-admin-audit-log & cap-a
 
     const resDelete = await callAdminRouter(reqDelete);
     assert.ok(resDelete.statusCode === 404 || resDelete.statusCode === 405 || !resDelete.body, 'Não deve existir rota DELETE para audit logs');
+  });
+  await t.test('11. Falha de INSERT não é reportada como sucesso', async () => {
+    const origCreate = AdminAuditRepository.create;
+    try {
+      // Simula falha no INSERT do banco
+      AdminAuditRepository.create = async () => {
+        throw new Error('pg_query_error: relation admin_audit_logs disk full');
+      };
+
+      await assert.rejects(
+        async () => {
+          await AdminAuditService.recordEvent({
+            companyId: tenantA.company.id,
+            actor: { id: tenantA.adminUser.id, name: tenantA.adminUser.name, email: tenantA.adminUser.email },
+            action: 'test.failing_insert',
+            category: 'SECURITY',
+          });
+        },
+        /disk full/,
+        'RecordEvent deve lançar erro explícito e nunca retornar falso sucesso'
+      );
+    } finally {
+      AdminAuditRepository.create = origCreate;
+    }
+  });
+
+  await t.test('12. Produção não utiliza armazenamento em memória (Fail-Closed na ausência de PostgreSQL)', async () => {
+    const originalEnv = process.env.NODE_ENV;
+    try {
+      process.env.NODE_ENV = 'production';
+
+      const dummyEntry: any = {
+        id: 'test-audit-fail',
+        companyId: tenantA.company.id,
+        action: 'test.production_guard',
+        category: 'SECURITY',
+        severity: 'INFO',
+        createdAt: new Date().toISOString(),
+      };
+
+      await assert.rejects(
+        async () => {
+          await AdminAuditRepository.create(dummyEntry);
+        },
+        /Conexão com PostgreSQL indisponível\. Armazenamento volátil em memória é estritamente proibido/,
+        'Repository.create deve falhar em produção se o banco estiver indisponível'
+      );
+
+      await assert.rejects(
+        async () => {
+          await AdminAuditRepository.list(tenantA.company.id);
+        },
+        /Conexão com PostgreSQL indisponível para consulta de logs de auditoria/,
+        'Repository.list deve falhar em produção se o banco estiver indisponível'
+      );
+    } finally {
+      process.env.NODE_ENV = originalEnv;
+    }
+  });
+
+  await t.test('13. Operações críticas mantêm consistência suportada e sinalizam falhas de auditoria via header', async () => {
+    const origCreate = AdminAuditRepository.create;
+    try {
+      // Simula falha no repositório de auditoria durante atualização de usuário
+      AdminAuditRepository.create = async () => {
+        throw new Error('audit_db_temporary_timeout');
+      };
+
+      const reqUpdate = {
+        method: 'PUT',
+        url: `/users/${tenantA.operatorUser.id}`,
+        body: {
+          name: 'Operador com Auditoria Sinalizada',
+        },
+        headers: {
+          'x-csrf-token': 'mock-csrf',
+        },
+        principal: {
+          csrfToken: 'mock-csrf',
+          user: tenantA.adminUser,
+          company: tenantA.company,
+          roles: [tenantA.adminRole],
+          permissions: ['users.manage'],
+        },
+      };
+
+      const res = await callAdminRouter(reqUpdate);
+      // Mutação já confirmada no repositório de usuários deve ser mantida
+      assert.strictEqual(res.statusCode, 200, 'Operação confirmada não deve ser revertida');
+      assert.strictEqual(res.body.name, 'Operador com Auditoria Sinalizada');
+      // Falha na gravação da auditoria deve ser explicitamente sinalizada
+      assert.strictEqual(
+        res.headers['x-audit-status'],
+        'AUDIT_RECORDING_FAILED',
+        'Header de advertência deve sinalizar falha na persistência da auditoria'
+      );
+    } finally {
+      AdminAuditRepository.create = origCreate;
+    }
+  });
+
+  await t.test('14. Exclusão da empresa não apaga automaticamente logs de auditoria (Preservação de Histórico)', async () => {
+    // Registra log para tenantB
+    await AdminAuditService.recordEvent({
+      companyId: tenantB.company.id,
+      actor: { id: tenantB.adminUser.id, name: tenantB.adminUser.name, email: tenantB.adminUser.email },
+      action: 'company.retention_test',
+      category: 'COMPANY',
+    });
+
+    // Consulta logs antes da exclusão
+    const logsBefore = await AdminAuditRepository.list(tenantB.company.id);
+    assert.ok(logsBefore.total >= 1, 'Deve possuir logs registrados antes da exclusão');
+
+    // Executa exclusão da empresa
+    await CompanyRepository.delete(tenantB.company.id);
+
+    // Consulta logs após: o histórico de auditoria continua preservado
+    const logsAfter = await AdminAuditRepository.list(tenantB.company.id);
+    assert.strictEqual(logsAfter.total, logsBefore.total, 'Logs de auditoria devem permanecer preservados após exclusão da empresa');
   });
 });

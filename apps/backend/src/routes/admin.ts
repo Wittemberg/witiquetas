@@ -42,6 +42,39 @@ function getAuditActor(req: Request) {
   };
 }
 
+/**
+ * Registra auditoria para operações administrativas em fluxos não-transacionais.
+ * Política explícita de falha e sinalização:
+ * Se a mutação já foi confirmada no repositório, uma falha subsequente de auditoria
+ * não tenta desfazer a operação nem simula falso erro na mutação, mas é imediatamente
+ * sinalizada via log crítico de segurança e cabeçalho HTTP 'X-Audit-Status: AUDIT_RECORDING_FAILED'.
+ */
+async function recordAuditOrSignal(
+  req: Request,
+  res: Response,
+  input: {
+    companyId: string;
+    action: string;
+    category: any;
+    severity?: any;
+    targetId?: string | null;
+    targetType?: string | null;
+    details?: Record<string, unknown> | null;
+  }
+) {
+  try {
+    await AdminAuditService.recordEvent({
+      ...input,
+      actor: getAuditActor(req),
+    });
+  } catch (auditErr: any) {
+    console.error(
+      `[AUDIT_FAILURE_CRITICAL] Falha de persistência da auditoria para '${input.action}' (empresa: ${input.companyId}): ${auditErr.message}`
+    );
+    res.setHeader('X-Audit-Status', 'AUDIT_RECORDING_FAILED');
+  }
+}
+
 
 // ==========================================
 // 1. EMPRESA (Company)
@@ -83,9 +116,8 @@ router.put('/company', requirePermission('company.manage'), requireCsrf, async (
     return res.status(404).json({ error: 'Empresa não encontrada.', code: 'COMPANY_NOT_FOUND' });
   }
 
-  await AdminAuditService.recordEvent({
+  await recordAuditOrSignal(req, res, {
     companyId,
-    actor: getAuditActor(req),
     action: 'company.update',
     category: 'COMPANY',
     severity: 'INFO',
@@ -208,9 +240,8 @@ router.post('/users', requirePermission('users.manage'), requireCsrf, async (req
 
   const roles = await RoleRepository.getUserRoles(companyId, user.id);
 
-  await AdminAuditService.recordEvent({
+  await recordAuditOrSignal(req, res, {
     companyId,
-    actor: getAuditActor(req),
     action: 'user.create',
     category: 'USER',
     severity: 'INFO',
@@ -358,9 +389,8 @@ router.put('/users/:id', requirePermission('users.manage'), requireCsrf, async (
 
   const updatedRoles = await RoleRepository.getUserRoles(companyId, targetId);
 
-  await AdminAuditService.recordEvent({
+  await recordAuditOrSignal(req, res, {
     companyId,
-    actor: getAuditActor(req),
     action: 'user.update',
     category: 'USER',
     severity: status === 'INACTIVE' ? 'WARN' : 'INFO',
@@ -397,9 +427,8 @@ router.post('/users/:id/reset-password', requirePermission('users.manage'), requ
   // Revogar sessões ativas do usuário
   await SessionRepository.revokeAllForUser(companyId, targetId);
 
-  await AdminAuditService.recordEvent({
+  await recordAuditOrSignal(req, res, {
     companyId,
-    actor: getAuditActor(req),
     action: 'user.reset_password',
     category: 'SECURITY',
     severity: 'WARN',
@@ -444,9 +473,8 @@ router.delete('/users/:id', requirePermission('users.manage'), requireCsrf, asyn
   await SessionRepository.revokeAllForUser(companyId, targetId);
   await UserRepository.delete(companyId, targetId);
 
-  await AdminAuditService.recordEvent({
+  await recordAuditOrSignal(req, res, {
     companyId,
-    actor: getAuditActor(req),
     action: 'user.delete',
     category: 'USER',
     severity: 'CRITICAL',
@@ -643,9 +671,8 @@ router.put('/roles/:id/permissions', requirePermission('roles.manage'), requireC
   await RoleRepository.setRolePermissions(role.id, permissions);
   const updatedPermissions = await RoleRepository.getRolePermissions(role.id);
 
-  await AdminAuditService.recordEvent({
+  await recordAuditOrSignal(req, res, {
     companyId,
-    actor: getAuditActor(req),
     action: 'role.update_permissions',
     category: 'ROLE',
     severity: 'WARN',
@@ -690,9 +717,8 @@ router.delete('/roles/:id', requirePermission('roles.manage'), requireCsrf, asyn
 
   await RoleRepository.delete(companyId, role.id);
 
-  await AdminAuditService.recordEvent({
+  await recordAuditOrSignal(req, res, {
     companyId,
-    actor: getAuditActor(req),
     action: 'role.delete',
     category: 'ROLE',
     severity: 'CRITICAL',

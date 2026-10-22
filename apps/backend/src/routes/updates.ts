@@ -139,21 +139,26 @@ router.put('/releases/:version', requireCsrf, async (req: Request, res: Response
     const authorName = req.principal?.user?.name || 'Administrador';
     const updated = UpdatesCenterService.updateReleaseNote(version, body, authorName);
         if (req.principal?.company?.id) {
-          await AdminAuditService.recordEvent({
-            companyId: req.principal.company.id,
-            actor: {
-              id: req.principal.user?.id || null,
-              name: req.principal.user?.name || authorName,
-              email: req.principal.user?.email || null,
-              ipAddress: (req.headers && (req.headers['x-forwarded-for'] as string)) || req.ip || req.socket?.remoteAddress || null,
-            },
-            action: 'release_note.update',
-            category: 'UPDATES',
-            severity: 'INFO',
-            targetId: version,
-            targetType: 'release_note',
-            details: { version, title: body.title, highlightsCount: body.highlights?.length ?? 0 },
-          });
+          try {
+            await AdminAuditService.recordEvent({
+              companyId: req.principal.company.id,
+              actor: {
+                id: req.principal.user?.id || null,
+                name: req.principal.user?.name || authorName,
+                email: req.principal.user?.email || null,
+                ipAddress: (req.headers && (req.headers['x-forwarded-for'] as string)) || req.ip || req.socket?.remoteAddress || null,
+              },
+              action: 'release_note.update',
+              category: 'UPDATES',
+              severity: 'INFO',
+              targetId: version,
+              targetType: 'release_note',
+              details: { version, title: body.title, highlightsCount: body.highlights?.length ?? 0 },
+            });
+          } catch (auditErr: any) {
+            console.error(`[AUDIT_FAILURE_CRITICAL] Falha ao registrar auditoria para release_note.update: ${auditErr.message}`);
+            res.setHeader('X-Audit-Status', 'AUDIT_RECORDING_FAILED');
+          }
         }
         return res.json(updated);
   } catch (err: any) {

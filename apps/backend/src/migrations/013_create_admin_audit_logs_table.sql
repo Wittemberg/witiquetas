@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS admin_audit_logs (
   id VARCHAR(64) PRIMARY KEY,
-  company_id VARCHAR(64) NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+  company_id VARCHAR(64) NOT NULL REFERENCES companies(id) ON DELETE RESTRICT,
   user_id VARCHAR(64) NULL,
   user_name VARCHAR(255) NULL,
   user_email VARCHAR(255) NULL,

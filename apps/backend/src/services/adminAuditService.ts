@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import type { PoolClient } from 'pg';
 import {
   AdminAuditCategory,
   AdminAuditSeverity,
@@ -55,8 +56,13 @@ export function sanitizeAuditDetails(data: any): any {
 export class AdminAuditService {
   /**
    * Registra um evento administrativo de forma segura, imutável e sanitizada.
+   * Lança erro explícito se a persistência falhar, sem retorno enganoso de sucesso.
+   * Permite injeção de PoolClient para operações transacionais quando suportadas.
    */
-  public static async recordEvent(input: RecordAuditEventInput): Promise<AdminAuditLogEntryDTO> {
+  public static async recordEvent(
+    input: RecordAuditEventInput,
+    client?: PoolClient
+  ): Promise<AdminAuditLogEntryDTO> {
     const sanitizedDetails = input.details ? sanitizeAuditDetails(input.details) : null;
 
     const entry: AdminAuditLogEntryDTO = {
@@ -75,13 +81,7 @@ export class AdminAuditService {
       createdAt: new Date().toISOString(),
     };
 
-    try {
-      return await AdminAuditRepository.create(entry);
-    } catch (err: any) {
-      console.error(`[AdminAuditService] Erro ao registrar evento de auditoria '${input.action}': ${err.message}`);
-      // Não propagar crash para o chamador caso a auditoria falhe após mutação bem-sucedida
-      return entry;
-    }
+    return await AdminAuditRepository.create(entry, client);
   }
 
   /**

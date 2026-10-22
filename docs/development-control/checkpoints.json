@@ -1,22 +1,22 @@
 {
   "checkpoints": [
     {
-      "sha": "PENDING_COMMIT",
-      "shortSha": "PENDING",
-      "date": "2026-10-19T10:55:00Z",
+      "sha": "1f8a03d53d8ce95fb3836ba991638166b80fa906",
+      "shortSha": "1f8a03d",
+      "date": "2026-10-22T14:49:00Z",
       "phase": "5",
       "patch": "5.8.0-sprint1",
-      "title": "5.8.0 — Central de Atualizações (Sprint 1: Arquitetura, Governança e Interface)",
+      "title": "5.8.0 — Central de Atualizações (Sprint 1: Conclusão, Experiência SaaS e Homologação UX)",
       "type": "FEATURE",
       "capabilities": [
         "cap-updates-center"
       ],
       "testsPassed": true,
-      "deployed": false,
+      "deployed": true,
       "manualValidation": true,
       "homologated": true,
-      "status": "READY_FOR_SPRINT_REVIEW",
-      "evidence": "CENTRAL DE ATUALIZAÇÕES — SPRINT 1 IMPLEMENTADA E VALIDADA: 1) Inventário completo do ecossistema documentado em UPDATES-CENTER-ARCHITECTURE.md e ADR-006. 2) Contratos canônicos DTO em @witiquetas/contracts (ReleaseManifestDTO, UpdateCenterOverviewDTO, UpdateCheckResultDTO, UpdateReleaseNoteDTO). 3) Rotas REST em /api/updates (/overview, /history, /releases/:version, /check) com RBAC estrito (updates.view e updates.manage). 4) Interface administrativa rica em UpdatesAdminView.tsx com status da versão atual, visualizador de Release Notes (destaques, breaking changes, migrações, changelog), histórico e editor de notas com live preview. 5) Suíte de testes automatizados tests/updatesCenterFoundation.test.ts com 11/11 subtestes PASS. 6) Salvaguarda formal comprovada: zero chamadas a Docker, Swarm ou Portainer webhooks."
+      "status": "CLOSED — MANUAL_HOMOLOGATED",
+      "evidence": "CENTRAL DE ATUALIZAÇÕES — SPRINT 1 CONCLUÍDA E HOMOLOGADA: 1) Publicação na main via PR #4 (commit 2f0e740, merge a854788) e Hotfix de UX via PR #5 (commit 3eebfdd, merge 1f8a03d), com execução da esteira de CI/CD em produção concluída com sucesso. 2) Homologação funcional da experiência SaaS: rotas /api/updates (/overview, /history, /releases/:version, /check), RBAC estrito (updates.view e updates.manage) e modal pós-login 'O que há de novo' com persistência idempotente por usuário via migration 012 (user_release_views). 3) Homologação visual pelo operador: layout landscape do modal, tipografia balanceada, contraste WCAG AAA nos temas claro (#ffffff) e escuro (#0f172a / #1e293b). 4) Script de backup pré-deploy 5.7.1: correção validada (identificação em Swarm e nome com espaço final) consolidada e publicada na branch de desenvolvimento 'fix/backup-script-predeploy-swarm' (commit f4591a3), com PR aberto para main (distinção explícita entre código integrado à main e código publicado em branch de desenvolvimento). 5) Suítes de testes 100% GREEN (updatesCenterFoundation.test.ts 11/11, whatsNewModalFlow.test.ts 9/9, devControlInvariants.test.ts 8/8)."
     },
     {
       "sha": "b86f64173b0505ad647e0eb3f45e1db8cf352e0a",

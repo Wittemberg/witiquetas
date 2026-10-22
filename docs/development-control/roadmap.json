@@ -1592,14 +1592,16 @@
           "evidence": [
             "tests/updatesCenterFoundation.test.ts",
             "docs/architecture/UPDATES-CENTER-ARCHITECTURE.md",
-            "docs/decisions/ADR-006-central-de-atualizacoes.md"
+            "docs/decisions/ADR-006-central-de-atualizacoes.md",
+            "tests/whatsNewModalFlow.test.ts"
           ],
           "dependencies": [
             "cap-company-settings",
             "cap-session-context"
           ],
           "notes": [
-            "SPRINT 1: Arquitetura canônica, DTOs (@witiquetas/contracts), rotas /api/updates, aba Atualizações em AdminPage, editor de notas de versão e salvaguarda estrita contra deploy mecânico ativo."
+            "SPRINT 1: Arquitetura canônica, DTOs (@witiquetas/contracts), rotas /api/updates, aba Atualizações em AdminPage, editor de notas de versão e salvaguarda estrita contra deploy mecânico ativo.",
+            "SAAS & UX: Modal pós-login 'O que há de novo' com persistência por usuário via migration 012 (user_release_views), layout landscape balanceado, contraste acessível WCAG AAA nos temas claro/escuro e homologação visual e funcional concluída em produção."
           ]
         }
       ]

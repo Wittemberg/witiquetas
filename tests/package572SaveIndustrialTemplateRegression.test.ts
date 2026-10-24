@@ -207,6 +207,8 @@ test('REGRESSÃO P0 — PERSISTÊNCIA DE MODELOS INDUSTRIAIS E DIMENSÕES PERSON
         document: doc,
       },
       principal: {
+        sessionId: session.sessionId,
+        csrfToken: session.csrfToken,
         user: { id: adminUser.id, name: adminUser.name },
         company: { id: company.id, name: company.name },
         roles: ['ADMIN'],
@@ -266,6 +268,8 @@ test('REGRESSÃO P0 — PERSISTÊNCIA DE MODELOS INDUSTRIAIS E DIMENSÕES PERSON
         document: doc,
       },
       principal: {
+        sessionId: session.sessionId,
+        csrfToken: session.csrfToken,
         user: { id: adminUser.id, name: adminUser.name },
         company: { id: company.id, name: company.name },
         roles: ['ADMIN'],
@@ -310,6 +314,8 @@ test('REGRESSÃO P0 — PERSISTÊNCIA DE MODELOS INDUSTRIAIS E DIMENSÕES PERSON
         document: doc,
       },
       principal: {
+        sessionId: session.sessionId,
+        csrfToken: session.csrfToken,
         user: { id: adminUser.id, name: adminUser.name },
         company: { id: company.id, name: company.name },
         roles: ['ADMIN'],
@@ -360,6 +366,8 @@ test('REGRESSÃO P0 — PERSISTÊNCIA DE MODELOS INDUSTRIAIS E DIMENSÕES PERSON
         document: doc,
       },
       principal: {
+        sessionId: session.sessionId,
+        csrfToken: session.csrfToken,
         user: { id: adminUser.id, name: adminUser.name },
         company: { id: company.id, name: company.name },
         roles: ['ADMIN'],
@@ -422,6 +430,8 @@ test('REGRESSÃO P0 — PERSISTÊNCIA DE MODELOS INDUSTRIAIS E DIMENSÕES PERSON
         document: doc,
       },
       principal: {
+        sessionId: session.sessionId,
+        csrfToken: session.csrfToken,
         user: { id: adminUser.id, name: adminUser.name },
         company: { id: company.id, name: company.name },
         roles: ['ADMIN'],
@@ -563,6 +573,8 @@ test('REGRESSÃO P0 — PERSISTÊNCIA DE MODELOS INDUSTRIAIS E DIMENSÕES PERSON
         },
       },
       principal: {
+        sessionId: session.sessionId,
+        csrfToken: session.csrfToken,
         user: { id: adminUser.id, name: adminUser.name },
         company: { id: company.id, name: company.name },
         roles: ['ADMIN'],
@@ -595,6 +607,8 @@ test('REGRESSÃO P0 — PERSISTÊNCIA DE MODELOS INDUSTRIAIS E DIMENSÕES PERSON
         },
       },
       principal: {
+        sessionId: session.sessionId,
+        csrfToken: session.csrfToken,
         user: { id: adminUser.id, name: adminUser.name },
         company: { id: company.id, name: company.name },
         roles: ['ADMIN'],
@@ -802,4 +816,43 @@ test('REGRESSÃO P0 — PERSISTÊNCIA DE MODELOS INDUSTRIAIS E DIMENSÕES PERSON
       assert.equal(reopened?.nicheId, tc.nicheId, `${tc.name}: NicheId final deve ser ${tc.nicheId}`);
     }
   });
+  await t.test('Security Gate (CSRF Protection): Requisições de mutação sem CSRF válido continuam sendo rejeitadas', async () => {
+    // 1. Sem header x-csrf-token
+    const resMissing = await callRouter(templatesRouter, {
+      method: 'POST',
+      url: '/',
+      body: { title: 'No CSRF', document: { schemaVersion: 1, title: 'No CSRF', nicheId: 'niche-gondola', dimensions: { widthMm: 50, heightMm: 30, dpi: 203 }, elements: [] } },
+      principal: {
+        sessionId: session.sessionId,
+        csrfToken: session.csrfToken,
+        user: { id: adminUser.id, name: adminUser.name },
+        company: { id: company.id, name: company.name },
+        roles: ['ADMIN'],
+        permissions: ['templates.create', 'templates.view', 'templates.edit'],
+      },
+      cookies: { witiquetas_session: session.rawToken },
+    });
+    assert.equal(resMissing.statusCode, 403);
+    assert.equal(resMissing.body.code, 'CSRF_TOKEN_MISSING');
+
+    // 2. Com token CSRF inválido / forjado
+    const resInvalid = await callRouter(templatesRouter, {
+      method: 'POST',
+      url: '/',
+      body: { title: 'Bad CSRF', document: { schemaVersion: 1, title: 'Bad CSRF', nicheId: 'niche-gondola', dimensions: { widthMm: 50, heightMm: 30, dpi: 203 }, elements: [] } },
+      principal: {
+        sessionId: session.sessionId,
+        csrfToken: session.csrfToken,
+        user: { id: adminUser.id, name: adminUser.name },
+        company: { id: company.id, name: company.name },
+        roles: ['ADMIN'],
+        permissions: ['templates.create', 'templates.view', 'templates.edit'],
+      },
+      headers: { 'x-csrf-token': 'wrong-csrf-token-attacker' },
+      cookies: { witiquetas_session: session.rawToken },
+    });
+    assert.equal(resInvalid.statusCode, 403);
+    assert.equal(resInvalid.body.code, 'CSRF_TOKEN_INVALID');
+  });
+
 });

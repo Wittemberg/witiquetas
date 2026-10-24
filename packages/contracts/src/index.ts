@@ -1145,3 +1145,45 @@ export interface MarkReleaseReadResponseDTO {
   success: boolean;
   markedVersions: string[];
 }
+
+
+// ========================================== //
+// AUDITORIA ADMINISTRATIVA (ADMIN AUDIT TRAIL) //
+// ========================================== //
+
+export type AdminAuditCategory = 'USER' | 'ROLE' | 'COMPANY' | 'UPDATES' | 'SECURITY';
+export type AdminAuditSeverity = 'INFO' | 'WARN' | 'CRITICAL';
+
+export interface AdminAuditLogEntryDTO {
+  id: string;
+  companyId: string;
+  userId: string | null;
+  userName: string | null;
+  userEmail: string | null;
+  action: string;
+  category: AdminAuditCategory;
+  severity: AdminAuditSeverity;
+  targetId: string | null;
+  targetType: string | null;
+  details: Record<string, unknown> | null;
+  ipAddress: string | null;
+  createdAt: string; // ISO 8601
+}
+
+export interface AdminAuditQueryFilterDTO {
+  page?: number;
+  limit?: number;
+  category?: AdminAuditCategory;
+  action?: string;
+  userId?: string;
+  startDate?: string;
+  endDate?: string;
+}
+
+export interface AdminAuditListResponseDTO {
+  logs: AdminAuditLogEntryDTO[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}

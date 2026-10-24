@@ -26,11 +26,55 @@ import {
 import { SessionRepository } from '../repositories/sessionRepository.js';
 import { PasswordService } from '../services/passwordService.js';
 import { EffectiveConfigurationService } from '../services/effectiveConfigurationService.js';
+import { AdminAuditService } from '../services/adminAuditService.js';
 
 const router = Router();
 
 // Todas as rotas de administração exigem usuário autenticado
 router.use(requireAuthenticatedUser);
+
+function getAuditActor(req: Request) {
+  return {
+    id: req.principal?.user?.id || null,
+    name: req.principal?.user?.name || null,
+    email: req.principal?.user?.email || null,
+    ipAddress: (req.headers && (req.headers['x-forwarded-for'] as string)) || req.ip || req.socket?.remoteAddress || null,
+  };
+}
+
+/**
+ * Registra auditoria para operações administrativas em fluxos não-transacionais.
+ * Política explícita de falha e sinalização:
+ * Se a mutação já foi confirmada no repositório, uma falha subsequente de auditoria
+ * não tenta desfazer a operação nem simula falso erro na mutação, mas é imediatamente
+ * sinalizada via log crítico de segurança e cabeçalho HTTP 'X-Audit-Status: AUDIT_RECORDING_FAILED'.
+ */
+async function recordAuditOrSignal(
+  req: Request,
+  res: Response,
+  input: {
+    companyId: string;
+    action: string;
+    category: any;
+    severity?: any;
+    targetId?: string | null;
+    targetType?: string | null;
+    details?: Record<string, unknown> | null;
+  }
+) {
+  try {
+    await AdminAuditService.recordEvent({
+      ...input,
+      actor: getAuditActor(req),
+    });
+  } catch (auditErr: any) {
+    console.error(
+      `[AUDIT_FAILURE_CRITICAL] Falha de persistência da auditoria para '${input.action}' (empresa: ${input.companyId}): ${auditErr.message}`
+    );
+    res.setHeader('X-Audit-Status', 'AUDIT_RECORDING_FAILED');
+  }
+}
+
 
 // ==========================================
 // 1. EMPRESA (Company)
@@ -71,6 +115,16 @@ router.put('/company', requirePermission('company.manage'), requireCsrf, async (
   if (!updated) {
     return res.status(404).json({ error: 'Empresa não encontrada.', code: 'COMPANY_NOT_FOUND' });
   }
+
+  await recordAuditOrSignal(req, res, {
+    companyId,
+    action: 'company.update',
+    category: 'COMPANY',
+    severity: 'INFO',
+    targetId: companyId,
+    targetType: 'company',
+    details: { name: updated.name },
+  });
 
   return res.status(200).json(updated);
 });
@@ -185,6 +239,16 @@ router.post('/users', requirePermission('users.manage'), requireCsrf, async (req
   }
 
   const roles = await RoleRepository.getUserRoles(companyId, user.id);
+
+  await recordAuditOrSignal(req, res, {
+    companyId,
+    action: 'user.create',
+    category: 'USER',
+    severity: 'INFO',
+    targetId: user.id,
+    targetType: 'user',
+    details: { createdUserId: user.id, name: user.name, email: user.email, status: user.status, roleIds: roleIds || [] },
+  });
 
   return res.status(201).json(sanitizeTenantUser(user, roles));
 });
@@ -314,12 +378,26 @@ router.put('/users/:id', requirePermission('users.manage'), requireCsrf, async (
     status: status !== undefined ? status : undefined,
   });
 
+  if (!updatedUser) {
+    return res.status(404).json({ error: 'Usuário não encontrado após atualização.' });
+  }
+
   // Se o usuário foi inativado, revogar imediatamente todas as suas sessões
   if (status === 'INACTIVE' && existing.status === 'ACTIVE') {
     await SessionRepository.revokeAllForUser(companyId, targetId);
   }
 
   const updatedRoles = await RoleRepository.getUserRoles(companyId, targetId);
+
+  await recordAuditOrSignal(req, res, {
+    companyId,
+    action: 'user.update',
+    category: 'USER',
+    severity: status === 'INACTIVE' ? 'WARN' : 'INFO',
+    targetId,
+    targetType: 'user',
+    details: { updatedUserId: targetId, name: updatedUser.name, email: updatedUser.email, status: updatedUser.status, roleIds: updatedRoles.map(r => r.id) },
+  });
 
   return res.status(200).json(sanitizeTenantUser(updatedUser, updatedRoles));
 });
@@ -348,6 +426,16 @@ router.post('/users/:id/reset-password', requirePermission('users.manage'), requ
 
   // Revogar sessões ativas do usuário
   await SessionRepository.revokeAllForUser(companyId, targetId);
+
+  await recordAuditOrSignal(req, res, {
+    companyId,
+    action: 'user.reset_password',
+    category: 'SECURITY',
+    severity: 'WARN',
+    targetId,
+    targetType: 'user',
+    details: { targetUserId: targetId, targetUserEmail: existing.email, temporaryPasswordGenerated: true },
+  });
 
   return res.status(200).json({ message: 'Senha redefinida com sucesso.' });
 });
@@ -384,6 +472,16 @@ router.delete('/users/:id', requirePermission('users.manage'), requireCsrf, asyn
 
   await SessionRepository.revokeAllForUser(companyId, targetId);
   await UserRepository.delete(companyId, targetId);
+
+  await recordAuditOrSignal(req, res, {
+    companyId,
+    action: 'user.delete',
+    category: 'USER',
+    severity: 'CRITICAL',
+    targetId,
+    targetType: 'user',
+    details: { deletedUserId: targetId, deletedUserEmail: existing.email, deletedUserName: existing.name },
+  });
 
   return res.status(200).json({ success: true, message: 'Usuário excluído com sucesso.' });
 });
@@ -573,6 +671,16 @@ router.put('/roles/:id/permissions', requirePermission('roles.manage'), requireC
   await RoleRepository.setRolePermissions(role.id, permissions);
   const updatedPermissions = await RoleRepository.getRolePermissions(role.id);
 
+  await recordAuditOrSignal(req, res, {
+    companyId,
+    action: 'role.update_permissions',
+    category: 'ROLE',
+    severity: 'WARN',
+    targetId: role.id,
+    targetType: 'role',
+    details: { roleId: role.id, roleCode: role.code, permissions: updatedPermissions },
+  });
+
   return res.status(200).json({
     roleId: role.id,
     permissions: updatedPermissions,
@@ -608,6 +716,16 @@ router.delete('/roles/:id', requirePermission('roles.manage'), requireCsrf, asyn
   }
 
   await RoleRepository.delete(companyId, role.id);
+
+  await recordAuditOrSignal(req, res, {
+    companyId,
+    action: 'role.delete',
+    category: 'ROLE',
+    severity: 'CRITICAL',
+    targetId: role.id,
+    targetType: 'role',
+    details: { deletedRoleId: role.id, roleCode: role.code, roleName: role.name },
+  });
 
   return res.status(200).json({ success: true, message: 'Perfil excluído com sucesso.' });
 });
@@ -1262,6 +1380,37 @@ router.put('/integrations/:id/mappings', requirePermission('integrations.manage'
   );
 
   return res.status(200).json(updatedMappings);
+});
+
+
+// ==========================================
+// 10. TRILHA DE AUDITORIA ADMINISTRATIVA (Audit Logs)
+// ==========================================
+
+/**
+ * GET /api/admin/audit-logs
+ * Consulta a trilha de auditoria da empresa com paginação e filtros.
+ */
+router.get('/audit-logs', requirePermission('audit.view'), async (req: Request, res: Response) => {
+  const companyId = req.principal!.company.id;
+  const { page, limit, category, action, userId, startDate, endDate } = req.query;
+
+  try {
+    const result = await AdminAuditService.listAuditLogs(companyId, {
+      page: page ? Number(page) : undefined,
+      limit: limit ? Number(limit) : undefined,
+      category: category as any,
+      action: action as string,
+      userId: userId as string,
+      startDate: startDate as string,
+      endDate: endDate as string,
+    });
+
+    return res.status(200).json(result);
+  } catch (err: any) {
+    console.error(`[AdminRoute] Erro ao consultar audit logs: ${err.message}`);
+    return res.status(500).json({ error: 'Falha ao consultar logs de auditoria.', code: 'AUDIT_QUERY_ERROR' });
+  }
 });
 
 export default router;

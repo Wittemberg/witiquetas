@@ -1394,16 +1394,22 @@
           "module": "admin",
           "weight": 2,
           "mvp": false,
-          "status": "PLANNED",
+          "status": "IMPLEMENTED",
           "manualValidation": false,
           "physicalValidation": false,
           "frozen": false,
-          "evidence": [],
+          "evidence": [
+            "apps/frontend/src/modules/admin/AuditAdminView.tsx",
+            "apps/frontend/src/services/adminAuditApi.ts",
+            "apps/frontend/src/modules/admin/AdminPage.tsx",
+            "tests/adminAuditTrail.test.ts"
+          ],
           "dependencies": [
-            "cap-admin-shell"
+            "cap-admin-shell",
+            "cap-admin-audit-log"
           ],
           "notes": [
-            "Rastreabilidade e conformidade LGPD/SOX."
+            "Interface de consulta de logs de auditoria administrativa com isolamento multi-tenant, filtros por categoria/ação/período, badges WCAG AAA e modal de detalhes sanitizados sem segredos."
           ]
         },
         {
@@ -1434,16 +1440,23 @@
           "module": "admin",
           "weight": 2,
           "mvp": false,
-          "status": "PLANNED",
+          "status": "IMPLEMENTED",
           "manualValidation": false,
           "physicalValidation": false,
           "frozen": false,
-          "evidence": [],
+          "evidence": [
+            "apps/backend/src/migrations/013_create_admin_audit_logs_table.sql",
+            "apps/backend/src/repositories/adminAuditRepository.ts",
+            "apps/backend/src/services/adminAuditService.ts",
+            "apps/backend/src/routes/admin.ts",
+            "packages/contracts/src/index.ts",
+            "tests/adminAuditTrail.test.ts"
+          ],
           "dependencies": [
             "cap-infra-storage-db"
           ],
           "notes": [
-            "Imutabilidade e auditoria forense."
+            "Trilha de auditoria administrativa persistente (admin_audit_logs), fail-closed, isolamento estrito multi-tenant (company_id da sessão), redação recursiva de segredos/senhas/tokens, e ausência de endpoints UPDATE/DELETE."
           ]
         },
         {

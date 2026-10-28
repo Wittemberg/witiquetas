@@ -38,9 +38,9 @@
 #    - set -euo pipefail, sem mascaramento por '|| true' em comandos críticos.
 #    - Preserva artefatos em /opt/backups/witiquetas em caso de erro para análise forense.
 #    - Zero segredos em disco, logs ou repositório.
-# 10. Vinculação Criptográfica e Autenticidade ao Deploy:
-#    - Gera evidência estruturada em JSON vinculada a TARGET_COMMIT_SHA, RUN_ID
-#      e assinatura de integridade SHA-256 do dump.
+# 10. Vinculação Criptográfica e Autenticação Real da Evidência:
+#    - Gera assinatura criptográfica HMAC-SHA256 vinculada a TARGET_COMMIT_SHA, RUN_ID,
+#      hash do dump e chave secreta compartilhada, impedindo falsificação por terceiros.
 # ==============================================================================
 
 set -euo pipefail
@@ -52,11 +52,11 @@ set -euo pipefail
 # pares CHAVE=VALOR estritamente permitidos.
 if [ ! -t 0 ]; then
   while IFS='=' read -r key val || [ -n "$key" ]; do
-    # Ignorar linhas vazias ou comentários
     [[ -z "$key" || "$key" =~ ^# ]] && continue
     case "$key" in
       AWS_ACCESS_KEY_ID) export AWS_ACCESS_KEY_ID="$val" ;;
       AWS_SECRET_ACCESS_KEY) export AWS_SECRET_ACCESS_KEY="$val" ;;
+      EVIDENCE_SIGNING_KEY) export EVIDENCE_SIGNING_KEY="$val" ;;
       S3_ENDPOINT) S3_ENDPOINT="$val" ;;
       S3_BUCKET) S3_BUCKET="$val" ;;
       S3_REGION) S3_REGION="$val" ;;
@@ -194,6 +194,11 @@ if ! command -v docker >/dev/null 2>&1; then
   exit 1
 fi
 
+if ! command -v openssl >/dev/null 2>&1; then
+  echo "❌ ERRO: 'openssl' CLI não encontrado para cálculo de assinatura HMAC." >&2
+  exit 1
+fi
+
 if [ -z "${AWS_ACCESS_KEY_ID:-}" ] || [ -z "${AWS_SECRET_ACCESS_KEY:-}" ]; then
   echo "❌ ERRO: AWS_ACCESS_KEY_ID ou AWS_SECRET_ACCESS_KEY não definidas no ambiente ou via stdin." >&2
   exit 1
@@ -215,7 +220,6 @@ echo "   Espaço disponível em ${BACKUP_ROOT}: $((AVAIL_KB / 1024))MB (Requisit
 # ------------------------------------------------------------------------------
 echo "🔍 [2/10] Identificando PostgreSQL pela configuração efetiva da aplicação..."
 
-# Localizar container backend em execução (priorizando serviço Swarm 'witiquetas_backend')
 BACKEND_CONTAINERS=$(docker ps --filter "status=running" --filter "label=com.docker.swarm.service.name=witiquetas_backend" --format "{{.ID}} {{.Names}}")
 if [ -z "$BACKEND_CONTAINERS" ]; then
   BACKEND_CONTAINERS=$(docker ps --filter "status=running" --filter "name=witiquetas_backend" --format "{{.ID}} {{.Names}}")
@@ -236,14 +240,12 @@ BACKEND_CONTAINER_ID=$(echo "$BACKEND_CONTAINERS" | awk '{print $1}')
 BACKEND_CONTAINER_NAME=$(echo "$BACKEND_CONTAINERS" | awk '{print $2}')
 echo "   Container Backend Ativo: ${BACKEND_CONTAINER_NAME} (${BACKEND_CONTAINER_ID})"
 
-# Obter as redes às quais o backend está conectado
 BACKEND_NETWORKS=$(docker inspect "$BACKEND_CONTAINER_ID" --format '{{range $k, $v := .NetworkSettings.Networks}}{{$k}} {{end}}')
 if [ -z "$BACKEND_NETWORKS" ]; then
   echo "❌ ERRO: O container backend não está conectado a nenhuma rede Docker." >&2
   exit 1
 fi
 
-# Extrair DATABASE_URL efetiva do backend
 APP_DB_URL=$(docker inspect "$BACKEND_CONTAINER_ID" --format '{{range .Config.Env}}{{println .}}{{end}}' | grep '^DATABASE_URL=' | head -1 | cut -d= -f2- || true)
 
 if [ -z "$APP_DB_URL" ]; then
@@ -251,7 +253,6 @@ if [ -z "$APP_DB_URL" ]; then
   exit 1
 fi
 
-# Parse da URL do banco preservando caracteres exatos
 CLEAN_DB_URL="${APP_DB_URL%%\?*}"
 DB_NAME_CONFIG="${CLEAN_DB_URL##*/}"
 NO_PROTO_URL="${CLEAN_DB_URL#*://}"
@@ -269,14 +270,12 @@ if [ "$DB_NAME_CONFIG" != "$TARGET_DB" ]; then
   exit 1
 fi
 
-# Recusar 'localhost' ou '127.0.0.1' como identificação inequívoca no ambiente de container
 if [ "$DB_HOST_CONFIG" = "localhost" ] || [ "$DB_HOST_CONFIG" = "127.0.0.1" ]; then
   echo "❌ ERRO: DB_HOST_CONFIG configurado como '${DB_HOST_CONFIG}'. Em ambientes Docker Swarm/Compose," >&2
   echo "   a aplicação deve conectar via service name/alias de rede para garantir identificação inequívoca." >&2
   exit 1
 fi
 
-# Tentar resolver o hostname do banco a partir do backend (DNS/VIP interno da rede Docker/Swarm)
 RESOLVED_DB_IP=$(docker exec -i "$BACKEND_CONTAINER_ID" getent hosts "$DB_HOST_CONFIG" 2>/dev/null | awk '{print $1}' | head -1 || true)
 if [ -z "$RESOLVED_DB_IP" ]; then
   RESOLVED_DB_IP=$(docker exec -i "$BACKEND_CONTAINER_ID" nslookup "$DB_HOST_CONFIG" 2>/dev/null | awk '/^Address: / { print $2 }' | tail -1 || true)
@@ -285,7 +284,6 @@ if [ -n "$RESOLVED_DB_IP" ]; then
   echo "   DNS da stack: Host '${DB_HOST_CONFIG}' resolve para VIP/IP ${RESOLVED_DB_IP}"
 fi
 
-# Localizar o container PostgreSQL que responde ao DB_HOST_CONFIG na mesma rede do backend
 PG_CONTAINERS=$(docker ps --filter "status=running" --format "{{.ID}} {{.Names}} {{.Image}}")
 PG_CONTAINER_ID=""
 PG_CONTAINER_NAME=""
@@ -295,7 +293,6 @@ PG_MATCH_COUNT=0
 while read -r cid cname cimage; do
   [ -z "$cid" ] && continue
 
-  # 1. Deve compartilhar pelo menos uma rede com o backend
   CONTAINER_NETS=$(docker inspect "$cid" --format '{{range $k, $v := .NetworkSettings.Networks}}{{$k}} {{end}}' 2>/dev/null || true)
   SHARED_NET=0
   for bnet in $BACKEND_NETWORKS; do
@@ -306,10 +303,8 @@ while read -r cid cname cimage; do
   done
   [ $SHARED_NET -eq 0 ] && continue
 
-  # 2. Deve corresponder ao hostname, nome do container, alias, label Swarm/Compose ou VIP resolvido
   MATCHES_HOST=0
 
-  # 2a. Match por nome do container ou network aliases
   if [ "$cname" = "$DB_HOST_CONFIG" ] || echo "$cname" | grep -q "${DB_HOST_CONFIG}"; then
     MATCHES_HOST=1
   else
@@ -319,7 +314,6 @@ while read -r cid cname cimage; do
     fi
   fi
 
-  # 2b. Match por label de serviço Docker Swarm ou Compose
   if [ $MATCHES_HOST -eq 0 ]; then
     SWARM_SVC=$(docker inspect "$cid" --format '{{index .Config.Labels "com.docker.swarm.service.name"}}' 2>/dev/null || true)
     COMPOSE_SVC=$(docker inspect "$cid" --format '{{index .Config.Labels "com.docker.compose.service"}}' 2>/dev/null || true)
@@ -330,7 +324,6 @@ while read -r cid cname cimage; do
     fi
   fi
 
-  # 2c. Match por VIP / IP resolvido via DNS da stack
   if [ $MATCHES_HOST -eq 0 ] && [ -n "$RESOLVED_DB_IP" ]; then
     CONTAINER_IPS=$(docker inspect "$cid" --format '{{range .NetworkSettings.Networks}}{{.IPAddress}} {{end}}' 2>/dev/null || true)
     if echo "$CONTAINER_IPS" | grep -qw "$RESOLVED_DB_IP"; then
@@ -348,7 +341,6 @@ while read -r cid cname cimage; do
 
   [ $MATCHES_HOST -eq 0 ] && continue
 
-  # 3. Deve responder a pg_isready e conter o banco TARGET_DB
   if docker exec -i "$cid" pg_isready -q >/dev/null 2>&1; then
     DB_EXISTS=$(docker exec -i "$cid" psql -U postgres -t -A -c "SELECT count(*) FROM pg_database WHERE datname = '${TARGET_DB}';" 2>/dev/null || echo "0")
     if [ "$DB_EXISTS" = "1" ]; then
@@ -368,7 +360,6 @@ fi
 echo "   Container PostgreSQL vinculado e confirmado: ${PG_CONTAINER_NAME} (${PG_CONTAINER_ID})"
 echo "   Imagem: ${PG_CONTAINER_IMAGE}"
 
-# Validar versão PostgreSQL (PostgreSQL 14)
 PG_VERSION=$(docker exec -i "$PG_CONTAINER_ID" psql -U postgres -t -c "SELECT version();" | head -1 | xargs)
 echo "   Versão em execução: ${PG_VERSION}"
 if ! echo "$PG_VERSION" | grep -q "PostgreSQL 14"; then
@@ -376,7 +367,6 @@ if ! echo "$PG_VERSION" | grep -q "PostgreSQL 14"; then
   exit 1
 fi
 
-# Inicializar relatório de evidência em formato texto
 {
   echo "======================================================================"
   echo " WITIQUETAS — EVIDÊNCIA DE AUDITORIA DO BACKUP PRÉ-PUBLICAÇÃO"
@@ -515,7 +505,6 @@ if ! docker exec -i "${RESTORE_CONTAINER}" pg_isready -U postgres >/dev/null 2>&
   exit 1
 fi
 
-# Validar disponibilidade de extensões
 if [ -n "$ORIGIN_EXTENSIONS" ]; then
   while IFS='|' read -r extname extver; do
     [ -z "$extname" ] && continue
@@ -742,11 +731,20 @@ echo "   Integridade referencial validada com sucesso: ZERO registros órfãos e
   echo "STATUS FINAL DO GATE DE BACKUP: APROVADO (GO)"
 } >> "${EVIDENCE_TXT}"
 
-# Calcular assinatura de integridade para garantia de autenticidade no CI
-INTEGRITY_SIGNATURE=$(printf '%s|%s|%s|%s|GO' "${TARGET_COMMIT_SHA}" "${WORKFLOW_RUN_ID}" "${LOCAL_SHA}" "${DUMP_FILENAME}" | sha256sum | awk '{print $1}')
+# ------------------------------------------------------------------------------
+# 11. AUTENTICAÇÃO CRIPTOGRÁFICA REAL DA EVIDÊNCIA VIA HMAC-SHA256
+# ------------------------------------------------------------------------------
+HMAC_SECRET="${EVIDENCE_SIGNING_KEY:-${AWS_SECRET_ACCESS_KEY:-}}"
+if [ -z "$HMAC_SECRET" ]; then
+  echo "❌ ERRO: Segredo para assinatura criptográfica da evidência não disponível." >&2
+  exit 1
+fi
+
+PAYLOAD_TO_SIGN="${TARGET_COMMIT_SHA}|${WORKFLOW_RUN_ID}|${LOCAL_SHA}|${DUMP_FILENAME}|GO"
+INTEGRITY_SIGNATURE=$(printf '%s' "$PAYLOAD_TO_SIGN" | openssl dgst -sha256 -hmac "$HMAC_SECRET" | awk '{print $NF}')
 
 # ------------------------------------------------------------------------------
-# 11. GERAÇÃO DE EVIDÊNCIA JSON ESTRUTURADA
+# 12. GERAÇÃO DE EVIDÊNCIA JSON ESTRUTURADA E AUTENTICADA
 # ------------------------------------------------------------------------------
 cat <<EOF > "${EVIDENCE_JSON}"
 {
@@ -767,6 +765,7 @@ cat <<EOF > "${EVIDENCE_JSON}"
   "constraintsValidated": true,
   "foreignKeysValid": true,
   "structuralParity": ${STRUCTURAL_PARITY},
+  "signatureAlgorithm": "HMAC-SHA256",
   "integritySignature": "${INTEGRITY_SIGNATURE}"
 }
 EOF

@@ -344,26 +344,35 @@ jobs:
             echo "Execute uma única vez o script scripts/deploy/setup-authorized-executor.sh no host de produção."
             exit 1
           fi
+          if [ -z "${{ secrets.DEPLOY_SSH_KNOWN_HOSTS }}" ]; then
+            echo "❌ ERRO DE SEGURANÇA: Secret DEPLOY_SSH_KNOWN_HOSTS não configurado!"
+            echo "A chave pública do servidor deve ser fixada para validação estrita (ssh-keyscan cego é proibido)."
+            exit 1
+          fi
           if [ -z "${{ secrets.MINIO_ACCESS_KEY_ID }}" ] || [ -z "${{ secrets.MINIO_SECRET_ACCESS_KEY }}" ]; then
             echo "❌ ERRO: Secrets MINIO_ACCESS_KEY_ID ou MINIO_SECRET_ACCESS_KEY não configurados no GitHub Actions!"
             exit 1
           fi
-          echo "Deployer e MinIO secrets configurados e validados."
+          echo "Deployer, Host Key confiável e MinIO secrets configurados e validados."
 
-      - name: Setup SSH Key & Known Hosts
+      - name: Setup SSH Key & Trusted Known Hosts (Zero Blind Keyscan)
         run: |
-          DEPLOY_PORT="${{ secrets.DEPLOY_PORT || 5822 }}"
           DEPLOY_HOST="${{ secrets.DEPLOY_HOST || 'witiquetas.wrtec.com.br' }}"
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
           echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -p "$DEPLOY_PORT" -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
+
+          # Fixação estrita da chave pública do servidor (anti-MitM)
+          echo "${{ secrets.DEPLOY_SSH_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+          echo "✅ Chave pública confiável do servidor fixada em ~/.ssh/known_hosts."
 
       - name: Execute Verified Backup & Ephemeral Restore Gate via Authorized Executor
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.MINIO_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.MINIO_SECRET_ACCESS_KEY }}
+          EVIDENCE_SIGNING_KEY: ${{ secrets.EVIDENCE_SIGNING_KEY || secrets.MINIO_SECRET_ACCESS_KEY }}
           S3_ENDPOINT: ${{ vars.MINIO_ENDPOINT || 'https://s3.wrtec.com.br' }}
           S3_BUCKET: ${{ vars.MINIO_BUCKET || 's3://witiquetas-bkp/pre-deploy' }}
           S3_REGION: ${{ vars.MINIO_REGION || 'eu-south' }}
@@ -377,10 +386,11 @@ jobs:
           set -e
           echo "🚀 Acionando backup auditado e validação de restauração no host autorizado via SSH (porta $DEPLOY_PORT)..."
           
-          # Passar parâmetros estritamente via stdin seguro: zero credenciais em ps aux, argumentos ou disco
-          cat <<EOF | ssh -i ~/.ssh/deploy_key -p "$DEPLOY_PORT" -T "${DEPLOY_USER}@${DEPLOY_HOST}" > execution_output.txt
+          # Passar parâmetros estritamente via stdin seguro com StrictHostKeyChecking=yes
+          cat <<EOF | ssh -i ~/.ssh/deploy_key -p "$DEPLOY_PORT" -o StrictHostKeyChecking=yes -T "${DEPLOY_USER}@${DEPLOY_HOST}" > execution_output.txt
 AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
 AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
+EVIDENCE_SIGNING_KEY=$EVIDENCE_SIGNING_KEY
 S3_ENDPOINT=$S3_ENDPOINT
 S3_BUCKET=$S3_BUCKET
 S3_REGION=$S3_REGION
@@ -392,7 +402,7 @@ EOF
           # Extrair a evidência estruturada da saída capturada
           sed -n '/<<<WITIQUETAS_BACKUP_EVIDENCE_JSON>>>/,/<<<END_WITIQUETAS_BACKUP_EVIDENCE_JSON>>>/p' execution_output.txt |             grep -v '<<<.*WITIQUETAS_BACKUP_EVIDENCE_JSON>>>' > "./backup_evidence_${{ github.sha }}.json"
 
-      - name: Validate Integrity & Authenticity of Backup Evidence Artifact
+      - name: Validate Integrity & Authenticity of Backup Evidence Artifact (HMAC-SHA256)
         run: |
           set -e
           EVIDENCE_FILE="./backup_evidence_${{ github.sha }}.json"
@@ -427,16 +437,17 @@ EOF
             exit 1
           fi
 
-          # Validação matemática da assinatura de integridade
-          EXPECTED_SIGNATURE=$(printf '%s|%s|%s|%s|GO' "${{ github.sha }}" "${{ github.run_id }}" "$DUMP_SHA" "$DUMP_NAME" | sha256sum | awk '{print $1}')
+          # Validação criptográfica da assinatura HMAC-SHA256 (autenticação real)
+          HMAC_SECRET="${{ secrets.EVIDENCE_SIGNING_KEY || secrets.MINIO_SECRET_ACCESS_KEY }}"
+          EXPECTED_SIGNATURE=$(printf '%s|%s|%s|%s|GO' "${{ github.sha }}" "${{ github.run_id }}" "$DUMP_SHA" "$DUMP_NAME" | openssl dgst -sha256 -hmac "$HMAC_SECRET" | awk '{print $NF}')
           if [ "$SIGNATURE" != "$EXPECTED_SIGNATURE" ]; then
-            echo "❌ ERRO FATAL: Assinatura de integridade da evidência inválida!"
-            echo "  Assinatura recebida: $SIGNATURE"
-            echo "  Assinatura esperada: $EXPECTED_SIGNATURE"
+            echo "❌ ERRO FATAL: Assinatura HMAC-SHA256 da evidência inválida ou inautêntica!"
+            echo "  Recebida: $SIGNATURE"
+            echo "  Esperada: $EXPECTED_SIGNATURE"
             exit 1
           fi
 
-          echo "✅ Evidência validada com autenticidade estrita: Status=GO, Commit=${{ github.sha }}, Run=${{ github.run_id }}, Assinatura OK."
+          echo "✅ Evidência validada com autenticação real (HMAC-SHA256): Status=GO, Commit=${{ github.sha }}, Run=${{ github.run_id }}, Assinatura OK."
 
       - name: Publish Gate Summary to GitHub Step Summary
         run: |
@@ -451,6 +462,8 @@ EOF
           echo "| Métrica / Verificação | Resultado |" >> $GITHUB_STEP_SUMMARY
           echo "| :--- | :--- |" >> $GITHUB_STEP_SUMMARY
           echo "| **Resultado do Gate** | **APROVADO (GO)** |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Autenticação Criptográfica** | **HMAC-SHA256 Assinado** |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Validação de Host SSH** | **Chave Fixada (StrictHostKeyChecking=yes)** |" >> $GITHUB_STEP_SUMMARY
           echo "| **Commit Validado** | \`${{ github.sha }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "| **Arquivo de Dump** | \`$DUMP_NAME\` |" >> $GITHUB_STEP_SUMMARY
           echo "| **SHA-256 do Dump** | \`$DUMP_SHA\` |" >> $GITHUB_STEP_SUMMARY
@@ -481,7 +494,7 @@ EOF
           name: backup-evidence-${{ github.sha }}
           path: ./
 
-      - name: Strict Pre-Deploy Evidence Verification (Replay Prevention & Authenticity)
+      - name: Strict Pre-Deploy Evidence Verification (Replay Prevention & HMAC Authenticity)
         run: |
           set -e
           EVIDENCE_FILE="./backup_evidence_${{ github.sha }}.json"
@@ -514,14 +527,15 @@ EOF
             exit 1
           fi
 
-          # Validação matemática da assinatura de integridade
-          EXPECTED_SIGNATURE=$(printf '%s|%s|%s|%s|GO' "${{ github.sha }}" "${{ github.run_id }}" "$DUMP_SHA" "$DUMP_NAME" | sha256sum | awk '{print $1}')
+          # Validação criptográfica da assinatura HMAC-SHA256 (autenticação real)
+          HMAC_SECRET="${{ secrets.EVIDENCE_SIGNING_KEY || secrets.MINIO_SECRET_ACCESS_KEY }}"
+          EXPECTED_SIGNATURE=$(printf '%s|%s|%s|%s|GO' "${{ github.sha }}" "${{ github.run_id }}" "$DUMP_SHA" "$DUMP_NAME" | openssl dgst -sha256 -hmac "$HMAC_SECRET" | awk '{print $NF}')
           if [ "$SIGNATURE" != "$EXPECTED_SIGNATURE" ]; then
-            echo "❌ ERRO FATAL: Assinatura de integridade da evidência de backup inválida ou forjada!"
+            echo "❌ ERRO FATAL: Assinatura HMAC-SHA256 da evidência de backup inválida ou forjada!"
             exit 1
           fi
 
-          echo "✅ Validação de Evidência Autêntica: Backup GO confirmado para o commit ${{ github.sha }} (Run ${{ github.run_id }})."
+          echo "✅ Validação de Evidência Autêntica (HMAC-SHA256): Backup GO confirmado para o commit ${{ github.sha }} (Run ${{ github.run_id }})."
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3

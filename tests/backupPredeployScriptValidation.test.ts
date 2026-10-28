@@ -34,6 +34,7 @@ test('3. STDIN INGESTION & ZERO SECRETS IN PROCESS ARGS: Leitura de parâmetros 
   assert.ok(content.includes('AWS_ACCESS_KEY_ID)'), 'Deve ingerir AWS_ACCESS_KEY_ID via stdin');
   assert.ok(content.includes('AWS_SECRET_ACCESS_KEY)'), 'Deve ingerir AWS_SECRET_ACCESS_KEY via stdin');
   assert.ok(content.includes('TARGET_COMMIT_SHA)'), 'Deve ingerir TARGET_COMMIT_SHA via stdin');
+  assert.ok(content.includes('EVIDENCE_SIGNING_KEY)'), 'Deve ingerir EVIDENCE_SIGNING_KEY via stdin');
 });
 
 test('4. TEN GATES VERIFICATION: O script canônico deve implementar todos os 10 gates de segurança', () => {
@@ -85,7 +86,7 @@ test('4. TEN GATES VERIFICATION: O script canônico deve implementar todos os 10
   assert.ok(content.includes('MATCH FULL'), 'Gate 10: Tratamento de semântica MATCH FULL');
 });
 
-test('5. EVIDENCE ARTIFACT BINDING & SIGNATURE: Geração de evidência estruturada com assinatura matemática', () => {
+test('5. EVIDENCE ARTIFACT BINDING & SIGNATURE: Geração de evidência estruturada com assinatura criptográfica HMAC-SHA256', () => {
   const content = fs.readFileSync(backupScriptPath, 'utf8');
 
   assert.ok(content.includes('EVIDENCE_JSON='), 'Deve definir caminho do arquivo de evidência JSON');
@@ -93,7 +94,7 @@ test('5. EVIDENCE ARTIFACT BINDING & SIGNATURE: Geração de evidência estrutur
   assert.ok(content.includes('"workflowRunId": "${WORKFLOW_RUN_ID}"'), 'Evidência deve conter run ID');
   assert.ok(content.includes('"status": "GO"'), 'Evidência deve conter status GO');
   assert.ok(content.includes('"dumpSha256": "${LOCAL_SHA}"'), 'Evidência deve conter hash SHA-256');
-  assert.ok(content.includes('INTEGRITY_SIGNATURE='), 'Deve calcular assinatura de integridade');
+  assert.ok(content.includes('openssl dgst -sha256 -hmac'), 'Deve calcular assinatura HMAC-SHA256 com chave secreta');
   assert.ok(content.includes('"integritySignature": "${INTEGRITY_SIGNATURE}"'), 'Evidência deve incluir assinatura');
   assert.ok(content.includes('<<<WITIQUETAS_BACKUP_EVIDENCE_JSON>>>'), 'Deve emitir delimitadores na saída padrão');
 });
@@ -132,6 +133,14 @@ test('6. SETUP EXECUTOR SCRIPT: Bloqueio estrito de privilégios de docker e exe
     content.includes('no-port-forwarding,no-X11-forwarding,no-agent-forwarding'),
     'authorized_keys deve restringir port, X11 e agent forwarding'
   );
+
+  // Proteção da chave privada do executor (zero exibição no terminal)
+  assert.ok(!content.includes('echo "${KEY_FILE}"'), 'Não deve imprimir o conteúdo da chave privada');
+  assert.ok(!content.includes('cat "${KEY_FILE}"\n'), 'Não deve despejar a chave privada no terminal');
+  assert.ok(content.includes('chmod 600 "${KEY_FILE}"'), 'Deve proteger arquivo da chave privada com 600');
+
+  // Fixação de chave pública do host (anti-MitM)
+  assert.ok(content.includes('DEPLOY_SSH_KNOWN_HOSTS'), 'Deve gerar/instruir configuração de DEPLOY_SSH_KNOWN_HOSTS');
 
   // Zero secrets em disco
   assert.ok(!content.includes('AWS_ACCESS_KEY_ID='), 'Script não deve gravar credenciais MinIO em variáveis estáticas');

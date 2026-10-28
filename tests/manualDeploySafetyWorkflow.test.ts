@@ -35,7 +35,7 @@ test('2. JOB SEPARATION: CI de candidatos isolado de promocao/deploy em producao
   assert.ok(candidateJobSection.includes('candidate-${{ github.sha }}'), 'Deve gerar tag candidate-${{ github.sha }}');
 });
 
-test('3. PRE-DEPLOY BACKUP GATE: Execução obrigatória do backup com segredos protegidos e porta SSH 5822', () => {
+test('3. PRE-DEPLOY BACKUP GATE: Autenticação real HMAC-SHA256 e validação confiável de host SSH (sem blind keyscan)', () => {
   const content = fs.readFileSync(workflowPath, 'utf8');
 
   // 1. Deve existir o job validate-predeploy-backup
@@ -54,24 +54,29 @@ test('3. PRE-DEPLOY BACKUP GATE: Execução obrigatória do backup com segredos 
   assert.ok(backupJobSection.includes('MINIO_ACCESS_KEY_ID'), 'Deve validar MINIO_ACCESS_KEY_ID');
   assert.ok(backupJobSection.includes('MINIO_SECRET_ACCESS_KEY'), 'Deve validar MINIO_SECRET_ACCESS_KEY');
 
-  // 5. Configuração real: porta 5822 e host witiquetas.wrtec.com.br
+  // 5. AJUSTE DE SEGURANÇA 2: Fixação confiável de host key (sem ssh-keyscan cego)
+  assert.ok(backupJobSection.includes('DEPLOY_SSH_KNOWN_HOSTS'), 'Deve exigir secret DEPLOY_SSH_KNOWN_HOSTS');
+  assert.ok(backupJobSection.includes('StrictHostKeyChecking=yes'), 'Deve ativar StrictHostKeyChecking=yes incondicionalmente');
+  assert.ok(!backupJobSection.includes('ssh-keyscan -p'), 'Não deve usar ssh-keyscan cego');
+
+  // 6. Configuração real: porta 5822 e host witiquetas.wrtec.com.br
   assert.ok(backupJobSection.includes('5822'), 'Deve usar porta real 5822');
   assert.ok(backupJobSection.includes('witiquetas.wrtec.com.br'), 'Deve referenciar host real');
   assert.ok(backupJobSection.includes("PRODUCTION_DB || 'witiquetas '"), 'Deve preservar espaço final no banco de dados');
 
-  // 6. Ingestão segura via stdin (zero credenciais em ps aux)
-  assert.ok(backupJobSection.includes('ssh -i ~/.ssh/deploy_key -p "$DEPLOY_PORT" -T'), 'Deve usar SSH não interativo com stdin seguro');
+  // 7. Ingestão segura via stdin (zero credenciais em ps aux)
+  assert.ok(backupJobSection.includes('ssh -i ~/.ssh/deploy_key -p "$DEPLOY_PORT" -o StrictHostKeyChecking=yes -T'), 'Deve usar SSH não interativo com stdin seguro e host verificado');
   assert.ok(backupJobSection.includes('<<<WITIQUETAS_BACKUP_EVIDENCE_JSON>>>'), 'Deve delimitar evidência de backup');
 
-  // 7. Validação de autenticidade matemática (assinatura de integridade)
-  assert.ok(backupJobSection.includes('integritySignature'), 'Deve validar assinatura de integridade');
-  assert.ok(backupJobSection.includes('EXPECTED_SIGNATURE'), 'Deve calcular assinatura esperada');
+  // 8. AJUSTE DE SEGURANÇA 1: Validação de autenticidade HMAC-SHA256 (não SHA-256 simples)
+  assert.ok(backupJobSection.includes('openssl dgst -sha256 -hmac'), 'Deve verificar autenticação HMAC-SHA256');
+  assert.ok(backupJobSection.includes('EXPECTED_SIGNATURE'), 'Deve calcular HMAC esperado com segredo');
 
-  // 8. Deve publicar artefato da evidência
+  // 9. Deve publicar artefato da evidência
   assert.ok(backupJobSection.includes('name: backup-evidence-${{ github.sha }}'), 'Deve fazer upload do artifact de evidência');
 });
 
-test('4. PRODUCTION DEPLOY GATE: Proteção estrita, validação de evidência autêntica e fail-closed no Portainer', () => {
+test('4. PRODUCTION DEPLOY GATE: Autenticação HMAC anti-forja, proteção estrita e fail-closed no Portainer', () => {
   const content = fs.readFileSync(workflowPath, 'utf8');
 
   assert.ok(content.includes('deploy-production:'), 'Deve existir job deploy-production');
@@ -89,12 +94,12 @@ test('4. PRODUCTION DEPLOY GATE: Proteção estrita, validação de evidência a
   // 3. Condicional estrita: apenas branch main
   assert.ok(deployJobSection.includes("github.ref == 'refs/heads/main'"), 'Deve exigir branch main');
 
-  // 4. Deve verificar autenticidade e integridade da evidência (anti-replay estrito)
+  // 4. Deve verificar autenticidade criptográfica HMAC-SHA256 da evidência (anti-forja e anti-replay)
   assert.ok(deployJobSection.includes('Download Backup Evidence Artifact'), 'Deve baixar artefato de evidência do backup');
   assert.ok(deployJobSection.includes('Strict Pre-Deploy Evidence Verification'), 'Deve validar integridade estrita da evidência');
   assert.ok(deployJobSection.includes('$COMMIT" != "${{ github.sha }}"'), 'Deve impedir replay de evidência com commit diferente');
   assert.ok(deployJobSection.includes('$RUN_ID" != "${{ github.run_id }}"'), 'Deve impedir replay de evidência de run anterior');
-  assert.ok(deployJobSection.includes('EXPECTED_SIGNATURE'), 'Deve verificar matematicamente a assinatura de integridade');
+  assert.ok(deployJobSection.includes('openssl dgst -sha256 -hmac'), 'Deve validar HMAC-SHA256 antes da promoção de imagens');
 
   // 5. Promocao e webhook devem estar exclusivamente dentro de deploy-production
   assert.ok(deployJobSection.includes('witiquetas-frontend:stable'), 'deploy-production promove frontend:stable');
@@ -119,7 +124,8 @@ test('5. EVALUATION MATRIX: Simulação lógica de cenários operacionais', () =
     backupPassed: boolean;
     evidenceMatchesCommit: boolean;
     evidenceMatchesRun: boolean;
-    evidenceAuthentic: boolean;
+    evidenceHmacValid: boolean;
+    hostKeyPinned: boolean;
     humanApproved: boolean;
   }
 
@@ -130,18 +136,20 @@ test('5. EVALUATION MATRIX: Simulação lógica de cenários operacionais', () =
       s.backupPassed &&
       s.evidenceMatchesCommit &&
       s.evidenceMatchesRun &&
-      s.evidenceAuthentic &&
+      s.evidenceHmacValid &&
+      s.hostKeyPinned &&
       s.humanApproved;
   }
 
-  // Cenário 1: Branch secundária (ex: feature/x ou validation) -> BLOQUEADO
+  // Cenário 1: Branch secundária -> BLOQUEADO
   assert.equal(canDeployToProduction({
     ref: 'refs/heads/feature/nova-tela',
     candidatesPassed: true,
     backupPassed: true,
     evidenceMatchesCommit: true,
     evidenceMatchesRun: true,
-    evidenceAuthentic: true,
+    evidenceHmacValid: true,
+    hostKeyPinned: true,
     humanApproved: true,
   }), false, 'Branch fora da main não pode realizar deploy');
 
@@ -152,7 +160,8 @@ test('5. EVALUATION MATRIX: Simulação lógica de cenários operacionais', () =
     backupPassed: true,
     evidenceMatchesCommit: true,
     evidenceMatchesRun: true,
-    evidenceAuthentic: true,
+    evidenceHmacValid: true,
+    hostKeyPinned: true,
     humanApproved: true,
   }), false, 'Falha em candidatos deve bloquear deploy');
 
@@ -163,40 +172,56 @@ test('5. EVALUATION MATRIX: Simulação lógica de cenários operacionais', () =
     backupPassed: false,
     evidenceMatchesCommit: true,
     evidenceMatchesRun: true,
-    evidenceAuthentic: true,
+    evidenceHmacValid: true,
+    hostKeyPinned: true,
     humanApproved: true,
   }), false, 'Falha no backup deve bloquear deploy incondicionalmente');
 
-  // Cenário 4: Evidência forjada ou adulterada (falha de assinatura) -> BLOQUEADO
+  // Cenário 4: Evidência forjada sem chave secreta (HMAC inválido) -> BLOQUEADO
   assert.equal(canDeployToProduction({
     ref: 'refs/heads/main',
     candidatesPassed: true,
     backupPassed: true,
     evidenceMatchesCommit: true,
     evidenceMatchesRun: true,
-    evidenceAuthentic: false,
+    evidenceHmacValid: false,
+    hostKeyPinned: true,
     humanApproved: true,
-  }), false, 'Evidência com assinatura inautêntica deve ser sumariamente bloqueada');
+  }), false, 'Evidência com HMAC inválido deve ser sumariamente bloqueada');
 
-  // Cenário 5: Sem aprovação humana no ambiente Production -> BLOQUEADO
+  // Cenário 5: Host SSH não confiável / MitM -> BLOQUEADO
   assert.equal(canDeployToProduction({
     ref: 'refs/heads/main',
     candidatesPassed: true,
     backupPassed: true,
     evidenceMatchesCommit: true,
     evidenceMatchesRun: true,
-    evidenceAuthentic: true,
+    evidenceHmacValid: true,
+    hostKeyPinned: false,
+    humanApproved: true,
+  }), false, 'Host key não fixada deve abortar conexão');
+
+  // Cenário 6: Sem aprovação humana no ambiente Production -> BLOQUEADO
+  assert.equal(canDeployToProduction({
+    ref: 'refs/heads/main',
+    candidatesPassed: true,
+    backupPassed: true,
+    evidenceMatchesCommit: true,
+    evidenceMatchesRun: true,
+    evidenceHmacValid: true,
+    hostKeyPinned: true,
     humanApproved: false,
   }), false, 'Ausência de aprovação humana no ambiente Production deve manter deploy suspenso');
 
-  // Cenário 6: Todos os requisitos atendidos: main, candidatos OK, backup OK, evidência autêntica e aprovado -> GO
+  // Cenário 7: Todos os requisitos atendidos: main, candidatos OK, backup OK, HMAC autêntico, host key OK e aprovado -> GO
   assert.equal(canDeployToProduction({
     ref: 'refs/heads/main',
     candidatesPassed: true,
     backupPassed: true,
     evidenceMatchesCommit: true,
     evidenceMatchesRun: true,
-    evidenceAuthentic: true,
+    evidenceHmacValid: true,
+    hostKeyPinned: true,
     humanApproved: true,
   }), true, 'Fluxo completo aprovado deve autorizar promoção e deploy');
 });

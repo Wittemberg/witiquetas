@@ -20,10 +20,17 @@
 #      command="sudo /opt/witiquetas/scripts/backup-and-validate-predeploy.sh",no-port-forwarding,no-X11-forwarding,no-agent-forwarding
 #    - A chave SSH NÃO consegue abrir shell, navegar no sistema de arquivos ou
 #      executar qualquer outro binário além do script de validação de backup.
-# 4. Zero Interrupção de Outras Stacks:
+# 4. Proteção da Chave Privada do Executor (Zero Exibição em Terminal):
+#    - A chave privada é mantida no filesystem do host com permissão estrita 600.
+#    - O script NUNCA imprime a chave privada na saída padrão ou em logs de terminal.
+#    - O operador é instruído a copiá-la de forma protegida para o GitHub Secrets.
+# 5. Fixação de Chave Pública do Servidor (Prevenção contra MitM):
+#    - Extrai a chave pública do host (/etc/ssh/ssh_host_ed25519_key.pub) e gera
+#      a linha exata para cadastro no secret DEPLOY_SSH_KNOWN_HOSTS.
+# 6. Zero Interrupção de Outras Stacks:
 #    - O script NÃO reinicia o daemon do Docker, NÃO mexe no Traefik, PostgreSQL,
 #      Portainer ou em quaisquer outros serviços ou stacks em execução no host.
-# 5. Zero Secrets Armazenados em Disco:
+# 7. Zero Secrets Armazenados em Disco:
 #    - As credenciais MinIO (AWS_ACCESS_KEY_ID e AWS_SECRET_ACCESS_KEY) NUNCA são
 #      salvas no host. Elas são injetadas exclusivamente em tempo de execução via
 #      stdin na sessão SSH do GitHub Actions.
@@ -90,7 +97,6 @@ echo "📁 [3/6] Criando diretórios protegidos para scripts e backups..."
 mkdir -p "${SCRIPTS_DIR}"
 mkdir -p "${BACKUP_DIR}"
 
-# Ajustar permissões para evitar leitura por outros usuários locais
 chown -R root:root "${SCRIPTS_DIR}"
 chmod 755 "${SCRIPTS_DIR}"
 
@@ -124,7 +130,7 @@ EOF
 chmod 440 "${SUDOERS_FILE}"
 echo "   ✅ Regra sudoers criada em ${SUDOERS_FILE}."
 
-# 6. Configurar par de chaves SSH dedicado com comando forçado
+# 6. Configurar par de chaves SSH dedicado com comando forçado e extrair host key
 echo "🔑 [6/6] Configurando acesso SSH dedicado com chave Ed25519 e comando forçado..."
 mkdir -p "${SSH_DIR}"
 chmod 700 "${SSH_DIR}"
@@ -138,6 +144,9 @@ else
   echo "   ℹ️  Chave Ed25519 pré-existente preservada."
 fi
 
+chmod 600 "${KEY_FILE}"
+chown "${DEPLOY_USER}":"${DEPLOY_USER}" "${KEY_FILE}"
+
 PUB_KEY=$(cat "${KEY_FILE}.pub")
 AUTH_KEYS="${SSH_DIR}/authorized_keys"
 
@@ -149,6 +158,17 @@ echo "   ✅ Chave pública configurada com restrição de comando forçado: ${S
 chmod 600 "${AUTH_KEYS}"
 chown -R "${DEPLOY_USER}":"${DEPLOY_USER}" "${SSH_DIR}"
 
+# Extrair chave pública do servidor para fixação estrita (anti-MitM)
+HOST_KEY_LINE=""
+for hk in /etc/ssh/ssh_host_ed25519_key.pub /etc/ssh/ssh_host_rsa_key.pub; do
+  if [ -f "$hk" ]; then
+    HK_TYPE=$(awk '{print $1}' "$hk")
+    HK_VAL=$(awk '{print $2}' "$hk")
+    HOST_KEY_LINE="[witiquetas.wrtec.com.br]:5822 ${HK_TYPE} ${HK_VAL}"
+    break
+  fi
+done
+
 # Resumo e Instruções Finais para o Operador
 echo ""
 echo "======================================================================"
@@ -157,17 +177,26 @@ echo "======================================================================"
 echo ""
 echo "📋 DADOS PARA CADASTRO ÚNICO NO GITHUB (Settings ➔ Secrets ➔ Actions):"
 echo ""
-echo "   • DEPLOY_HOST:          witiquetas.wrtec.com.br"
-echo "   • DEPLOY_USER:          ${DEPLOY_USER}"
-echo "   • DEPLOY_PORT:          5822"
-echo "   • DEPLOY_SSH_KEY:       (Cole o conteúdo EXATO da chave privada abaixo)"
-echo ""
+echo "   • DEPLOY_HOST:             witiquetas.wrtec.com.br"
+echo "   • DEPLOY_USER:             ${DEPLOY_USER}"
+echo "   • DEPLOY_PORT:             5822"
+if [ -n "$HOST_KEY_LINE" ]; then
+  echo "   • DEPLOY_SSH_KNOWN_HOSTS:  ${HOST_KEY_LINE}"
+else
+  echo "   • DEPLOY_SSH_KNOWN_HOSTS:  [witiquetas.wrtec.com.br]:5822 (copie de /etc/ssh/ssh_host_ed25519_key.pub)"
+fi
 echo "   • MINIO_ACCESS_KEY_ID:     Chave de acesso da service account MinIO"
 echo "   • MINIO_SECRET_ACCESS_KEY: Segredo de acesso da service account MinIO"
 echo "   • PORTAINER_WEBHOOK_URL:   URL do webhook do Portainer para a stack witiquetas"
 echo ""
-echo "------------------- [COPIE A CHAVE PRIVADA ABAIXO] -------------------"
-cat "${KEY_FILE}"
-echo "------------------- [FIM DA CHAVE PRIVADA] -------------------"
+echo "🔒 PROTEÇÃO DA CHAVE PRIVADA DO EXECUTOR (DEPLOY_SSH_KEY):"
+echo "   A chave privada foi salva em: ${KEY_FILE} (permissões 600)."
+echo "   Por segurança, ela NÃO é exibida neste terminal para evitar exposição"
+echo "   em telas compartilhadas, gravações de sessão ou buffers de histórico."
 echo ""
+echo "   Para cadastrá-la no GitHub Secrets de forma protegida, transfira-a diretamente"
+echo "   para o clipboard ou arquivo seguro do seu ambiente de trabalho:"
+echo "      sudo cat ${KEY_FILE} | clip     # (Windows PowerShell / Git Bash)"
+echo "      sudo cat ${KEY_FILE} | xclip    # (Linux X11)"
+echo "      sudo cat ${KEY_FILE} | pbcopy   # (macOS)"
 echo "======================================================================"

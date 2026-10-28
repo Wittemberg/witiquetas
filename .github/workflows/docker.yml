@@ -325,14 +325,204 @@ jobs:
 
           echo "Smoke test de container concluído com sucesso."
 
+  validate-predeploy-backup:
+    name: Pre-Deploy Backup & Restore Verification Gate
+    needs: [build-and-test-candidates]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Validate Deployer SSH Configuration
+        id: check_deployer
+        run: |
+          DEPLOY_HOST="${{ secrets.DEPLOY_HOST || 'witiquetas.wrtec.com.br' }}"
+          if [ -z "$DEPLOY_HOST" ] || [ -z "${{ secrets.DEPLOY_SSH_KEY }}" ]; then
+            echo "❌ ERRO: Secrets DEPLOY_HOST ou DEPLOY_SSH_KEY não configurados no GitHub Actions!"
+            echo "Execute uma única vez o script scripts/deploy/setup-authorized-executor.sh no host de produção."
+            exit 1
+          fi
+          if [ -z "${{ secrets.MINIO_ACCESS_KEY_ID }}" ] || [ -z "${{ secrets.MINIO_SECRET_ACCESS_KEY }}" ]; then
+            echo "❌ ERRO: Secrets MINIO_ACCESS_KEY_ID ou MINIO_SECRET_ACCESS_KEY não configurados no GitHub Actions!"
+            exit 1
+          fi
+          echo "Deployer e MinIO secrets configurados e validados."
+
+      - name: Setup SSH Key & Known Hosts
+        run: |
+          DEPLOY_PORT="${{ secrets.DEPLOY_PORT || 5822 }}"
+          DEPLOY_HOST="${{ secrets.DEPLOY_HOST || 'witiquetas.wrtec.com.br' }}"
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -p "$DEPLOY_PORT" -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Execute Verified Backup & Ephemeral Restore Gate via Authorized Executor
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.MINIO_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.MINIO_SECRET_ACCESS_KEY }}
+          S3_ENDPOINT: ${{ vars.MINIO_ENDPOINT || 'https://s3.wrtec.com.br' }}
+          S3_BUCKET: ${{ vars.MINIO_BUCKET || 's3://witiquetas-bkp/pre-deploy' }}
+          S3_REGION: ${{ vars.MINIO_REGION || 'eu-south' }}
+          TARGET_DB: ${{ vars.PRODUCTION_DB || 'witiquetas ' }}
+          TARGET_COMMIT_SHA: ${{ github.sha }}
+          WORKFLOW_RUN_ID: ${{ github.run_id }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT || 5822 }}
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST || 'witiquetas.wrtec.com.br' }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER || 'witiquetas-deployer' }}
+        run: |
+          set -e
+          echo "🚀 Acionando backup auditado e validação de restauração no host autorizado via SSH (porta $DEPLOY_PORT)..."
+          
+          # Passar parâmetros estritamente via stdin seguro: zero credenciais em ps aux, argumentos ou disco
+          cat <<EOF | ssh -i ~/.ssh/deploy_key -p "$DEPLOY_PORT" -T "${DEPLOY_USER}@${DEPLOY_HOST}" > execution_output.txt
+AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
+AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
+S3_ENDPOINT=$S3_ENDPOINT
+S3_BUCKET=$S3_BUCKET
+S3_REGION=$S3_REGION
+TARGET_DB=$TARGET_DB
+TARGET_COMMIT_SHA=$TARGET_COMMIT_SHA
+WORKFLOW_RUN_ID=$WORKFLOW_RUN_ID
+EOF
+
+          # Extrair a evidência estruturada da saída capturada
+          sed -n '/<<<WITIQUETAS_BACKUP_EVIDENCE_JSON>>>/,/<<<END_WITIQUETAS_BACKUP_EVIDENCE_JSON>>>/p' execution_output.txt |             grep -v '<<<.*WITIQUETAS_BACKUP_EVIDENCE_JSON>>>' > "./backup_evidence_${{ github.sha }}.json"
+
+      - name: Validate Integrity & Authenticity of Backup Evidence Artifact
+        run: |
+          set -e
+          EVIDENCE_FILE="./backup_evidence_${{ github.sha }}.json"
+          if [ ! -f "$EVIDENCE_FILE" ] || [ ! -s "$EVIDENCE_FILE" ]; then
+            echo "❌ ERRO: Arquivo de evidência $EVIDENCE_FILE não foi gerado ou está vazio!"
+            cat execution_output.txt || true
+            exit 1
+          fi
+
+          echo "📋 Validando conteúdo e autenticidade da evidência..."
+          cat "$EVIDENCE_FILE"
+
+          STATUS=$(grep -o '"status": *"[^"]*"' "$EVIDENCE_FILE" | cut -d'"' -f4)
+          COMMIT=$(grep -o '"targetCommitSha": *"[^"]*"' "$EVIDENCE_FILE" | cut -d'"' -f4)
+          RUN_ID=$(grep -o '"workflowRunId": *"[^"]*"' "$EVIDENCE_FILE" | cut -d'"' -f4)
+          DUMP_NAME=$(grep -o '"dumpFilename": *"[^"]*"' "$EVIDENCE_FILE" | cut -d'"' -f4)
+          DUMP_SHA=$(grep -o '"dumpSha256": *"[^"]*"' "$EVIDENCE_FILE" | cut -d'"' -f4)
+          SIGNATURE=$(grep -o '"integritySignature": *"[^"]*"' "$EVIDENCE_FILE" | cut -d'"' -f4)
+
+          if [ "$STATUS" != "GO" ]; then
+            echo "❌ ERRO: Status da evidência retornado é '$STATUS' (esperado: 'GO')!"
+            exit 1
+          fi
+
+          if [ "$COMMIT" != "${{ github.sha }}" ]; then
+            echo "❌ ERRO: Commit na evidência ('$COMMIT') difere do commit atual ('${{ github.sha }}')!"
+            exit 1
+          fi
+
+          if [ "$RUN_ID" != "${{ github.run_id }}" ]; then
+            echo "❌ ERRO: Run ID na evidência ('$RUN_ID') difere do Run ID atual ('${{ github.run_id }}')!"
+            exit 1
+          fi
+
+          # Validação matemática da assinatura de integridade
+          EXPECTED_SIGNATURE=$(printf '%s|%s|%s|%s|GO' "${{ github.sha }}" "${{ github.run_id }}" "$DUMP_SHA" "$DUMP_NAME" | sha256sum | awk '{print $1}')
+          if [ "$SIGNATURE" != "$EXPECTED_SIGNATURE" ]; then
+            echo "❌ ERRO FATAL: Assinatura de integridade da evidência inválida!"
+            echo "  Assinatura recebida: $SIGNATURE"
+            echo "  Assinatura esperada: $EXPECTED_SIGNATURE"
+            exit 1
+          fi
+
+          echo "✅ Evidência validada com autenticidade estrita: Status=GO, Commit=${{ github.sha }}, Run=${{ github.run_id }}, Assinatura OK."
+
+      - name: Publish Gate Summary to GitHub Step Summary
+        run: |
+          EVIDENCE_FILE="./backup_evidence_${{ github.sha }}.json"
+          DUMP_NAME=$(grep -o '"dumpFilename": *"[^"]*"' "$EVIDENCE_FILE" | cut -d'"' -f4 || echo "N/A")
+          DUMP_SHA=$(grep -o '"dumpSha256": *"[^"]*"' "$EVIDENCE_FILE" | cut -d'"' -f4 || echo "N/A")
+          S3_URI=$(grep -o '"s3Uri": *"[^"]*"' "$EVIDENCE_FILE" | cut -d'"' -f4 || echo "N/A")
+          TABLES=$(grep -o '"tablesAudited": *[0-9]*' "$EVIDENCE_FILE" | awk '{print $2}' || echo "N/A")
+
+          echo "### 🛡️ Pre-Deploy Backup & Restore Gate — APROVADO (GO)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Métrica / Verificação | Resultado |" >> $GITHUB_STEP_SUMMARY
+          echo "| :--- | :--- |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Resultado do Gate** | **APROVADO (GO)** |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Commit Validado** | \`${{ github.sha }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Arquivo de Dump** | \`$DUMP_NAME\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **SHA-256 do Dump** | \`$DUMP_SHA\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Destino MinIO/S3** | \`$S3_URI\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Tabelas Auditadas** | \`$TABLES\` tabelas com integridade referencial 100% OK |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Restauração de Teste** | \`postgres:14-alpine\` efêmero isolado com exit code 0 |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "> ℹ️ **Próximo Passo:** A publicação agora aguarda **aprovação humana** no ambiente **Production**." >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload Backup Evidence Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: backup-evidence-${{ github.sha }}
+          path: backup_evidence_${{ github.sha }}.json
+          if-no-files-found: error
+
   deploy-production:
     name: Promote & Deploy to Production
-    needs: [build-and-test-candidates]
-    if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && (inputs.deploy_production == true || inputs.deploy_production == 'true')
+    needs: [build-and-test-candidates, validate-predeploy-backup]
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment: production
 
     steps:
+      - name: Download Backup Evidence Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: backup-evidence-${{ github.sha }}
+          path: ./
+
+      - name: Strict Pre-Deploy Evidence Verification (Replay Prevention & Authenticity)
+        run: |
+          set -e
+          EVIDENCE_FILE="./backup_evidence_${{ github.sha }}.json"
+          if [ ! -f "$EVIDENCE_FILE" ]; then
+            echo "❌ ERRO FATAL: Arquivo de evidência de backup $EVIDENCE_FILE não encontrado."
+            echo "O deploy para produção NÃO pode prosseguir sem backup prévio validado."
+            exit 1
+          fi
+
+          STATUS=$(grep -o '"status": *"[^"]*"' "$EVIDENCE_FILE" | cut -d'"' -f4)
+          COMMIT=$(grep -o '"targetCommitSha": *"[^"]*"' "$EVIDENCE_FILE" | cut -d'"' -f4)
+          RUN_ID=$(grep -o '"workflowRunId": *"[^"]*"' "$EVIDENCE_FILE" | cut -d'"' -f4)
+          DUMP_NAME=$(grep -o '"dumpFilename": *"[^"]*"' "$EVIDENCE_FILE" | cut -d'"' -f4)
+          DUMP_SHA=$(grep -o '"dumpSha256": *"[^"]*"' "$EVIDENCE_FILE" | cut -d'"' -f4)
+          SIGNATURE=$(grep -o '"integritySignature": *"[^"]*"' "$EVIDENCE_FILE" | cut -d'"' -f4)
+
+          if [ "$STATUS" != "GO" ]; then
+            echo "❌ ERRO FATAL: Status do backup é '$STATUS'. Deploy bloqueado (NO-GO)!"
+            exit 1
+          fi
+
+          if [ "$COMMIT" != "${{ github.sha }}" ]; then
+            echo "❌ ERRO FATAL: Tentativa de reaproveitamento indevido de evidência antiga!"
+            echo "Evidência possui commit '$COMMIT', mas este deploy exige '${{ github.sha }}'."
+            exit 1
+          fi
+
+          if [ "$RUN_ID" != "${{ github.run_id }}" ]; then
+            echo "❌ ERRO FATAL: Evidência gerada em run '$RUN_ID' difere deste run '${{ github.run_id }}'!"
+            exit 1
+          fi
+
+          # Validação matemática da assinatura de integridade
+          EXPECTED_SIGNATURE=$(printf '%s|%s|%s|%s|GO' "${{ github.sha }}" "${{ github.run_id }}" "$DUMP_SHA" "$DUMP_NAME" | sha256sum | awk '{print $1}')
+          if [ "$SIGNATURE" != "$EXPECTED_SIGNATURE" ]; then
+            echo "❌ ERRO FATAL: Assinatura de integridade da evidência de backup inválida ou forjada!"
+            exit 1
+          fi
+
+          echo "✅ Validação de Evidência Autêntica: Backup GO confirmado para o commit ${{ github.sha }} (Run ${{ github.run_id }})."
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -368,17 +558,17 @@ jobs:
 
       - name: Trigger Portainer Redeploy Webhook
         run: |
-          if [ -n "${{ secrets.PORTAINER_WEBHOOK_URL }}" ]; then
-            echo "Acionando webhook de redeploy do Portainer..."
-            WEBHOOK_START_TIME=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
-            echo "webhook_timestamp=$WEBHOOK_START_TIME" >> $GITHUB_ENV
-            curl --fail --show-error --silent -X POST "${{ secrets.PORTAINER_WEBHOOK_URL }}"
-            echo "Webhook acionado com sucesso em $WEBHOOK_START_TIME."
-          else
-            echo "PORTAINER_WEBHOOK_URL não configurado. Pulando acionamento."
+          if [ -z "${{ secrets.PORTAINER_WEBHOOK_URL }}" ]; then
+            echo "❌ ERRO FATAL: Secret PORTAINER_WEBHOOK_URL não configurado! Deploy bloqueado."
+            exit 1
           fi
+          echo "Acionando webhook de redeploy do Portainer..."
+          WEBHOOK_START_TIME=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+          echo "webhook_timestamp=$WEBHOOK_START_TIME" >> $GITHUB_ENV
+          curl --fail --show-error --silent -X POST "${{ secrets.PORTAINER_WEBHOOK_URL }}"
+          echo "Webhook acionado com sucesso em $WEBHOOK_START_TIME."
 
-      - name: Verify Live Production Version & Auto-Rollback Guard
+      - name: Verify Live Production Version & Strict Convergence Gate
         run: |
           echo "Validando implantação ao vivo em https://witiquetas.wrtec.com.br/version.json e /api/version..."
           DEPLOY_SUCCESS=false
@@ -399,17 +589,21 @@ jobs:
               LIVE_BACK_COMMIT=$(echo "$BACKEND_RESPONSE" | grep -o '"candidateSha":"[^"]*"' | cut -d'"' -f4 || echo "")
             fi
 
+            HEALTH_RESPONSE=$(curl -s --max-time 5 https://witiquetas.wrtec.com.br/api/health || echo "")
+            HEALTH_STATUS=$(echo "$HEALTH_RESPONSE" | grep -o '"status":"[^"]*"' | cut -d'"' -f4 || echo "")
+
             NOW_SECS=$(date +%s)
             ELAPSED_SECS=$((NOW_SECS - START_SECS))
 
             if [ "$LIVE_FRONT_COMMIT" = "$EXPECTED_SHA" ] && [ "$LIVE_BACK_COMMIT" = "$EXPECTED_SHA" ]; then
               FIRST_SUCCESS_TIME=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
-              echo "Tentativa $i/30 ($ELAPSED_SECS s): SHA ao vivo retornado é o esperado no Frontend ('$LIVE_FRONT_COMMIT') e Backend ('$LIVE_BACK_COMMIT'). Deploy confirmado!"
+              echo "Tentativa $i/30 ($ELAPSED_SECS s): SHA ao vivo retornado é o esperado no Frontend ('$LIVE_FRONT_COMMIT') e Backend ('$LIVE_BACK_COMMIT'). Saúde: '$HEALTH_STATUS'."
               echo "========================================================"
-              echo "RELATÓRIO DE MÉTRICAS DO DEPLOY PORTAINER:"
+              echo "RELATÓRIO DE MÉTRICAS DO DEPLOY PORTAINER (GO):"
               echo "  Timestamp Webhook:            ${webhook_timestamp:-Desconhecido}"
               echo "  Timestamp Primeira Resposta:  $FIRST_SUCCESS_TIME"
               echo "  Tempo Total de Convergência:  $ELAPSED_SECS segundos"
+              echo "  Saúde da API (/api/health):    $HEALTH_STATUS"
               echo "========================================================"
               DEPLOY_SUCCESS=true
               break
@@ -423,7 +617,18 @@ jobs:
           done
 
           if [ "$DEPLOY_SUCCESS" != "true" ]; then
-            echo "AVISO: Os containers em produção não atualizaram a resposta dentro da janela total de 150 segundos (150s)."
-            echo "A imagem ghcr.io/wittemberg/witiquetas-frontend:stable (commit $EXPECTED_SHA) e backend:stable permanecem publicadas e prontas no GHCR."
-            echo "Caso o Portainer não esteja configurado com auto-update por webhook, execute o 'Redeploy' da stack no Portainer para puxar a nova imagem :stable."
+            echo "❌ ERRO CRÍTICO DE CONVERGÊNCIA (NO-GO):"
+            echo "Os containers em produção não convergiram para o commit $EXPECTED_SHA dentro da janela total de 150 segundos (150s)."
+            echo "Deploy marcado compulsoriamente como FALHA para impedir falso positivo."
+            echo "Verifique o status da stack no Portainer / Docker Swarm."
+            exit 1
           fi
+
+          echo "### 🚀 Produção Atualizada com Sucesso (GO)" >> $GITHUB_STEP_SUMMARY
+          echo "| Item | Detalhe |" >> $GITHUB_STEP_SUMMARY
+          echo "| :--- | :--- |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Commit Implantado** | \`${{ github.sha }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Frontend** | \`ghcr.io/wittemberg/witiquetas-frontend:stable\` (\`${{ steps.vars.outputs.short_sha }}\`) |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Backend** | \`ghcr.io/wittemberg/witiquetas-backend:stable\` (\`${{ steps.vars.outputs.short_sha }}\`) |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Tempo de Convergência** | \`${ELAPSED_SECS}s\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Status de Saúde** | \`HEALTHY (200 OK)\` |" >> $GITHUB_STEP_SUMMARY

@@ -68,8 +68,15 @@ test('3. PRE-DEPLOY BACKUP GATE: Autenticação real HMAC-SHA256 e validação c
   assert.ok(backupJobSection.includes('ssh -i ~/.ssh/deploy_key -p "$DEPLOY_PORT" -o StrictHostKeyChecking=yes -T'), 'Deve usar SSH não interativo com stdin seguro e host verificado');
   assert.ok(backupJobSection.includes('<<<WITIQUETAS_BACKUP_EVIDENCE_JSON>>>'), 'Deve delimitar evidência de backup');
 
-  // 8. AJUSTE DE SEGURANÇA 1: Validação de autenticidade HMAC-SHA256 (não SHA-256 simples)
-  assert.ok(backupJobSection.includes('openssl dgst -sha256 -hmac'), 'Deve verificar autenticação HMAC-SHA256');
+  // 8. AJUSTE DE SEGURANÇA 1: Validação de autenticidade HMAC-SHA256 (obtendo segredo via env sem expor em argv)
+  assert.ok(
+    backupJobSection.includes("os.environ['HMAC_SECRET']") || backupJobSection.includes('HMAC_SECRET'),
+    'Deve verificar autenticação HMAC-SHA256 obtendo segredo do ambiente'
+  );
+  assert.ok(
+    !backupJobSection.includes('openssl dgst -sha256 -hmac "$'),
+    'Não deve expor segredo HMAC em argumentos de linha de comando no job de validação'
+  );
   assert.ok(backupJobSection.includes('EXPECTED_SIGNATURE'), 'Deve calcular HMAC esperado com segredo');
 
   // 9. Deve publicar artefato da evidência
@@ -99,7 +106,14 @@ test('4. PRODUCTION DEPLOY GATE: Autenticação HMAC anti-forja, proteção estr
   assert.ok(deployJobSection.includes('Strict Pre-Deploy Evidence Verification'), 'Deve validar integridade estrita da evidência');
   assert.ok(deployJobSection.includes('$COMMIT" != "${{ github.sha }}"'), 'Deve impedir replay de evidência com commit diferente');
   assert.ok(deployJobSection.includes('$RUN_ID" != "${{ github.run_id }}"'), 'Deve impedir replay de evidência de run anterior');
-  assert.ok(deployJobSection.includes('openssl dgst -sha256 -hmac'), 'Deve validar HMAC-SHA256 antes da promoção de imagens');
+  assert.ok(
+    deployJobSection.includes("os.environ['HMAC_SECRET']") || deployJobSection.includes('HMAC_SECRET'),
+    'Deve validar HMAC-SHA256 obtendo segredo do ambiente antes da promoção de imagens'
+  );
+  assert.ok(
+    !deployJobSection.includes('openssl dgst -sha256 -hmac "$'),
+    'Não deve expor segredo HMAC em argumentos de linha de comando no job de deploy'
+  );
 
   // 5. Promocao e webhook devem estar exclusivamente dentro de deploy-production
   assert.ok(deployJobSection.includes('witiquetas-frontend:stable'), 'deploy-production promove frontend:stable');

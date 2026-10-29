@@ -403,6 +403,8 @@ EOF
           sed -n '/<<<WITIQUETAS_BACKUP_EVIDENCE_JSON>>>/,/<<<END_WITIQUETAS_BACKUP_EVIDENCE_JSON>>>/p' execution_output.txt |             grep -v '<<<.*WITIQUETAS_BACKUP_EVIDENCE_JSON>>>' > "./backup_evidence_${{ github.sha }}.json"
 
       - name: Validate Integrity & Authenticity of Backup Evidence Artifact (HMAC-SHA256)
+        env:
+          HMAC_SECRET: ${{ secrets.EVIDENCE_SIGNING_KEY || secrets.MINIO_SECRET_ACCESS_KEY }}
         run: |
           set -e
           EVIDENCE_FILE="./backup_evidence_${{ github.sha }}.json"
@@ -437,9 +439,9 @@ EOF
             exit 1
           fi
 
-          # Validação criptográfica da assinatura HMAC-SHA256 (autenticação real)
-          HMAC_SECRET="${{ secrets.EVIDENCE_SIGNING_KEY || secrets.MINIO_SECRET_ACCESS_KEY }}"
-          EXPECTED_SIGNATURE=$(printf '%s|%s|%s|%s|GO' "${{ github.sha }}" "${{ github.run_id }}" "$DUMP_SHA" "$DUMP_NAME" | openssl dgst -sha256 -hmac "$HMAC_SECRET" | awk '{print $NF}')
+          # Validação criptográfica da assinatura HMAC-SHA256 (obtendo segredo via env sem expor em argv)
+          EXPECTED_SIGNATURE=$(printf '%s|%s|%s|%s|GO' "${{ github.sha }}" "${{ github.run_id }}" "$DUMP_SHA" "$DUMP_NAME" | \
+            python3 -c "import hmac, hashlib, os, sys; print(hmac.new(os.environ['HMAC_SECRET'].encode(), sys.stdin.read().encode(), hashlib.sha256).hexdigest())")
           if [ "$SIGNATURE" != "$EXPECTED_SIGNATURE" ]; then
             echo "❌ ERRO FATAL: Assinatura HMAC-SHA256 da evidência inválida ou inautêntica!"
             echo "  Recebida: $SIGNATURE"
@@ -495,6 +497,8 @@ EOF
           path: ./
 
       - name: Strict Pre-Deploy Evidence Verification (Replay Prevention & HMAC Authenticity)
+        env:
+          HMAC_SECRET: ${{ secrets.EVIDENCE_SIGNING_KEY || secrets.MINIO_SECRET_ACCESS_KEY }}
         run: |
           set -e
           EVIDENCE_FILE="./backup_evidence_${{ github.sha }}.json"
@@ -527,9 +531,9 @@ EOF
             exit 1
           fi
 
-          # Validação criptográfica da assinatura HMAC-SHA256 (autenticação real)
-          HMAC_SECRET="${{ secrets.EVIDENCE_SIGNING_KEY || secrets.MINIO_SECRET_ACCESS_KEY }}"
-          EXPECTED_SIGNATURE=$(printf '%s|%s|%s|%s|GO' "${{ github.sha }}" "${{ github.run_id }}" "$DUMP_SHA" "$DUMP_NAME" | openssl dgst -sha256 -hmac "$HMAC_SECRET" | awk '{print $NF}')
+          # Validação criptográfica da assinatura HMAC-SHA256 (obtendo segredo via env sem expor em argv)
+          EXPECTED_SIGNATURE=$(printf '%s|%s|%s|%s|GO' "${{ github.sha }}" "${{ github.run_id }}" "$DUMP_SHA" "$DUMP_NAME" | \
+            python3 -c "import hmac, hashlib, os, sys; print(hmac.new(os.environ['HMAC_SECRET'].encode(), sys.stdin.read().encode(), hashlib.sha256).hexdigest())")
           if [ "$SIGNATURE" != "$EXPECTED_SIGNATURE" ]; then
             echo "❌ ERRO FATAL: Assinatura HMAC-SHA256 da evidência de backup inválida ou forjada!"
             exit 1

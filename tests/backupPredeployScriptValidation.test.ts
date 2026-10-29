@@ -94,12 +94,19 @@ test('5. EVIDENCE ARTIFACT BINDING & SIGNATURE: Geração de evidência estrutur
   assert.ok(content.includes('"workflowRunId": "${WORKFLOW_RUN_ID}"'), 'Evidência deve conter run ID');
   assert.ok(content.includes('"status": "GO"'), 'Evidência deve conter status GO');
   assert.ok(content.includes('"dumpSha256": "${LOCAL_SHA}"'), 'Evidência deve conter hash SHA-256');
-  assert.ok(content.includes('openssl dgst -sha256 -hmac'), 'Deve calcular assinatura HMAC-SHA256 com chave secreta');
+  assert.ok(
+    content.includes("os.environ['HMAC_SECRET']") || content.includes('process.env.HMAC_SECRET'),
+    'Deve obter segredo HMAC do ambiente de forma protegida'
+  );
+  assert.ok(
+    !content.includes('openssl dgst -sha256 -hmac "$'),
+    'Não deve expor o segredo HMAC em argumentos de processo (ps aux)'
+  );
   assert.ok(content.includes('"integritySignature": "${INTEGRITY_SIGNATURE}"'), 'Evidência deve incluir assinatura');
   assert.ok(content.includes('<<<WITIQUETAS_BACKUP_EVIDENCE_JSON>>>'), 'Deve emitir delimitadores na saída padrão');
 });
 
-test('6. SETUP EXECUTOR SCRIPT: Bloqueio estrito de privilégios de docker e execução forçada via SSH', () => {
+test('6. SETUP EXECUTOR SCRIPT: Bloqueio estrito de privilégios de docker e chave privada fora do host', () => {
   assert.ok(fs.existsSync(setupExecutorScriptPath), 'setup-authorized-executor.sh deve existir');
   const content = fs.readFileSync(setupExecutorScriptPath, 'utf8');
 
@@ -123,8 +130,19 @@ test('6. SETUP EXECUTOR SCRIPT: Bloqueio estrito de privilégios de docker e exe
     'Regra sudoers deve ser restrita apenas ao script de backup pré-deploy'
   );
 
-  // Chave SSH Ed25519 com comando forçado e opções defensivas
-  assert.ok(content.includes('ed25519'), 'Deve usar par de chaves Ed25519');
+  // Chave SSH: A chave privada DEVE permanecer fora do servidor; servidor instala exclusivamente a pública
+  assert.ok(
+    !content.includes('ssh-keygen -t ed25519 -N ""'),
+    'Host NÃO deve gerar chave privada no host; chave privada permanece fora do servidor'
+  );
+  assert.ok(
+    !content.includes('KEY_FILE='),
+    'Servidor não deve manipular arquivo de chave privada KEY_FILE'
+  );
+  assert.ok(
+    content.includes('authorized_keys'),
+    'authorized_keys deve ser configurado com a chave pública do executor'
+  );
   assert.ok(
     content.includes('command=\\"sudo ${SCRIPTS_DIR}/backup-and-validate-predeploy.sh\\"'),
     'authorized_keys deve forçar exclusivamente o comando do script de backup'
@@ -133,11 +151,6 @@ test('6. SETUP EXECUTOR SCRIPT: Bloqueio estrito de privilégios de docker e exe
     content.includes('no-port-forwarding,no-X11-forwarding,no-agent-forwarding'),
     'authorized_keys deve restringir port, X11 e agent forwarding'
   );
-
-  // Proteção da chave privada do executor (zero exibição no terminal)
-  assert.ok(!content.includes('echo "${KEY_FILE}"'), 'Não deve imprimir o conteúdo da chave privada');
-  assert.ok(!content.includes('cat "${KEY_FILE}"\n'), 'Não deve despejar a chave privada no terminal');
-  assert.ok(content.includes('chmod 600 "${KEY_FILE}"'), 'Deve proteger arquivo da chave privada com 600');
 
   // Fixação de chave pública do host (anti-MitM)
   assert.ok(content.includes('DEPLOY_SSH_KNOWN_HOSTS'), 'Deve gerar/instruir configuração de DEPLOY_SSH_KNOWN_HOSTS');

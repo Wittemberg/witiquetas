@@ -20,10 +20,11 @@
 #      command="sudo /opt/witiquetas/scripts/backup-and-validate-predeploy.sh",no-port-forwarding,no-X11-forwarding,no-agent-forwarding
 #    - A chave SSH NÃO consegue abrir shell, navegar no sistema de arquivos ou
 #      executar qualquer outro binário além do script de validação de backup.
-# 4. Proteção da Chave Privada do Executor (Zero Exibição em Terminal):
-#    - A chave privada é mantida no filesystem do host com permissão estrita 600.
-#    - O script NUNCA imprime a chave privada na saída padrão ou em logs de terminal.
-#    - O operador é instruído a copiá-la de forma protegida para o GitHub Secrets.
+# 4. Chave Privada do Executor Fora do Servidor (Zero Armazenamento no Host):
+#    - O host de produção NÃO gera nem armazena a chave privada SSH do executor.
+#    - O operador gera o par de chaves fora do servidor (ex: na estação de trabalho),
+#      cadastra a chave privada exclusivamente no GitHub Secrets (DEPLOY_SSH_KEY)
+#      e fornece exclusivamente a chave pública para instalação neste host.
 # 5. Fixação de Chave Pública do Servidor (Prevenção contra MitM):
 #    - Extrai a chave pública do host (/etc/ssh/ssh_host_ed25519_key.pub) e gera
 #      a linha exata para cadastro no secret DEPLOY_SSH_KNOWN_HOSTS.
@@ -73,6 +74,12 @@ if ! command -v aws >/dev/null 2>&1; then
   echo "   ✅ AWS CLI instalado com sucesso em $(which aws)."
 else
   echo "   ✅ AWS CLI já instalado: $(aws --version | head -1)."
+fi
+
+# Verificar Python 3 (usado para cálculo seguro de HMAC sem exposição de segredo em argv)
+if ! command -v python3 >/dev/null 2>&1; then
+  echo "⚠️  'python3' não encontrado. Instalando python3 para cálculo de HMAC protegido..."
+  apt-get update -qq && apt-get install -y -qq python3 || true
 fi
 
 # 2. Criar usuário de serviço dedicado 'witiquetas-deployer' sem acesso administrativo irrestrito
@@ -130,30 +137,36 @@ EOF
 chmod 440 "${SUDOERS_FILE}"
 echo "   ✅ Regra sudoers criada em ${SUDOERS_FILE}."
 
-# 6. Configurar par de chaves SSH dedicado com comando forçado e extrair host key
-echo "🔑 [6/6] Configurando acesso SSH dedicado com chave Ed25519 e comando forçado..."
+# 6. Instalar exclusivamente a chave pública do executor com comando forçado e extrair host key
+echo "🔑 [6/6] Configurando acesso SSH dedicado com chave pública e comando forçado..."
 mkdir -p "${SSH_DIR}"
 chmod 700 "${SSH_DIR}"
 chown "${DEPLOY_USER}":"${DEPLOY_USER}" "${SSH_DIR}"
 
-KEY_FILE="${SSH_DIR}/id_ed25519"
-if [ ! -f "${KEY_FILE}" ]; then
-  ssh-keygen -t ed25519 -N "" -f "${KEY_FILE}" -C "witiquetas-gh-deployer-$(hostname)" >/dev/null
-  echo "   ✅ Novo par de chaves Ed25519 gerado."
-else
-  echo "   ℹ️  Chave Ed25519 pré-existente preservada."
+AUTH_KEYS="${SSH_DIR}/authorized_keys"
+
+# A chave privada DEVE permanecer fora do servidor.
+# O servidor recebe e instala exclusivamente a chave pública do executor.
+EXECUTOR_PUB_KEY="${1:-${DEPLOYER_PUBLIC_KEY:-}}"
+
+if [ -z "${EXECUTOR_PUB_KEY}" ]; then
+  if [ -t 0 ]; then
+    echo ""
+    echo "👉 Insira a chave pública SSH do executor (ex: ssh-ed25519 AAAAC3NzaC1lZDI1NTE5...):"
+    read -r EXECUTOR_PUB_KEY
+  fi
 fi
 
-chmod 600 "${KEY_FILE}"
-chown "${DEPLOY_USER}":"${DEPLOY_USER}" "${KEY_FILE}"
-
-PUB_KEY=$(cat "${KEY_FILE}.pub")
-AUTH_KEYS="${SSH_DIR}/authorized_keys"
+if [ -z "${EXECUTOR_PUB_KEY}" ]; then
+  echo "❌ ERRO: Nenhuma chave pública fornecida para o executor." >&2
+  echo "   Uso: sudo ./setup-authorized-executor.sh \"ssh-ed25519 AAAA...\" ou export DEPLOYER_PUBLIC_KEY=\"...\"" >&2
+  exit 1
+fi
 
 # Configurar authorized_keys com comando forçado para o script sudoers
 SSH_OPTIONS="command=\"sudo ${SCRIPTS_DIR}/backup-and-validate-predeploy.sh\",no-port-forwarding,no-X11-forwarding,no-agent-forwarding"
-echo "${SSH_OPTIONS} ${PUB_KEY}" > "${AUTH_KEYS}"
-echo "   ✅ Chave pública configurada com restrição de comando forçado: ${SSH_OPTIONS}."
+echo "${SSH_OPTIONS} ${EXECUTOR_PUB_KEY}" > "${AUTH_KEYS}"
+echo "   ✅ Chave pública configurada com restrição de comando forçado."
 
 chmod 600 "${AUTH_KEYS}"
 chown -R "${DEPLOY_USER}":"${DEPLOY_USER}" "${SSH_DIR}"
@@ -189,14 +202,10 @@ echo "   • MINIO_ACCESS_KEY_ID:     Chave de acesso da service account MinIO"
 echo "   • MINIO_SECRET_ACCESS_KEY: Segredo de acesso da service account MinIO"
 echo "   • PORTAINER_WEBHOOK_URL:   URL do webhook do Portainer para a stack witiquetas"
 echo ""
-echo "🔒 PROTEÇÃO DA CHAVE PRIVADA DO EXECUTOR (DEPLOY_SSH_KEY):"
-echo "   A chave privada foi salva em: ${KEY_FILE} (permissões 600)."
-echo "   Por segurança, ela NÃO é exibida neste terminal para evitar exposição"
-echo "   em telas compartilhadas, gravações de sessão ou buffers de histórico."
-echo ""
-echo "   Para cadastrá-la no GitHub Secrets de forma protegida, transfira-a diretamente"
-echo "   para o clipboard ou arquivo seguro do seu ambiente de trabalho:"
-echo "      sudo cat ${KEY_FILE} | clip     # (Windows PowerShell / Git Bash)"
-echo "      sudo cat ${KEY_FILE} | xclip    # (Linux X11)"
-echo "      sudo cat ${KEY_FILE} | pbcopy   # (macOS)"
+echo "🔒 CHAVE PRIVADA DO EXECUTOR (DEPLOY_SSH_KEY):"
+echo "   A chave privada NÃO foi gerada e NÃO reside neste servidor."
+echo "   Ela deve ser gerada na sua estação de trabalho (ou gerenciador de segredos):"
+echo "      ssh-keygen -t ed25519 -f witiquetas_deploy_key -N \"\" -C \"witiquetas-deployer\""
+echo "   Cadastre a chave privada (witiquetas_deploy_key) no secret DEPLOY_SSH_KEY do GitHub Actions."
+echo "   A chave pública (witiquetas_deploy_key.pub) foi a que você instalou neste host."
 echo "======================================================================"

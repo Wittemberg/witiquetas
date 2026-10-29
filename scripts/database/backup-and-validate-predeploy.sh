@@ -734,14 +734,26 @@ echo "   Integridade referencial validada com sucesso: ZERO registros órfãos e
 # ------------------------------------------------------------------------------
 # 11. AUTENTICAÇÃO CRIPTOGRÁFICA REAL DA EVIDÊNCIA VIA HMAC-SHA256
 # ------------------------------------------------------------------------------
-HMAC_SECRET="${EVIDENCE_SIGNING_KEY:-${AWS_SECRET_ACCESS_KEY:-}}"
+export HMAC_SECRET="${EVIDENCE_SIGNING_KEY:-${AWS_SECRET_ACCESS_KEY:-}}"
 if [ -z "$HMAC_SECRET" ]; then
   echo "❌ ERRO: Segredo para assinatura criptográfica da evidência não disponível." >&2
   exit 1
 fi
 
 PAYLOAD_TO_SIGN="${TARGET_COMMIT_SHA}|${WORKFLOW_RUN_ID}|${LOCAL_SHA}|${DUMP_FILENAME}|GO"
-INTEGRITY_SIGNATURE=$(printf '%s' "$PAYLOAD_TO_SIGN" | openssl dgst -sha256 -hmac "$HMAC_SECRET" | awk '{print $NF}')
+
+# Obtenção do segredo exclusivamente do ambiente do processo (zero segredo na linha de comando / ps aux)
+if command -v python3 >/dev/null 2>&1; then
+  INTEGRITY_SIGNATURE=$(printf '%s' "$PAYLOAD_TO_SIGN" | python3 -c "import hmac, hashlib, os, sys; print(hmac.new(os.environ['HMAC_SECRET'].encode(), sys.stdin.read().encode(), hashlib.sha256).hexdigest())")
+elif command -v node >/dev/null 2>&1; then
+  INTEGRITY_SIGNATURE=$(printf '%s' "$PAYLOAD_TO_SIGN" | node -e "const crypto=require('crypto'); let d=''; process.stdin.on('data', c=>d+=c); process.stdin.on('end', ()=>console.log(crypto.createHmac('sha256', process.env.HMAC_SECRET).update(d).digest('hex')));")
+elif command -v perl >/dev/null 2>&1; then
+  INTEGRITY_SIGNATURE=$(printf '%s' "$PAYLOAD_TO_SIGN" | perl -MDigest::SHA=hmac_sha256_hex -e 'print hmac_sha256_hex(<STDIN>, $ENV{HMAC_SECRET})')
+else
+  echo "❌ ERRO CRÍTICO: Interpretador seguro (python3, node ou perl) não encontrado para cálculo do HMAC sem exposição em argv." >&2
+  exit 1
+fi
+unset HMAC_SECRET
 
 # ------------------------------------------------------------------------------
 # 12. GERAÇÃO DE EVIDÊNCIA JSON ESTRUTURADA E AUTENTICADA

@@ -104,7 +104,8 @@ echo "📁 [3/6] Criando diretórios protegidos para scripts e backups..."
 mkdir -p "${SCRIPTS_DIR}"
 mkdir -p "${BACKUP_DIR}"
 
-chown -R root:root "${SCRIPTS_DIR}"
+# Ajuste pontual: não usar -R em SCRIPTS_DIR para preservar permissões de arquivos existentes e não relacionados
+chown root:root "${SCRIPTS_DIR}"
 chmod 755 "${SCRIPTS_DIR}"
 
 chown -R "${DEPLOY_USER}":"${DEPLOY_USER}" "${BACKUP_DIR}"

@@ -387,17 +387,16 @@ jobs:
           echo "🚀 Acionando backup auditado e validação de restauração no host autorizado via SSH (porta $DEPLOY_PORT)..."
           
           # Passar parâmetros estritamente via stdin seguro com StrictHostKeyChecking=yes
-          cat <<EOF | ssh -i ~/.ssh/deploy_key -p "$DEPLOY_PORT" -o StrictHostKeyChecking=yes -T "${DEPLOY_USER}@${DEPLOY_HOST}" > execution_output.txt
-AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
-AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
-EVIDENCE_SIGNING_KEY=$EVIDENCE_SIGNING_KEY
-S3_ENDPOINT=$S3_ENDPOINT
-S3_BUCKET=$S3_BUCKET
-S3_REGION=$S3_REGION
-TARGET_DB=$TARGET_DB
-TARGET_COMMIT_SHA=$TARGET_COMMIT_SHA
-WORKFLOW_RUN_ID=$WORKFLOW_RUN_ID
-EOF
+          printf "%s\n" \
+            "AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID" \
+            "AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY" \
+            "EVIDENCE_SIGNING_KEY=$EVIDENCE_SIGNING_KEY" \
+            "S3_ENDPOINT=$S3_ENDPOINT" \
+            "S3_BUCKET=$S3_BUCKET" \
+            "S3_REGION=$S3_REGION" \
+            "TARGET_DB=$TARGET_DB" \
+            "TARGET_COMMIT_SHA=$TARGET_COMMIT_SHA" \
+            "WORKFLOW_RUN_ID=$WORKFLOW_RUN_ID" | ssh -i ~/.ssh/deploy_key -p "$DEPLOY_PORT" -o StrictHostKeyChecking=yes -T "${DEPLOY_USER}@${DEPLOY_HOST}" > execution_output.txt
 
           # Extrair a evidência estruturada da saída capturada
           sed -n '/<<<WITIQUETAS_BACKUP_EVIDENCE_JSON>>>/,/<<<END_WITIQUETAS_BACKUP_EVIDENCE_JSON>>>/p' execution_output.txt |             grep -v '<<<.*WITIQUETAS_BACKUP_EVIDENCE_JSON>>>' > "./backup_evidence_${{ github.sha }}.json"

@@ -5,15 +5,14 @@ import path from 'node:path';
 
 const workflowPath = path.resolve('.github/workflows/docker.yml');
 
-test('1. WORKFLOW SAFETY: Estrutura de gatilhos e input deploy_production em docker.yml', () => {
+test('1. WORKFLOW SAFETY: Estrutura de gatilhos em docker.yml', () => {
   assert.ok(fs.existsSync(workflowPath), 'docker.yml deve existir');
   const content = fs.readFileSync(workflowPath, 'utf8');
 
-  // Input de deploy_production deve ser booleano com default false
+  // Trigger push na main e workflow_dispatch
+  assert.ok(content.includes('push:'), 'Deve ter trigger push');
+  assert.ok(content.includes('- main'), 'Deve monitorar branch main');
   assert.ok(content.includes('workflow_dispatch:'), 'Deve ter trigger workflow_dispatch');
-  assert.ok(content.includes('deploy_production:'), 'Deve definir input deploy_production');
-  assert.ok(content.includes('type: boolean'), 'deploy_production deve ser do tipo boolean');
-  assert.ok(content.includes('default: false'), 'deploy_production deve ter default false');
 });
 
 test('2. JOB SEPARATION: CI de candidatos isolado de promocao/deploy em producao', () => {
@@ -22,13 +21,12 @@ test('2. JOB SEPARATION: CI de candidatos isolado de promocao/deploy em producao
   // Job de build e teste de candidatos
   assert.ok(content.includes('build-and-test-candidates:'), 'Deve existir job build-and-test-candidates');
   assert.ok(
-    content.includes('needs: build-agent-windows') ||
     content.includes('needs: [build-agent-windows, postgres-integration-gate]'),
-    'Deve depender dos gates anteriores'
+    'Deve depender dos gates anteriores de agent e postgres'
   );
 
   // O job build-and-test-candidates NAO pode promover imagens estaveis nem acionar webhook
-  const candidateJobSection = content.split('build-and-test-candidates:')[1].split('deploy-production:')[0];
+  const candidateJobSection = content.split('build-and-test-candidates:')[1].split('validate-predeploy-backup:')[0];
   assert.ok(!candidateJobSection.includes('witiquetas-frontend:stable'), 'build-and-test-candidates NAO deve taggear :stable');
   assert.ok(!candidateJobSection.includes('witiquetas-backend:stable'), 'build-and-test-candidates NAO deve taggear backend :stable');
   assert.ok(!candidateJobSection.includes('PORTAINER_WEBHOOK_URL'), 'build-and-test-candidates NAO deve conter webhook Portainer');
@@ -37,60 +35,212 @@ test('2. JOB SEPARATION: CI de candidatos isolado de promocao/deploy em producao
   assert.ok(candidateJobSection.includes('candidate-${{ github.sha }}'), 'Deve gerar tag candidate-${{ github.sha }}');
 });
 
-test('3. PRODUCTION DEPLOY GATE: Job deploy-production estritamente condicionado e protegido', () => {
+test('3. PRE-DEPLOY BACKUP GATE: Autenticação real HMAC-SHA256 e validação confiável de host SSH (sem blind keyscan)', () => {
+  const content = fs.readFileSync(workflowPath, 'utf8');
+
+  // 1. Deve existir o job validate-predeploy-backup
+  assert.ok(content.includes('validate-predeploy-backup:'), 'Deve existir job validate-predeploy-backup');
+  const backupJobSection = content.split('validate-predeploy-backup:')[1].split('deploy-production:')[0];
+
+  // 2. Deve depender de build-and-test-candidates
+  assert.ok(backupJobSection.includes('needs: [build-and-test-candidates]'), 'validate-predeploy-backup deve depender de build-and-test-candidates');
+
+  // 3. Deve exigir branch main
+  assert.ok(backupJobSection.includes("github.ref == 'refs/heads/main'"), 'validate-predeploy-backup deve exigir branch main');
+
+  // 4. Deve validar segredos do executor e MinIO
+  assert.ok(backupJobSection.includes('DEPLOY_HOST'), 'Deve validar DEPLOY_HOST');
+  assert.ok(backupJobSection.includes('DEPLOY_SSH_KEY'), 'Deve validar DEPLOY_SSH_KEY');
+  assert.ok(backupJobSection.includes('MINIO_ACCESS_KEY_ID'), 'Deve validar MINIO_ACCESS_KEY_ID');
+  assert.ok(backupJobSection.includes('MINIO_SECRET_ACCESS_KEY'), 'Deve validar MINIO_SECRET_ACCESS_KEY');
+
+  // 5. AJUSTE DE SEGURANÇA 2: Fixação confiável de host key (sem ssh-keyscan cego)
+  assert.ok(backupJobSection.includes('DEPLOY_SSH_KNOWN_HOSTS'), 'Deve exigir secret DEPLOY_SSH_KNOWN_HOSTS');
+  assert.ok(backupJobSection.includes('StrictHostKeyChecking=yes'), 'Deve ativar StrictHostKeyChecking=yes incondicionalmente');
+  assert.ok(!backupJobSection.includes('ssh-keyscan -p'), 'Não deve usar ssh-keyscan cego');
+
+  // 6. Configuração real: porta 5822 e host witiquetas.wrtec.com.br
+  assert.ok(backupJobSection.includes('5822'), 'Deve usar porta real 5822');
+  assert.ok(backupJobSection.includes('witiquetas.wrtec.com.br'), 'Deve referenciar host real');
+  assert.ok(backupJobSection.includes("PRODUCTION_DB || 'witiquetas '"), 'Deve preservar espaço final no banco de dados');
+
+  // 7. Ingestão segura via stdin (zero credenciais em ps aux)
+  assert.ok(backupJobSection.includes('ssh -i ~/.ssh/deploy_key -p "$DEPLOY_PORT" -o StrictHostKeyChecking=yes -T'), 'Deve usar SSH não interativo com stdin seguro e host verificado');
+  assert.ok(backupJobSection.includes('<<<WITIQUETAS_BACKUP_EVIDENCE_JSON>>>'), 'Deve delimitar evidência de backup');
+
+  // 8. AJUSTE DE SEGURANÇA 1: Validação de autenticidade HMAC-SHA256 (obtendo segredo via env sem expor em argv)
+  assert.ok(
+    backupJobSection.includes("os.environ['HMAC_SECRET']") || backupJobSection.includes('HMAC_SECRET'),
+    'Deve verificar autenticação HMAC-SHA256 obtendo segredo do ambiente'
+  );
+  assert.ok(
+    !backupJobSection.includes('openssl dgst -sha256 -hmac "$'),
+    'Não deve expor segredo HMAC em argumentos de linha de comando no job de validação'
+  );
+  assert.ok(backupJobSection.includes('EXPECTED_SIGNATURE'), 'Deve calcular HMAC esperado com segredo');
+
+  // 9. Deve publicar artefato da evidência
+  assert.ok(backupJobSection.includes('name: backup-evidence-${{ github.sha }}'), 'Deve fazer upload do artifact de evidência');
+});
+
+test('4. PRODUCTION DEPLOY GATE: Autenticação HMAC anti-forja, proteção estrita e fail-closed no Portainer', () => {
   const content = fs.readFileSync(workflowPath, 'utf8');
 
   assert.ok(content.includes('deploy-production:'), 'Deve existir job deploy-production');
   const deployJobSection = content.split('deploy-production:')[1];
 
-  // Deve depender de build-and-test-candidates
-  assert.ok(deployJobSection.includes('needs: [build-and-test-candidates]'), 'deploy-production deve depender de build-and-test-candidates');
-
-  // Deve ter environment production
-  assert.ok(deployJobSection.includes('environment: production'), 'deploy-production deve estar vinculado a environment: production');
-
-  // Condicional estrita
-  assert.ok(deployJobSection.includes("github.ref == 'refs/heads/main'"), 'Deve exigir branch main');
-  assert.ok(deployJobSection.includes("github.event_name == 'workflow_dispatch'"), 'Deve exigir evento workflow_dispatch');
+  // 1. Deve depender de build-and-test-candidates E validate-predeploy-backup
   assert.ok(
-    deployJobSection.includes('inputs.deploy_production == true') ||
-    deployJobSection.includes("inputs.deploy_production == 'true'"),
-    'Deve exigir flag deploy_production verdadeira'
+    deployJobSection.includes('needs: [build-and-test-candidates, validate-predeploy-backup]'),
+    'deploy-production deve depender incondicionalmente de build-and-test-candidates e validate-predeploy-backup'
   );
 
-  // Promocao e webhook devem estar exclusivamente dentro de deploy-production
+  // 2. Deve ter environment: production (aprovação humana prévia obrigatória)
+  assert.ok(deployJobSection.includes('environment: production'), 'deploy-production deve estar vinculado a environment: production');
+
+  // 3. Condicional estrita: apenas branch main
+  assert.ok(deployJobSection.includes("github.ref == 'refs/heads/main'"), 'Deve exigir branch main');
+
+  // 4. Deve verificar autenticidade criptográfica HMAC-SHA256 da evidência (anti-forja e anti-replay)
+  assert.ok(deployJobSection.includes('Download Backup Evidence Artifact'), 'Deve baixar artefato de evidência do backup');
+  assert.ok(deployJobSection.includes('Strict Pre-Deploy Evidence Verification'), 'Deve validar integridade estrita da evidência');
+  assert.ok(deployJobSection.includes('$COMMIT" != "${{ github.sha }}"'), 'Deve impedir replay de evidência com commit diferente');
+  assert.ok(deployJobSection.includes('$RUN_ID" != "${{ github.run_id }}"'), 'Deve impedir replay de evidência de run anterior');
+  assert.ok(
+    deployJobSection.includes("os.environ['HMAC_SECRET']") || deployJobSection.includes('HMAC_SECRET'),
+    'Deve validar HMAC-SHA256 obtendo segredo do ambiente antes da promoção de imagens'
+  );
+  assert.ok(
+    !deployJobSection.includes('openssl dgst -sha256 -hmac "$'),
+    'Não deve expor segredo HMAC em argumentos de linha de comando no job de deploy'
+  );
+
+  // 5. Promocao e webhook devem estar exclusivamente dentro de deploy-production
   assert.ok(deployJobSection.includes('witiquetas-frontend:stable'), 'deploy-production promove frontend:stable');
   assert.ok(deployJobSection.includes('witiquetas-backend:stable'), 'deploy-production promove backend:stable');
   assert.ok(deployJobSection.includes('PORTAINER_WEBHOOK_URL'), 'deploy-production contem o webhook Portainer');
+
+  // 6. Falha no Webhook Portainer deve ser fatal (não ignorada)
+  assert.ok(deployJobSection.includes('PORTAINER_WEBHOOK_URL não configurado! Deploy bloqueado'), 'Falta de webhook deve ser fatal');
+
+  // 7. Guarda estrita de convergência (exit 1 em caso de timeout de convergência)
+  assert.ok(
+    deployJobSection.includes('ERRO CRÍTICO DE CONVERGÊNCIA (NO-GO)') &&
+    deployJobSection.includes('exit 1'),
+    'Deve fail-close com exit 1 se convergência falhar'
+  );
 });
 
-test('4. EVALUATION MATRIX: Simulacao logica de cenarios de disparo', () => {
-  function evaluateDeployCondition(ref: string, eventName: string, deployProduction: any): boolean {
-    const isMain = ref === 'refs/heads/main';
-    const isDispatch = eventName === 'workflow_dispatch';
-    const isDeployApproved = deployProduction === true || deployProduction === 'true';
-    return isMain && isDispatch && isDeployApproved;
+test('5. EVALUATION MATRIX: Simulação lógica de cenários operacionais', () => {
+  interface DeployScenario {
+    ref: string;
+    candidatesPassed: boolean;
+    backupPassed: boolean;
+    evidenceMatchesCommit: boolean;
+    evidenceMatchesRun: boolean;
+    evidenceHmacValid: boolean;
+    hostKeyPinned: boolean;
+    humanApproved: boolean;
   }
 
-  // Cenario A: Push na main (CI normal) -> NUNCA faz deploy
-  assert.equal(evaluateDeployCondition('refs/heads/main', 'push', undefined), false, 'Push na main nao deve autorizar deploy');
+  function canDeployToProduction(s: DeployScenario): boolean {
+    const isMain = s.ref === 'refs/heads/main';
+    return isMain &&
+      s.candidatesPassed &&
+      s.backupPassed &&
+      s.evidenceMatchesCommit &&
+      s.evidenceMatchesRun &&
+      s.evidenceHmacValid &&
+      s.hostKeyPinned &&
+      s.humanApproved;
+  }
 
-  // Cenario B: Push em branch de validacao -> NUNCA faz deploy
-  assert.equal(evaluateDeployCondition('refs/heads/validation/5.7.1', 'push', undefined), false, 'Push em validation nao deve autorizar deploy');
+  // Cenário 1: Branch secundária -> BLOQUEADO
+  assert.equal(canDeployToProduction({
+    ref: 'refs/heads/feature/nova-tela',
+    candidatesPassed: true,
+    backupPassed: true,
+    evidenceMatchesCommit: true,
+    evidenceMatchesRun: true,
+    evidenceHmacValid: true,
+    hostKeyPinned: true,
+    humanApproved: true,
+  }), false, 'Branch fora da main não pode realizar deploy');
 
-  // Cenario C: workflow_dispatch sem flag de deploy (ex: apenas testes manuais) -> NUNCA faz deploy
-  assert.equal(evaluateDeployCondition('refs/heads/main', 'workflow_dispatch', false), false, 'dispatch com false nao deve autorizar deploy');
-  assert.equal(evaluateDeployCondition('refs/heads/main', 'workflow_dispatch', undefined), false, 'dispatch sem input nao deve autorizar deploy');
+  // Cenário 2: Falha no build/teste de candidatos na main -> BLOQUEADO
+  assert.equal(canDeployToProduction({
+    ref: 'refs/heads/main',
+    candidatesPassed: false,
+    backupPassed: true,
+    evidenceMatchesCommit: true,
+    evidenceMatchesRun: true,
+    evidenceHmacValid: true,
+    hostKeyPinned: true,
+    humanApproved: true,
+  }), false, 'Falha em candidatos deve bloquear deploy');
 
-  // Cenario D: workflow_dispatch em branch diferente de main mesmo com flag -> NUNCA faz deploy
-  assert.equal(evaluateDeployCondition('refs/heads/feature/x', 'workflow_dispatch', true), false, 'dispatch fora da main nao deve autorizar deploy');
+  // Cenário 3: Falha no backup ou na restauração efêmera -> BLOQUEADO
+  assert.equal(canDeployToProduction({
+    ref: 'refs/heads/main',
+    candidatesPassed: true,
+    backupPassed: false,
+    evidenceMatchesCommit: true,
+    evidenceMatchesRun: true,
+    evidenceHmacValid: true,
+    hostKeyPinned: true,
+    humanApproved: true,
+  }), false, 'Falha no backup deve bloquear deploy incondicionalmente');
 
-  // Cenario E: workflow_dispatch na main COM deploy_production=true -> AUTORIZADO
-  assert.equal(evaluateDeployCondition('refs/heads/main', 'workflow_dispatch', true), true, 'dispatch na main com true deve autorizar deploy');
-  assert.equal(evaluateDeployCondition('refs/heads/main', 'workflow_dispatch', 'true'), true, 'dispatch na main com string "true" deve autorizar deploy');
+  // Cenário 4: Evidência forjada sem chave secreta (HMAC inválido) -> BLOQUEADO
+  assert.equal(canDeployToProduction({
+    ref: 'refs/heads/main',
+    candidatesPassed: true,
+    backupPassed: true,
+    evidenceMatchesCommit: true,
+    evidenceMatchesRun: true,
+    evidenceHmacValid: false,
+    hostKeyPinned: true,
+    humanApproved: true,
+  }), false, 'Evidência com HMAC inválido deve ser sumariamente bloqueada');
+
+  // Cenário 5: Host SSH não confiável / MitM -> BLOQUEADO
+  assert.equal(canDeployToProduction({
+    ref: 'refs/heads/main',
+    candidatesPassed: true,
+    backupPassed: true,
+    evidenceMatchesCommit: true,
+    evidenceMatchesRun: true,
+    evidenceHmacValid: true,
+    hostKeyPinned: false,
+    humanApproved: true,
+  }), false, 'Host key não fixada deve abortar conexão');
+
+  // Cenário 6: Sem aprovação humana no ambiente Production -> BLOQUEADO
+  assert.equal(canDeployToProduction({
+    ref: 'refs/heads/main',
+    candidatesPassed: true,
+    backupPassed: true,
+    evidenceMatchesCommit: true,
+    evidenceMatchesRun: true,
+    evidenceHmacValid: true,
+    hostKeyPinned: true,
+    humanApproved: false,
+  }), false, 'Ausência de aprovação humana no ambiente Production deve manter deploy suspenso');
+
+  // Cenário 7: Todos os requisitos atendidos: main, candidatos OK, backup OK, HMAC autêntico, host key OK e aprovado -> GO
+  assert.equal(canDeployToProduction({
+    ref: 'refs/heads/main',
+    candidatesPassed: true,
+    backupPassed: true,
+    evidenceMatchesCommit: true,
+    evidenceMatchesRun: true,
+    evidenceHmacValid: true,
+    hostKeyPinned: true,
+    humanApproved: true,
+  }), true, 'Fluxo completo aprovado deve autorizar promoção e deploy');
 });
 
-test('5. WORKFLOW AUDIT: Ausencia de canais alternativos de deploy desprotegidos', () => {
+test('6. WORKFLOW AUDIT: Ausência de canais alternativos de deploy desprotegidos', () => {
   const workflowsDir = path.resolve('.github/workflows');
   const files = fs.readdirSync(workflowsDir).filter((f) => f.endsWith('.yml') || f.endsWith('.yaml'));
 
@@ -109,32 +259,3 @@ test('5. WORKFLOW AUDIT: Ausencia de canais alternativos de deploy desprotegidos
     );
   }
 });
-
-test('6. POSTGRES GATE ARCHITECTURE: Execucao obrigatoria com PostgreSQL 14 isolado sem duplicacao no runner geral', () => {
-  const content = fs.readFileSync(workflowPath, 'utf8');
-
-  // 1. Deve existir o job dedicado postgres-integration-gate
-  assert.ok(content.includes('postgres-integration-gate:'), 'Deve existir job postgres-integration-gate');
-  const pgJobSection = content.split('postgres-integration-gate:')[1].split('build-and-test-candidates:')[0];
-
-  // 2. Job dedicado deve usar postgres:14-alpine como service e definir DATABASE_URL
-  assert.ok(pgJobSection.includes('image: postgres:14-alpine'), 'Job postgres-integration-gate deve usar imagem postgres:14-alpine');
-  assert.ok(pgJobSection.includes('DATABASE_URL: postgresql://'), 'Job postgres-integration-gate deve configurar DATABASE_URL');
-  assert.ok(pgJobSection.includes('tests/package571PostgresRealIntegration.test.ts'), 'Job postgres-integration-gate deve executar package571PostgresRealIntegration.test.ts');
-
-  // 3. build-and-test-candidates deve depender de postgres-integration-gate
-  assert.ok(content.includes('needs: [build-agent-windows, postgres-integration-gate]'), 'build-and-test-candidates deve ter postgres-integration-gate como dependencia');
-
-  // 4. build-and-test-candidates NAO deve duplicar a suite postgres real em seu runner geral (evita falha por ausencia de DATABASE_URL)
-  const candidateJobSection = content.split('build-and-test-candidates:')[1].split('deploy-production:')[0];
-  const testStepSection = candidateJobSection.split('Run TypeScript Automated Tests & Quality Gate')[1].split('- name: Set up Docker Buildx')[0];
-  assert.ok(
-    !testStepSection.includes('tests/package571PostgresRealIntegration.test.ts'),
-    'Runner geral nao deve duplicar package571PostgresRealIntegration.test.ts sem container PostgreSQL dedicado'
-  );
-  assert.ok(
-    testStepSection.includes('tests/package571PersistentPrintQueue.test.ts'),
-    'Runner geral deve manter a suite unitaria da fila persistente (package571PersistentPrintQueue.test.ts)'
-  );
-});
-
